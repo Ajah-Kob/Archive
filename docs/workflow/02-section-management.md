@@ -31,7 +31,7 @@ Before this workflow begins:
 ## Part A – Section Creation
 
 1. The Coordinator navigates to the **Section Management** page.
-2. The Coordinator creates a new class section by entering the required section information (e.g., academic year, section code, semester, and other required details).
+2. The Coordinator creates a new class section by entering the required section information (e.g., academic year, section code, and other required details).
 3. The system validates the entered information.
 4. The system creates the class section.
 5. The system generates a unique invitaion code for the newly created section.

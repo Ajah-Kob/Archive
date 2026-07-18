@@ -27,17 +27,11 @@ Before this workflow begins:
 # Workflow
 
 1. The Program Chair navigates to the **Coordinator Management** page.
-
 2. The system displays a list of eligible faculty members who can be assigned as coordinators.
-
 3. The Program Chair selects a faculty member.
-
 4. The Program Chair confirms the coordinator assignment.
-
 5. The system assigns the **Coordinator** role to the selected faculty member.
-
 6. The system grants the faculty member access to coordinator-exclusive features.
-
 7. The assigned coordinator may now create and manage the corresponding class section within Archive based on the academic section they handle in the institution.
 
 ---

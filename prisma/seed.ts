@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client'
+import { PrismaNeon } from '@prisma/adapter-neon'
 import bcrypt from 'bcrypt'
+import { config } from 'dotenv'
+config({ path: '.env.local' })
 
-const prisma = new PrismaClient()
+const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
+const prisma = new PrismaClient({ adapter })
 
 async function main() {
   const defaultEmail = 'admin@domain.com'

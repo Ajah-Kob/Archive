@@ -12,15 +12,12 @@ datasource db {
   provider = "postgresql"
 }
 
-model ResetPasswordToken {
-  id                          BigInt                  @id(map: "idx_30320_primary") @default(autoincrement())
-  email                       String                  @db.VarChar(191)
-  token                       String                  @unique(map: "idx_30320_resetpasswordtoken_token_key") @db.VarChar(191)
-  expires                     DateTime                @db.Timestamptz(6)
-  created_at                  DateTime                @default(now()) @db.Timestamptz(6)
+// ───────────────────────────── User ─────────────────────────────
 
-  @@unique([email, token], map: "idx_30320_resetpasswordtoken_email_token_key")
-
+enum Role {
+  SUPERADMIN
+  ADMIN
+  USER
 }
 
 model User {
@@ -39,10 +36,21 @@ model User {
   student                     Student?
   submissions                 MilestoneSubmission[]
   media                       Media[]
-    
+
   @@index([email, deletedAt])
 }
 
+model ResetPasswordToken {
+  id                          BigInt                  @id(map: "idx_30320_primary") @default(autoincrement())
+  email                       String                  @db.VarChar(191)
+  token                       String                  @unique(map: "idx_30320_resetpasswordtoken_token_key") @db.VarChar(191)
+  expires                     DateTime                @db.Timestamptz(6)
+  created_at                  DateTime                @default(now()) @db.Timestamptz(6)
+
+  @@unique([email, token], map: "idx_30320_resetpasswordtoken_email_token_key")
+}
+
+// ───────────────────────────── Faculty ─────────────────────────────
 
 model Faculty {
   id                          Int                     @id @default(autoincrement())
@@ -81,17 +89,26 @@ model Adviser {
   @@index([deletedAt])
 }
 
+// ───────────────────────────── Invitation ─────────────────────────────
+
+enum InvitationType {
+  STUDENT
+  FACULTY
+}
+
 model InvitationCode {
   id                          Int                     @id @default(autoincrement())
   code                        String                  @unique
   type                        InvitationType
-  section                     Section?                
+  section                     Section?
   expiresAt                   DateTime
   createdAt                   DateTime                @default(now())
   deletedAt                   DateTime?
 
   @@index([deletedAt])
 }
+
+// ───────────────────────────── Section & Student & Group ─────────────────────────────
 
 model Section {
   id                          Int                     @id @default(autoincrement())
@@ -132,12 +149,15 @@ model Group {
   topics                     Topic[]
   capstone                   Capstone?
   milestones                 Milestone[]
+  capstoneArchive            CapstoneArchive?
   createdAt                  DateTime                 @default(now())
   updatedAt                  DateTime                 @updatedAt
   deletedAt                  DateTime?
 
   @@index([deletedAt])
 }
+
+// ───────────────────────────── Topic & Capstone ─────────────────────────────
 
 enum TopicStatus {
   PENDING
@@ -165,6 +185,11 @@ model Topic {
   @@index([deletedAt])
 }
 
+enum CapstonePhase {
+  CAPSTONE_1
+  CAPSTONE_2
+}
+
 model Capstone {
   id                          Int                     @id @default(autoincrement())
   groupId                     Int                     @unique
@@ -183,6 +208,16 @@ model Capstone {
   @@index([deletedAt])
 }
 
+// ───────────────────────────── Milestone & Submission ─────────────────────────────
+
+enum Chapter {
+  CHAPTER_1
+  CHAPTER_2
+  CHAPTER_3
+  CHAPTER_4
+  CHAPTER_5
+}
+
 model Milestone {
   id                          Int                     @id @default(autoincrement())
   groupId                     Int
@@ -197,7 +232,7 @@ model Milestone {
   @@index([capstoneId])
 }
 
-enum SubmissionStatus{
+enum SubmissionStatus {
   PENDING
   NEED_REVISION
   APPROVED
@@ -209,7 +244,7 @@ model MilestoneSubmission {
   milestone                   Milestone               @relation(fields: [milestoneId], references: [id])
   submittedBy                 Int
   user                        User                    @relation(fields: [submittedBy], references: [id])
-  mediaId                     Int
+  mediaId                     Int                       
   media                       Media                   @relation(fields: [mediaId], references: [id])
   status                      SubmissionStatus        @default(PENDING)
   createdAt                   DateTime                @default(now())
@@ -222,6 +257,29 @@ model MilestoneSubmission {
   @@index([deletedAt])
 }
 
+// ───────────────────────────── Repository ─────────────────────────────
+
+model CapstoneArchive {
+  id                              Int                     @id @default(autoincrement())
+  groupId                         Int                     @unique
+  group                           Group                   @relation(fields: [groupId], references: [id])
+  title                           String
+  abstract                        String?
+  datePublished                   DateTime
+  favorited                       Boolean                 @default(false)
+  category                        String
+  mediaId                         Int                     @unique
+  media                           Media                   @relation(fields: [mediaId], references: [id])
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
+  deletedAt                       DateTime?
+
+  @@index([deletedAt])
+  @@index([category])
+}
+
+// ───────────────────────────── Media ─────────────────────────────
+
 model Media {
   id                          Int                     @id @default(autoincrement())
   fileName                    String
@@ -230,34 +288,10 @@ model Media {
   size                        Int
   uploadedById                Int
   uploadedBy                  User                    @relation(fields: [uploadedById], references: [id])
-  submissions                 MilestoneSubmission[]
+  milestoneSubmission         MilestoneSubmission[]
+  capstoneArchive             CapstoneArchive?
   createdAt                   DateTime                @default(now())
   deletedAt                   DateTime?
 
   @@index([deletedAt])
-}
-
-enum InvitationType {
-  STUDENT
-  FACULTY
-}
-
-enum Role {
-  SUPERADMIN
-  ADMIN
-  USER
-}
-
-
-enum CapstonePhase {
-  CAPSTONE_1
-  CAPSTONE_2
-}
-
-enum Chapter {
-  CHAPTER_1
-  CHAPTER_2
-  CHAPTER_3
-  CHAPTER_4
-  CHAPTER_5
 }

@@ -24,7 +24,7 @@ export function ModalFooter({ type }: ModalFooter) {
 
 function JoinAsStudentButton() {
   return (
-    <button className="flex-1 flex items-center justify-center gap-[8px] py-[10px] rounded-[9px] text-[13.5px] font-semibold text-white cursor-pointer disabled:opacity-50 linear-gradient(169.736deg, #707dff 0%, #5565ff 100%)">
+    <button className="flex-1 flex items-center justify-center gap-[8px] py-[10px] rounded-[9px] text-[13.5px] font-semibold text-white cursor-pointer disabled:opacity-50 bg-gradient-to-br from-red-400 to-red-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]">
       Join as Student
       <ArrowRight size={14} />
     </button>
@@ -33,7 +33,7 @@ function JoinAsStudentButton() {
 
 function JoinAsFacultyButton() {
   return (
-    <button className="flex-1 flex items-center justify-center gap-[8px] py-[10px] rounded-[9px] text-[13.5px] font-semibold text-white cursor-pointer disabled:opacity-50 linear-gradient(169.736deg, #707dff 0%, #5565ff 100%)">
+    <button className="flex-1 flex items-center justify-center gap-[8px] py-[10px] rounded-[9px] text-[13.5px] font-semibold text-white cursor-pointer disabled:opacity-50 bg-gradient-to-br from-indigo-400 to-indigo-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]">
       Join as Faculty
       <ArrowRight size={14} />
     </button>

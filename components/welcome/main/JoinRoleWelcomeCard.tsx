@@ -25,7 +25,7 @@ export function JoinAsStudentWelcomeCard() {
 
       <button
         onClick={() => setActiveModal('student')}
-        className="flex items-center justify-center gap-[7px] w-full py-[10px] rounded-[10px] text-[13.5px] font-semibold text-white cursor-pointer bg-gradient-to-br from-indigo-400 to-indigo-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]"
+        className="flex items-center justify-center gap-[7px] w-full py-[10px] rounded-[10px] text-[13.5px] font-semibold text-white cursor-pointer bg-gradient-to-br from-red-400 to-red-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]"
       >
         Join as Student
         <ArrowRight size={15} />
@@ -54,7 +54,7 @@ export function JoinAsFacultyWelcomeCard() {
 
       <button
         onClick={() => setActiveModal('faculty')}
-        className="flex items-center justify-center gap-[7px] w-full py-[10px] rounded-[10px] text-[13.5px] font-semibold text-white cursor-pointer bg-gradient-to-br from-red-400 to-red-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]"
+        className="flex items-center justify-center gap-[7px] w-full py-[10px] rounded-[10px] text-[13.5px] font-semibold text-white cursor-pointer bg-gradient-to-br from-indigo-400 to-indigo-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]"
       >
         Join as Faculty
         <ArrowRight size={15} />
@@ -62,4 +62,3 @@ export function JoinAsFacultyWelcomeCard() {
     </div>
   )
 }
-

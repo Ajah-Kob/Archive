@@ -18,7 +18,7 @@ export function InvitationCodeInput({
   return (
     <form className="flex flex-col items-start w-full pt-[22px]">
       <div className="pb-[7px]">
-        <label className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[12.5px] leading-[18.75px] text-[#3c4268] tracking-[0.125px]">
+        <label className="font-['Plus_Jakarta_Sans', sans-serif] font-bold text-[12.5px] leading-[18.75px] text-[#3c4268] tracking-[0.125px]">
           Invitation Code
         </label>
       </div>

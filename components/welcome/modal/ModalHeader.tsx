@@ -4,29 +4,29 @@ interface ModalHeader {
   type: 'student' | 'faculty'
 }
 
-const headerText = {
-  stundent: {
-    title: 'Join as Student',
-    description: 'Join as Student',
-  },
-  faculty: {
-    title: 'Join Faculty',
-    description: 'Enter the invitation code provided by the Program Chair.',
-  },
-}
-
 export function ModalHeader({ type }: ModalHeader) {
-  const headerType = headerText[type]
   const setActiveModal = useWelcomeModal((state) => state.setActiveModal)
+  const header = {
+    student: {
+      title: 'Join as Student',
+      description:
+        'Enter the invitation code provided by your coordinator to become a student and join a section.',
+    },
+    faculty: {
+      title: 'Join Faculty',
+      description:
+        'Enter the invitation code provided by the Program Chair to become a faculty member.',
+    },
+  }
 
   return (
     <>
       <div className="flex flex-col items-start w-full">
         <p className="font-['Sora',sans-serif] font-bold text-[17px] leading-[25.5px] text-[#12143a] tracking-[-0.17px]">
-          {headerType.title}
+          {header[type].title}
         </p>
-        <p className="font-medium text-[13px] leading-[20.15px] text-[#8a93b4] pt-[7px] w-full">
-          {headerType.description}
+        <p className="font-['Plus_Jakarta_Sans'] font-medium text-[13px] leading-[20.15px] text-[#8a93b4] pt-[7px] w-full">
+          {header[type].description}
         </p>
       </div>
 

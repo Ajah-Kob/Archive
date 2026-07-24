@@ -10,27 +10,24 @@ import { InvitationCode, InvitationType } from '@prisma/client'
 
 const table = 'invitationCode'
 
-// GET FACULTY INVITATION CODE — returns a valid FACULTY code.
-// If the latest code is expired, soft-deletes it and creates a new one.
+// GET FACULTY INVITATION CODE — returns the latest valid FACULTY code.
 async function getFacultyInvitationCodeData() {
+
+  'use cache'
+  cacheTag('invitation-code')
+  cacheLife('max')
+
   try {
-    let record = await prisma[table].findFirst({
+    const record = await prisma[table].findFirst({
       where: { deletedAt: null, type: 'FACULTY' as const },
       orderBy: { id: 'desc' },
     })
 
     if (!record || record.expiresAt < new Date()) {
-      if (record) {
-        const target = { id: record.id, expiresAt: record.expiresAt }
-        const res = await softDeleteInvitationCode(target)
-        console.log(res)
-      }
-
-      const res = await createInvitationCode('FACULTY')
       return {
-        success: res?.success,
-        payload: res?.payload,
-        message: res?.message,
+        success: false,
+        payload: null,
+        message: 'No valid faculty invitation code found',
       }
     }
 
@@ -44,12 +41,33 @@ async function getFacultyInvitationCodeData() {
   }
 }
 
-export async function getFacultyInvitationCode() {
+export async function copyFacultyInvitationCode() {
   // Only Program Chair can acces this server action
   /*if (!(await requireUser())) {
     return { success: false, payload: null, message: 'Not authorized' }
   }*/
-  return getFacultyInvitationCodeData()
+
+  const res = await getFacultyInvitationCodeData()
+  if (res.success && res.payload) {
+    return {
+      success: true,
+      message: 'Invitation code found',
+      payload: res.payload,
+    }
+  }
+
+  // No valid code exists — soft-delete old one (if any expired) and create new
+  const expired = await prisma[table].findFirst({
+    where: { deletedAt: null, type: 'FACULTY' as const },
+    orderBy: { id: 'desc' },
+  })
+
+  if (expired) {
+    await softDeleteInvitationCode(expired)
+  }
+
+  const created = await createInvitationCode('FACULTY')
+  return created
 }
 
 // Create invitation code
@@ -62,7 +80,7 @@ async function createInvitationCode(type: InvitationType) {
       data: { code, type, expiresAt },
     })
 
-    revalidateTag('invitation-codes', 'max')
+    revalidateTag('invitation-code', 'max')
     type === 'STUDENT' ? revalidatePath('/section') : revalidatePath('/faculty')
 
     return {
@@ -79,24 +97,11 @@ async function createInvitationCode(type: InvitationType) {
   }
 }
 
-async function softDeleteInvitationCode({
-  id,
-  expiresAt,
-}: {
-  id: number
-  expiresAt: Date
-}) {
+async function softDeleteInvitationCode(code: InvitationCode) {
   try {
-    if (!id || !expiresAt) {
-      return {
-        success: false,
-        payload: null,
-        message: 'Invitation code invalid or expired.',
-      }
-    }
-
-    const deletedInvitationCode = await prisma[table].update({
-      where: { id },
+    const { id, expiresAt } = code
+    const deleted = await prisma[table].update({
+      where: { id, expiresAt },
       data: { deletedAt: expiresAt },
     })
 
@@ -104,7 +109,7 @@ async function softDeleteInvitationCode({
 
     return {
       success: true,
-      payload: deletedInvitationCode,
+      payload: deleted,
       message: 'Invitation code deleted successfully.',
     }
   } catch {

@@ -16,11 +16,11 @@ export function InvitationCodeInput({
   const hasError = !!error
 
   return (
-    <div className="flex flex-col items-start w-full pt-[22px]">
+    <form className="flex flex-col items-start w-full pt-[22px]">
       <div className="pb-[7px]">
-        <p className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[12.5px] leading-[18.75px] text-[#3c4268] tracking-[0.125px]">
+        <label className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[12.5px] leading-[18.75px] text-[#3c4268] tracking-[0.125px]">
           Invitation Code
-        </p>
+        </label>
       </div>
       <input
         value={value}
@@ -40,6 +40,6 @@ export function InvitationCodeInput({
           </p>
         </div>
       )}
-    </div>
+    </form>
   )
 }

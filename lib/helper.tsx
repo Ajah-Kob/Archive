@@ -5,7 +5,7 @@ export function isValidEmail(email: string): boolean {
 }
 
 // Generates invitation code
-export function generateCode(length = 8): string {
+export function generateInvitationCode(length = 8): string {
   const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   let code = ''
   for (let i = 0; i < length; i++) {

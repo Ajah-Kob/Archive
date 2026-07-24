@@ -2,13 +2,16 @@
 
 import { Copy, Check } from 'lucide-react'
 import { useState } from 'react'
+import { getFacultyInvitationCode } from '@/lib/actions/invitation-code'
 
 export function CopyInviteCode() {
   const [copied, setCopied] = useState(false)
 
   async function handleCopy() {
     setCopied(true)
-    await navigator.clipboard.writeText('INVITE-ARCHIVE-2024')
+    const res = await getFacultyInvitationCode()
+    const code = res.payload.code
+    await navigator.clipboard.writeText(code)
     setTimeout(() => setCopied(false), 2000)
   }
 

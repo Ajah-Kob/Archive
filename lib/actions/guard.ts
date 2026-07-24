@@ -40,7 +40,10 @@ export async function requireCoordinator(): Promise<Session | null> {
   if (!session) return null
   const coordinatorTable = 'coordinator' as const
   const coordinator = await prisma[coordinatorTable].findFirst({
-    where: { faculty: { userId: +session.user.id, deletedAt: null }, deletedAt: null },
+    where: {
+      faculty: { userId: +session.user.id, deletedAt: null },
+      deletedAt: null,
+    },
   })
   console.log(coordinator)
   return coordinator ? session : null
@@ -52,7 +55,10 @@ export async function requireAdviser(): Promise<Session | null> {
   if (!session) return null
   const adviserTable = 'adviser' as const
   const adviser = await prisma[adviserTable].findFirst({
-    where: { faculty: { userId: +session.user.id, deletedAt: null }, deletedAt: null },
+    where: {
+      faculty: { userId: +session.user.id, deletedAt: null },
+      deletedAt: null,
+    },
   })
   console.log(adviser)
   return adviser ? session : null
@@ -74,19 +80,13 @@ export async function requireStudent(): Promise<Session | null> {
 export async function requirePanelist(): Promise<Session | null> {
   const session = await requireUser()
   if (!session) return null
-  return null //add logic later that checks if the user is panelist
-}
-
-export async function requireProgramChair(): Promise<Session | null>{
-  const session = await requireUser()
-  if (!session) return null
-  return null //add logic later that checks if the user is program chair
+  return null
 }
 
 // Strips the password hash (and any other secrets) before a user row is sent
 // to the client. Accepts a single row or an array.
 export function sanitizeUser<T extends { password?: unknown } | null>(
-  user: T
+  user: T,
 ): T {
   if (!user) return user
   const { password, ...safe } = user as Record<string, unknown>
@@ -94,7 +94,7 @@ export function sanitizeUser<T extends { password?: unknown } | null>(
 }
 
 export function sanitizeUsers<T extends { password?: unknown }>(
-  users: T[] | null | undefined
+  users: T[] | null | undefined,
 ): T[] {
   if (!users) return []
   return users.map((u) => sanitizeUser(u))

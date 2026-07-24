@@ -177,8 +177,8 @@ export async function updateStudentGroup(_prevState: any, formData: FormData) {
       },
     })
 
-    revalidateTag('students', 'max')
-    revalidateTag('groups', 'max')
+    revalidateTag('students')
+    revalidateTag('groups')
     revalidatePath('/dashboard/students')
 
     return {
@@ -221,7 +221,7 @@ export async function softDeleteStudent(id: string) {
       data: { deletedAt: new Date() },
     })
 
-    revalidateTag('students', 'max')
+    revalidateTag('students')
     revalidatePath('/dashboard/students')
 
     return {

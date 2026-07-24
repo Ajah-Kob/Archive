@@ -30,9 +30,7 @@ Before this workflow begins:
 ## Part A – Chapter Submission
 
 1. The capstone group uploads a chapter document.
-
 2. The system validates and records the submission.
-
 3. The system notifies the assigned adviser of the new submission.
 
 ---
@@ -40,11 +38,8 @@ Before this workflow begins:
 ## Part B – Document Review
 
 1. The adviser opens the submitted chapter.
-
 2. The adviser reviews the document.
-
 3. The adviser provides feedback.
-
 4. The adviser selects one of the following actions:
 
    * **Approve**
@@ -55,11 +50,8 @@ Before this workflow begins:
 ## Part C – Approval
 
 1. The adviser marks the submission as **Approved**.
-
 2. The system records the approval.
-
 3. The system notifies the capstone group.
-
 4. The group may continue working on their capstone milestones.
 
 ---
@@ -67,15 +59,10 @@ Before this workflow begins:
 ## Part D – Revision Request
 
 1. The adviser requests revisions.
-
 2. The adviser includes feedback describing the required changes.
-
 3. The system notifies the capstone group.
-
 4. The group revises the document.
-
 5. The group submits a new version.
-
 6. The workflow returns to **Part B – Document Review**.
 
 ---

@@ -34,11 +34,8 @@ Before this workflow begins:
 ## Part A – Adviser Invitation
 
 1. The Group Leader navigates to the **Adviser Management** page.
-
 2. The Group Leader selects the previously chosen faculty member from the list of available faculty members.
-
 3. The Group Leader sends an adviser invitation.
-
 4. The system notifies the selected faculty member.
 
 ---
@@ -46,15 +43,10 @@ Before this workflow begins:
 ## Part B – Adviser Response
 
 1. The faculty member reviews the adviser invitation.
-
 2. The faculty member accepts the invitation.
-
 3. The system assigns the faculty member as the group's adviser.
-
 4. Adviser-specific features become available.
-
 5. The adviser gains access to the group's milestone workspace, submissions, and progress.
-
 6. The group may begin adviser consultations and chapter submissions.
 
 ---

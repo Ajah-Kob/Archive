@@ -221,22 +221,22 @@ Form-bound actions accept `(_prevState: any, formData: FormData)`.
 
 ### user.ts — Admin CRUD
 
-| Function | Signature | Cache |
-|---|---|---|
-| `getUser(id)` | `async (id: number) => User \| null` | `'use cache'`, tag `user-${id}` |
-| `getUsers(page?, perPage?)` | `async (page?, perPage?) => { users, totalPages, ... }` | `'use cache'`, tag `users` |
-| `createUser(_prev, formData)` | mutation | revalidates tag `users` |
-| `softDeleteUser(id)` | `async (id: number)` | revalidates tag `users` |
-| `updateUser(_prev, formData)` | mutation | revalidates tag `users` |
+| Function                      | Signature                                               | Cache                           |
+|-------------------------------|---------------------------------------------------------|---------------------------------|
+| `getUser(id)`                 | `async (id: number) => User \| null`                    | `'use cache'`, tag `user-${id}` |
+| `getUsers(page?, perPage?)`   | `async (page?, perPage?) => { users, totalPages, ... }` | `'use cache'`, tag `users`      |
+| `createUser(_prev, formData)` | mutation                                                | revalidates tag `users`         |
+| `softDeleteUser(id)`          | `async (id: number)`                                    | revalidates tag `users`         |
+| `updateUser(_prev, formData)` | mutation                                                | revalidates tag `users`         |
 
 All queries filter `deletedAt: null`. `getUser` throws `NotFoundError` if no match.
 
 ### me.ts — Current user
 
-| Function | Purpose | Cache |
-|---|---|---|
-| `getMe()` | Fetch authenticated user | `react cache()` (per-request dedup) |
-| `updateMe(_prev, formData)` | Update name/email/image | mutation (client calls `update()`) |
+| Function                            | Purpose                                          | Cache                                |
+|-------------------------------------|--------------------------------------------------|--------------------------------------|
+| `getMe()`                           | Fetch authenticated user                         | `react cache()` (per-request dedup)  |
+| `updateMe(_prev, formData)`         | Update name/email/image                          | mutation (client calls `update()`)   |
 | `updateMePassword(_prev, formData)` | Verify current password, set new hash | mutation |
 
 `getMe()` uses `react cache()` — NOT `'use cache'`. It is deduplicated per HTTP request only.
@@ -253,19 +253,19 @@ export const getMe = cache(async () => {
 
 ### media.ts — File storage
 
-| Function | Purpose |
-|---|---|
+| Function                                       | Purpose                                                             |
+|------------------------------------------------|---------------------------------------------------------------------|
 | `uploadMedia(userId: number, imageFile: File)` | Uploads to Blob at `user/{userId}/{random}-{filename}`, returns URL |
-| `deleteMedia(_prev, formData)` | Deletes blob URL from formData |
+| `deleteMedia(_prev, formData)`                 | Deletes blob URL from formData                                      |
 
 Blob domain allowlisted in `next.config.ts`: `tosysoik0rjt4ojn.public.blob.vercel-storage.com`
 
 ### util.ts — Auth utilities
 
-| Function | Purpose |
-|---|---|
-| `forgotPassword(_prev, formData)` | Creates `ResetPasswordToken`, sends email via Nodemailer/Brevo |
-| `resetPassword(_prev, formData)` | Validates token, hashes new password (12 rounds), deletes used token |
+| Function                          | Purpose                                                              |
+|-----------------------------------|----------------------------------------------------------------------|
+| `forgotPassword(_prev, formData)` | Creates `ResetPasswordToken`, sends email via Nodemailer/Brevo       |
+| `resetPassword(_prev, formData)`  | Validates token, hashes new password (12 rounds), deletes used token |
 
 ---
 

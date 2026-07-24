@@ -1,7 +1,6 @@
 import { getServerSession, Session } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import prisma from '@/lib/prisma'
-import prisma from '@/lib/prisma'
 
 const ADMIN_ROLES = ['SUPERADMIN', 'ADMIN']
 

@@ -12,7 +12,7 @@ export function CopyInviteCode() {
     const res = await getFacultyInvitationCode()
     const code = res.payload.code
     await navigator.clipboard.writeText(code)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
@@ -25,9 +25,9 @@ export function CopyInviteCode() {
       }`}
     >
       {copied ? (
-        <Check className="size-[13px] text-[#059669]" />
+        <Check className="size-3.25 text-[#059669]" />
       ) : (
-        <Copy className="size-[13px] text-[#707dff]" />
+        <Copy className="size-3.25 text-[#707dff]" />
       )}
       <span
         className={`font-sans font-bold text-[13px] leading-[19.5px] ${

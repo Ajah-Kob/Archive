@@ -94,7 +94,7 @@ export function ExpandedNavLink({ pathname }: { pathname: string }) {
 
             <div>
               <span
-                className={`text-[13.5px] whitespace-nowrap ${
+                className={`text-[13px] whitespace-nowrap ${
                   isActive
                     ? 'font-bold text-[#707dff]'
                     : 'font-medium text-[#5a6382] group-hover:text-[#707dff]'

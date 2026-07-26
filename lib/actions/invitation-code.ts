@@ -5,18 +5,11 @@ import { revalidateTag, revalidatePath } from 'next/cache'
 import { cacheLife, cacheTag } from 'next/cache'
 import { generateInvitationCode } from '@/lib/helper'
 import { USERS_PER_PAGE } from '@/config/constants'
-import { requireAdmin, requireUser, requireStudent } from '@/lib/actions/guard'
 import { InvitationCode, InvitationType } from '@prisma/client'
 
 const table = 'invitationCode'
 
-// GET FACULTY INVITATION CODE — returns the latest valid FACULTY code.
 async function getFacultyInvitationCodeData() {
-
-  'use cache'
-  cacheTag('invitation-code')
-  cacheLife('max')
-
   try {
     const record = await prisma[table].findFirst({
       where: { deletedAt: null, type: 'FACULTY' as const },
@@ -70,7 +63,6 @@ export async function copyFacultyInvitationCode() {
   return created
 }
 
-// Create invitation code
 async function createInvitationCode(type: InvitationType) {
   const code = generateInvitationCode()
   const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
@@ -118,5 +110,20 @@ async function softDeleteInvitationCode(code: InvitationCode) {
       payload: null,
       message: 'Failed to delete invitation code',
     }
+  }
+}
+
+export async function validateFacultyCode(code: string) {
+  const record = await prisma.invitationCode.findFirst({
+    where: {
+      code,
+      type: 'FACULTY',
+      deletedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+  })
+  return {
+    success: !!record,
+    message: record ? 'Valid' : 'Invalid or expired code',
   }
 }

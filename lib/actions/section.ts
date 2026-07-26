@@ -87,78 +87,6 @@ export async function getSections(
   return getSectionsData(page, perPage)
 }
 
-// CREATE (admin only)
-export async function createSection(_prevState: any, formData: FormData) {
-  const session = await requireAdmin()
-  if (!session) {
-    return {
-      success: false,
-      message: 'You are not authorized to perform this action.',
-    }
-  }
-
-  const yearLevel = formData.get('yearLevel')?.toString().trim()
-  const sectionGroup = formData.get('sectionGroup')?.toString().trim()
-  const groupNumber = formData.get('groupNumber')?.toString().trim()
-
-  const errors: Record<string, string> = {}
-  if (!sectionGroup) errors.section = 'Section name is required.'
-  if (!yearLevel) errors.yearLevel = 'Year level is required.'
-  if (!groupNumber) errors.groupNumber = 'Year level is required.'
-
-  if (Object.keys(errors).length > 0) {
-    return {
-      success: false,
-      errors,
-      input: { sectionId, joinCode, coordinatorId, section, yearLevel },
-    }
-  }
-
-  const parsedCoordinatorId = parseInt(coordinatorId!)
-  if (Number.isNaN(parsedCoordinatorId)) {
-    return {
-      success: false,
-      message: 'Invalid coordinator.',
-      input: { sectionId, joinCode, coordinatorId, section, yearLevel },
-    }
-  }
-
-  try {
-    const existing = await prisma[table].findFirst({ where: { joinCode } })
-    if (existing) {
-      return {
-        success: false,
-        message: `Join code "${joinCode}" is already in use.`,
-        input: { sectionId, joinCode, coordinatorId, section, yearLevel },
-      }
-    }
-
-    const record = await prisma[table].create({
-      data: {
-        sectionId: sectionId!,
-        joinCode: joinCode!,
-        coordinatorId: parsedCoordinatorId,
-        section: section!,
-        yearLevel: yearLevel!,
-      },
-    })
-
-    revalidateTag('sections', 'max')
-    revalidatePath('/dashboard/sections')
-
-    return {
-      success: true,
-      message: 'Section created successfully',
-      payload: record,
-    }
-  } catch {
-    return {
-      success: false,
-      payload: null,
-      message: 'Failed to create section',
-    }
-  }
-}
 
 // SOFT DELETE (admin only)
 export async function softDeleteSection(id: string) {
@@ -290,7 +218,7 @@ export async function updateSection(_prevState: any, formData: FormData) {
       },
     })
 
-    revalidateTag('sections')
+    revalidateTag('sections', 'max')
     revalidatePath('/dashboard/sections')
 
     return {

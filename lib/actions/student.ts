@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma'
 import { revalidateTag, revalidatePath } from 'next/cache'
 import { cacheLife, cacheTag } from 'next/cache'
 import { USERS_PER_PAGE } from '@/config/constants'
-import { requireAdmin, requireStudent } from '@/lib/actions/guard'
+import { requireAdmin, getSession } from '@/lib/actions/guard'
 
 const table = 'student'
 
@@ -52,71 +52,63 @@ export async function getStudents(page = 1, perPage = USERS_PER_PAGE) {
   return getStudentsData(page, perPage)
 }
 
-// JOIN SECTION — user enters invitation code and adds a student record and links the section
-export async function joinStudentRole(userId: number, code: string) {
-  if (!(await requireStudent())) {
-    return {
-      success: false,
-      payload: null,
-      message: 'Only students can join a section.',
-    }
+// JOIN SECTION — validates a STUDENT invitation code and creates a student record linked to the section
+export async function joinSection(formData: FormData) {
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false, message: 'Not authenticated' }
+  }
+
+  const code = formData.get('code')?.toString().trim()
+  if (!code) {
+    return { success: false, message: 'Please enter an invitation code.' }
   }
 
   try {
-    const invitation = await prisma[table].findFirst({
-      where: { code, deletedAt: null, expiresAt: { gte: new Date() } },
+    const invitation = await prisma.invitationCode.findFirst({
+      where: {
+        code,
+        type: 'STUDENT',
+        deletedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       include: { section: true },
     })
 
     if (!invitation) {
-      return {
-        success: false,
-        payload: null,
-        message: 'Invalid or expired invitation code.',
-      }
+      return { success: false, message: 'Invalid or expired invitation code.' }
     }
 
     if (!invitation.section) {
       return {
         success: false,
-        payload: null,
         message: 'This invitation code is not linked to any section.',
       }
     }
 
-    const existing = await prisma[table].findFirst({
-      where: { userId, deletedAt: null },
+    const existing = await prisma.student.findFirst({
+      where: { userId: +session.user.id, deletedAt: null },
     })
     if (existing) {
       return {
         success: false,
-        payload: null,
         message: 'You are already enrolled in a section.',
       }
     }
 
-    const record = await prisma[table].create({
+    await prisma.student.create({
       data: {
-        userId,
+        userId: +session.user.id,
         sectionId: invitation.section.id,
-      },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-        section: { select: { id: true, section: true, yearLevel: true } },
       },
     })
 
     revalidateTag('students', 'max')
     revalidateTag('sections', 'max')
-    revalidatePath('/dashboard/students')
 
-    return {
-      success: true,
-      message: 'Successfully joined section.',
-      payload: record,
-    }
+    return { success: true, message: 'Successfully joined section.' }
   } catch {
-    return { success: false, payload: null, message: 'Failed to join section.' }
+    return { success: false, message: 'Failed to join section.' }
   }
 }
 
@@ -177,8 +169,8 @@ export async function updateStudentGroup(_prevState: any, formData: FormData) {
       },
     })
 
-    revalidateTag('students')
-    revalidateTag('groups')
+    revalidateTag('students', 'max')
+    revalidateTag('groups', 'max')
     revalidatePath('/dashboard/students')
 
     return {
@@ -221,7 +213,7 @@ export async function softDeleteStudent(id: string) {
       data: { deletedAt: new Date() },
     })
 
-    revalidateTag('students')
+    revalidateTag('students', 'max')
     revalidatePath('/dashboard/students')
 
     return {

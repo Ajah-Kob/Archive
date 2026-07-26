@@ -1,11 +1,13 @@
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Loader2 } from 'lucide-react'
 import { useWelcomeModal } from '@/store/useWelcomeModal'
 
 interface ModalFooter {
   type: 'student' | 'faculty'
+  disabled?: boolean
+  isPending?: boolean
 }
 
-export function ModalFooter({ type }: ModalFooter) {
+export function ModalFooter({ type, disabled, isPending }: ModalFooter) {
   const setActiveModal = useWelcomeModal((state) => state.setActiveModal)
 
   return (
@@ -16,26 +18,36 @@ export function ModalFooter({ type }: ModalFooter) {
       >
         Cancel
       </button>
-      {type === 'student' && <JoinAsStudentButton />}
-      {type === 'faculty' && <JoinAsFacultyButton />}
+      {type === 'student' && <JoinAsStudentButton disabled={disabled} isPending={isPending} />}
+      {type === 'faculty' && <JoinAsFacultyButton disabled={disabled} isPending={isPending} />}
     </div>
   )
 }
 
-function JoinAsStudentButton() {
+function JoinAsStudentButton({ disabled, isPending }: { disabled?: boolean; isPending?: boolean }) {
   return (
-    <button className="flex-1 flex items-center justify-center gap-[8px] py-[10px] rounded-[9px] text-[13.5px] font-semibold text-white cursor-pointer disabled:opacity-50 bg-gradient-to-br from-red-400 to-red-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]">
-      Join as Student
-      <ArrowRight size={14} />
+    <button
+      type="submit"
+      form="join-section-form"
+      disabled={disabled}
+      className="flex-1 flex items-center justify-center gap-[8px] py-[11px] rounded-[9px] text-[13.5px] font-semibold text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-br from-red-400 to-red-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]"
+    >
+      {isPending ? 'Joining...' : 'Join as Student'}
+      {isPending ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
     </button>
   )
 }
 
-function JoinAsFacultyButton() {
+function JoinAsFacultyButton({ disabled, isPending }: { disabled?: boolean; isPending?: boolean }) {
   return (
-    <button className="flex-1 flex items-center justify-center gap-[8px] py-[10px] rounded-[9px] text-[13.5px] font-semibold text-white cursor-pointer disabled:opacity-50 bg-gradient-to-br from-indigo-400 to-indigo-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]">
-      Join as Faculty
-      <ArrowRight size={14} />
+    <button
+      type="submit"
+      form="join-faculty-form"
+      disabled={disabled}
+      className="flex-1 flex items-center justify-center gap-[8px] py-[11px] rounded-[9px] text-[13.5px] font-semibold text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-br from-indigo-400 to-indigo-500 shadow-[0px_4px_14px_0px_rgba(112,125,255,0.30)]"
+    >
+      {isPending ? 'Joining...' : 'Join as Faculty'}
+      {isPending ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
     </button>
   )
 }

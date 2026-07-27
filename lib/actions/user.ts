@@ -134,7 +134,7 @@ async function persistNewUser(data: { name: string; email: string; password: str
       },
     })
 
-    revalidateTag("users", "max")
+    revalidateTag("users")
     revalidatePath("/dashboard/users")
 
     return { success: true, message: "User created successfully", payload: sanitizeUser(user) }
@@ -176,7 +176,7 @@ export async function softDeleteUser(id: string) {
       data: { deletedAt: new Date() },
     })
 
-    revalidateTag("users", "max")
+    revalidateTag("users")
     revalidatePath("/dashboard/users")
 
     return { success: true, payload: sanitizeUser(user) }
@@ -242,7 +242,7 @@ export async function updateUser(_prevState: any, formData: FormData) {
       data: { name, email, role: safeRole as any, updatedAt: new Date() },
     })
 
-    revalidateTag("users", "max")
+    revalidateTag("users")
     revalidatePath("/dashboard/users")
 
     return { success: true, message: "User updated successfully.", payload: sanitizeUser(user) }

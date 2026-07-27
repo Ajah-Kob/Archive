@@ -2,7 +2,7 @@
 
 import { Copy, Check } from 'lucide-react'
 import { useState } from 'react'
-import { copyFacultyInvitationCode } from '@/lib/actions/invitation-code'
+import { copyFacultyInvitationCode } from '@/lib/actions/join-code'
 
 export function CopyInviteCode() {
   const [copied, setCopied] = useState(false)

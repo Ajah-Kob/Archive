@@ -3,13 +3,13 @@
 import prisma from '@/lib/prisma'
 import { revalidateTag, revalidatePath } from 'next/cache'
 import { cacheLife, cacheTag } from 'next/cache'
-import { generateInvitationCode } from '@/lib/helper'
+import { generateJoinCode } from '@/lib/helper'
 import { USERS_PER_PAGE } from '@/config/constants'
 import { InvitationCode, InvitationType } from '@prisma/client'
 
-const table = 'invitationCode'
+const table = 'joinCode'
 
-async function getFacultyInvitationCodeData() {
+async function getFacultyJoinCodeData() {
   try {
     const record = await prisma[table].findFirst({
       where: { deletedAt: null, type: 'FACULTY' as const },
@@ -34,13 +34,13 @@ async function getFacultyInvitationCodeData() {
   }
 }
 
-export async function copyFacultyInvitationCode() {
+export async function copyFacultyJoinCode() {
   // Only Program Chair can acces this server action
   /*if (!(await requireUser())) {
     return { success: false, payload: null, message: 'Not authorized' }
   }*/
 
-  const res = await getFacultyInvitationCodeData()
+  const res = await getFacultyJoinCodeData()
   if (res.success && res.payload) {
     return {
       success: true,
@@ -56,15 +56,15 @@ export async function copyFacultyInvitationCode() {
   })
 
   if (expired) {
-    await softDeleteInvitationCode(expired)
+    await softDeleteJoinCode(expired)
   }
 
-  const created = await createInvitationCode('FACULTY')
+  const created = await createJoinCode('FACULTY')
   return created
 }
 
-async function createInvitationCode(type: InvitationType) {
-  const code = generateInvitationCode()
+async function createJoinCode(type: InvitationType) {
+  const code = generateJoinCode()
   const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
 
   try {
@@ -72,7 +72,7 @@ async function createInvitationCode(type: InvitationType) {
       data: { code, type, expiresAt },
     })
 
-    revalidateTag('invitation-code', 'max')
+    revalidateTag('join-code', 'max')
     type === 'STUDENT' ? revalidatePath('/section') : revalidatePath('/faculty')
 
     return {
@@ -89,7 +89,7 @@ async function createInvitationCode(type: InvitationType) {
   }
 }
 
-async function softDeleteInvitationCode(code: InvitationCode) {
+async function softDeleteJoinCode(code: InvitationCode) {
   try {
     const { id, expiresAt } = code
     const deleted = await prisma[table].update({
@@ -97,7 +97,7 @@ async function softDeleteInvitationCode(code: InvitationCode) {
       data: { deletedAt: expiresAt },
     })
 
-    revalidateTag('invitation-codes', 'max')
+    revalidateTag('join-codes', 'max')
 
     return {
       success: true,

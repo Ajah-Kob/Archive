@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ModalHeader } from './ModalHeader'
 import { ModalFooter } from './ModalFooter'
-import { joinSection } from '@/lib/actions/student'
+import { joinSection } from '@/lib/actions/sections'
 import { TriangleAlert } from 'lucide-react'
 import { useWelcomeModal } from '@/store/useWelcomeModal'
 
@@ -39,7 +39,11 @@ export function JoinSectionModal() {
       <div className="relative bg-white border border-[#eceef8] rounded-[16px] w-[420px] p-[29px] shadow-[0px_24px_64px_0px_rgba(16,20,58,0.16),0px_4px_16px_0px_rgba(0,0,0,0.06)] flex flex-col items-start">
         <ModalHeader type="student" />
 
-        <form id="join-section-form" onSubmit={handleSubmit} className="flex flex-col items-start w-full pt-[22px]">
+        <form
+          id="join-section-form"
+          onSubmit={handleSubmit}
+          className="flex flex-col items-start w-full pt-[22px]"
+        >
           <div className="pb-[7px]">
             <label className="font-['Plus_Jakarta_Sans', sans-serif] font-bold text-[12.5px] leading-[18.75px] text-[#3c4268] tracking-[0.125px]">
               Invitation Code

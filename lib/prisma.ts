@@ -1,9 +1,11 @@
-import { PrismaClient } from "@prisma/client"
-import { PrismaNeon } from "@prisma/adapter-neon"
+import { PrismaClient } from '@prisma/client'
+import { PrismaNeon } from '@prisma/adapter-neon'
 
 const prismaClientSingleton = () => {
-  const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
-  return new PrismaClient({ adapter })
+  const adapter = new PrismaNeon({
+    connectionString: process.env.DATABASE_URL!,
+  })
+  return new PrismaClient({ adapter, log: ['query'] })
 }
 
 type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>

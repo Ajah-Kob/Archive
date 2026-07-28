@@ -7,6 +7,7 @@ import { FacultyList } from '@/components/faculty/FacultyList'
 export default async function FacultyPage() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/login')
+  
   return (
     <section className="bg-[#f4f6ff] min-h-full flex flex-col gap-3 pt-[30px] px-[30px]">
       <div className="flex gap-[6px] items-center h-[18px]">

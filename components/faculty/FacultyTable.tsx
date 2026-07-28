@@ -1,8 +1,6 @@
 'use client'
 
-import { useState } from 'react'
 import { UserProfile } from '@/components/ui/UserProfile'
-import { ActionButton } from '@/components/ui/ActionButton'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { ActivityStatus } from '../ui/ActivityStatus'
 import { Workload } from './Workload'
@@ -22,8 +20,6 @@ interface FacultyTableProps {
 }
 
 export function FacultyTable({ faculty }: FacultyTableProps) {
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-
   return (
     <div className="w-full">
       <div className="flex bg-[#fafbff] border-b border-[#f0f2fa]">
@@ -64,24 +60,12 @@ export function FacultyTable({ faculty }: FacultyTableProps) {
           <div className="w-[197px]">
             <Workload current={member.workload.current} max={member.workload.max} />
           </div>
-          <div className="relative">
-            <ActionButton onClick={() => setOpenMenuId(openMenuId === member.id ? null : member.id)} />
-            {openMenuId === member.id && (
-              <div className="absolute right-0 top-full z-10 pt-1">
-                <ActionMenu
-                  onViewDetails={() => {
-                    console.log('View details:', member.id)
-                    setOpenMenuId(null)
-                  }}
-                  onRemoveFaculty={() => {
-                    console.log('Remove faculty:', member.id)
-                    setOpenMenuId(null)
-                  }}
-                  onClose={() => setOpenMenuId(null)}
-                />
-              </div>
-            )}
-          </div>
+          <ActionMenu
+            items={[
+              { label: 'View Details', onClick: () => console.log('View details:', member.id) },
+              { label: 'Remove Faculty', onClick: () => console.log('Remove faculty:', member.id), variant: 'danger' },
+            ]}
+          />
         </div>
       ))}
     </div>

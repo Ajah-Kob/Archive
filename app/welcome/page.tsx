@@ -1,16 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { WelcomeCards } from '@/components/welcome/WelcomeCards'
-import { InfoBanner } from '@/components/welcome/WelcomeBanner'
-import { WelcomeHeading } from '@/components/welcome/WelcomeHeading'
-import { JoinFacultyModal } from '@/components/welcome/JoinFacultyModal'
-import { JoinSectionModal } from '@/components/welcome/JoinSectionModal'
+import { WelcomeBanner } from '@/components/welcome/main/WelcomeBanner'
+import { WelcomeHeading } from '@/components/welcome/main/WelcomeHeading'
+import { JoinFacultyModal } from '@/components/welcome/modal/JoinFacultyModal'
+import { JoinSectionModal } from '@/components/welcome/modal/JoinSectionModal'
+import { JoinSuccessfulModal } from '@/components/welcome/modal/JoinSuccessfulModal'
+import { useWelcomeModal } from '@/store/useWelcomeModal'
+import {
+  JoinAsStudentWelcomeCard,
+  JoinAsFacultyWelcomeCard,
+} from '@/components/welcome/main/JoinRoleWelcomeCard'
 
 export default function WelcomePage() {
-  const [activeModal, setActiveModal] = useState<'faculty' | 'student' | null>(
-    null
-  )
+  const activeModal = useWelcomeModal((state) => state.activeModal)
+  const successModal = useWelcomeModal((state) => state.successModal)
 
   return (
     <div className="bg-[#f4f6ff] h-full flex flex-col items-center justify-center relative overflow-hidden">
@@ -41,19 +44,23 @@ export default function WelcomePage() {
       />
 
       <div className="relative flex flex-col items-center gap-[30px]">
-        <InfoBanner />
+        <WelcomeBanner />
         <WelcomeHeading />
-        <WelcomeCards
-          onStudentClick={() => setActiveModal('student')}
-          onFacultyClick={() => setActiveModal('faculty')}
-        />
+        <div className="flex items-center h-fit w-fit gap-[20px]">
+          <JoinAsStudentWelcomeCard />
+          <JoinAsFacultyWelcomeCard />
+        </div>
       </div>
 
       {activeModal === 'faculty' && (
-        <JoinFacultyModal onClose={() => setActiveModal(null)} />
+        <JoinFacultyModal />
       )}
       {activeModal === 'student' && (
-        <JoinSectionModal onClose={() => setActiveModal(null)} />
+        <JoinSectionModal />
+      )}
+
+      {successModal && (
+        <JoinSuccessfulModal />
       )}
     </div>
   )

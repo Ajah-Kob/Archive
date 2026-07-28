@@ -3,34 +3,24 @@
 import prisma from '@/lib/prisma'
 import { revalidateTag, revalidatePath } from 'next/cache'
 import { cacheLife, cacheTag } from 'next/cache'
-import { generateInvitationCode } from '@/lib/helper'
+import { generateJoinCode } from '@/lib/helper'
 import { USERS_PER_PAGE } from '@/config/constants'
-import { requireAdmin, requireUser, requireStudent } from '@/lib/actions/guard'
 import { InvitationCode, InvitationType } from '@prisma/client'
 
-const table = 'invitationCode'
+const table = 'joinCode'
 
-// GET FACULTY INVITATION CODE — returns a valid FACULTY code.
-// If the latest code is expired, soft-deletes it and creates a new one.
-async function getFacultyInvitationCodeData() {
+async function getFacultyJoinCodeData() {
   try {
-    let record = await prisma[table].findFirst({
+    const record = await prisma[table].findFirst({
       where: { deletedAt: null, type: 'FACULTY' as const },
       orderBy: { id: 'desc' },
     })
 
     if (!record || record.expiresAt < new Date()) {
-      if (record) {
-        const target = { id: record.id, expiresAt: record.expiresAt }
-        const res = await softDeleteInvitationCode(target)
-        console.log(res)
-      }
-
-      const res = await createInvitationCode('FACULTY')
       return {
-        success: res?.success,
-        payload: res?.payload,
-        message: res?.message,
+        success: false,
+        payload: null,
+        message: 'No valid faculty invitation code found',
       }
     }
 
@@ -44,17 +34,37 @@ async function getFacultyInvitationCodeData() {
   }
 }
 
-export async function getFacultyInvitationCode() {
+export async function copyFacultyJoinCode() {
   // Only Program Chair can acces this server action
   /*if (!(await requireUser())) {
     return { success: false, payload: null, message: 'Not authorized' }
   }*/
-  return getFacultyInvitationCodeData()
+
+  const res = await getFacultyJoinCodeData()
+  if (res.success && res.payload) {
+    return {
+      success: true,
+      message: 'Invitation code found',
+      payload: res.payload,
+    }
+  }
+
+  // No valid code exists — soft-delete old one (if any expired) and create new
+  const expired = await prisma[table].findFirst({
+    where: { deletedAt: null, type: 'FACULTY' as const },
+    orderBy: { id: 'desc' },
+  })
+
+  if (expired) {
+    await softDeleteJoinCode(expired)
+  }
+
+  const created = await createJoinCode('FACULTY')
+  return created
 }
 
-// Create invitation code
-async function createInvitationCode(type: InvitationType) {
-  const code = generateInvitationCode()
+async function createJoinCode(type: InvitationType) {
+  const code = generateJoinCode()
   const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
 
   try {
@@ -62,7 +72,7 @@ async function createInvitationCode(type: InvitationType) {
       data: { code, type, expiresAt },
     })
 
-    revalidateTag('invitation-codes', 'max')
+    revalidateTag('join-code', 'max')
     type === 'STUDENT' ? revalidatePath('/section') : revalidatePath('/faculty')
 
     return {
@@ -79,32 +89,19 @@ async function createInvitationCode(type: InvitationType) {
   }
 }
 
-async function softDeleteInvitationCode({
-  id,
-  expiresAt,
-}: {
-  id: number
-  expiresAt: Date
-}) {
+async function softDeleteJoinCode(code: InvitationCode) {
   try {
-    if (!id || !expiresAt) {
-      return {
-        success: false,
-        payload: null,
-        message: 'Invitation code invalid or expired.',
-      }
-    }
-
-    const deletedInvitationCode = await prisma[table].update({
-      where: { id },
+    const { id, expiresAt } = code
+    const deleted = await prisma[table].update({
+      where: { id, expiresAt },
       data: { deletedAt: expiresAt },
     })
 
-    revalidateTag('invitation-codes', 'max')
+    revalidateTag('join-codes', 'max')
 
     return {
       success: true,
-      payload: deletedInvitationCode,
+      payload: deleted,
       message: 'Invitation code deleted successfully.',
     }
   } catch {
@@ -113,5 +110,20 @@ async function softDeleteInvitationCode({
       payload: null,
       message: 'Failed to delete invitation code',
     }
+  }
+}
+
+export async function validateFacultyCode(code: string) {
+  const record = await prisma.invitationCode.findFirst({
+    where: {
+      code,
+      type: 'FACULTY',
+      deletedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+  })
+  return {
+    success: !!record,
+    message: record ? 'Valid' : 'Invalid or expired code',
   }
 }

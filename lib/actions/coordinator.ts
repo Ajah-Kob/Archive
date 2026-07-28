@@ -100,7 +100,7 @@ export async function addCoordinator(facultyId: number) {
     })
 
     revalidateTag('coordinators', 'max')
-    revalidatePath('/dashboard/coordinators')
+    revalidatePath('/coordinators')
 
     return {
       success: true,
@@ -157,7 +157,7 @@ export async function removeCoordinator(id: string) {
       data: { deletedAt: new Date() },
     })
 
-    revalidateTag('coordinators', 'max')
+    revalidateTag('coordinators')
     revalidatePath('/dashboard/coordinators')
 
     return {

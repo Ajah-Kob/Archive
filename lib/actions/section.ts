@@ -87,6 +87,66 @@ export async function getSections(
   return getSectionsData(page, perPage)
 }
 
+export async function joinSection(formData: FormData) {
+  const code = formData.get('code')?.toString().trim()
+  if (!code) {
+    return { success: false, message: 'Please enter an invitation code.' }
+  }
+
+  const session = await requireUser()
+  if (!session) {
+    return {
+      success: false,
+      message: 'You must be logged in to join a section.',
+    }
+  }
+
+  try {
+    const joinCode = await prisma.joinCode.findFirst({
+      where: {
+        code,
+        type: 'STUDENT',
+        deletedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      include: { section: true },
+    })
+
+    if (!joinCode) {
+      return { success: false, message: 'Invalid or expired invitation code.' }
+    }
+
+    if (!joinCode.section) {
+      return { success: false, message: 'No section is linked to this code.' }
+    }
+
+    const existingStudent = await prisma.student.findFirst({
+      where: { userId: +session.user.id, deletedAt: null },
+    })
+
+    if (existingStudent) {
+      return {
+        success: false,
+        message: 'You are already enrolled in a section.',
+      }
+    }
+
+    await prisma.student.create({
+      data: {
+        userId: +session.user.id,
+        sectionId: joinCode.section.id,
+      },
+    })
+
+    return { success: true, message: 'Successfully joined the section.' }
+  } catch (error) {
+    console.error('joinSection error:', error)
+    return {
+      success: false,
+      message: 'Something went wrong. Please try again.',
+    }
+  }
+}
 
 // SOFT DELETE (admin only)
 export async function softDeleteSection(id: string) {
@@ -135,14 +195,6 @@ export async function softDeleteSection(id: string) {
 
 // UPDATE (admin only)
 export async function updateSection(_prevState: any, formData: FormData) {
-  const session = await requireAdmin()
-  if (!session) {
-    return {
-      success: false,
-      message: 'You are not authorized to perform this action.',
-    }
-  }
-
   const id = formData.get('id')?.toString().trim()
   const sectionId = formData.get('sectionId')?.toString().trim()
   const joinCode = formData.get('joinCode')?.toString().trim()

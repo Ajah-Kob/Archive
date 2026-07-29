@@ -17,16 +17,6 @@ export default function WelcomePage() {
 
   return (
     <div className="bg-[#f4f6ff] h-full flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Dot grid background */}
-      <div
-        className="absolute size-full pointer-events-none"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle, rgba(112,125,255,0.3) 0.8px, transparent 0.8px)',
-          backgroundSize: '20px 20px',
-        }}
-      />
-
       {/* Decorative gradient blobs */}
       <div
         className="absolute left-[-200px] top-[86px] w-[750px] h-[600px] rounded-[190px] pointer-events-none"

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import {
   LayoutDashboard,
   Users,
@@ -9,6 +10,7 @@ import {
   Calendar,
   BookMarked,
   User,
+  UserPlus,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -20,6 +22,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Join', href: '/welcome', icon: UserPlus },
   { label: 'Faculty', href: '/faculty', icon: Users },
   { label: 'Milestones', href: '/milestones', icon: Flag },
   { label: 'Defense', href: '/defense', icon: Shield },
@@ -28,10 +31,20 @@ const navItems: NavItem[] = [
   { label: 'Profile', href: '/dashboard/user/profile', icon: User },
 ]
 
+const USER_ALLOWED = new Set(['/welcome', '/repository', '/dashboard/user/profile'])
+
+function useNavItems() {
+  const { data: session } = useSession()
+  const role = session?.user?.role
+  const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN'
+  return isAdmin ? navItems : navItems.filter((item) => USER_ALLOWED.has(item.href))
+}
+
 export function CollapsedNavLink({ pathname }: { pathname: string }) {
+  const items = useNavItems()
   return (
     <div className="flex flex-col gap-0.5">
-      {navItems.map((item) => {
+      {items.map((item) => {
         const isActive = pathname === item.href
         const Icon = item.icon
         return (
@@ -65,9 +78,10 @@ export function CollapsedNavLink({ pathname }: { pathname: string }) {
 }
 
 export function ExpandedNavLink({ pathname }: { pathname: string }) {
+  const items = useNavItems()
   return (
     <div className="flex flex-col gap-0.5">
-      {navItems.map((item) => {
+      {items.map((item) => {
         const isActive = pathname === item.href
         const Icon = item.icon
         return (

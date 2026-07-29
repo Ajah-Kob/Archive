@@ -71,7 +71,7 @@ export function ExpandedFooter({
           </div>
         </div>
 
-        <div className="flex flex-col gap-px w-auto">
+        <div className="flex flex-col gap-px w-auto pr-5">
           <span className="text-[13px] font-bold text-[#12143a] truncate">
             {name}
           </span>

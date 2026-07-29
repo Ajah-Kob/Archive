@@ -17,7 +17,9 @@ datasource db {
 enum Role {
   SUPERADMIN
   ADMIN
-  USER
+  FACULTY
+  STUDENT
+  GUEST
 }
 
 model User {
@@ -25,7 +27,7 @@ model User {
   name                        String
   email                       String                   @unique
   image                       String?
-  role                        Role                     @default(USER)
+  role                        Role                     @default(GUEST)
   activatedAt                 DateTime?
   createdAt                   DateTime                 @default(now())
   loggedInAt                  DateTime?                @default(now())

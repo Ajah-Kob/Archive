@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt'
 import { config } from 'dotenv'
 config({ path: '.env.local' })
 
-const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
+const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL_UNPOOLED! })
 const prisma = new PrismaClient({ adapter })
 
 async function main() {

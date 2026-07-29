@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react'
 
-export function InfoBanner() {
+export function WelcomeBanner() {
   return (
     <div className="flex items-center gap-[10px] bg-[rgba(112,124,255,0.1)] border border-[rgba(112,125,255,0.2)] rounded-[10px] px-[17px] py-[11px]">
       <Info size={14} className="text-[rgb(112,125,255)]" />

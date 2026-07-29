@@ -2,14 +2,17 @@
 
 import { Copy, Check } from 'lucide-react'
 import { useState } from 'react'
+import { copyFacultyJoinCode } from '@/lib/actions/join-code'
 
-export function CopyInviteCode() {
+export function CopyJoinCode() {
   const [copied, setCopied] = useState(false)
 
   async function handleCopy() {
     setCopied(true)
-    await navigator.clipboard.writeText('INVITE-ARCHIVE-2024')
-    setTimeout(() => setCopied(false), 2000)
+    const res = await copyFacultyJoinCode()
+    const code = res.payload.code
+    await navigator.clipboard.writeText(code)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
@@ -22,9 +25,9 @@ export function CopyInviteCode() {
       }`}
     >
       {copied ? (
-        <Check className="size-[13px] text-[#059669]" />
+        <Check className="size-3.25 text-[#059669]" />
       ) : (
-        <Copy className="size-[13px] text-[#707dff]" />
+        <Copy className="size-3.25 text-[#707dff]" />
       )}
       <span
         className={`font-sans font-bold text-[13px] leading-[19.5px] ${

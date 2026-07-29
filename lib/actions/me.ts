@@ -163,7 +163,7 @@ export async function updateMe(_prevState: User, formData: FormData) {
       data: updateData,
     })
 
-    revalidateTag('me', 'max')
+    revalidateTag('me')
 
     return {
       success: true,
@@ -260,7 +260,7 @@ export async function updateMePassword(_prevState: User, formData: FormData) {
       data: { password: hashedPassword, updatedAt: new Date() },
     })
 
-    revalidateTag('me', 'max')
+    revalidateTag('me')
 
     return {
       success: true,

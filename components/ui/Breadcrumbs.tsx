@@ -11,10 +11,12 @@ interface BreadcrumbsProps {
 
 export function Breadcrumbs({ items }: BreadcrumbsProps) {
   return (
-    <div className="flex gap-[6px] items-center h-[18px]">
+    <div className="flex gap-[6px] items-center h-[18px] mb-4">
       {items.map((item, index) => (
         <div key={index} className="flex gap-[6px] items-center">
-          {index > 0 && <ChevronRight className="size-3 text-[rgba(16,19,58,0.5)]" />}
+          {index > 0 && (
+            <ChevronRight className="size-3 text-[rgba(16,19,58,0.5)]" />
+          )}
           <span
             className={`font-sans text-[12px] leading-[18px] ${
               item.isActive

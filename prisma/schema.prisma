@@ -34,14 +34,16 @@ model User {
   updatedAt                   DateTime?                @updatedAt
   faculty                     Faculty?
   student                     Student?
-  media                       Media[]
+  templates                   Template[]
+  capstoneArchives            CapstoneArchive[]
+  milestoneSubmissions        MilestoneSubmission[]
   invitationsSent             Invitation[]            @relation("InvitationSender")
 
   @@index([email, deletedAt])
 }
 
 model ResetPasswordToken {
-  id                          BigInt                  @id(map: "idx_30320_primary") @default(autoincrement())
+  id                          Int                     @id(map: "idx_30320_primary") @default(autoincrement())
   email                       String                  @db.VarChar(191)
   token                       String                  @unique(map: "idx_30320_resetpasswordtoken_token_key") @db.VarChar(191)
   expires                     DateTime                @db.Timestamptz(6)
@@ -133,9 +135,11 @@ model Invitation {
   invitedBy   User              @relation("InvitationSender", fields: [invitedById], references: [id])
   status      InvitationStatus  @default(PENDING)
   createdAt   DateTime          @default(now())
+  deletedAt   DateTime?
 
   @@index([facultyId])
   @@index([invitedById])
+  @@index([deletedAt])
 }
 
 // ───────────────────────────── Section & Student & Group ─────────────────────────────
@@ -168,7 +172,6 @@ model Student {
   createdAt                   DateTime                @default(now())
   updatedAt                   DateTime                @updatedAt
   deletedAt                   DateTime?
-  MilestoneSubmission         MilestoneSubmission[]
 
   @@index([deletedAt])
 }
@@ -253,14 +256,18 @@ model Milestone {
   id                          Int                     @id @default(autoincrement())
   groupId                     Int
   group                       Group                   @relation(fields: [groupId], references: [id])
-  phase                       String
-  chapter                     String
+  phase                       CapstonePhase
+  chapter                     Chapter
   capstoneId                  Int
   capstone                    Capstone                @relation(fields: [capstoneId], references: [id])
   submissions                 MilestoneSubmission[]
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  deletedAt                   DateTime?
 
   @@index([groupId])
   @@index([capstoneId])
+  @@index([deletedAt])
 }
 
 enum SubmissionStatus {
@@ -275,8 +282,10 @@ model MilestoneSubmission {
   milestone                   Milestone               @relation(fields: [milestoneId], references: [id])
   submittedBy                 Int
   user                        User                    @relation(fields: [submittedBy], references: [id])
-  mediaId                     Int                       
-  media                       Media                   @relation(fields: [mediaId], references: [id])
+  fileName                    String
+  blobUrl                     String
+  mimeType                    String
+  size                        Int
   status                      SubmissionStatus        @default(PENDING)
   createdAt                   DateTime                @default(now())
   updatedAt                   DateTime                @updatedAt
@@ -284,7 +293,6 @@ model MilestoneSubmission {
 
   @@index([milestoneId])
   @@index([submittedBy])
-  @@index([mediaId])
   @@index([deletedAt])
 }
 
@@ -297,32 +305,34 @@ model CapstoneArchive {
   title                           String
   abstract                        String?
   datePublished                   DateTime
-  favorited                       Boolean                 @default(false)
-  category                        String
-  mediaId                         Int                     @unique
-  media                           Media                   @relation(fields: [mediaId], references: [id])
+  fileName                        String
+  blobUrl                         String
+  mimeType                        String
+  size                            Int
+  uploadedById                    Int
+  uploadedBy                      User                    @relation(fields: [uploadedById], references: [id])
   createdAt                       DateTime                @default(now())
   updatedAt                       DateTime                @updatedAt
   deletedAt                       DateTime?
 
   @@index([deletedAt])
-  @@index([category])
 }
 
-// ───────────────────────────── Media ─────────────────────────────
+// ───────────────────────────── Template ─────────────────────────────
 
-model Media {
-  id                          Int                     @id @default(autoincrement())
-  fileName                    String
-  blobUrl                     String
-  mimeType                    String
-  size                        Int
-  uploadedById                Int
-  uploadedBy                  User                    @relation(fields: [uploadedById], references: [id])
-  milestoneSubmission         MilestoneSubmission[]
-  capstoneArchive             CapstoneArchive?
-  createdAt                   DateTime                @default(now())
-  deletedAt                   DateTime?
+model Template {
+  id                              Int                     @id @default(autoincrement())
+  name                            String
+  fileName                        String
+  blobUrl                         String
+  mimeType                        String
+  size                            Int
+  uploadedById                    Int
+  uploadedBy                      User                    @relation(fields: [uploadedById], references: [id])
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
+  deletedAt                       DateTime?
 
   @@index([deletedAt])
+  @@index([uploadedById])
 }

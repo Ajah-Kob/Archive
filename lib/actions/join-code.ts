@@ -5,7 +5,7 @@ import { revalidateTag, revalidatePath } from 'next/cache'
 import { cacheLife, cacheTag } from 'next/cache'
 import { generateJoinCode } from '@/lib/helper'
 import { USERS_PER_PAGE } from '@/config/constants'
-import { InvitationCode, InvitationType } from '@prisma/client'
+import { JoinCode, JoinType } from '@prisma/client'
 
 const table = 'joinCode'
 
@@ -63,7 +63,7 @@ export async function copyFacultyJoinCode() {
   return created
 }
 
-async function createJoinCode(type: InvitationType) {
+async function createJoinCode(type: JoinType) {
   const code = generateJoinCode()
   const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
 
@@ -89,7 +89,7 @@ async function createJoinCode(type: InvitationType) {
   }
 }
 
-async function softDeleteJoinCode(code: InvitationCode) {
+async function softDeleteJoinCode(code: JoinCode) {
   try {
     const { id, expiresAt } = code
     const deleted = await prisma[table].update({
@@ -114,7 +114,7 @@ async function softDeleteJoinCode(code: InvitationCode) {
 }
 
 export async function validateFacultyCode(code: string) {
-  const record = await prisma.invitationCode.findFirst({
+  const record = await prisma[table].findFirst({
     where: {
       code,
       type: 'FACULTY',

@@ -2,7 +2,7 @@
 
 import { Search, ChevronDown } from 'lucide-react'
 import { FacultyTable, type FacultyMember } from './FacultyTable'
-import { CopyInviteCode } from './CopyInviteCode'
+import { CopyJoinCode } from '@/components/faculty/CopyJoinCode'
 
 const facultyData: FacultyMember[] = [
   {
@@ -10,7 +10,8 @@ const facultyData: FacultyMember[] = [
     initials: 'MS',
     name: 'Dr. Maria Santos',
     email: 'm.santos@university.edu',
-    avatarGradient: 'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)',
+    avatarGradient:
+      'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)',
     activityStatus: 'active',
     workload: { current: 2, max: 8 },
   },
@@ -19,7 +20,8 @@ const facultyData: FacultyMember[] = [
     initials: 'AS',
     name: 'Prof. Andrea Santos',
     email: 'a.santos@university.edu',
-    avatarGradient: 'linear-gradient(135deg, #10b981 0%, #059669 60%, #047857 100%)',
+    avatarGradient:
+      'linear-gradient(135deg, #10b981 0%, #059669 60%, #047857 100%)',
     activityStatus: 'active',
     workload: { current: 4, max: 8 },
   },
@@ -28,7 +30,8 @@ const facultyData: FacultyMember[] = [
     initials: 'CR',
     name: 'Dr. Carlo Reyes',
     email: 'c.reyes@university.edu',
-    avatarGradient: 'linear-gradient(135deg, #fe6f6f 0%, #f87c7c 55%, #ff9e9e 100%)',
+    avatarGradient:
+      'linear-gradient(135deg, #fe6f6f 0%, #f87c7c 55%, #ff9e9e 100%)',
     activityStatus: '2 hours ago',
     workload: { current: 8, max: 8 },
   },
@@ -37,7 +40,8 @@ const facultyData: FacultyMember[] = [
     initials: 'MT',
     name: 'Prof. Manuel Tan',
     email: 'm.tan@university.edu',
-    avatarGradient: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 55%, #0f766e 100%)',
+    avatarGradient:
+      'linear-gradient(135deg, #14b8a6 0%, #0d9488 55%, #0f766e 100%)',
     activityStatus: 'active',
     workload: { current: 5, max: 8 },
   },
@@ -46,7 +50,8 @@ const facultyData: FacultyMember[] = [
     initials: 'JL',
     name: 'Dr. Julia Lim',
     email: 'j.lim@university.edu',
-    avatarGradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 55%, #6d28d9 100%)',
+    avatarGradient:
+      'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 55%, #6d28d9 100%)',
     activityStatus: '1 hour ago',
     workload: { current: 0, max: 8 },
   },
@@ -69,7 +74,7 @@ export function FacultyList() {
           <ChevronDown className="size-[13px]" />
         </button>
         <div className="flex-1 flex justify-end">
-          <CopyInviteCode />
+          <CopyJoinCode />
         </div>
       </div>
       <FacultyTable faculty={facultyData} />

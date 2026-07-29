@@ -2,14 +2,14 @@
 
 import { Copy, Check } from 'lucide-react'
 import { useState } from 'react'
-import { copyFacultyInvitationCode } from '@/lib/actions/join-code'
+import { copyFacultyJoinCode } from '@/lib/actions/join-code'
 
-export function CopyInviteCode() {
+export function CopyJoinCode() {
   const [copied, setCopied] = useState(false)
 
   async function handleCopy() {
     setCopied(true)
-    const res = await copyFacultyInvitationCode()
+    const res = await copyFacultyJoinCode()
     const code = res.payload.code
     await navigator.clipboard.writeText(code)
     setTimeout(() => setCopied(false), 1500)

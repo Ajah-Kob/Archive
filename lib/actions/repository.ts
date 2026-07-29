@@ -150,8 +150,8 @@ export async function deleteArchive(id: number) {
       data: { deletedAt: new Date() },
     })
 
-    revalidateTag('archives')
-    revalidateTag(`archive-${id}`)
+    revalidateTag('archives', 'max')
+    revalidateTag(`archive-${id}`, 'max')
     return { success: true, message: 'Archive deleted.' }
   } catch (error) {
     console.error('Error in deleteArchive:', error)

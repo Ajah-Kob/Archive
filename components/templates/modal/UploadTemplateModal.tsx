@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, UploadCloud } from 'lucide-react'
+import { toast } from 'sonner'
 import { uploadTemplate } from '@/lib/actions/template'
 
 interface UploadTemplateModalProps {
@@ -23,13 +24,11 @@ export default function UploadTemplateModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const reset = () => {
     setSelectedFile(null)
     setIsDragging(false)
-    setError(null)
     setIsUploading(false)
   }
 
@@ -48,36 +47,31 @@ export default function UploadTemplateModal({
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setSelectedFile(e.dataTransfer.files[0])
-      setError(null)
     }
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0])
-      setError(null)
     }
   }
-
-  const [category, setCategory] = useState<string>('TEMPLATES')
 
   const handleConfirmUpload = async () => {
     if (!selectedFile) return
     setIsUploading(true)
-    setError(null)
 
     const formData = new FormData()
     formData.append('file', selectedFile)
-    formData.append('category', category)
 
     const result = await uploadTemplate(formData)
 
     if (!result.success) {
-      setError(result.message)
+      toast.error(result.message)
       setIsUploading(false)
       return
     }
 
+    toast.success('Template uploaded successfully.')
     onUploadComplete(result)
     reset()
     onClose()
@@ -151,6 +145,13 @@ export default function UploadTemplateModal({
                 {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Click or
                 drag to replace
               </p>
+              <button
+                type="button"
+                onClick={() => setSelectedFile(null)}
+                className="text-xs font-medium text-red-500 hover:text-red-600 underline mt-2"
+              >
+                Remove file
+              </button>
             </div>
           ) : (
             <div>
@@ -166,38 +167,6 @@ export default function UploadTemplateModal({
             </div>
           )}
         </div>
-
-        {/* Category selector */}
-        {selectedFile && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
-              Category
-            </label>
-            <div className="flex gap-2">
-              {['TEMPLATES', 'GUIDES', 'FORMS'].map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategory(cat)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    category === cat
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {cat.charAt(0) + cat.slice(1).toLowerCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Error message */}
-        {error && (
-          <p className="text-xs font-medium text-red-500 text-center">
-            {error}
-          </p>
-        )}
 
         {/* Modal Actions */}
         <div className="flex items-center justify-end gap-3">

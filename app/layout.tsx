@@ -33,7 +33,11 @@ export default function RootLayout({
       >
         <Providers>
           <HydrationZustand>{children}</HydrationZustand>
-          <Toaster richColors position="bottom-right" toastOptions={{ style: { fontSize: '16px' } }} />
+          <Toaster
+            richColors
+            position="top-center"
+            toastOptions={{ style: { fontSize: '16px' } }}
+          />
         </Providers>
       </body>
     </html>

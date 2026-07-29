@@ -1,36 +1,61 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Upload } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import TemplatesToolbar from '@/components/templates/main/TemplatesToolbar'
 import TemplateTable from '@/components/templates/main/TemplatesTable'
 import UploadTemplateModal from '@/components/templates/modal/UploadTemplateModal'
+import RemoveTemplateModal from '@/components/templates/modal/RemoveTemplateModal'
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
-import { getTemplates, deleteTemplate } from '@/lib/actions/template'
+import { getTemplates } from '@/lib/actions/template'
 
 export type UserRole = 'student' | 'faculty'
 
 export interface TemplateItem {
   id: number
   name: string
-  category: string
   dateUploaded: string
+  rawCreatedAt: string
   uploadedBy: string
   size: string
+  rawSize: number
   fileUrl: string
 }
 
 export default function TemplatesPage() {
   const { data: session } = useSession()
-  const userRole = (session?.user?.role as UserRole) || 'student'
+  const userRole = 'faculty'
 
   const [templates, setTemplates] = useState<TemplateItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false)
+  const [removeTarget, setRemoveTarget] = useState<TemplateItem | null>(null)
+  const [sortField, setSortField] = useState<'name' | 'date' | 'uploadedBy' | 'size'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleSort = (field: typeof sortField) => {
+    setSortDir((prev) => (sortField === field ? (prev === 'asc' ? 'desc' : 'asc') : 'desc'))
+    setSortField(field)
+  }
+
+  const sortedTemplates = useMemo(() => {
+    const sorted = [...templates]
+    sorted.sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case 'name': cmp = a.name.localeCompare(b.name); break
+        case 'date': cmp = a.rawCreatedAt.localeCompare(b.rawCreatedAt); break
+        case 'uploadedBy': cmp = a.uploadedBy.localeCompare(b.uploadedBy); break
+        case 'size': cmp = a.rawSize - b.rawSize; break
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return sorted
+  }, [templates, sortField, sortDir])
 
   const fetchTemplates = useCallback(async (search?: string) => {
     setLoading(true)
@@ -71,14 +96,11 @@ export default function TemplatesPage() {
     }
   }
 
-  const handleRemoveFile = async (file: TemplateItem) => {
-    if (!confirm(`Are you sure you want to remove ${file.name}?`)) return
-    const result = await deleteTemplate(file.id)
-    if (result.success) {
-      fetchTemplates(searchTerm)
-    } else {
-      alert(result.message)
-    }
+  const handleDownloadFile = (file: TemplateItem) => {
+    const a = document.createElement('a')
+    a.href = file.fileUrl
+    a.download = file.name
+    a.click()
   }
 
   return (
@@ -125,20 +147,25 @@ export default function TemplatesPage() {
           <TemplatesToolbar
             searchTerm={searchTerm}
             onSearchChange={(e) => setSearchTerm(e.target.value)}
+            resultCount={templates.length}
           />
 
           {/* Data Table */}
           <TemplateTable
-            templates={templates}
+            templates={sortedTemplates}
             error={loading ? null : error}
             loading={loading}
             isEmpty={!loading && templates.length === 0 && !searchTerm}
+            sortField={sortField}
+            sortDir={sortDir}
+            onSort={handleSort}
             getRowActions={(item) => [
               { label: 'View', onClick: () => handleViewFile(item) },
+              { label: 'Download', onClick: () => handleDownloadFile(item) },
               {
                 label: 'Remove',
                 variant: 'danger',
-                onClick: () => handleRemoveFile(item),
+                onClick: () => setRemoveTarget(item),
               },
             ]}
           />
@@ -153,6 +180,15 @@ export default function TemplatesPage() {
           onUploadComplete={handleUploadComplete}
         />
       )}
+
+      {/* Confirm Remove Modal */}
+      <RemoveTemplateModal
+        template={removeTarget}
+        onClose={() => {
+          setRemoveTarget(null)
+          fetchTemplates(searchTerm)
+        }}
+      />
     </>
   )
 }

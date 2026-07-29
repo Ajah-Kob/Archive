@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidateTag } from 'next/cache'
-import { put, del } from '@vercel/blob'
+import { put } from '@vercel/blob'
 import prisma from '@/lib/prisma'
 import { requireUser } from '@/lib/actions/guard'
 
@@ -30,14 +30,15 @@ export async function getTemplates(search?: string) {
     return templates.map((t) => ({
       id: t.id,
       name: t.name,
-      category: t.category,
       dateUploaded: t.createdAt.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
       }),
+      rawCreatedAt: t.createdAt.toISOString(),
       uploadedBy: t.uploadedBy.name,
       size: `${(t.size / (1024 * 1024)).toFixed(1)} MB`,
+      rawSize: t.size,
       fileUrl: t.blobUrl,
     }))
   } catch (error) {
@@ -53,16 +54,23 @@ export async function uploadTemplate(formData: FormData) {
   }
 
   const file = formData.get('file') as File
-  const category = (formData.get('category')?.toString().trim() || 'TEMPLATES') as 'TEMPLATES' | 'GUIDES' | 'FORMS'
 
   if (!file || file.size === 0) {
     return { success: false, payload: null, message: 'No file provided.' }
   }
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return { success: false, payload: null, message: 'Unsupported file type. Only PDF, DOC, DOCX allowed.' }
+    return {
+      success: false,
+      payload: null,
+      message: 'Unsupported file type. Only PDF, DOC, DOCX allowed.',
+    }
   }
   if (file.size > MAX_SIZE_BYTES) {
-    return { success: false, payload: null, message: 'File too large (max 10MB).' }
+    return {
+      success: false,
+      payload: null,
+      message: 'File too large (max 10MB).',
+    }
   }
 
   try {
@@ -75,10 +83,9 @@ export async function uploadTemplate(formData: FormData) {
       addRandomSuffix: true,
     })
 
-    const template = await (prisma[table] as any).create({
+    const template = await prisma.template.create({
       data: {
         name: file.name,
-        category,
         fileName: file.name,
         blobUrl: blob.url,
         mimeType: file.type,
@@ -87,11 +94,16 @@ export async function uploadTemplate(formData: FormData) {
       },
     })
 
-    revalidateTag('templates')
+    revalidateTag('templates', 'max')
 
     return {
       success: true,
-      payload: { id: template.id, url: blob.url, size: file.size, name: file.name },
+      payload: {
+        id: template.id,
+        url: blob.url,
+        size: file.size,
+        name: file.name,
+      },
       message: 'Template uploaded successfully.',
     }
   } catch (error) {
@@ -107,7 +119,7 @@ export async function deleteTemplate(id: number) {
   }
 
   try {
-    const template = await (prisma[table] as any).findFirst({
+    const template = await prisma.template.findFirst({
       where: { id, deletedAt: null },
     })
 
@@ -115,14 +127,16 @@ export async function deleteTemplate(id: number) {
       return { success: false, message: 'Template not found.' }
     }
 
-    await del(template.blobUrl)
+    if (+session.user.id !== template.uploadedById) {
+      return { success: false, message: 'You can only remove documents you have uploaded.' }
+    }
 
-    await (prisma[table] as any).update({
+    await prisma.template.update({
       where: { id },
       data: { deletedAt: new Date() },
     })
 
-    revalidateTag('templates')
+    revalidateTag('templates', 'max')
     return { success: true, message: 'Template deleted.' }
   } catch (error) {
     console.error('Error in deleteTemplate:', error)

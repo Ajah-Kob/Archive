@@ -1,17 +1,19 @@
 'use client'
 
-import { AlertCircle, FolderOpen, Loader2 } from 'lucide-react'
+import { AlertCircle, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react'
 import { FileIcon } from '@/components/ui/FileIcon'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ActionMenu, type ActionItem } from '@/components/ui/ActionMenu'
+import TableSkeleton from './TableSkeleton'
 
 export interface TemplateItem {
   id: number
   name: string
-  category: string
   dateUploaded: string
+  rawCreatedAt: string
   uploadedBy: string
   size: string
+  rawSize: number
   fileUrl: string
 }
 
@@ -21,6 +23,9 @@ interface TemplateTableProps {
   loading?: boolean
   isEmpty?: boolean
   getRowActions?: (item: TemplateItem) => ActionItem[]
+  sortField?: string
+  sortDir?: 'asc' | 'desc'
+  onSort?: (field: string) => void
 }
 
 function UserAvatar({ name }: { name: string }) {
@@ -46,18 +51,12 @@ export default function TemplateTable({
   loading,
   isEmpty,
   getRowActions,
+  sortField,
+  sortDir,
+  onSort,
 }: TemplateTableProps) {
   if (loading) {
-    return (
-      <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
-        <div className="flex-1 min-h-0 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 size={24} className="text-indigo-500 animate-spin" />
-            <p className="text-sm text-slate-500">Loading templates...</p>
-          </div>
-        </div>
-      </div>
-    )
+    return <TableSkeleton />
   }
 
   if (error) {
@@ -107,21 +106,49 @@ export default function TemplateTable({
     `}</style>
       <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
         {/* Header table — forced scrollbar gutter for alignment */}
-        <div className="flex-shrink-0 header-scrollbar-hidden">
+        <div className="flex-shrink-0 header-scrollbar-hidden overflow-hidden rounded-t-[14px]">
           <table className="w-full table-fixed border-collapse">
             <thead>
               <tr className="bg-[#f8f9fe] border-b border-[#eceef8]">
-                <th className="py-[15px] px-[20px] text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase text-left w-auto">
-                  NAME
+                <th className="py-[15px] px-[20px] text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase text-left w-auto cursor-pointer select-none" onClick={() => onSort?.('name')}>
+                  <span className="flex items-center gap-1">
+                    NAME
+                    {sortField === 'name' ? (
+                      sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+                    ) : (
+                      <ChevronUp size={12} className="opacity-30" />
+                    )}
+                  </span>
                 </th>
-                <th className="py-[15px] px-[20px] text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase text-left w-[148px]">
-                  DATE UPLOADED
+                <th className="py-[15px] px-[20px] text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase text-left w-[148px] cursor-pointer select-none" onClick={() => onSort?.('date')}>
+                  <span className="flex items-center gap-1">
+                    DATE UPLOADED
+                    {sortField === 'date' ? (
+                      sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+                    ) : (
+                      <ChevronUp size={12} className="opacity-30" />
+                    )}
+                  </span>
                 </th>
-                <th className="py-[15px] px-[20px] text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase text-left w-[170px]">
-                  UPLOADED BY
+                <th className="py-[15px] px-[20px] text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase text-left w-[170px] cursor-pointer select-none" onClick={() => onSort?.('uploadedBy')}>
+                  <span className="flex items-center gap-1">
+                    UPLOADED BY
+                    {sortField === 'uploadedBy' ? (
+                      sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+                    ) : (
+                      <ChevronUp size={12} className="opacity-30" />
+                    )}
+                  </span>
                 </th>
-                <th className="py-[15px] px-[20px] text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase text-left w-[90px]">
-                  SIZE
+                <th className="py-[15px] px-[20px] text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase text-left w-[90px] cursor-pointer select-none" onClick={() => onSort?.('size')}>
+                  <span className="flex items-center gap-1">
+                    SIZE
+                    {sortField === 'size' ? (
+                      sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+                    ) : (
+                      <ChevronUp size={12} className="opacity-30" />
+                    )}
+                  </span>
                 </th>
                 <th className="w-[80px]"></th>
               </tr>

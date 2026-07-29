@@ -72,7 +72,7 @@ model Coordinator {
   id                          Int                     @id @default(autoincrement())
   facultyId                   Int                     @unique
   faculty                     Faculty                 @relation(fields: [facultyId], references: [id])
-  sections                    Section[]
+  section                     Section[]
   createdAt                   DateTime                @default(now())
   updatedAt                   DateTime                @updatedAt
   deletedAt                   DateTime?

@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag } from 'next/cache'
+import { cacheLife, cacheTag, revalidatePath, revalidateTag } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import type { SectionData } from '@/components/coordinator/main/SectionDataRow'
@@ -146,13 +146,6 @@ export async function joinSection(formData: FormData) {
 
 // SOFT DELETE (admin only)
 export async function softDeleteSection(id: string) {
-  if (!(await requireAdmin())) {
-    return {
-      success: false,
-      payload: null,
-      message: 'You are not authorized to perform this action.',
-    }
-  }
 
   const targetId = parseInt(id)
   if (Number.isNaN(targetId)) {
@@ -267,7 +260,7 @@ export async function updateSection(_prevState: any, formData: FormData) {
     })
 
     revalidateTag('sections', 'max')
-    revalidatePath('/dashboard/sections')
+    revalidatePath('/sections')
 
     return {
       success: true,

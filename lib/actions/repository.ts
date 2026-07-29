@@ -159,37 +159,3 @@ export async function deleteArchive(id: number) {
   }
 }
 
-export async function toggleFavorite(id: number) {
-  const session = await requireUser()
-  if (!session) {
-    return { success: false, message: 'Not authorized.' }
-  }
-
-  try {
-    const archive = await prisma[table].findFirst({
-      where: { id, deletedAt: null },
-      select: { favorited: true },
-    })
-
-    if (!archive) {
-      return { success: false, message: 'Archive not found.' }
-    }
-
-    await prisma[table].update({
-      where: { id },
-      data: { favorited: !archive.favorited },
-    })
-
-    revalidateTag('archives', 'max')
-    revalidateTag(`archive-${id}`, 'max')
-    return {
-      success: true,
-      message: archive.favorited
-        ? 'Removed from favorites.'
-        : 'Added to favorites.',
-    }
-  } catch (error) {
-    console.error('Error in toggleFavorite:', error)
-    return { success: false, message: 'Failed to update favorite.' }
-  }
-}

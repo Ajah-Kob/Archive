@@ -32,21 +32,21 @@ Features: JWT auth (Credentials), role-based user management, soft-delete, file 
 
 ## Tech Stack (exact versions)
 
-| Layer | Package | Version |
-|---|---|---|
-| Framework | `next` | 16.2.4 |
-| React | `react` / `react-dom` | 19.2.x |
-| Auth | `next-auth` | 4.24.x |
-| ORM | `prisma` / `@prisma/client` | 7.x |
-| DB driver | `@neondatabase/serverless` | 1.x |
-| Prisma adapter | `@prisma/adapter-neon` | 7.x |
-| File storage | `@vercel/blob` | 2.x |
-| State | `zustand` | 5.x |
-| Email | `nodemailer` | 7.x |
-| Toasts | `sonner` | 2.x |
-| Icons | `lucide-react` | 1.x |
-| CSS | `tailwindcss` | 4.x (PostCSS, no config file) |
-| TypeScript | `typescript` | 6.x |
+| Layer          | Package                     | Version                       |
+| -------------- | --------------------------- | ----------------------------- |
+| Framework      | `next`                      | 16.2.4                        |
+| React          | `react` / `react-dom`       | 19.2.x                        |
+| Auth           | `next-auth`                 | 4.24.x                        |
+| ORM            | `prisma` / `@prisma/client` | 7.x                           |
+| DB driver      | `@neondatabase/serverless`  | 1.x                           |
+| Prisma adapter | `@prisma/adapter-neon`      | 7.x                           |
+| File storage   | `@vercel/blob`              | 2.x                           |
+| State          | `zustand`                   | 5.x                           |
+| Email          | `nodemailer`                | 7.x                           |
+| Toasts         | `sonner`                    | 2.x                           |
+| Icons          | `lucide-react`              | 1.x                           |
+| CSS            | `tailwindcss`               | 4.x (PostCSS, no config file) |
+| TypeScript     | `typescript`                | 6.x                           |
 
 **TypeScript strict mode is OFF** — `"strict": false` in tsconfig.
 
@@ -122,7 +122,7 @@ model User {
   name        String?
   email       String    @unique
   image       String?
-  role        Role      @default(USER)
+  role        Role      @default(GUEST)
   password    String?
   activatedAt DateTime?
   loggedInAt  DateTime?
@@ -136,7 +136,9 @@ model User {
 enum Role {
   SUPERADMIN
   ADMIN
-  USER
+  FACULTY
+  STUDENT
+  GUEST
 }
 ```
 
@@ -222,7 +224,7 @@ Form-bound actions accept `(_prevState: any, formData: FormData)`.
 ### user.ts — Admin CRUD
 
 | Function                      | Signature                                               | Cache                           |
-|-------------------------------|---------------------------------------------------------|---------------------------------|
+| ----------------------------- | ------------------------------------------------------- | ------------------------------- |
 | `getUser(id)`                 | `async (id: number) => User \| null`                    | `'use cache'`, tag `user-${id}` |
 | `getUsers(page?, perPage?)`   | `async (page?, perPage?) => { users, totalPages, ... }` | `'use cache'`, tag `users`      |
 | `createUser(_prev, formData)` | mutation                                                | revalidates tag `users`         |
@@ -233,11 +235,11 @@ All queries filter `deletedAt: null`. `getUser` throws `NotFoundError` if no mat
 
 ### me.ts — Current user
 
-| Function                            | Purpose                                          | Cache                                |
-|-------------------------------------|--------------------------------------------------|--------------------------------------|
-| `getMe()`                           | Fetch authenticated user                         | `react cache()` (per-request dedup)  |
-| `updateMe(_prev, formData)`         | Update name/email/image                          | mutation (client calls `update()`)   |
-| `updateMePassword(_prev, formData)` | Verify current password, set new hash | mutation |
+| Function                            | Purpose                               | Cache                               |
+| ----------------------------------- | ------------------------------------- | ----------------------------------- |
+| `getMe()`                           | Fetch authenticated user              | `react cache()` (per-request dedup) |
+| `updateMe(_prev, formData)`         | Update name/email/image               | mutation (client calls `update()`)  |
+| `updateMePassword(_prev, formData)` | Verify current password, set new hash | mutation                            |
 
 `getMe()` uses `react cache()` — NOT `'use cache'`. It is deduplicated per HTTP request only.
 
@@ -247,14 +249,16 @@ import { cache } from 'react'
 export const getMe = cache(async () => {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return null
-  return prisma.user.findFirst({ where: { id: session.user.id, deletedAt: null } })
+  return prisma.user.findFirst({
+    where: { id: session.user.id, deletedAt: null },
+  })
 })
 ```
 
 ### media.ts — File storage
 
 | Function                                       | Purpose                                                             |
-|------------------------------------------------|---------------------------------------------------------------------|
+| ---------------------------------------------- | ------------------------------------------------------------------- |
 | `uploadMedia(userId: number, imageFile: File)` | Uploads to Blob at `user/{userId}/{random}-{filename}`, returns URL |
 | `deleteMedia(_prev, formData)`                 | Deletes blob URL from formData                                      |
 
@@ -263,7 +267,7 @@ Blob domain allowlisted in `next.config.ts`: `tosysoik0rjt4ojn.public.blob.verce
 ### util.ts — Auth utilities
 
 | Function                          | Purpose                                                              |
-|-----------------------------------|----------------------------------------------------------------------|
+| --------------------------------- | -------------------------------------------------------------------- |
 | `forgotPassword(_prev, formData)` | Creates `ResetPasswordToken`, sends email via Nodemailer/Brevo       |
 | `resetPassword(_prev, formData)`  | Validates token, hashes new password (12 rounds), deletes used token |
 
@@ -279,7 +283,10 @@ For read queries that return list/detail data:
 
 ```typescript
 'use server'
-import { unstable_cacheTag as cacheTag, unstable_cacheLife as cacheLife } from 'next/cache'
+import {
+  unstable_cacheTag as cacheTag,
+  unstable_cacheLife as cacheLife,
+} from 'next/cache'
 
 export async function getUsers(page = 1, perPage = USERS_PER_PAGE) {
   'use cache'
@@ -314,10 +321,10 @@ export const getMe = cache(async () => { ... })
 
 Client-only UI state. Never stores server data.
 
-| Store | State | Used by |
-|---|---|---|
-| `useAside` | `minimized: boolean` + `toggleMinimized()` | Sidebar collapse |
-| `useDrawer` | `isOpen: boolean` + `open()` + `close()` | Mobile drawer |
+| Store       | State                                      | Used by          |
+| ----------- | ------------------------------------------ | ---------------- |
+| `useAside`  | `minimized: boolean` + `toggleMinimized()` | Sidebar collapse |
+| `useDrawer` | `isOpen: boolean` + `open()` + `close()`   | Mobile drawer    |
 
 Wrap components reading Zustand state in `<HydrationZustand>` (from `templates/hydrationZustand.tsx`) to prevent SSR mismatch. Dashboard layout handles this at the template level.
 
@@ -325,11 +332,11 @@ Wrap components reading Zustand state in `<HydrationZustand>` (from `templates/h
 
 ## Routing & Templates
 
-| Route | Protection | Template | Notes |
-|---|---|---|---|
-| `/` | Public | `Default` | |
-| `/login`, `/signup`, `/forgot-password`, `/reset-password` | Public (redirect if authed) | `Blank` | |
-| `/dashboard/*` | Auth required | `Dashboard` | Each page checks `getServerSession()` |
+| Route                                                      | Protection                  | Template    | Notes                                 |
+| ---------------------------------------------------------- | --------------------------- | ----------- | ------------------------------------- |
+| `/`                                                        | Public                      | `Default`   |                                       |
+| `/login`, `/signup`, `/forgot-password`, `/reset-password` | Public (redirect if authed) | `Blank`     |                                       |
+| `/dashboard/*`                                             | Auth required               | `Dashboard` | Each page checks `getServerSession()` |
 
 **No middleware.ts exists.** Do not create one. Route protection is per-page.
 
@@ -391,15 +398,15 @@ await prisma.user.findMany({
 
 All from `.env.local` (pulled via `vercel env pull .env.local`).
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | Pooled Neon — Prisma runtime |
+| Variable                | Purpose                             |
+| ----------------------- | ----------------------------------- |
+| `DATABASE_URL`          | Pooled Neon — Prisma runtime        |
 | `DATABASE_URL_UNPOOLED` | Direct Neon — Prisma CLI migrations |
-| `NEXTAUTH_SECRET` | JWT signing key |
-| `NEXTAUTH_URL` | Base URL for auth callbacks |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob API token |
-| `SMTP_HOST` | Brevo SMTP host |
-| `SMTP_KEY` | Brevo SMTP API key |
+| `NEXTAUTH_SECRET`       | JWT signing key                     |
+| `NEXTAUTH_URL`          | Base URL for auth callbacks         |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob API token               |
+| `SMTP_HOST`             | Brevo SMTP host                     |
+| `SMTP_KEY`              | Brevo SMTP API key                  |
 
 Derived constants in `config/constants.ts`: `APP_NAME`, `APP_BASE_URL`, `SMTP_FROM_NAME`, `SMTP_FROM_EMAIL`, `USERS_PER_PAGE`.
 

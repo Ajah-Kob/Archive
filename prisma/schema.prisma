@@ -60,6 +60,7 @@ model Faculty {
   id                          Int                     @id @default(autoincrement())
   userId                      Int                     @unique
   user                        User                    @relation(fields: [userId], references: [id])
+  isProgramChair              Boolean                 @default(false)
   coordinator                 Coordinator?
   adviser                     Adviser?
   invitations                 Invitation[]

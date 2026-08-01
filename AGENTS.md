@@ -114,47 +114,9 @@ types/                               # Shared TypeScript types
 
 ## Database Schema
 
-### User
+The Prisma schema at `prisma/schema.prisma` is the single source of truth for all models, relations, and enums. Read it before writing any query — do not rely on model definitions duplicated in this file.
 
-```prisma
-model User {
-  id          Int       @id @default(autoincrement())
-  name        String?
-  email       String    @unique
-  image       String?
-  role        Role      @default(GUEST)
-  password    String?
-  activatedAt DateTime?
-  loggedInAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-
-  @@index([email, deletedAt])
-}
-
-enum Role {
-  SUPERADMIN
-  ADMIN
-  FACULTY
-  STUDENT
-  GUEST
-}
-```
-
-### ResetPasswordToken
-
-```prisma
-model ResetPasswordToken {
-  id         Int      @id @default(autoincrement())
-  email      String
-  token      String   @unique
-  expires    DateTime
-  created_at DateTime @default(now())
-
-  @@unique([email, token])
-}
-```
+Current models: `User`, `ResetPasswordToken`, `Faculty`, `Coordinator`, `Adviser`, `JoinCode`, `Invitation`, `Section`, `Student`, `Group`, `Topic`, `Capstone`, `Milestone`, `MilestoneSubmission`, `CapstoneArchive`, `Template`.
 
 ### Critical conventions
 

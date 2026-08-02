@@ -1,18 +1,32 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag } from 'next/cache'
-import { getSession } from '@/lib/actions/guard'
+import { getSession, requireAdminOrProgramChair, unauthorized } from '@/lib/actions/guard'
 import { validateFacultyCode } from '@/lib/actions/join-code'
+import { timeAgo } from '@/lib/helper'
+import {
+  unstable_cacheTag as cacheTag,
+  unstable_cacheLife as cacheLife,
+} from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+// A faculty member is considered "active now" if they signed in within this window.
+const ACTIVE_NOW_MS = 5 * 60 * 1000
+
+function activityStatusFor(loggedInAt: Date | null): 'active' | string {
+  if (!loggedInAt) return 'Never'
+  if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
+  return timeAgo(loggedInAt)
+}
 
 async function getAvailableFacultyData() {
-  'use cache'
-  cacheTag('faculty')
-  cacheLife('max')
-
   try {
     const faculty = await prisma.faculty.findMany({
-      where: { deletedAt: null, coordinator: null },
+      where: {
+        deletedAt: null,
+        coordinator: { isNot: { deletedAt: null } },
+        isProgramChair: false,
+      },
       include: {
         user: { select: { id: true, name: true, email: true, image: true } },
       },
@@ -31,6 +45,229 @@ async function getAvailableFacultyData() {
 
 export async function getAvailableFaculty() {
   return getAvailableFacultyData()
+}
+
+export async function getFacultyMembers() {
+  'use cache'
+  cacheTag('faculty')
+  cacheLife('max')
+
+  const faculty = await prisma.faculty.findMany({
+    where: { deletedAt: null },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          loggedInAt: true,
+        },
+      },
+      coordinator: {
+        include: {
+          _count: {
+            select: { section: { where: { deletedAt: null } } },
+          },
+        },
+      },
+      adviser: {
+        include: {
+          _count: {
+            select: { capstones: { where: { deletedAt: null } } },
+          },
+        },
+      },
+    },
+    orderBy: { id: 'asc' },
+  })
+
+  const payload = faculty.map((f) => {
+    const isAdviser = !!f.adviser && f.adviser.deletedAt === null
+    const isCoordinator = !!f.coordinator && f.coordinator.deletedAt === null
+    return {
+      id: f.id,
+      userId: f.userId,
+      name: f.user.name,
+      email: f.user.email,
+      image: f.user.image,
+      loggedInAt: f.user.loggedInAt,
+      activityStatus: activityStatusFor(f.user.loggedInAt),
+      isAdviser,
+      isCoordinator,
+      adviseeCount: isAdviser ? f.adviser._count.capstones : 0,
+      sectionsManaged: isCoordinator ? f.coordinator._count.section : 0,
+    }
+  })
+
+  return { success: true, payload }
+}
+
+export async function getFacultyMemberDetail(facultyId: number) {
+  'use cache'
+  cacheTag(`faculty-${facultyId}`)
+  cacheLife('max')
+
+  const faculty = await prisma.faculty.findFirst({
+    where: { id: facultyId, deletedAt: null },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          loggedInAt: true,
+        },
+      },
+      coordinator: {
+        include: {
+          _count: {
+            select: { section: { where: { deletedAt: null } } },
+          },
+        },
+      },
+      adviser: {
+        include: {
+          capstones: {
+            where: { deletedAt: null },
+            include: {
+              group: {
+                include: {
+                  students: {
+                    where: { deletedAt: null },
+                    include: { section: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!faculty) {
+    return { success: false, message: 'Faculty not found.' }
+  }
+
+  const isAdviser = !!faculty.adviser && faculty.adviser.deletedAt === null
+  const isCoordinator = !!faculty.coordinator && faculty.coordinator.deletedAt === null
+  const capstones = isAdviser ? faculty.adviser.capstones : []
+
+  const roles: string[] = []
+  if (isAdviser) roles.push('Adviser')
+  if (isCoordinator) roles.push('Coordinator')
+
+  const groups = capstones.map((capstone) => {
+    const liveStudents = capstone.group.students
+    const section = liveStudents[0]?.section
+    return {
+      id: capstone.group.id,
+      name: capstone.group.groupName,
+      sectionLabel: section ? `${section.section} ${section.yearLevel}` : 'No section',
+      memberCount: liveStudents.length,
+    }
+  })
+
+  return {
+    success: true,
+    payload: {
+      id: faculty.id,
+      userId: faculty.userId,
+      name: faculty.user.name,
+      email: faculty.user.email,
+      image: faculty.user.image,
+      loggedInAt: faculty.user.loggedInAt,
+      activityStatus: activityStatusFor(faculty.user.loggedInAt),
+      roles,
+      adviseeCount: capstones.length,
+      sectionsManaged: isCoordinator ? faculty.coordinator._count.section : 0,
+      groups,
+    },
+  }
+}
+
+export async function removeFaculty(facultyId: number) {
+  const session = await requireAdminOrProgramChair()
+  if (!session) return unauthorized
+
+  const faculty = await prisma.faculty.findFirst({
+    where: { id: facultyId, deletedAt: null },
+    include: {
+      coordinator: {
+        include: {
+          _count: {
+            select: { section: { where: { deletedAt: null } } },
+          },
+        },
+      },
+    },
+  })
+  if (!faculty) {
+    return { success: false, message: 'Faculty not found.' }
+  }
+
+  const adviser = await prisma.adviser.findFirst({
+    where: { facultyId, deletedAt: null },
+    include: {
+      _count: {
+        select: { capstones: { where: { deletedAt: null } } },
+      },
+    },
+  })
+
+  const adviseeCount = adviser?._count.capstones ?? 0
+  if (adviseeCount > 0) {
+    return {
+      success: false,
+      message: `Cannot remove faculty with ${adviseeCount} advisee group(s). Reassign the groups first.`,
+    }
+  }
+
+  const liveCoordinator =
+    !!faculty.coordinator && faculty.coordinator.deletedAt === null
+  const sectionCount = liveCoordinator ? faculty.coordinator._count.section : 0
+  if (sectionCount > 0) {
+    return {
+      success: false,
+      message: `Cannot remove faculty managing ${sectionCount} section(s). Reassign the sections first.`,
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.faculty.update({
+      where: { id: facultyId },
+      data: { deletedAt: new Date() },
+    }),
+    ...(adviser
+      ? [
+          prisma.adviser.update({
+            where: { id: adviser.id },
+            data: { deletedAt: new Date() },
+          }),
+        ]
+      : []),
+    ...(liveCoordinator
+      ? [
+          prisma.coordinator.update({
+            where: { id: faculty.coordinator.id },
+            data: { deletedAt: new Date() },
+          }),
+        ]
+      : []),
+    prisma.user.update({
+      where: { id: faculty.userId },
+      data: { role: 'GUEST' },
+    }),
+  ])
+
+  revalidateTag('faculty', 'max')
+  revalidateTag('coordinators', 'max')
+  revalidatePath('/faculty')
+  revalidatePath('/sections')
+
+  return { success: true, message: 'Faculty removed.' }
 }
 
 export async function joinFaculty(formData: FormData) {
@@ -59,6 +296,15 @@ export async function joinFaculty(formData: FormData) {
   await prisma.faculty.create({
     data: { userId: +session.user.id },
   })
+
+  await prisma.user.update({
+    where: { id: +session.user.id },
+    data: { role: 'FACULTY' },
+  })
+
+  revalidateTag('users', 'max')
+  revalidateTag('faculty', 'max')
+  revalidatePath('/faculty')
 
   return { success: true, message: 'Faculty registration successful.' }
 }

@@ -33,6 +33,21 @@ export async function requireAdmin(): Promise<Session | null> {
   return session
 }
 
+// Guards a server action for admins (SUPERADMIN/ADMIN) or the program chair
+// (a faculty member with isProgramChair). Checked against the DB so a change
+// of program chair takes effect without waiting for a session refresh.
+export async function requireAdminOrProgramChair(): Promise<Session | null> {
+  const session = await requireAdmin()
+  if (session) return session
+
+  const current = await getSession()
+  if (!current?.user?.id) return null
+  const programChair = await prisma.faculty.findFirst({
+    where: { userId: +current.user.id, deletedAt: null, isProgramChair: true },
+  })
+  return programChair ? current : null
+}
+
 // Guards a server action for users with a coordinator record.
 export async function requireCoordinator(): Promise<Session | null> {
   const session = await requireUser()
@@ -46,6 +61,28 @@ export async function requireCoordinator(): Promise<Session | null> {
   })
   console.log(coordinator)
   return coordinator ? session : null
+}
+
+// Guards a server action for anyone with coordinator-scoped access: admins,
+// the program chair, or a live coordinator record. Checked against the DB so
+// removed coordinators lose access without waiting for a session refresh.
+export async function requireCoordinatorAccess(): Promise<Session | null> {
+  const session = await getSession()
+  if (!session?.user?.id) return null
+  const role = (session.user.role as string) ?? ''
+  if (ADMIN_ROLES.includes(role)) return session
+
+  const faculty = await prisma.faculty.findFirst({
+    where: {
+      userId: +session.user.id,
+      deletedAt: null,
+      OR: [
+        { isProgramChair: true },
+        { coordinator: { deletedAt: null } },
+      ],
+    },
+  })
+  return faculty ? session : null
 }
 
 // Guards a server action for users with an adviser record.

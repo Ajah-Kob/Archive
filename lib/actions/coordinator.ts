@@ -2,18 +2,13 @@
 
 import prisma from '@/lib/prisma'
 import { revalidateTag, revalidatePath } from 'next/cache'
-import { cacheLife, cacheTag } from 'next/cache'
 import { USERS_PER_PAGE } from '@/config/constants'
-import { requireAdmin, requireUser } from '@/lib/actions/guard'
+import { requireAdminOrProgramChair, requireUser } from '@/lib/actions/guard'
 
 const table = 'coordinator'
 
 // GET ALL (paginated)
 async function getCoordinatorsData(page: number, perPage: number) {
-  'use cache'
-  cacheTag('coordinators')
-  cacheLife('max')
-
   try {
     const skip = (page - 1) * perPage
     const [coordinators, total] = await prisma.$transaction([
@@ -30,7 +25,7 @@ async function getCoordinatorsData(page: number, perPage: number) {
               },
             },
           },
-          _count: { select: { sections: true } },
+          _count: { select: { section: true } },
         },
       }),
       prisma[table].count({ where: { deletedAt: null } }),
@@ -66,14 +61,6 @@ export async function getCoordinators(page = 1, perPage = USERS_PER_PAGE) {
 
 // CREATE — called when faculty accepts the coordinator invitation
 export async function addCoordinator(facultyId: number) {
-  if (!(await requireAdmin())) {
-    return {
-      success: false,
-      payload: null,
-      message: 'You are not authorized to perform this action.',
-    }
-  }
-
   try {
     const existing = await prisma[table].findFirst({
       where: { facultyId, deletedAt: null },
@@ -86,8 +73,13 @@ export async function addCoordinator(facultyId: number) {
       }
     }
 
-    const record = await prisma[table].create({
-      data: { facultyId },
+    // A previous removal soft-deletes the row, which still occupies the
+    // unique facultyId slot. Re-inviting revives the existing record instead
+    // of creating a new one.
+    const record = await prisma[table].upsert({
+      where: { facultyId },
+      create: { facultyId },
+      update: { deletedAt: null },
       include: {
         faculty: {
           include: {
@@ -100,7 +92,8 @@ export async function addCoordinator(facultyId: number) {
     })
 
     revalidateTag('coordinators', 'max')
-    revalidatePath('/coordinators')
+    revalidateTag('faculty', 'max')
+    revalidatePath('/sections')
 
     return {
       success: true,
@@ -118,7 +111,7 @@ export async function addCoordinator(facultyId: number) {
 
 // REMOVE — only allowed if coordinator has no sections
 export async function removeCoordinator(id: string) {
-  if (!(await requireAdmin())) {
+  if (!(await requireAdminOrProgramChair())) {
     return {
       success: false,
       payload: null,
@@ -134,7 +127,7 @@ export async function removeCoordinator(id: string) {
   try {
     const coordinator = await prisma[table].findFirst({
       where: { id: targetId, deletedAt: null },
-      include: { _count: { select: { sections: true } } },
+      include: { _count: { select: { section: true } } },
     })
     if (!coordinator) {
       return {
@@ -144,11 +137,11 @@ export async function removeCoordinator(id: string) {
       }
     }
 
-    if (coordinator._count.sections > 0) {
+    if (coordinator._count.section > 0) {
       return {
         success: false,
         payload: null,
-        message: `Cannot remove coordinator with ${coordinator._count.sections} existing section(s). Remove sections first.`,
+        message: `Cannot remove coordinator with ${coordinator._count.section} existing section(s). Remove sections first.`,
       }
     }
 
@@ -157,8 +150,9 @@ export async function removeCoordinator(id: string) {
       data: { deletedAt: new Date() },
     })
 
-    revalidateTag('coordinators')
-    revalidatePath('/dashboard/coordinators')
+    revalidateTag('coordinators', 'max')
+    revalidateTag('faculty', 'max')
+    revalidatePath('/sections')
 
     return {
       success: true,

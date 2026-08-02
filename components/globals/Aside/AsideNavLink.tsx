@@ -5,12 +5,14 @@ import { useSession } from 'next-auth/react'
 import {
   LayoutDashboard,
   Users,
+  FileText,
   Flag,
   Shield,
   Calendar,
   BookMarked,
   User,
   UserPlus,
+  LayoutGrid,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -24,6 +26,8 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Join', href: '/welcome', icon: UserPlus },
   { label: 'Faculty', href: '/faculty', icon: Users },
+  { label: 'Sections', href: '/sections', icon: LayoutGrid },
+  { label: 'Templates', href: '/templates', icon: FileText },
   { label: 'Milestones', href: '/milestones', icon: Flag },
   { label: 'Defense', href: '/defense', icon: Shield },
   { label: 'Calendar', href: '/calendar', icon: Calendar },
@@ -31,13 +35,51 @@ const navItems: NavItem[] = [
   { label: 'Profile', href: '/dashboard/user/profile', icon: User },
 ]
 
-const USER_ALLOWED = new Set(['/welcome', '/repository', '/dashboard/user/profile'])
+const GUEST_ALLOWED = new Set([
+  '/welcome',
+  '/repository',
+  '/dashboard/user/profile',
+])
+
+const MEMBER_ALLOWED = new Set([
+  '/dashboard',
+  '/repository',
+  '/dashboard/user/profile',
+])
+
+const COORDINATOR_ALLOWED = new Set([
+  '/dashboard',
+  '/faculty',
+  '/templates',
+  '/repository',
+  '/dashboard/user/profile',
+])
+
+const PROGRAM_CHAIR_ALLOWED = new Set([
+  '/dashboard',
+  '/faculty',
+  '/sections',
+  '/templates',
+  '/repository',
+  '/dashboard/user/profile',
+])
 
 function useNavItems() {
   const { data: session } = useSession()
   const role = session?.user?.role
   const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN'
-  return isAdmin ? navItems : navItems.filter((item) => USER_ALLOWED.has(item.href))
+  if (isAdmin) return navItems
+  if (session?.user?.isProgramChair) {
+    return navItems.filter((item) => PROGRAM_CHAIR_ALLOWED.has(item.href))
+  }
+  if (session?.user?.isCoordinator) {
+    return navItems.filter((item) => COORDINATOR_ALLOWED.has(item.href))
+  }
+  const allowed =
+    session?.user?.isFaculty || session?.user?.isStudent
+      ? MEMBER_ALLOWED
+      : GUEST_ALLOWED
+  return navItems.filter((item) => allowed.has(item.href))
 }
 
 export function CollapsedNavLink({ pathname }: { pathname: string }) {

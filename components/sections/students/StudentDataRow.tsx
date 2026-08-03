@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Users } from 'lucide-react'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { ActivityStatus } from '@/components/ui/ActivityStatus'
@@ -18,11 +19,16 @@ export interface StudentData {
 
 interface StudentDataRowProps {
   data: StudentData
+  renderActions?: () => ReactNode
 }
 
-export function StudentDataRow({ data }: StudentDataRowProps) {
+export function StudentDataRow({ data, renderActions }: StudentDataRowProps) {
   return (
-    <div className="grid grid-cols-[2fr_1fr_1fr] items-center px-[20px] h-[63px] border-b border-[#f0f2fa] hover:bg-slate-50/40 transition-colors">
+    <div
+      className={`grid items-center px-[20px] h-[63px] border-b border-[#f0f2fa] hover:bg-slate-50/40 transition-colors ${
+        renderActions ? 'grid-cols-[2fr_1fr_1fr_1fr]' : 'grid-cols-[2fr_1fr_1fr]'
+      }`}
+    >
       <div className="min-w-0 pr-4">
         <UserProfile
           initials={data.initials}
@@ -48,6 +54,10 @@ export function StudentDataRow({ data }: StudentDataRowProps) {
           </span>
         )}
       </div>
+
+      {renderActions && (
+        <div className="flex justify-end pl-4">{renderActions()}</div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { StudentDataRow, type StudentData } from './StudentDataRow'
 
@@ -43,6 +44,7 @@ interface StudentTableProps {
   sortField?: StudentSortKey
   sortDir?: 'asc' | 'desc'
   onSort?: (field: StudentSortKey) => void
+  renderActions?: (student: StudentData) => ReactNode
 }
 
 export function StudentTable({
@@ -51,11 +53,16 @@ export function StudentTable({
   sortField,
   sortDir,
   onSort,
+  renderActions,
 }: StudentTableProps) {
   return (
     <div className="w-full">
       {/* Header Row */}
-      <div className="grid grid-cols-[2fr_1fr_1fr] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]">
+      <div
+        className={`grid items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] ${
+          renderActions ? 'grid-cols-[2fr_1fr_1fr_1fr]' : 'grid-cols-[2fr_1fr_1fr]'
+        }`}
+      >
         <SortHeader
           field="name"
           label="Student"
@@ -69,6 +76,7 @@ export function StudentTable({
         <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
           Group
         </div>
+        {renderActions && <div />}
       </div>
 
       {students.length === 0 ? (
@@ -82,7 +90,13 @@ export function StudentTable({
         </div>
       ) : (
         students.map((student) => (
-          <StudentDataRow key={student.id} data={student} />
+          <StudentDataRow
+            key={student.id}
+            data={student}
+            renderActions={
+              renderActions ? () => renderActions(student) : undefined
+            }
+          />
         ))
       )}
     </div>

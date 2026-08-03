@@ -64,6 +64,12 @@ const PROGRAM_CHAIR_ALLOWED = new Set([
   '/dashboard/user/profile',
 ])
 
+const MY_SECTIONS_NAV: NavItem = {
+  label: 'My Sections',
+  href: '/my-sections',
+  icon: Layers,
+}
+
 function useNavItems() {
   const { data: session } = useSession()
   const role = session?.user?.role
@@ -73,7 +79,14 @@ function useNavItems() {
     return navItems.filter((item) => PROGRAM_CHAIR_ALLOWED.has(item.href))
   }
   if (session?.user?.isCoordinator) {
-    return navItems.filter((item) => COORDINATOR_ALLOWED.has(item.href))
+    const base = navItems.filter((item) => COORDINATOR_ALLOWED.has(item.href))
+    const dashboardIndex = base.findIndex((item) => item.href === '/dashboard')
+    const insertAt = dashboardIndex >= 0 ? dashboardIndex + 1 : 1
+    return [
+      ...base.slice(0, insertAt),
+      MY_SECTIONS_NAV,
+      ...base.slice(insertAt),
+    ]
   }
   const allowed =
     session?.user?.isFaculty || session?.user?.isStudent

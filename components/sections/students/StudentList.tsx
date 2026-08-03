@@ -1,13 +1,20 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Search, ChevronDown } from 'lucide-react'
 import { StudentTable, type StudentSortKey } from './StudentTable'
 import type { StudentData } from './StudentDataRow'
 
 type GroupFilter = 'all' | 'none' | string
 
-export function StudentList({ students }: { students: StudentData[] }) {
+export function StudentList({
+  students,
+  renderActions,
+}: {
+  students: StudentData[]
+  renderActions?: (student: StudentData) => ReactNode
+}) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<GroupFilter>('all')
   const [filterOpen, setFilterOpen] = useState(false)
@@ -165,6 +172,7 @@ export function StudentList({ students }: { students: StudentData[] }) {
         sortField={sortField}
         sortDir={sortDir}
         onSort={handleSort}
+        renderActions={renderActions}
       />
     </div>
   )

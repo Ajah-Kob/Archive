@@ -163,19 +163,72 @@ async function main() {
     }
   }
 
-  // ── Sample Section (managed by Prof. Andrea Santos) ──
-  let section = await prisma.section.findFirst({
-    where: { coordinatorId: andreaCoordinatorId },
-  })
-  if (!section) {
-    section = await prisma.section.create({
-      data: {
-        coordinatorId: andreaCoordinatorId,
-        section: 'BSIS 3A',
-        yearLevel: '3rd Year',
-      },
+  // ── Sample Sections (managed by Prof. Andrea Santos) ──
+  // Strict format: {year}{section}{group} e.g. 4AG1 → 4th Year, Section A, Group 1
+  const sectionSeed = [
+    { section: '4AG1', yearLevel: '4th Year' },
+    { section: '3AG1', yearLevel: '3rd Year' },
+  ]
+  const sections: Record<string, number> = {}
+  for (const s of sectionSeed) {
+    let row = await prisma.section.findFirst({
+      where: { section: s.section },
     })
+    if (row && row.deletedAt) {
+      row = await prisma.section.update({
+        where: { id: row.id },
+        data: {
+          coordinatorId: andreaCoordinatorId,
+          yearLevel: s.yearLevel,
+          deletedAt: null,
+        },
+      })
+    }
+    if (!row) {
+      row = await prisma.section.create({
+        data: {
+          coordinatorId: andreaCoordinatorId,
+          section: s.section,
+          yearLevel: s.yearLevel,
+        },
+      })
+    } else if (row.coordinatorId !== andreaCoordinatorId) {
+      row = await prisma.section.update({
+        where: { id: row.id },
+        data: { coordinatorId: andreaCoordinatorId },
+      })
+    }
+
+    let joinCode = row.joinCodeId
+      ? await prisma.joinCode.findUnique({ where: { id: row.joinCodeId } })
+      : null
+    if (!joinCode || joinCode.deletedAt || joinCode.expiresAt < new Date()) {
+      joinCode = await prisma.joinCode.create({
+        data: {
+          code: `SEC${row.section}${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+          type: 'STUDENT',
+          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        },
+      })
+      await prisma.section.update({
+        where: { id: row.id },
+        data: { joinCodeId: joinCode.id },
+      })
+    }
+
+    sections[s.section] = row.id
   }
+
+  // Soft-delete any other sections assigned to this coordinator so reseeding
+  // keeps the sample dataset exactly at the two canonical sections.
+  await prisma.section.updateMany({
+    where: {
+      coordinatorId: andreaCoordinatorId,
+      deletedAt: null,
+      NOT: { section: { in: ['4AG1', '3AG1'] } },
+    },
+    data: { deletedAt: new Date() },
+  })
 
   // ── Sample Students ──
   const studentSeed = [
@@ -199,8 +252,8 @@ async function main() {
     })
     const student = await prisma.student.upsert({
       where: { userId: user.id },
-      update: { sectionId: section.id, deletedAt: null },
-      create: { userId: user.id, sectionId: section.id },
+      update: { sectionId: sections['4AG1'], deletedAt: null },
+      create: { userId: user.id, sectionId: sections['4AG1'] },
     })
     studentIds.push(student.id)
   }
@@ -229,11 +282,13 @@ async function main() {
     if (group && group.deletedAt) {
       group = await prisma.group.update({
         where: { id: group.id },
-        data: { deletedAt: null },
+        data: { sectionId: sections['4AG1'], deletedAt: null },
       })
     }
     if (!group) {
-      group = await prisma.group.create({ data: { groupName: g.groupName } })
+      group = await prisma.group.create({
+        data: { groupName: g.groupName, sectionId: sections['4AG1'] },
+      })
     }
 
     for (const idx of g.members) {

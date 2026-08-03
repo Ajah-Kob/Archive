@@ -25,13 +25,15 @@ export function TableListHeader({ onAction }: TableListHeaderProps) {
           </span>
         </div>
       </div>
-      <button
-        onClick={onAction}
-        className="flex gap-[7px] items-center h-[37px] px-[15px] py-[9px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[13px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
-      >
-        <UserCog className="size-4" />
-        Manage Coodinators
-      </button>
+      {onAction && (
+        <button
+          onClick={onAction}
+          className="flex gap-[7px] items-center h-[37px] px-[15px] py-[9px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[13px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
+        >
+          <UserCog className="size-4" />
+          Manage Coodinators
+        </button>
+      )}
     </div>
   )
 }

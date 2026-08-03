@@ -1,6 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 import { ModalHeader } from './ModalHeader'
 import { ModalFooter } from './ModalFooter'
 import { joinSection } from '@/lib/actions/sections'
@@ -8,7 +11,9 @@ import { TriangleAlert } from 'lucide-react'
 import { useWelcomeModal } from '@/store/useWelcomeModal'
 
 export function JoinSectionModal() {
-  const setSuccessModal = useWelcomeModal((state) => state.setSuccessModal)
+  const setActiveModal = useWelcomeModal((state) => state.setActiveModal)
+  const { update } = useSession()
+  const router = useRouter()
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
@@ -31,7 +36,12 @@ export function JoinSectionModal() {
       return
     }
 
-    setSuccessModal('student')
+    setActiveModal(null)
+    toast.success("You've joined successfully!", {
+      description: 'You now have access to your class section and milestone workspace.',
+    })
+    await update()
+    router.push('/dashboard')
   }
 
   return (

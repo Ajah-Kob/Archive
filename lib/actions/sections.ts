@@ -4,8 +4,10 @@ import prisma from '@/lib/prisma'
 import { cacheLife, cacheTag, revalidatePath, revalidateTag } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import type { SectionData } from '@/components/coordinator/main/SectionDataRow'
-import { getInitials } from '@/lib/helper'
+import type { SectionData } from '@/components/sections/main/SectionDataRow'
+import type { StudentData } from '@/components/sections/students/StudentDataRow'
+import { getInitials, timeAgo } from '@/lib/helper'
+import { unslugify } from '@/lib/slug'
 
 const gradients = [
   'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)',
@@ -17,6 +19,15 @@ const gradients = [
 ]
 
 const table = 'section'
+
+// A student is considered "active now" if they signed in within this window.
+const ACTIVE_NOW_MS = 5 * 60 * 1000
+
+function activityStatusFor(loggedInAt: Date | null): 'active' | string {
+  if (!loggedInAt) return 'Never'
+  if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
+  return timeAgo(loggedInAt)
+}
 
 function getGradient(id: number) {
   return gradients[id % gradients.length]
@@ -70,6 +81,121 @@ async function getSectionsData() {
   }))
 
   return payload
+}
+
+export interface SectionDetailData {
+  section: {
+    id: number
+    name: string
+    coordinatorName: string
+    studentsCount: number
+    groupsCount: number
+  }
+  students: StudentData[]
+}
+
+async function getSectionDetailData(slug: string) {
+  'use cache'
+  cacheTag(`section-${slug}`)
+  cacheLife('max')
+
+  const section = await prisma[table].findFirst({
+    where: {
+      deletedAt: null,
+      section: { equals: unslugify(slug), mode: 'insensitive' },
+    },
+    include: {
+      coordinator: {
+        include: {
+          faculty: {
+            include: {
+              user: {
+                select: { name: true },
+              },
+            },
+          },
+        },
+      },
+      students: {
+        where: { deletedAt: null },
+        orderBy: { user: { name: 'asc' } },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              loggedInAt: true,
+            },
+          },
+          group: {
+            select: {
+              id: true,
+              groupName: true,
+              students: {
+                where: { deletedAt: null },
+                select: { id: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!section) return null
+
+  const students: StudentData[] = section.students.map((s) => ({
+    id: s.id,
+    userId: s.user.id,
+    initials: getInitials(s.user.name),
+    name: s.user.name,
+    email: s.user.email,
+    avatarGradient: getGradient(s.id),
+    activityStatus: activityStatusFor(s.user.loggedInAt),
+    loggedInAt: s.user.loggedInAt,
+    group: s.group
+      ? {
+          name: s.group.groupName,
+          members: s.group.students.length,
+        }
+      : null,
+  }))
+
+  return {
+    section: {
+      id: section.id,
+      name: section.section,
+      coordinatorName: section.coordinator.faculty.user.name,
+      studentsCount: students.length,
+      groupsCount: new Set(
+        students.filter((s) => s.group).map((s) => s.group!.name),
+      ).size,
+    },
+    students,
+  }
+}
+
+export async function getSectionBySlug(slug: string) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return { success: false, message: 'Not authenticated', payload: null }
+  }
+
+  try {
+    const payload = await getSectionDetailData(slug)
+    if (!payload) {
+      return { success: false, message: 'Section not found', payload: null }
+    }
+    return { success: true, payload }
+  } catch (error) {
+    console.error('[getSectionBySlug | Error]:', error)
+    return {
+      success: false,
+      message: 'Failed to fetch section',
+      payload: null,
+    }
+  }
 }
 
 export async function getSections() {
@@ -139,6 +265,15 @@ export async function joinSection(formData: FormData) {
       },
     })
 
+    await prisma.user.update({
+      where: { id: +session.user.id },
+      data: { role: 'STUDENT' },
+    })
+
+    revalidateTag('users', 'max')
+    revalidateTag('sections', 'max')
+    revalidatePath('/sections')
+
     return { success: true, message: 'Successfully joined the section.' }
   } catch (error) {
     console.error('joinSection error:', error)
@@ -151,7 +286,6 @@ export async function joinSection(formData: FormData) {
 
 // SOFT DELETE (admin only)
 export async function softDeleteSection(id: string) {
-
   const targetId = parseInt(id)
   if (Number.isNaN(targetId)) {
     return { success: false, payload: null, message: 'Invalid section id.' }
@@ -183,108 +317,6 @@ export async function softDeleteSection(id: string) {
       success: false,
       payload: null,
       message: 'Failed to delete section',
-    }
-  }
-}
-
-// UPDATE (admin only)
-export async function updateSection(_prevState: any, formData: FormData) {
-  const id = formData.get('id')?.toString().trim()
-  const joinCode = formData.get('joinCode')?.toString().trim()
-  const coordinatorId = formData.get('coordinatorId')?.toString().trim()
-  const section = formData.get('section')?.toString().trim()
-  const yearLevel = formData.get('yearLevel')?.toString().trim()
-
-  const errors: Record<string, string> = {}
-  if (!joinCode) errors.joinCode = 'Join code is required.'
-  if (!coordinatorId) errors.coordinatorId = 'Coordinator is required.'
-  if (!section) errors.section = 'Section name is required.'
-  if (!yearLevel) errors.yearLevel = 'Year level is required.'
-
-  if (Object.keys(errors).length > 0) {
-    return {
-      success: false,
-      errors,
-      input: { id, joinCode, coordinatorId, section, yearLevel },
-    }
-  }
-
-  const targetId = parseInt(id!)
-  if (Number.isNaN(targetId)) {
-    return {
-      success: false,
-      message: 'Invalid section id.',
-      input: { id, joinCode, coordinatorId, section, yearLevel },
-    }
-  }
-
-  const parsedCoordinatorId = parseInt(coordinatorId!)
-  if (Number.isNaN(parsedCoordinatorId)) {
-    return {
-      success: false,
-      message: 'Invalid coordinator.',
-      input: { id, joinCode, coordinatorId, section, yearLevel },
-    }
-  }
-
-  try {
-    const target = await prisma[table].findFirst({
-      where: { id: targetId, deletedAt: null },
-    })
-    if (!target) {
-      return {
-        success: false,
-        message: 'Section not found.',
-        input: { id, joinCode, coordinatorId, section, yearLevel },
-      }
-    }
-
-    const joinCodeRecord = await prisma.joinCode.findFirst({
-      where: { code: joinCode, deletedAt: null },
-    })
-    if (!joinCodeRecord) {
-      return {
-        success: false,
-        message: `Join code "${joinCode}" not found.`,
-        input: { id, joinCode, coordinatorId, section, yearLevel },
-      }
-    }
-
-    const existing = await prisma[table].findFirst({
-      where: { joinCodeId: joinCodeRecord.id, NOT: { id: targetId } },
-    })
-    if (existing) {
-      return {
-        success: false,
-        message: `Join code "${joinCode}" is already in use.`,
-        input: { id, joinCode, coordinatorId, section, yearLevel },
-      }
-    }
-
-    const record = await prisma[table].update({
-      where: { id: targetId },
-      data: {
-        joinCodeId: joinCodeRecord.id,
-        coordinatorId: parsedCoordinatorId,
-        section: section!,
-        yearLevel: yearLevel!,
-        updatedAt: new Date(),
-      },
-    })
-
-    revalidateTag('sections', 'max')
-    revalidatePath('/sections')
-
-    return {
-      success: true,
-      message: 'Section updated successfully.',
-      payload: record,
-    }
-  } catch {
-    return {
-      success: false,
-      payload: null,
-      message: 'Failed to update section.',
     }
   }
 }

@@ -4,7 +4,6 @@ import { WelcomeBanner } from '@/components/welcome/main/WelcomeBanner'
 import { WelcomeHeading } from '@/components/welcome/main/WelcomeHeading'
 import { JoinFacultyModal } from '@/components/welcome/modal/JoinFacultyModal'
 import { JoinSectionModal } from '@/components/welcome/modal/JoinSectionModal'
-import { JoinSuccessfulModal } from '@/components/welcome/modal/JoinSuccessfulModal'
 import { useWelcomeModal } from '@/store/useWelcomeModal'
 import {
   JoinAsStudentWelcomeCard,
@@ -13,7 +12,6 @@ import {
 
 export default function WelcomePage() {
   const activeModal = useWelcomeModal((state) => state.activeModal)
-  const successModal = useWelcomeModal((state) => state.successModal)
 
   return (
     <div className="bg-[#f4f6ff] h-full flex flex-col items-center justify-center relative overflow-hidden">
@@ -47,10 +45,6 @@ export default function WelcomePage() {
       )}
       {activeModal === 'student' && (
         <JoinSectionModal />
-      )}
-
-      {successModal && (
-        <JoinSuccessfulModal />
       )}
     </div>
   )

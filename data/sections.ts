@@ -1,4 +1,4 @@
-import type { SectionData } from '@/components/coordinator/main/SectionDataRow'
+import type { SectionData } from '@/components/sections/main/SectionDataRow'
 
 export const sectionData: SectionData[] = [
   {

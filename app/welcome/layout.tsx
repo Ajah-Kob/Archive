@@ -17,6 +17,7 @@ export default async function WelcomeLayout({
 }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/login')
+  if (session.user.isFaculty || session.user.isStudent) redirect('/dashboard')
 
   return <TemplateWelcome>{children}</TemplateWelcome>
 }

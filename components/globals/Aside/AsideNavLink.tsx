@@ -12,7 +12,7 @@ import {
   BookMarked,
   User,
   UserPlus,
-  LayoutGrid,
+  Layers,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -26,7 +26,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Join', href: '/welcome', icon: UserPlus },
   { label: 'Faculty', href: '/faculty', icon: Users },
-  { label: 'Sections', href: '/sections', icon: LayoutGrid },
+  { label: 'Sections', href: '/sections', icon: Layers },
   { label: 'Templates', href: '/templates', icon: FileText },
   { label: 'Milestones', href: '/milestones', icon: Flag },
   { label: 'Defense', href: '/defense', icon: Shield },

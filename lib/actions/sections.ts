@@ -92,6 +92,11 @@ export async function getSections() {
 }
 
 export async function joinSection(formData: FormData) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return { success: false, message: 'Not authenticated' }
+  }
+
   const code = formData.get('code')?.toString().trim()
   if (!code) {
     return { success: false, message: 'Please enter an invitation code.' }

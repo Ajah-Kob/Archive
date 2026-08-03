@@ -10,7 +10,7 @@ import { requireAdmin, requireUser, sanitizeUser, sanitizeUsers } from "@/lib/ac
 
 const table = "user"
 const MIN_PASSWORD_LENGTH = 8
-const VALID_ROLES = ["SUPERADMIN", "ADMIN", "USER"]
+const VALID_ROLES = ["SUPERADMIN", "ADMIN", "FACULTY", "STUDENT", "GUEST"]
 
 // GET ONE
 async function getUserData(id: string) {
@@ -83,7 +83,7 @@ export async function signupUser(_prevState: any, formData: FormData) {
     return { success: false, errors, input: { name, email } }
   }
 
-  return persistNewUser({ name: name!, email: email!, password: password!, role: "USER" })
+  return persistNewUser({ name: name!, email: email!, password: password!, role: "GUEST" })
 }
 
 // CREATE (admin only) — may assign a role.
@@ -95,8 +95,8 @@ export async function createUser(_prevState: any, formData: FormData) {
   const name = formData.get("name")?.toString().trim()
   const email = formData.get("email")?.toString().trim()
   const password = formData.get("password")?.toString().trim()
-  const role = formData.get("role")?.toString().trim() || "USER"
-  const safeRole = VALID_ROLES.includes(role) ? role : "USER"
+  const role = formData.get("role")?.toString().trim() || "GUEST"
+  const safeRole = VALID_ROLES.includes(role) ? role : "GUEST"
 
   const errors: Record<string, string> = {}
   if (!name) errors.name = "Name is required."
@@ -134,7 +134,7 @@ async function persistNewUser(data: { name: string; email: string; password: str
       },
     })
 
-    revalidateTag("users")
+    revalidateTag("users", "max")
     revalidatePath("/dashboard/users")
 
     return { success: true, message: "User created successfully", payload: sanitizeUser(user) }
@@ -176,7 +176,7 @@ export async function softDeleteUser(id: string) {
       data: { deletedAt: new Date() },
     })
 
-    revalidateTag("users")
+    revalidateTag("users", "max")
     revalidatePath("/dashboard/users")
 
     return { success: true, payload: sanitizeUser(user) }
@@ -195,8 +195,8 @@ export async function updateUser(_prevState: any, formData: FormData) {
   const id = formData.get("id")?.toString().trim()
   const name = formData.get("name")?.toString().trim()
   const email = formData.get("email")?.toString().trim()
-  const role = formData.get("role")?.toString().trim() || "USER"
-  const safeRole = VALID_ROLES.includes(role) ? role : "USER"
+  const role = formData.get("role")?.toString().trim() || "GUEST"
+  const safeRole = VALID_ROLES.includes(role) ? role : "GUEST"
 
   const errors: Record<string, string> = {}
   if (!name) errors.name = "Name is required."
@@ -242,7 +242,7 @@ export async function updateUser(_prevState: any, formData: FormData) {
       data: { name, email, role: safeRole as any, updatedAt: new Date() },
     })
 
-    revalidateTag("users")
+    revalidateTag("users", "max")
     revalidatePath("/dashboard/users")
 
     return { success: true, message: "User updated successfully.", payload: sanitizeUser(user) }

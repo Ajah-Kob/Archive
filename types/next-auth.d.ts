@@ -8,6 +8,10 @@ declare module 'next-auth' {
       email?: string | null
       role?: string | null
       image?: string | null
+      isProgramChair?: boolean
+      isFaculty?: boolean
+      isStudent?: boolean
+      isCoordinator?: boolean
     }
   }
 
@@ -21,5 +25,9 @@ declare module 'next-auth' {
     id: string
     role?: string
     image?: string
+    isProgramChair?: boolean
+    isFaculty?: boolean
+    isStudent?: boolean
+    isCoordinator?: boolean
   }
 }

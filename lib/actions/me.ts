@@ -163,7 +163,7 @@ export async function updateMe(_prevState: User, formData: FormData) {
       data: updateData,
     })
 
-    revalidateTag('me')
+    revalidateTag('me', 'max')
 
     return {
       success: true,
@@ -200,7 +200,11 @@ export async function updateMePassword(_prevState: User, formData: FormData) {
   let errors: Record<string, string> = {}
 
   const requiredFields = [
-    { key: 'current_password', label: 'Current Password', value: current_password },
+    {
+      key: 'current_password',
+      label: 'Current Password',
+      value: current_password,
+    },
     { key: 'new_password', label: 'New Password', value: new_password },
     {
       key: 'confirm_password',
@@ -224,7 +228,8 @@ export async function updateMePassword(_prevState: User, formData: FormData) {
 
   // Password strength validation
   if (new_password && new_password.length < MIN_PASSWORD_LENGTH) {
-    errors['new_password'] = `New password must be at least ${MIN_PASSWORD_LENGTH} characters long.`
+    errors['new_password'] =
+      `New password must be at least ${MIN_PASSWORD_LENGTH} characters long.`
   }
 
   // Return errors if any exist
@@ -242,7 +247,11 @@ export async function updateMePassword(_prevState: User, formData: FormData) {
     const me = await prisma[table].findFirst({
       where: { id: +id, deletedAt: null },
     })
-    if (!me || !me.password || !(await compare(current_password!, me.password))) {
+    if (
+      !me ||
+      !me.password ||
+      !(await compare(current_password!, me.password))
+    ) {
       return {
         success: false,
         errors: { current_password: 'Current password is incorrect.' },
@@ -260,7 +269,7 @@ export async function updateMePassword(_prevState: User, formData: FormData) {
       data: { password: hashedPassword, updatedAt: new Date() },
     })
 
-    revalidateTag('me')
+    revalidateTag('me', 'max')
 
     return {
       success: true,

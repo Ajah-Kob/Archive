@@ -120,6 +120,7 @@ enum InvitationRole {
   COORDINATOR
   ADVISER
   PANELIST
+  GROUP
 }
 
 enum InvitationStatus {
@@ -130,15 +131,16 @@ enum InvitationStatus {
 }
 
 model Invitation {
-  id          Int               @id @default(autoincrement())
-  facultyId   Int
-  faculty     Faculty           @relation(fields: [facultyId], references: [id])
-  role        InvitationRole
-  invitedById Int
-  invitedBy   User              @relation("InvitationSender", fields: [invitedById], references: [id])
-  status      InvitationStatus  @default(PENDING)
-  createdAt   DateTime          @default(now())
-  deletedAt   DateTime?
+  id                          Int                     @id @default(autoincrement())
+  facultyId                   Int
+  faculty                     Faculty                 @relation(fields: [facultyId], references: [id])
+  role                        InvitationRole
+  invitedById                 Int
+  invitedBy                   User                    @relation("InvitationSender", fields: [invitedById], references: [id])
+  status                      InvitationStatus        @default(PENDING)
+  readAt                      DateTime?
+  createdAt                   DateTime                @default(now())
+  deletedAt                   DateTime?
 
   @@index([facultyId])
   @@index([invitedById])
@@ -153,7 +155,7 @@ model Section {
   joinCode                    JoinCode?               @relation(fields: [joinCodeId], references: [id], onDelete: SetNull)
   coordinatorId               Int
   coordinator                 Coordinator             @relation(fields: [coordinatorId], references: [id])
-  section                     String
+  section                     String                   @unique
   yearLevel                   String
   students                    Student[]
   createdAt                   DateTime                @default(now())

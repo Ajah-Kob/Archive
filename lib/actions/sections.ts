@@ -190,14 +190,12 @@ export async function softDeleteSection(id: string) {
 // UPDATE (admin only)
 export async function updateSection(_prevState: any, formData: FormData) {
   const id = formData.get('id')?.toString().trim()
-  const sectionId = formData.get('sectionId')?.toString().trim()
   const joinCode = formData.get('joinCode')?.toString().trim()
   const coordinatorId = formData.get('coordinatorId')?.toString().trim()
   const section = formData.get('section')?.toString().trim()
   const yearLevel = formData.get('yearLevel')?.toString().trim()
 
   const errors: Record<string, string> = {}
-  if (!sectionId) errors.sectionId = 'Section ID is required.'
   if (!joinCode) errors.joinCode = 'Join code is required.'
   if (!coordinatorId) errors.coordinatorId = 'Coordinator is required.'
   if (!section) errors.section = 'Section name is required.'
@@ -207,7 +205,7 @@ export async function updateSection(_prevState: any, formData: FormData) {
     return {
       success: false,
       errors,
-      input: { id, sectionId, joinCode, coordinatorId, section, yearLevel },
+      input: { id, joinCode, coordinatorId, section, yearLevel },
     }
   }
 
@@ -216,7 +214,7 @@ export async function updateSection(_prevState: any, formData: FormData) {
     return {
       success: false,
       message: 'Invalid section id.',
-      input: { id, sectionId, joinCode, coordinatorId, section, yearLevel },
+      input: { id, joinCode, coordinatorId, section, yearLevel },
     }
   }
 
@@ -225,7 +223,7 @@ export async function updateSection(_prevState: any, formData: FormData) {
     return {
       success: false,
       message: 'Invalid coordinator.',
-      input: { id, sectionId, joinCode, coordinatorId, section, yearLevel },
+      input: { id, joinCode, coordinatorId, section, yearLevel },
     }
   }
 
@@ -237,26 +235,36 @@ export async function updateSection(_prevState: any, formData: FormData) {
       return {
         success: false,
         message: 'Section not found.',
-        input: { id, sectionId, joinCode, coordinatorId, section, yearLevel },
+        input: { id, joinCode, coordinatorId, section, yearLevel },
+      }
+    }
+
+    const joinCodeRecord = await prisma.joinCode.findFirst({
+      where: { code: joinCode, deletedAt: null },
+    })
+    if (!joinCodeRecord) {
+      return {
+        success: false,
+        message: `Join code "${joinCode}" not found.`,
+        input: { id, joinCode, coordinatorId, section, yearLevel },
       }
     }
 
     const existing = await prisma[table].findFirst({
-      where: { joinCode, NOT: { id: targetId } },
+      where: { joinCodeId: joinCodeRecord.id, NOT: { id: targetId } },
     })
     if (existing) {
       return {
         success: false,
         message: `Join code "${joinCode}" is already in use.`,
-        input: { id, sectionId, joinCode, coordinatorId, section, yearLevel },
+        input: { id, joinCode, coordinatorId, section, yearLevel },
       }
     }
 
     const record = await prisma[table].update({
       where: { id: targetId },
       data: {
-        sectionId: sectionId!,
-        joinCode: joinCode!,
+        joinCodeId: joinCodeRecord.id,
         coordinatorId: parsedCoordinatorId,
         section: section!,
         yearLevel: yearLevel!,

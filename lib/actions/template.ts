@@ -13,6 +13,11 @@ const ALLOWED_TYPES = [
 const MAX_SIZE_BYTES = 10 * 1024 * 1024
 
 export async function getTemplates(search?: string) {
+  const session = await requireUser()
+  if (!session) {
+    return []
+  }
+
   try {
     const where: Record<string, unknown> = { deletedAt: null }
     if (search) {

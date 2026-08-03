@@ -23,25 +23,16 @@ Read this before making any changes. This is the canonical reference for AI agen
 
 ## Project Identity
 
-**Archive** — a Capstone Management System (CMS) for the Bachelor of Science in
-Information Systems (BSIS) program. It replaces the manual capstone workflow
-(Messenger, Drive, email) with a centralized platform for submitting capstone
-documents, getting adviser feedback, and tracking progress through the capstone
-lifecycle.
+**Archive** — a Capstone Management System (CMS) for the Bachelor of Science in Information Systems (BSIS) program. It replaces the manual capstone workflow (Messenger, Drive, email) with a centralized platform for submitting capstone documents, getting adviser feedback, and tracking progress through the capstone lifecycle.
 
 Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 
 **Feature areas**
 
-- **Role-based access** — `GUEST`, `STUDENT`, `FACULTY`, `ADMIN`, `SUPERADMIN`.
-  Faculty hold adviser/coordinator records; Program Chair is a flag on
-  `Faculty`, not a role.
-- **Join by invitation code** — guests join as student or faculty via a code
-  (`/welcome`).
-- **Faculty & coordinator management** — invitations, adviser/coordinator
-  assignment, workload caps (`ADVISER_CAP`).
-- **Sections** — coordinators own sections, students enroll; monitored via
-  `/sections` and `/sections/[slug]`.
+- **Role-based access** — `GUEST`, `STUDENT`, `FACULTY`, `ADMIN`, `SUPERADMIN`. Faculty hold adviser/coordinator records; Program Chair is a flag on `Faculty`, not a role.
+- **Join by invitation code** — guests join as student or faculty via a code (`/welcome`).
+- **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`).
+- **Sections** — coordinators own sections, students enroll; monitored via `/sections` and `/sections/[slug]`.
 - **Templates** — capstone document templates (upload/remove) at `/templates`.
 - **Repository** — capstone repository at `/repository`.
 - **Notifications** — in-app notification panel in the aside footer.
@@ -50,12 +41,7 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 **Planned (aside nav placeholders, no pages yet):** Milestones, Defense,
 Calendar.
 
-**Workflow docs:** the complete capstone lifecycle — coordinator assignment →
-section management → group management → adviser assignment → Capstone 1 (topic,
-ch. 1–3, adviser review, proposal defense) → Capstone 2 (ch. 4–5, final defense)
-→ progress monitoring — is documented in `docs/workflow/`. Start at
-`docs/workflow/00-overview.md`; each numbered file (`01-…`–`10-…`) details one
-business process.
+**Workflow docs:** the complete capstone lifecycle — coordinator assignment → section management → group management → adviser assignment → Capstone 1 (topic, ch. 1–3, adviser review, proposal defense) → Capstone 2 (ch. 4–5, final defense) → progress monitoring — is documented in `docs/workflow/`. Start at `docs/workflow/00-overview.md`; each numbered file (`01-…`–`10-…`) details one business process.
 
 > Repo caveat: grew out of the `nextcrud` boilerplate — `package.json`,
 > `config/constants.ts`, and some docs still say "NextCrud". Treat those as

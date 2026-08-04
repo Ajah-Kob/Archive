@@ -147,6 +147,7 @@ function JoinModalInput({ formId }: { formId: string }) {
         </label>
       </div>
       <input
+        name="code"
         value={code}
         onChange={(e) => {
           setCode(e.target.value)

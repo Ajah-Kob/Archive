@@ -30,7 +30,7 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 **Feature areas**
 
 - **Role-based access** — `GUEST`, `STUDENT`, `FACULTY`, `ADMIN`, `SUPERADMIN`. Faculty hold adviser/coordinator records; Program Chair is a flag on `Faculty`, not a role.
-- **Join by invitation code** — guests join as student or faculty via a code (`/welcome`).
+- **Join by invitation code** — guests join as student or faculty via a code (`/join-archive`).
 - **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`).
 - **Sections** — coordinators own sections, students enroll; monitored via `/sections` and `/sections/[slug]`.
 - **Templates** — capstone document templates (upload/remove) at `/templates`.
@@ -411,6 +411,46 @@ Run `npm run db:seed`. The seed script uses `new PrismaClient()` directly (not t
 - **Dev:** `npm run dev` (Turbopack)
 - **Server Actions body limit:** 2 MB (`next.config.ts`)
 - **Node.js:** 22.14.x required
+
+---
+
+## React Conventions
+
+Two Vercel skill sets govern how we write React components. Full rules live in `.agents/skills/`; this section is the quick-reference.
+
+- **Composition Patterns** → `.agents/skills/vercel-composition-patterns/AGENTS.md`
+- **React Best Practices** → `.agents/skills/vercel-react-best-practices/AGENTS.md`
+
+### Component Architecture
+
+- **No boolean prop proliferation.** Don't add `isEditing`, `isThread`, etc. to customize behavior. Use composition or explicit variant components instead.
+- **Use compound components** for complex UI (modals, forms, cards). Shared state lives in a context provider; subcomponents read from it via `use()`.
+- **Lift state into providers.** If two sibling components need the same state, move it to a provider above them — not prop-drilling or useEffect syncing.
+- **Explicit variants > boolean modes.** `ThreadComposer` and `EditComposer` are better than `<Composer isThread isEditing />`.
+
+### State Management
+
+- **Decouple state from UI.** The provider is the only place that knows how state is managed (useState, Zustand, server sync). UI components consume the context interface.
+- **Generic context interface.** Define `state`, `actions`, and `meta` parts. Any provider can implement the same interface.
+- **Zustand for global UI state** (sidebar, drawer). React context for scoped component state (modals, forms).
+
+### Performance (Critical)
+
+- **No waterfalls.** Check cheap sync conditions before `await`. Use `Promise.all()` for independent async operations.
+- **Server components by default.** Only add `'use client'` when the component needs interactivity (event handlers, hooks, browser APIs).
+- **Dynamic imports for heavy components.** Use `next/dynamic` for large components not needed on initial render.
+- **Authenticate server actions inside the action** — don't rely solely on middleware or page-level checks.
+
+### Rendering
+
+- **Hoist static JSX** outside components. Decorative elements, constants, and static markup should not re-render.
+- **Conditional rendering with ternary**, not `&&` (avoids rendering `0` as empty).
+- **No inline component definitions.** Define components outside the parent to avoid remounting on every render.
+
+### React 19
+
+- **No `forwardRef`.** `ref` is a regular prop in React 19.
+- **`use()` instead of `useContext()`.** Can be called conditionally.
 
 ---
 

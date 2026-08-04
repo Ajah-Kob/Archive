@@ -1,17 +1,14 @@
 'use client'
 
 import { useState, useRef, useActionState } from 'react'
-import { useRouter } from 'next/navigation'
 import { forgotPassword } from '@/lib/actions/util'
+import { AuthInput } from '@/components/ui/AuthInput'
 
 export default function FormForgotPassword({
   className,
 }: {
   className: string
 }) {
-  const router = useRouter()
-
-  const { push: redirect } = router
   const formRef = useRef<HTMLFormElement>(null)
 
   const [state, handleSubmit, isPending] = useActionState(forgotPassword, {
@@ -19,37 +16,35 @@ export default function FormForgotPassword({
     message: null,
     errors: null,
   })
+  const [isFormValid, setIsFormValid] = useState(false)
+
+  function checkFormValidity() {
+    const form = formRef.current
+    if (!form) return
+    const inputs = form.querySelectorAll('input[required]:not([type="hidden"])')
+    setIsFormValid(
+      Array.from(inputs).every(
+        (input) => (input as HTMLInputElement).value.trim() !== ''
+      )
+    )
+  }
 
   return (
     <form
       ref={formRef}
       action={handleSubmit}
-      data-animate-pulse={isPending}
+      onInput={checkFormValidity}
       noValidate
       className={`${className} flex flex-col gap-5`}
     >
-      <div className="form-control">
-        <label className="auth-label" htmlFor="email">
-          Email*
-        </label>
-
-        <input
-          required
-          className={`w-full ${
-            !state?.success && state?.errors?.email
-              ? 'has-errors'
-              : 'border-black'
-          } auth-input `}
-          type="email"
-          name="email"
-          placeholder="johnthomas@email.com"
-        />
-
-        {/* Field Alert */}
-        {state?.errors?.email && (
-          <p className="error">{state?.errors?.email}</p>
-        )}
-      </div>
+      <AuthInput
+        label="Email"
+        name="email"
+        type="email"
+        placeholder="johnthomas@email.com"
+        error={state?.errors?.email}
+        required
+      />
 
       {/* Alert */}
       {state && state.message && (
@@ -65,10 +60,12 @@ export default function FormForgotPassword({
       <div>
         <button
           type="submit"
-          className="button button--accent w-full justify-center disabled:animate-pulse disabled:opacity-50 my-3"
-          disabled={isPending}
+          disabled={isPending || !isFormValid}
+          className="self-stretch h-9 px-3.5 py-3.5 bg-gradient-to-r from-indigo-400 via-violet-400 via-[57%] to-red-400 to-[140%] rounded-md shadow-[0px_2px_8px_0px_rgba(0,0,0,0.08),0px_4px_22px_0px_rgba(112,125,255,0.27)] inline-flex justify-center items-center disabled:animate-pulse disabled:opacity-50 transition-all hover:opacity-95 w-full"
         >
-          {isPending ? 'Please wait...' : 'Submit'}
+          <div className="text-center justify-start text-white text-sm font-semibold leading-5 tracking-tight">
+            {isPending ? 'Please wait...' : 'Submit'}
+          </div>
         </button>
       </div>
     </form>

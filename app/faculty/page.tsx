@@ -19,10 +19,10 @@ export default async function FacultyPage() {
       </div>
       <div className="flex flex-col">
         <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
-          Adviser Workload
+          Faculty
         </h1>
         <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] mt-1">
-          Monitor BSIS capstone progress, coordinator assignments, adviser workload, and defense outcomes.
+          Monitor faculty adviser workload to help avoid overloading advisers with capstone groups.
         </p>
       </div>
       <div className="flex-1 pb-[30px]">

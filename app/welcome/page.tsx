@@ -4,7 +4,6 @@ import { WelcomeBanner } from '@/components/welcome/main/WelcomeBanner'
 import { WelcomeHeading } from '@/components/welcome/main/WelcomeHeading'
 import { JoinFacultyModal } from '@/components/welcome/modal/JoinFacultyModal'
 import { JoinSectionModal } from '@/components/welcome/modal/JoinSectionModal'
-import { JoinSuccessfulModal } from '@/components/welcome/modal/JoinSuccessfulModal'
 import { useWelcomeModal } from '@/store/useWelcomeModal'
 import {
   JoinAsStudentWelcomeCard,
@@ -13,20 +12,9 @@ import {
 
 export default function WelcomePage() {
   const activeModal = useWelcomeModal((state) => state.activeModal)
-  const successModal = useWelcomeModal((state) => state.successModal)
 
   return (
     <div className="bg-[#f4f6ff] h-full flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Dot grid background */}
-      <div
-        className="absolute size-full pointer-events-none"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle, rgba(112,125,255,0.3) 0.8px, transparent 0.8px)',
-          backgroundSize: '20px 20px',
-        }}
-      />
-
       {/* Decorative gradient blobs */}
       <div
         className="absolute left-[-200px] top-[86px] w-[750px] h-[600px] rounded-[190px] pointer-events-none"
@@ -57,10 +45,6 @@ export default function WelcomePage() {
       )}
       {activeModal === 'student' && (
         <JoinSectionModal />
-      )}
-
-      {successModal && (
-        <JoinSuccessfulModal />
       )}
     </div>
   )

@@ -1,14 +1,18 @@
 'use client'
 
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import {
   LayoutDashboard,
   Users,
+  FileText,
   Flag,
   Shield,
   Calendar,
   BookMarked,
   User,
+  UserPlus,
+  Layers,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -20,7 +24,10 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Join', href: '/welcome', icon: UserPlus },
   { label: 'Faculty', href: '/faculty', icon: Users },
+  { label: 'Sections', href: '/sections', icon: Layers },
+  { label: 'Templates', href: '/templates', icon: FileText },
   { label: 'Milestones', href: '/milestones', icon: Flag },
   { label: 'Defense', href: '/defense', icon: Shield },
   { label: 'Calendar', href: '/calendar', icon: Calendar },
@@ -28,10 +35,71 @@ const navItems: NavItem[] = [
   { label: 'Profile', href: '/dashboard/user/profile', icon: User },
 ]
 
+const GUEST_ALLOWED = new Set([
+  '/welcome',
+  '/repository',
+  '/dashboard/user/profile',
+])
+
+const MEMBER_ALLOWED = new Set([
+  '/dashboard',
+  '/repository',
+  '/dashboard/user/profile',
+])
+
+const COORDINATOR_ALLOWED = new Set([
+  '/dashboard',
+  '/faculty',
+  '/templates',
+  '/repository',
+  '/dashboard/user/profile',
+])
+
+const PROGRAM_CHAIR_ALLOWED = new Set([
+  '/dashboard',
+  '/faculty',
+  '/sections',
+  '/templates',
+  '/repository',
+  '/dashboard/user/profile',
+])
+
+const MY_SECTIONS_NAV: NavItem = {
+  label: 'My Sections',
+  href: '/my-sections',
+  icon: Layers,
+}
+
+function useNavItems() {
+  const { data: session } = useSession()
+  const role = session?.user?.role
+  const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN'
+  if (isAdmin) return navItems
+  if (session?.user?.isProgramChair) {
+    return navItems.filter((item) => PROGRAM_CHAIR_ALLOWED.has(item.href))
+  }
+  if (session?.user?.isCoordinator) {
+    const base = navItems.filter((item) => COORDINATOR_ALLOWED.has(item.href))
+    const dashboardIndex = base.findIndex((item) => item.href === '/dashboard')
+    const insertAt = dashboardIndex >= 0 ? dashboardIndex + 1 : 1
+    return [
+      ...base.slice(0, insertAt),
+      MY_SECTIONS_NAV,
+      ...base.slice(insertAt),
+    ]
+  }
+  const allowed =
+    session?.user?.isFaculty || session?.user?.isStudent
+      ? MEMBER_ALLOWED
+      : GUEST_ALLOWED
+  return navItems.filter((item) => allowed.has(item.href))
+}
+
 export function CollapsedNavLink({ pathname }: { pathname: string }) {
+  const items = useNavItems()
   return (
     <div className="flex flex-col gap-0.5">
-      {navItems.map((item) => {
+      {items.map((item) => {
         const isActive = pathname === item.href
         const Icon = item.icon
         return (
@@ -65,9 +133,10 @@ export function CollapsedNavLink({ pathname }: { pathname: string }) {
 }
 
 export function ExpandedNavLink({ pathname }: { pathname: string }) {
+  const items = useNavItems()
   return (
     <div className="flex flex-col gap-0.5">
-      {navItems.map((item) => {
+      {items.map((item) => {
         const isActive = pathname === item.href
         const Icon = item.icon
         return (

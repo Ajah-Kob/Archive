@@ -51,7 +51,7 @@ export default function Aside() {
         <ExpandedFooter
           initials={initials}
           name={session?.user?.name || 'User'}
-          role={session?.user?.role || 'USER'}
+          role={session?.user?.role || 'GUEST'}
         />
       )}
     </aside>

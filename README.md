@@ -85,19 +85,19 @@ Zustand stores hold purely presentational state (sidebar minimized, mobile drawe
 ### Auth flow
 
 ```
-Browser                  Next.js Server                 Neon DB
-   │                         │                            │
-   │── POST /login ──────────┤                            │
-   │    { email, password }  │                            │
-   │                         │── findUnique(email) ───────┤
-   │                         │◄── { id, name, role, … } ──┤
-   │                         │                            │
-   │                         │── bcrypt.compare(password)  │
-   │                         │── update loggedInAt ───────┤
-   │                         │                            │
-   │                         │── Sign JWT (id, name,      │
-   │                         │    email, image, role)      │
-   │◄── Set httpOnly cookie ──┤                            │
+Browser                  Next.js Server                  Neon DB
+   │                          │                             │
+   │── POST /login ───────────┤                             │
+   │    { email, password }   │                             │
+   │                          │── findUnique(email) ────────┤
+   │                          │◄── { id, name, role, … } ───┤
+   │                          │                             │
+   │                          │── bcrypt.compare(password)  │
+   │                          │── update loggedInAt ────────┤
+   │                          │                             │
+   │                          │── Sign JWT (id, name,       │
+   │                          │    email, image, role)      │
+   │◄── Set httpOnly cookie ──┤                             │
 ```
 
 ### Data flow (server actions)

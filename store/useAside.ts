@@ -6,7 +6,7 @@ type AsideState = {
   toggleMinimize: () => void
 }
 
-const initialState = false
+const initialState = true
 
 export const useAside = create<AsideState>()((set) => ({
   minimize: initialState,

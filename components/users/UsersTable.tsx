@@ -256,7 +256,7 @@ export default function UsersTable({
             <div className="form-control">
               <label>Role</label>
               <select name="role" className="w-full">
-                <option value="USER">User</option>
+                <option value="GUEST">Guest</option>
                 <option value="ADMIN">Admin</option>
                 <option value="SUPERADMIN">Superadmin</option>
               </select>
@@ -310,7 +310,7 @@ export default function UsersTable({
                 className="w-full"
                 defaultValue={selectedUser.role}
               >
-                <option value="USER">User</option>
+                <option value="GUEST">Guest</option>
                 <option value="ADMIN">Admin</option>
                 <option value="SUPERADMIN">Superadmin</option>
               </select>

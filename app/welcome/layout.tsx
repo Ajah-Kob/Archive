@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { ReactNode } from 'react'
-import TemplateMain from '@/templates/Main'
+import TemplateWelcome from '@/templates/Welcome'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/authOptions'
@@ -17,6 +17,7 @@ export default async function WelcomeLayout({
 }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/login')
+  if (session.user.isFaculty || session.user.isStudent) redirect('/dashboard')
 
-  return <TemplateMain>{children}</TemplateMain>
+  return <TemplateWelcome>{children}</TemplateWelcome>
 }

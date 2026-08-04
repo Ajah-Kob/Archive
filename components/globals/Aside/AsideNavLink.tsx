@@ -24,7 +24,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Join', href: '/welcome', icon: UserPlus },
+  { label: 'Join', href: '/join-archive', icon: UserPlus },
   { label: 'Faculty', href: '/faculty', icon: Users },
   { label: 'Sections', href: '/sections', icon: Layers },
   { label: 'Templates', href: '/templates', icon: FileText },
@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
 ]
 
 const GUEST_ALLOWED = new Set([
-  '/welcome',
+  '/join-archive',
   '/repository',
   '/dashboard/user/profile',
 ])

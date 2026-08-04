@@ -6,8 +6,8 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/authOptions'
 
 export const metadata: Metadata = {
-  title: 'Welcome',
-  description: 'Welcome to Archive',
+  title: 'Join Archive',
+  description: 'Join Archive as a student or faculty member',
 }
 
 export default async function WelcomeLayout({

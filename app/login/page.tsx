@@ -10,7 +10,7 @@ export default function Login() {
           <div className="flex-1 p-6 flex flex-col gap-5 items-center justify-center bg-[#F8F7FF]">
             <div className="size-72 absolute -left-16 top-16 opacity-30 bg-purple-400 rounded-full blur-[80px] pointer-events-none z-0" />
             <div className="size-64 absolute right-260 top-90 opacity-25 bg-rose-400 rounded-full blur-[80px] pointer-events-none z-0" />
-            <div className="w-full max-w-[440px] p-8 md:p-10 rounded-3xl bg-[#ffffff] shadow-[0px_4px_24px_0px_rgba(0,0,0,0.03),0px_20px_60px_-4px_rgba(112,125,255,0.16),0px_0px_0px_1px_rgba(112,125,255,0.06)] flex flex-col gap-6 relative z-10">
+            <div className="w-full max-w-[340px] p-8 md:p-10 rounded-3xl bg-[#ffffff] shadow-[0px_4px_24px_0px_rgba(0,0,0,0.03),0px_20px_60px_-4px_rgba(112,125,255,0.16),0px_0px_0px_1px_rgba(112,125,255,0.06)] flex flex-col gap-6 relative z-10">
               {/* Logo Header */}
               <div className="w-full h-8 flex justify-start items-center gap-3">
                 <div className="size-8 bg-gradient-to-br from-indigo-400 to-red-400 rounded-xl flex justify-center items-center text-white text-sm">

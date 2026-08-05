@@ -52,9 +52,9 @@ export default function FormResetPassword({
   // if no token and email return:
   if (!email && !token) {
     return (
-      <div className="w-full max-w-[340px] p-8 md:p-10 rounded-3xl bg-[#ffffff] shadow-[0px_4px_24px_0px_rgba(0,0,0,0.03),0px_20px_60px_-4px_rgba(112,125,255,0.16),0px_0px_0px_1px_rgba(112,125,255,0.06)] flex flex-col gap-6">
+      <div className="w-full max-w-[340px] p-6 md:p-8 rounded-3xl bg-[#ffffff] shadow-[0px_4px_24px_0px_rgba(0,0,0,0.03),0px_20px_60px_-4px_rgba(112,125,255,0.16),0px_0px_0px_1px_rgba(112,125,255,0.06)] flex flex-col gap-5">
         <div className="text-left flex flex-col gap-2.5">
-          <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-[28.8px]">
+          <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-normal">
             Invalid reset link
           </h2>
           <p className="text-gray-500 font-inter text-[13px] non-italic font-medium leading-[20.8px]">
@@ -79,7 +79,7 @@ export default function FormResetPassword({
       action={handleSubmit}
       onInput={checkFormValidity}
       noValidate
-      className={`flex flex-col gap-5 ${className}`}
+      className={`flex flex-col gap-4 ${className}`}
     >
       <AuthInput
         label="Email"
@@ -105,7 +105,7 @@ export default function FormResetPassword({
         name="confirmPassword"
         type="password"
         placeholder="********"
-        error={state?.errors?.confirmpassword}
+        error={state?.errors?.confirmPassword}
         required
       />
 

@@ -1,10 +1,14 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useTransition } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AuthInput } from '@/components/ui/AuthInput'
+import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
+import { PasswordToggle } from '@/components/ui/PasswordToggle'
+import { useAuthFormValidity } from '@/components/forms/useAuthFormValidity'
+import { isValidEmail } from '@/lib/helper'
 
 export default function FormLogin({ className }: { className?: string }) {
   // Refs
@@ -13,6 +17,8 @@ export default function FormLogin({ className }: { className?: string }) {
   // Hooks
   const router = useRouter()
   const { push: redirect } = router
+  const [pending, startTransition] = useTransition()
+  const { isFormValid, checkFormValidity } = useAuthFormValidity(formRef)
 
   // State
   const [state, setState] = useState({
@@ -23,88 +29,84 @@ export default function FormLogin({ className }: { className?: string }) {
       password: '',
     },
   })
-  const [pending, setPending] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [isFormValid, setIsFormValid] = useState(false)
 
-  function checkFormValidity() {
-    const form = formRef.current
-    if (!form) return
-    const inputs = form.querySelectorAll('input[required]:not([type="hidden"])')
-    setIsFormValid(
-      Array.from(inputs).every(
-        (input) => (input as HTMLInputElement).value.trim() !== ''
-      )
-    )
-  }
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    setPending(true)
+    startTransition(async () => {
+      const formData = new FormData(formRef.current)
+      const email = formData.get('email')?.toString().trim()
+      const password = formData.get('password')?.toString().trim()
 
-    const formData = new FormData(formRef.current)
-    const email = formData.get('email')?.toString().trim()
-    const password = formData.get('password')?.toString().trim()
-
-    if (!email || !password) {
-      setState({
-        message: null,
-        success: false,
-        errors: {
-          email: !email ? 'Email is required.' : '',
-          password: !password ? 'Password is required.' : '',
-        },
-      })
-      setPending(false)
-      return
-    }
-
-    try {
-      const res = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      })
-
-      if (res?.ok === true) {
+      if (!email || !password) {
         setState({
-          message: 'Logged in successfully',
-          success: true,
+          message: null,
+          success: false,
           errors: {
-            email: '',
+            email: !email ? 'Email is required.' : '',
+            password: !password ? 'Password is required.' : '',
+          },
+        })
+        return
+      }
+
+      if (!isValidEmail(email)) {
+        setState({
+          message: null,
+          success: false,
+          errors: {
+            email: 'Please enter a valid email address.',
             password: '',
           },
         })
+        return
+      }
 
-        // Wait 1 second before redirecting
-        setTimeout(() => {
-          redirect('/dashboard')
-        }, 1000)
-      } else {
+      try {
+        const res = await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        })
+
+        if (res?.ok === true) {
+          setState({
+            message: 'Logged in successfully',
+            success: true,
+            errors: {
+              email: '',
+              password: '',
+            },
+          })
+
+          // Wait 1 second before redirecting
+          setTimeout(() => {
+            redirect('/dashboard')
+          }, 1000)
+        } else {
+          setState({
+            message: null,
+            success: false,
+            errors: {
+              email: '',
+              password: 'Invalid email or password.',
+            },
+          })
+        }
+      } catch (error) {
+        console.log('error: ', error)
+
         setState({
-          message: 'Failed to login',
+          message: null,
           success: false,
           errors: {
             email: '',
-            password: '',
+            password: 'Invalid email or password.',
           },
         })
       }
-
-      setPending(false)
-    } catch (error) {
-      console.log('error: ', error)
-
-      setState({
-        message: 'Failed to login',
-        success: false,
-        errors: {
-          email: '',
-          password: '',
-        },
-      })
-    }
+    })
   }
 
   return (
@@ -113,11 +115,11 @@ export default function FormLogin({ className }: { className?: string }) {
       onSubmit={handleSubmit}
       onInput={checkFormValidity}
       noValidate
-      className={`${className} flex flex-col gap-5`}
+      className={`${className} flex flex-col gap-4`}
     >
       {/* Header Section */}
       <div className=" text-left flex flex-col gap-2.5">
-        <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-[28.8px]">
+        <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-normal">
           Login to your account
         </h2>
         <p className="text-gray-500 font-inter text-[13px] non-italic font-medium leading-[20.8px]">
@@ -156,32 +158,10 @@ export default function FormLogin({ className }: { className?: string }) {
           error={state?.errors?.password}
           required
         >
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-            className="p-2 text-gray-400 hover:text-slate-600 transition-colors cursor-pointer"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-5 h-5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-              />
-            </svg>
-          </button>
+          <PasswordToggle
+            shown={showPassword}
+            onToggle={() => setShowPassword((shown) => !shown)}
+          />
         </AuthInput>
 
         {/* 4. Remember Me & Forgot Password Links Row */}
@@ -202,21 +182,11 @@ export default function FormLogin({ className }: { className?: string }) {
           </Link>
         </div>
 
-        <button
-          type="submit"
-          disabled={pending || !isFormValid}
-          className="self-stretch h-9 px-3.5 py-3.5 bg-gradient-to-r from-indigo-400 via-violet-400 via-[57%] to-red-400 to-[140%] rounded-md shadow-[0px_2px_8px_0px_rgba(0,0,0,0.08),0px_4px_22px_0px_rgba(112,125,255,0.27)] inline-flex justify-center items-center disabled:animate-pulse disabled:opacity-50 transition-all hover:opacity-95"
-        >
-          {/* Dynamic Submission Text Logic */}
-          <div className="text-center justify-start text-white text-sm font-semibold leading-5 tracking-tight">
-            {pending ? 'Please wait...' : 'Sign in →'}
-          </div>
-
-          {/* 2. Dynamic Icon Visibility Logic (Hides while loading) */}
-          {!pending && (
-            <div className="size-3.5 relative overflow-hidden"></div>
-          )}
-        </button>
+        <AuthSubmitButton
+          pending={pending}
+          label="Sign in →"
+          disabled={!isFormValid}
+        />
       </div>
 
       {/* Footer Registration Navigation link */}

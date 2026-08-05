@@ -35,7 +35,7 @@ export default function FormForgotPassword({
       action={handleSubmit}
       onInput={checkFormValidity}
       noValidate
-      className={`${className} flex flex-col gap-5`}
+      className={`${className} flex flex-col gap-4`}
     >
       <AuthInput
         label="Email"

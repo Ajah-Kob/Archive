@@ -44,3 +44,8 @@ next-env.d.ts
 .env*.local
 
 PROMPT.md
+
+# ui-ux-pro-max skill (local-only tooling)
+.agents/skills/ui-ux-pro-max/
+__pycache__/
+*.pyc

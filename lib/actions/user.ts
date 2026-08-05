@@ -16,7 +16,7 @@ const VALID_ROLES = ["SUPERADMIN", "ADMIN", "FACULTY", "STUDENT", "GUEST"]
 async function getUserData(id: string) {
   'use cache'
   cacheTag('users')
-  cacheLife('max')
+  cacheLife('seconds')
 
   try {
     const user = await prisma[table].findFirst({ where: { id: +id, deletedAt: null } })
@@ -36,7 +36,7 @@ export async function getUser(id: string) {
 async function getUsersData(page: number, perPage: number) {
   'use cache'
   cacheTag('users')
-  cacheLife('max')
+  cacheLife('seconds')
 
   try {
     const skip = (page - 1) * perPage
@@ -70,6 +70,7 @@ export async function signupUser(_prevState: any, formData: FormData) {
   const name = formData.get("name")?.toString().trim()
   const email = formData.get("email")?.toString().trim()
   const password = formData.get("password")?.toString().trim()
+  const confirmPassword = formData.get("confirmPassword")?.toString().trim()
 
   const errors: Record<string, string> = {}
   if (!name) errors.name = "Name is required."
@@ -78,6 +79,8 @@ export async function signupUser(_prevState: any, formData: FormData) {
   if (!password) errors.password = "Password is required."
   else if (password.length < MIN_PASSWORD_LENGTH)
     errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`
+  if (!confirmPassword) errors.confirmPassword = "Please confirm your password."
+  else if (confirmPassword !== password) errors.confirmPassword = "Passwords do not match."
 
   if (Object.keys(errors).length > 0) {
     return { success: false, errors, input: { name, email } }

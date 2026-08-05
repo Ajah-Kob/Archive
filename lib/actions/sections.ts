@@ -1,13 +1,13 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag, revalidatePath, revalidateTag } from 'next/cache'
+import { cacheLife, cacheTag, revalidatePath, revalidateTag, updateTag } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import type { SectionData } from '@/components/sections/main/SectionDataRow'
 import type { StudentData } from '@/components/sections/students/StudentDataRow'
 import { generateJoinCode, getInitials, timeAgo } from '@/lib/helper'
-import { unslugify } from '@/lib/slug'
+import { slugify, unslugify } from '@/lib/slug'
 import { requireCoordinator } from '@/lib/actions/guard'
 
 const gradients = [
@@ -271,11 +271,13 @@ export async function joinSection(formData: FormData) {
       data: { role: 'STUDENT' },
     })
 
-    revalidateTag('users', 'max')
-    revalidateTag('sections', 'max')
-    revalidateTag('my-sections', 'max')
+    updateTag('users')
+    updateTag('sections')
+    updateTag('my-sections')
+    updateTag(`my-section-${joinCode.section.id}`)
     revalidatePath('/sections')
     revalidatePath('/my-sections')
+    revalidatePath(`/my-sections/${slugify(joinCode.section.section)}`)
 
     return { success: true, message: 'Successfully joined the section.' }
   } catch (error) {

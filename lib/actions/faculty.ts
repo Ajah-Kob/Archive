@@ -50,7 +50,7 @@ export async function getAvailableFaculty() {
 export async function getFacultyMembers() {
   'use cache'
   cacheTag('faculty')
-  cacheLife('max')
+  cacheLife('seconds')
 
   const faculty = await prisma.faculty.findMany({
     where: { deletedAt: null },

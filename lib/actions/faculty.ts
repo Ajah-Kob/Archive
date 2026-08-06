@@ -171,7 +171,7 @@ export async function getFacultyMemberDetail(facultyId: number) {
     return {
       id: capstone.group.id,
       name: capstone.group.groupName,
-      sectionLabel: section ? `${section.section} ${section.yearLevel}` : 'No section',
+      sectionLabel: section ? section.section : 'No section',
       memberCount: liveStudents.length,
     }
   })

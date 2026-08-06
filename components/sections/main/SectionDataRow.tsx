@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation'
 import { Users } from 'lucide-react'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { ActionMenu } from '@/components/ui/ActionMenu'
-import { slugify } from '@/lib/slug'
 
 export interface SectionData {
   id: number
@@ -71,7 +70,7 @@ export function SectionDataRow({ data }: SectionDataRowProps) {
           items={[
             {
               label: 'View Details',
-              onClick: () => router.push(`/sections/${slugify(data.section)}`),
+              onClick: () => router.push(`/sections/${data.id}`),
             },
           ]}
         />

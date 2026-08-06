@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, PenLine, Plus, X } from 'lucide-react'
+import { PenLine, Plus, X } from 'lucide-react'
 import { useActionState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -10,30 +10,6 @@ import {
   updateSection,
   type MySectionCardData,
 } from '@/lib/actions/sections'
-
-const YEAR_LEVELS = ['3rd Year', '4th Year']
-const SECTION_LETTERS = ['A', 'B', 'C']
-const GROUP_NUMBERS = ['1', '2']
-
-interface ParsedName {
-  yearLevel: string
-  section: string
-  groupNumber: string
-}
-
-function parseName(name?: string): ParsedName {
-  const match = name?.match(/^(\d)([A-Z])G(\d{1,2})$/i)
-  if (!match) return { yearLevel: '4th Year', section: 'A', groupNumber: '1' }
-  return {
-    yearLevel: match[1] === '3' ? '3rd Year' : '4th Year',
-    section: match[2].toUpperCase(),
-    groupNumber: match[3],
-  }
-}
-
-function yearDigit(yearLevel: string) {
-  return yearLevel === '4th Year' ? '4' : '3'
-}
 
 interface SectionModalProps {
   mode: 'create' | 'edit'
@@ -45,13 +21,14 @@ interface SectionModalProps {
 export function SectionModal({ mode, section, onClose, onSuccess }: SectionModalProps) {
   const action = mode === 'edit' ? updateSection : createSection
   const [state, formAction, isPending] = useActionState(action, null)
+  const [name, setName] = useState(section?.name ?? '')
 
-  const initial = parseName(section?.name)
-  const [yearLevel, setYearLevel] = useState(initial.yearLevel)
-  const [sectionLetter, setSectionLetter] = useState(initial.section)
-  const [groupNumber, setGroupNumber] = useState(initial.groupNumber)
-
-  const previewName = `${yearDigit(yearLevel)}${sectionLetter}G${groupNumber}`
+  const trimmed = name.trim()
+  const canSubmit =
+    trimmed.length >= 3 &&
+    trimmed.length <= 60 &&
+    /^[A-Za-z0-9 .-]+$/.test(trimmed) &&
+    name === trimmed
 
   useEffect(() => {
     if (state && state.success) {
@@ -62,44 +39,7 @@ export function SectionModal({ mode, section, onClose, onSuccess }: SectionModal
   }, [state, onClose, onSuccess])
 
   const inputClass =
-    'w-full h-[42.25px] pl-[12px] pr-[30px] appearance-none bg-white border border-[#e8ebf8] rounded-[10px] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] font-sans font-semibold text-[13px] text-[#3d4566] outline-none focus:border-[rgba(112,125,255,0.5)] transition-colors'
-
-  function SelectField({
-    label,
-    name,
-    value,
-    options,
-    onChange,
-  }: {
-    label: string
-    name: string
-    value: string
-    options: string[]
-    onChange: (v: string) => void
-  }) {
-    return (
-      <div className="flex flex-col items-start">
-        <label className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
-          {label}
-        </label>
-        <div className="relative w-full pt-[6px]">
-          <select
-            name={name}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className={inputClass}
-          >
-            {options.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-[12px] top-1/2 -translate-y-1/2 size-[14px] text-[#8a93b4] pointer-events-none" />
-        </div>
-      </div>
-    )
-  }
+    'w-full h-[42.25px] px-[14px] bg-white border border-[#e8ebf8] rounded-[10px] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] font-sans font-semibold text-[13px] text-[#3d4566] outline-none focus:border-[rgba(112,125,255,0.5)] transition-colors'
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(15,18,40,0.45)] backdrop-blur-sm animate-in fade-in duration-200">
@@ -132,42 +72,21 @@ export function SectionModal({ mode, section, onClose, onSuccess }: SectionModal
           )}
 
           <div className="flex flex-col items-start pt-[22px] px-[22px]">
-            <div className="grid grid-cols-3 gap-x-[14px] gap-y-[14px] w-full">
-              <SelectField
-                label="Year Level"
-                name="yearLevel"
-                value={yearLevel}
-                options={YEAR_LEVELS}
-                onChange={setYearLevel}
-              />
-              <SelectField
-                label="Section"
-                name="section"
-                value={sectionLetter}
-                options={SECTION_LETTERS}
-                onChange={setSectionLetter}
-              />
-              <SelectField
-                label="Group Number"
-                name="groupNumber"
-                value={groupNumber}
-                options={GROUP_NUMBERS}
-                onChange={setGroupNumber}
-              />
-            </div>
-
-            <div className="flex items-center justify-between w-full mt-[22px] px-[19px] py-[17px] rounded-[12px] bg-[rgba(112,125,255,0.02)] border border-[rgba(112,125,255,0.13)]">
-              <div className="flex flex-col items-start">
-                <span className="font-sans font-bold text-[10.5px] leading-[15.75px] text-[#9ea8c6] tracking-[1.05px] uppercase">
-                  Section Preview
-                </span>
-                <span className="pt-[4px] font-['Sora',sans-serif] font-extrabold text-[28px] leading-[28px] text-[#1e3a8a] tracking-[-0.56px]">
-                  {previewName}
-                </span>
+            <div className="flex flex-col items-start w-full">
+              <label className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
+                Section Name
+              </label>
+              <div className="relative w-full pt-[6px]">
+                <input
+                  type="text"
+                  name="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. BSIS 4A"
+                  maxLength={60}
+                  className={inputClass}
+                />
               </div>
-              <span className="px-[11px] py-[4px] rounded-[20px] bg-[rgba(112,125,255,0.06)] border border-[rgba(112,125,255,0.14)] font-sans font-bold text-[11px] leading-[16.5px] text-[#707dff] whitespace-nowrap">
-                {yearLevel}
-              </span>
             </div>
 
             {state && !state.success && (
@@ -187,7 +106,7 @@ export function SectionModal({ mode, section, onClose, onSuccess }: SectionModal
             </button>
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isPending || !canSubmit}
               className="px-[20px] py-[9px] rounded-[10px] font-sans font-bold text-[13px] leading-[19.5px] text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98] transition-all"
               style={{
                 backgroundImage:

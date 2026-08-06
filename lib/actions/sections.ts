@@ -7,7 +7,6 @@ import { authOptions } from '@/lib/authOptions'
 import type { SectionData } from '@/components/sections/main/SectionDataRow'
 import type { StudentData } from '@/components/sections/students/StudentDataRow'
 import { generateJoinCode, getInitials, timeAgo } from '@/lib/helper'
-import { slugify, unslugify } from '@/lib/slug'
 import { requireCoordinator } from '@/lib/actions/guard'
 
 const gradients = [
@@ -95,15 +94,15 @@ export interface SectionDetailData {
   students: StudentData[]
 }
 
-async function getSectionDetailData(slug: string) {
+async function getSectionDetailData(id: number) {
   'use cache'
-  cacheTag(`section-${slug}`)
+  cacheTag(`section-${id}`)
   cacheLife('max')
 
   const section = await prisma[table].findFirst({
     where: {
+      id,
       deletedAt: null,
-      section: { equals: unslugify(slug), mode: 'insensitive' },
     },
     include: {
       coordinator: {
@@ -177,20 +176,20 @@ async function getSectionDetailData(slug: string) {
   }
 }
 
-export async function getSectionBySlug(slug: string) {
+export async function getSectionById(id: number) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return { success: false, message: 'Not authenticated', payload: null }
   }
 
   try {
-    const payload = await getSectionDetailData(slug)
+    const payload = await getSectionDetailData(id)
     if (!payload) {
       return { success: false, message: 'Section not found', payload: null }
     }
     return { success: true, payload }
   } catch (error) {
-    console.error('[getSectionBySlug | Error]:', error)
+    console.error('[getSectionById | Error]:', error)
     return {
       success: false,
       message: 'Failed to fetch section',
@@ -291,7 +290,7 @@ export async function joinSection(formData: FormData) {
     updateTag(`my-section-${joinCode.section.id}`)
     revalidatePath('/sections')
     revalidatePath('/my-sections')
-    revalidatePath(`/my-sections/${slugify(joinCode.section.section)}`)
+    revalidatePath(`/my-sections/${joinCode.section.id}`)
 
     return { success: true, message: 'Successfully joined the section.' }
   } catch (error) {
@@ -345,8 +344,6 @@ export async function softDeleteSection(id: string) {
 export interface MySectionCardData {
   id: number
   name: string
-  yearLevel: string
-  accent: 'indigo' | 'amber'
   students: number
   groups: number
   hasJoinCode: boolean
@@ -356,10 +353,6 @@ export interface MySectionCardData {
 }
 
 const JOIN_CODE_TTL_MS = 3 * 24 * 60 * 60 * 1000
-
-function accentForYear(yearLevel: string): 'indigo' | 'amber' {
-  return yearLevel === '4th Year' ? 'indigo' : 'amber'
-}
 
 function revalidateCoordinatorCache(sectionId?: number) {
   revalidateTag('my-sections', 'max')
@@ -392,8 +385,6 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
       return {
         id: s.id,
         name: s.section,
-        yearLevel: s.yearLevel,
-        accent: accentForYear(s.yearLevel),
         students: s.students.length,
         groups: s._count.groups,
         hasJoinCode: !!validCode,
@@ -461,8 +452,6 @@ async function getCoordinatorSectionData(sectionId: number) {
     section: {
       id: section.id,
       name: section.section,
-      yearLevel: section.yearLevel,
-      accent: accentForYear(section.yearLevel),
       hasJoinCode: !!section.joinCode && !section.joinCode.deletedAt,
       joinCode:
         section.joinCode && !section.joinCode.deletedAt
@@ -502,7 +491,7 @@ export async function getCoordinatorSections() {
   return { success: true, message: '', payload }
 }
 
-export async function getCoordinatorSectionBySlug(slug: string) {
+export async function getCoordinatorSectionById(id: number) {
   const coordinator = await requireCoordinatorRow()
   if (!coordinator) {
     return { success: false, message: 'Not authorized', payload: null }
@@ -511,9 +500,9 @@ export async function getCoordinatorSectionBySlug(slug: string) {
   try {
     const section = await prisma.section.findFirst({
       where: {
+        id,
         coordinatorId: coordinator.id,
         deletedAt: null,
-        section: { equals: unslugify(slug), mode: 'insensitive' },
       },
       select: { id: true },
     })
@@ -524,7 +513,7 @@ export async function getCoordinatorSectionBySlug(slug: string) {
     const payload = await getCoordinatorSectionData(section.id)
     return { success: true, message: '', payload }
   } catch (error) {
-    console.error('[getCoordinatorSectionBySlug | Error]:', error)
+    console.error('[getCoordinatorSectionById | Error]:', error)
     return {
       success: false,
       message: 'Failed to fetch section',
@@ -533,29 +522,39 @@ export async function getCoordinatorSectionBySlug(slug: string) {
   }
 }
 
+const SECTION_NAME_PATTERN = /^[A-Za-z0-9 .-]+$/
+
+function validateSectionName(raw: string): string | null {
+  const name = raw.trim()
+  if (name.length < 3 || name.length > 60) {
+    return 'Section name must be between 3 and 60 characters.'
+  }
+  if (name !== raw) {
+    return 'Section name cannot have leading or trailing spaces.'
+  }
+  if (!SECTION_NAME_PATTERN.test(name)) {
+    return 'Section name can only contain letters, numbers, spaces, periods, and dashes.'
+  }
+  return name
+}
+
 export async function createSection(_prevState: any, formData: FormData) {
   const coordinator = await requireCoordinatorRow()
   if (!coordinator) {
     return { success: false, message: 'You are not authorized to perform this action.' }
   }
 
-  const yearLevel = formData.get('yearLevel')?.toString().trim() ?? ''
-  const sectionLetter = formData.get('section')?.toString().trim().toUpperCase() ?? ''
-  const groupNumber = formData.get('groupNumber')?.toString().trim() ?? ''
-
-  if (!['3rd Year', '4th Year'].includes(yearLevel)) {
-    return { success: false, message: 'Please choose a valid year level.' }
-  }
-  if (!/^[A-Z]$/.test(sectionLetter)) {
-    return { success: false, message: 'Please choose a valid section letter.' }
-  }
-  if (groupNumber !== '1' && groupNumber !== '2') {
-    return { success: false, message: 'Please choose a valid group number.' }
+  const name = validateSectionName(formData.get('name')?.toString() ?? '')
+  if (typeof name !== 'string') {
+    return { success: false, message: name }
   }
 
-  const name = `${yearLevel === '4th Year' ? 4 : 3}${sectionLetter}G${groupNumber}`
-
-  const existing = await prisma.section.findFirst({ where: { section: name } })
+  const existing = await prisma.section.findFirst({
+    where: {
+      coordinatorId: coordinator.id,
+      section: { equals: name, mode: 'insensitive' },
+    },
+  })
   if (existing && !existing.deletedAt) {
     return { success: false, message: `Section ${name} already exists.` }
   }
@@ -580,7 +579,6 @@ export async function createSection(_prevState: any, formData: FormData) {
         where: { id: existing.id },
         data: {
           coordinatorId: coordinator.id,
-          yearLevel,
           joinCodeId: joinCode.id,
           deletedAt: null,
         },
@@ -593,7 +591,6 @@ export async function createSection(_prevState: any, formData: FormData) {
         data: {
           coordinatorId: coordinator.id,
           section: name,
-          yearLevel,
           joinCodeId: joinCode.id,
         },
       })
@@ -618,21 +615,10 @@ export async function updateSection(_prevState: any, formData: FormData) {
     return { success: false, message: 'Invalid section.' }
   }
 
-  const yearLevel = formData.get('yearLevel')?.toString().trim() ?? ''
-  const sectionLetter = formData.get('section')?.toString().trim().toUpperCase() ?? ''
-  const groupNumber = formData.get('groupNumber')?.toString().trim() ?? ''
-
-  if (!['3rd Year', '4th Year'].includes(yearLevel)) {
-    return { success: false, message: 'Please choose a valid year level.' }
+  const name = validateSectionName(formData.get('name')?.toString() ?? '')
+  if (typeof name !== 'string') {
+    return { success: false, message: name }
   }
-  if (!/^[A-Z]$/.test(sectionLetter)) {
-    return { success: false, message: 'Please choose a valid section letter.' }
-  }
-  if (groupNumber !== '1' && groupNumber !== '2') {
-    return { success: false, message: 'Please choose a valid group number.' }
-  }
-
-  const name = `${yearLevel === '4th Year' ? 4 : 3}${sectionLetter}G${groupNumber}`
 
   try {
     const current = await prisma.section.findFirst({
@@ -646,7 +632,12 @@ export async function updateSection(_prevState: any, formData: FormData) {
       return { success: true, message: 'No changes to save.' }
     }
 
-    const target = await prisma.section.findFirst({ where: { section: name } })
+    const target = await prisma.section.findFirst({
+      where: {
+        coordinatorId: coordinator.id,
+        section: { equals: name, mode: 'insensitive' },
+      },
+    })
     if (target && !target.deletedAt) {
       return { success: false, message: `Section ${name} already exists.` }
     }
@@ -669,7 +660,6 @@ export async function updateSection(_prevState: any, formData: FormData) {
           where: { id: target.id },
           data: {
             coordinatorId: coordinator.id,
-            yearLevel,
             joinCodeId: current.joinCodeId,
             deletedAt: null,
           },
@@ -690,7 +680,7 @@ export async function updateSection(_prevState: any, formData: FormData) {
     } else {
       await prisma.section.update({
         where: { id: current.id },
-        data: { section: name, yearLevel },
+        data: { section: name },
       })
     }
 

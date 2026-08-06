@@ -4,16 +4,16 @@ import { notFound } from 'next/navigation'
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { SectionCodeButton } from '@/components/my-sections/SectionCodeButton'
 import { MySectionStudents } from '@/components/my-sections/MySectionStudents'
-import { getCoordinatorSectionBySlug } from '@/lib/actions/sections'
+import { getCoordinatorSectionById } from '@/lib/actions/sections'
 
 export default async function MySectionDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ id: string }>
 }) {
-  const { slug } = await params
+  const { id } = await params
 
-  const res = await getCoordinatorSectionBySlug(slug)
+  const res = await getCoordinatorSectionById(parseInt(id))
   const payload = res.success && res.payload ? res.payload : null
   if (!payload) notFound()
 

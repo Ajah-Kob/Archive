@@ -163,14 +163,14 @@ model Section {
   joinCode      JoinCode?   @relation(fields: [joinCodeId], references: [id], onDelete: SetNull)
   coordinatorId Int
   coordinator   Coordinator @relation(fields: [coordinatorId], references: [id])
-  section       String      @unique
-  yearLevel     String
+  section       String
   students      Student[]
   groups        Group[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   deletedAt     DateTime?
 
+  @@unique([coordinatorId, section])
   @@index([deletedAt])
 }
 

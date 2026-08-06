@@ -3,16 +3,16 @@ import { ArrowLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { StudentList } from '@/components/sections/students/StudentList'
-import { getSectionBySlug } from '@/lib/actions/sections'
+import { getSectionById } from '@/lib/actions/sections'
 
 export default async function SectionDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ id: string }>
 }) {
-  const { slug } = await params
+  const { id } = await params
 
-  const res = await getSectionBySlug(slug)
+  const res = await getSectionById(parseInt(id))
   const payload = res.success && res.payload ? res.payload : null
   if (!payload) notFound()
 

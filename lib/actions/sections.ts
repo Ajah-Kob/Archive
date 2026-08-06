@@ -249,22 +249,36 @@ export async function joinSection(formData: FormData) {
     }
 
     const existingStudent = await prisma.student.findFirst({
-      where: { userId: +session.user.id, deletedAt: null },
+      where: { userId: +session.user.id },
     })
 
-    if (existingStudent) {
+    if (existingStudent && !existingStudent.deletedAt) {
       return {
         success: false,
         message: 'You are already enrolled in a section.',
       }
     }
 
-    await prisma.student.create({
-      data: {
-        userId: +session.user.id,
-        sectionId: joinCode.section.id,
-      },
-    })
+    if (existingStudent) {
+      // Resurrect a previously removed student (soft-deleted row) instead of
+      // creating a new one — Student.userId is unique, so a fresh create
+      // would throw a constraint violation.
+      await prisma.student.update({
+        where: { id: existingStudent.id },
+        data: {
+          sectionId: joinCode.section.id,
+          groupId: null,
+          deletedAt: null,
+        },
+      })
+    } else {
+      await prisma.student.create({
+        data: {
+          userId: +session.user.id,
+          sectionId: joinCode.section.id,
+        },
+      })
+    }
 
     await prisma.user.update({
       where: { id: +session.user.id },
@@ -752,10 +766,16 @@ export async function removeStudentFromSection(studentId: number) {
     }
 
     const groupId = student.groupId
-    await prisma.student.update({
-      where: { id: student.id },
-      data: { groupId: null, deletedAt: new Date() },
-    })
+    await prisma.$transaction([
+      prisma.student.update({
+        where: { id: student.id },
+        data: { groupId: null, deletedAt: new Date() },
+      }),
+      prisma.user.update({
+        where: { id: student.userId },
+        data: { role: 'GUEST' },
+      }),
+    ])
 
     // Business rule: a group cannot exist without a student.
     if (groupId) {
@@ -789,6 +809,8 @@ export async function removeStudentFromSection(studentId: number) {
     }
 
     revalidateCoordinatorCache(student.sectionId)
+    revalidateTag('users', 'max')
+    revalidatePath('/dashboard/users')
     revalidateTag(`workspace-${student.userId}`, 'max')
     revalidateTag(`classmates-${student.userId}`, 'max')
     if (groupId) revalidateTag(`journey-${groupId}`, 'max')

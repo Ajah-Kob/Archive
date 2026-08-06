@@ -88,8 +88,8 @@ export const authOptions: NextAuthOptions = {
           token.image = dbUser.image
           token.role = dbUser.role
           token.isProgramChair = dbUser.faculty?.isProgramChair ?? false
-          token.isFaculty = !!dbUser.faculty
-          token.isStudent = !!dbUser.student
+          token.isFaculty = !!dbUser.faculty && dbUser.faculty.deletedAt === null
+          token.isStudent = !!dbUser.student && dbUser.student.deletedAt === null
           // Relation includes don't respect soft-deletes — check deletedAt
           // explicitly so a removed coordinator loses their access flags.
           const coordinator = dbUser.faculty?.coordinator

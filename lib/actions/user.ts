@@ -32,22 +32,58 @@ export async function getUser(id: string) {
   return getUserData(id)
 }
 
-// GET ALL (paginated)
-async function getUsersData(page: number, perPage: number) {
+// GET ALL (paginated, filterable, sortable)
+async function getUsersData(
+  page: number,
+  perPage: number,
+  search?: string,
+  roleFilter?: string,
+  dateFrom?: string,
+  dateTo?: string,
+  sortField?: string,
+  sortDir?: string,
+) {
   'use cache'
   cacheTag('users')
   cacheLife('seconds')
 
   try {
+    const where: any = { deletedAt: null }
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ]
+    }
+    if (roleFilter) {
+      where.role = roleFilter
+    }
+    if (dateFrom) {
+      where.createdAt = { ...where.createdAt, gte: new Date(dateFrom) }
+    }
+    if (dateTo) {
+      where.createdAt = { ...where.createdAt, lte: new Date(dateTo + "T23:59:59.999Z") }
+    }
+
+    const orderBy: any = {}
+    if (sortField === "chair") {
+      orderBy.faculty = { isProgramChair: sortDir === "desc" ? "desc" : "asc" }
+    } else if (sortField && ["id", "name", "email", "role", "createdAt"].includes(sortField)) {
+      orderBy[sortField] = sortDir === "desc" ? "desc" : "asc"
+    } else {
+      orderBy.id = "asc"
+    }
+
     const skip = (page - 1) * perPage
     const [users, total] = await prisma.$transaction([
       prisma[table].findMany({
-        where: { deletedAt: null },
+        where,
         skip,
         take: perPage,
-        orderBy: { id: "asc" },
+        orderBy,
+        include: { faculty: { select: { isProgramChair: true } } },
       }),
-      prisma[table].count({ where: { deletedAt: null } }),
+      prisma[table].count({ where }),
     ])
     return {
       success: true,
@@ -60,9 +96,18 @@ async function getUsersData(page: number, perPage: number) {
   }
 }
 
-export async function getUsers(page: number = 1, perPage: number = USERS_PER_PAGE) {
+export async function getUsers(
+  page: number = 1,
+  perPage: number = USERS_PER_PAGE,
+  search?: string,
+  roleFilter?: string,
+  dateFrom?: string,
+  dateTo?: string,
+  sortField?: string,
+  sortDir?: string,
+) {
   if (!(await requireAdmin())) return { success: false, payload: null, total: 0, totalPages: 1, message: "Not authorized" }
-  return getUsersData(page, perPage)
+  return getUsersData(page, perPage, search, roleFilter, dateFrom, dateTo, sortField, sortDir)
 }
 
 // SIGNUP (public) — always creates a plain USER; never reads a role from input.

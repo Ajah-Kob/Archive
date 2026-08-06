@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { getSession, requireAdminOrProgramChair, unauthorized } from '@/lib/actions/guard'
+import { getSession, requireAdmin, requireAdminOrProgramChair, unauthorized } from '@/lib/actions/guard'
 import { validateFacultyCode } from '@/lib/actions/join-code'
 import { timeAgo } from '@/lib/helper'
 import {
@@ -74,7 +74,10 @@ export async function getFacultyMembers() {
       adviser: {
         include: {
           _count: {
-            select: { capstones: { where: { deletedAt: null } } },
+            select: {
+              capstones: { where: { deletedAt: null } },
+              groups: { where: { deletedAt: null } },
+            },
           },
         },
       },
@@ -95,7 +98,9 @@ export async function getFacultyMembers() {
       activityStatus: activityStatusFor(f.user.loggedInAt),
       isAdviser,
       isCoordinator,
-      adviseeCount: isAdviser ? f.adviser._count.capstones : 0,
+      adviseeCount: isAdviser
+        ? f.adviser._count.capstones + f.adviser._count.groups
+        : 0,
       sectionsManaged: isCoordinator ? f.coordinator._count.section : 0,
     }
   })
@@ -142,6 +147,7 @@ export async function getFacultyMemberDetail(facultyId: number) {
               },
             },
           },
+          groups: { where: { deletedAt: null }, select: { id: true } },
         },
       },
     },
@@ -181,7 +187,8 @@ export async function getFacultyMemberDetail(facultyId: number) {
       loggedInAt: faculty.user.loggedInAt,
       activityStatus: activityStatusFor(faculty.user.loggedInAt),
       roles,
-      adviseeCount: capstones.length,
+      adviseeCount:
+        capstones.length + (faculty.adviser?.groups.length ?? 0),
       sectionsManaged: isCoordinator ? faculty.coordinator._count.section : 0,
       groups,
     },
@@ -212,12 +219,16 @@ export async function removeFaculty(facultyId: number) {
     where: { facultyId, deletedAt: null },
     include: {
       _count: {
-        select: { capstones: { where: { deletedAt: null } } },
+        select: {
+          capstones: { where: { deletedAt: null } },
+          groups: { where: { deletedAt: null } },
+        },
       },
     },
   })
 
-  const adviseeCount = adviser?._count.capstones ?? 0
+  const adviseeCount =
+    (adviser?._count.capstones ?? 0) + (adviser?._count.groups ?? 0)
   if (adviseeCount > 0) {
     return {
       success: false,
@@ -307,4 +318,57 @@ export async function joinFaculty(formData: FormData) {
   revalidatePath('/faculty')
 
   return { success: true, message: 'Faculty registration successful.' }
+}
+
+export async function toggleProgramChair(id: number) {
+  const session = await requireAdmin()
+  if (!session) {
+    return { success: false, message: 'Not authorized' }
+  }
+
+  try {
+    let target = await prisma.faculty.findFirst({
+      where: { userId: id, deletedAt: null },
+      include: { user: true },
+    })
+
+    if (!target) {
+      const user = await prisma.user.findFirst({
+        where: { id, deletedAt: null },
+      })
+      if (!user || user.role !== 'FACULTY') {
+        return { success: false, message: 'Only faculty can be program chair' }
+      }
+      target = await prisma.faculty.create({
+        data: { userId: id, isProgramChair: false },
+        include: { user: true },
+      })
+    }
+
+    const newValue = !target.isProgramChair
+
+    if (newValue) {
+      await prisma.faculty.updateMany({
+        where: { isProgramChair: true },
+        data: { isProgramChair: false },
+      })
+    }
+
+    await prisma.faculty.update({
+      where: { id: target.id },
+      data: { isProgramChair: newValue },
+    })
+
+    revalidateTag('users', 'max')
+    revalidatePath('/dashboard/users')
+
+    return {
+      success: true,
+      message: newValue
+        ? `${target.user.name} is now the Program Chair`
+        : `${target.user.name} is no longer Program Chair`,
+    }
+  } catch {
+    return { success: false, message: 'Failed to toggle program chair' }
+  }
 }

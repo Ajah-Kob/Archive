@@ -43,9 +43,16 @@ next-env.d.ts
 .vercel
 .env*.local
 
+.agents
 PROMPT.md
+PLAN.md
 
 # ui-ux-pro-max skill (local-only tooling)
 .agents/skills/ui-ux-pro-max/
 __pycache__/
 *.pyc
+
+# local planning docs (kept locally, not versioned)
+/archive-plan/
+/docs/archived-plan/
+/docs/decisions/

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { Bell, Check, Clock, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { getInitials, timeAgo } from '@/lib/helper'
@@ -21,6 +22,10 @@ interface InvitationNotification {
   faculty: {
     user: { id: number; name: string; email: string; image: string | null }
   }
+  student?: {
+    user: { id: number; name: string; email: string; image: string | null }
+  } | null
+  group?: { id: number; groupName: string } | null
   invitedBy: { id: number; name: string; image: string | null }
 }
 
@@ -37,6 +42,14 @@ const ROLE_META: Record<string, { article: string; callout: string }> = {
     article: 'an Adviser',
     callout: 'Accepting will let you supervise student groups and review their capstone progress.',
   },
+  GROUP: {
+    article: 'a Group Member',
+    callout: 'Accepting will add you to the group and unlock the capstone workspace.',
+  },
+  ADVISER_ASSIGNMENT: {
+    article: 'an Adviser',
+    callout: 'Accepting will assign you as the adviser for this capstone group.',
+  },
 }
 
 function roleLabel(role: string): string {
@@ -52,6 +65,7 @@ function roleCallout(role: string): string {
 
 export default function NotificationPanel({ variant }: NotificationPanelProps) {
   const { data: session, update } = useSession()
+  const router = useRouter()
   const userId = session?.user?.id ? +session.user.id : null
 
   const [isOpen, setIsOpen] = useState(false)
@@ -130,6 +144,7 @@ export default function NotificationPanel({ variant }: NotificationPanelProps) {
   }
 
   const handleAccept = async (id: number) => {
+    const current = notifications.find((n) => n.id === id)
     setBusyId(id)
     const result = await acceptInvitation(id)
     if (result.success) {
@@ -142,6 +157,10 @@ export default function NotificationPanel({ variant }: NotificationPanelProps) {
           : new Date().toISOString(),
       )
       await update()
+      if (current?.role === 'GROUP') {
+        router.push('/milestones')
+        router.refresh()
+      }
     } else {
       toast.error(result.message)
     }
@@ -280,10 +299,28 @@ export default function NotificationPanel({ variant }: NotificationPanelProps) {
 
                       <div className="flex-1 min-w-px">
                         <p className="text-[13px] leading-[20.15px] text-[#3c4268] font-medium">
-                          You&apos;ve been invited to become{' '}
-                          <span className="font-bold text-[#12143a]">
-                            {roleLabel(notification.role)}
-                          </span>
+                          {notification.role === 'GROUP' ? (
+                            <>
+                              You&apos;ve been invited to join the group{' '}
+                              <span className="font-bold text-[#12143a]">
+                                {notification.group?.groupName ?? 'your section'}
+                              </span>
+                            </>
+                          ) : notification.role === 'ADVISER_ASSIGNMENT' ? (
+                            <>
+                              You&apos;ve been invited to advise on the group{' '}
+                              <span className="font-bold text-[#12143a]">
+                                {notification.group?.groupName ?? 'a capstone group'}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              You&apos;ve been invited to become{' '}
+                              <span className="font-bold text-[#12143a]">
+                                {roleLabel(notification.role)}
+                              </span>
+                            </>
+                          )}
                         </p>
 
                         <div className="flex items-center gap-[6px] pt-1">

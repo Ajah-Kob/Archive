@@ -23,33 +23,33 @@ enum Role {
 }
 
 model User {
-  id                          Int                      @id @default(autoincrement())
-  name                        String
-  email                       String                   @unique
-  image                       String?
-  role                        Role                     @default(GUEST)
-  activatedAt                 DateTime?
-  createdAt                   DateTime                 @default(now())
-  loggedInAt                  DateTime?                @default(now())
-  deletedAt                   DateTime?
-  password                    String?
-  updatedAt                   DateTime?                @updatedAt
-  faculty                     Faculty?
-  student                     Student?
-  templates                   Template[]
-  capstoneArchives            CapstoneArchive[]
-  milestoneSubmissions        MilestoneSubmission[]
-  invitationsSent             Invitation[]            @relation("InvitationSender")
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String                @unique
+  image                String?
+  role                 Role                  @default(GUEST)
+  activatedAt          DateTime?
+  createdAt            DateTime              @default(now())
+  loggedInAt           DateTime?             @default(now())
+  deletedAt            DateTime?
+  password             String?
+  updatedAt            DateTime?             @updatedAt
+  faculty              Faculty?
+  student              Student?
+  templates            Template[]
+  capstoneArchives     CapstoneArchive[]
+  milestoneSubmissions MilestoneSubmission[]
+  invitationsSent      Invitation[]          @relation("InvitationSender")
 
   @@index([email, deletedAt])
 }
 
 model ResetPasswordToken {
-  id                          Int                     @id(map: "idx_30320_primary") @default(autoincrement())
-  email                       String                  @db.VarChar(191)
-  token                       String                  @unique(map: "idx_30320_resetpasswordtoken_token_key") @db.VarChar(191)
-  expires                     DateTime                @db.Timestamptz(6)
-  created_at                  DateTime                @default(now()) @db.Timestamptz(6)
+  id         Int      @id(map: "idx_30320_primary") @default(autoincrement())
+  email      String   @db.VarChar(191)
+  token      String   @unique(map: "idx_30320_resetpasswordtoken_token_key") @db.VarChar(191)
+  expires    DateTime @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
 
   @@unique([email, token], map: "idx_30320_resetpasswordtoken_email_token_key")
 }
@@ -57,40 +57,41 @@ model ResetPasswordToken {
 // ───────────────────────────── Faculty ─────────────────────────────
 
 model Faculty {
-  id                          Int                     @id @default(autoincrement())
-  userId                      Int                     @unique
-  user                        User                    @relation(fields: [userId], references: [id])
-  isProgramChair              Boolean                 @default(false)
-  coordinator                 Coordinator?
-  adviser                     Adviser?
-  invitations                 Invitation[]
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id             Int          @id @default(autoincrement())
+  userId         Int          @unique
+  user           User         @relation(fields: [userId], references: [id])
+  isProgramChair Boolean      @default(false)
+  coordinator    Coordinator?
+  adviser        Adviser?
+  invitations    Invitation[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
 
   @@index([deletedAt])
 }
 
 model Coordinator {
-  id                          Int                     @id @default(autoincrement())
-  facultyId                   Int                     @unique
-  faculty                     Faculty                 @relation(fields: [facultyId], references: [id])
-  section                     Section[]
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id        Int       @id @default(autoincrement())
+  facultyId Int       @unique
+  faculty   Faculty   @relation(fields: [facultyId], references: [id])
+  section   Section[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([deletedAt])
 }
 
 model Adviser {
-  id                          Int                     @id @default(autoincrement())
-  facultyId                   Int                     @unique
-  faculty                     Faculty                 @relation(fields: [facultyId], references: [id])
-  capstones                   Capstone[]
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id        Int        @id @default(autoincrement())
+  facultyId Int        @unique
+  faculty   Faculty    @relation(fields: [facultyId], references: [id])
+  capstones Capstone[]
+  groups    Group[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
 
   @@index([deletedAt])
 }
@@ -103,13 +104,13 @@ enum JoinType {
 }
 
 model JoinCode {
-  id                          Int                     @id @default(autoincrement())
-  code                        String                  @unique
-  type                        JoinType
-  section                     Section?
-  expiresAt                   DateTime
-  createdAt                   DateTime                @default(now())
-  deletedAt                   DateTime?
+  id        Int       @id @default(autoincrement())
+  code      String    @unique
+  type      JoinType
+  section   Section?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
   @@index([deletedAt])
 }
@@ -121,6 +122,7 @@ enum InvitationRole {
   ADVISER
   PANELIST
   GROUP
+  ADVISER_ASSIGNMENT
 }
 
 enum InvitationStatus {
@@ -131,18 +133,24 @@ enum InvitationStatus {
 }
 
 model Invitation {
-  id                          Int                     @id @default(autoincrement())
-  facultyId                   Int
-  faculty                     Faculty                 @relation(fields: [facultyId], references: [id])
-  role                        InvitationRole
-  invitedById                 Int
-  invitedBy                   User                    @relation("InvitationSender", fields: [invitedById], references: [id])
-  status                      InvitationStatus        @default(PENDING)
-  readAt                      DateTime?
-  createdAt                   DateTime                @default(now())
-  deletedAt                   DateTime?
+  id          Int              @id @default(autoincrement())
+  facultyId   Int?
+  faculty     Faculty?         @relation(fields: [facultyId], references: [id])
+  studentId   Int?
+  student     Student?         @relation(fields: [studentId], references: [id])
+  groupId     Int?
+  group       Group?           @relation(fields: [groupId], references: [id])
+  role        InvitationRole
+  invitedById Int
+  invitedBy   User             @relation("InvitationSender", fields: [invitedById], references: [id])
+  status      InvitationStatus @default(PENDING)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+  deletedAt   DateTime?
 
   @@index([facultyId])
+  @@index([studentId])
+  @@index([groupId])
   @@index([invitedById])
   @@index([deletedAt])
 }
@@ -150,51 +158,58 @@ model Invitation {
 // ───────────────────────────── Section & Student & Group ─────────────────────────────
 
 model Section {
-  id                          Int                     @id @default(autoincrement())
-  joinCodeId                  Int?                    @unique
-  joinCode                    JoinCode?               @relation(fields: [joinCodeId], references: [id], onDelete: SetNull)
-  coordinatorId               Int
-  coordinator                 Coordinator             @relation(fields: [coordinatorId], references: [id])
-  section                     String                   @unique
-  yearLevel                   String
-  students                    Student[]
-  groups                      Group[]
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id            Int         @id @default(autoincrement())
+  joinCodeId    Int?        @unique
+  joinCode      JoinCode?   @relation(fields: [joinCodeId], references: [id], onDelete: SetNull)
+  coordinatorId Int
+  coordinator   Coordinator @relation(fields: [coordinatorId], references: [id])
+  section       String      @unique
+  yearLevel     String
+  students      Student[]
+  groups        Group[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
 
   @@index([deletedAt])
 }
 
 model Student {
-  id                          Int                     @id @default(autoincrement())
-  userId                      Int                     @unique
-  user                        User                    @relation(fields: [userId], references: [id])
-  sectionId                   Int
-  section                     Section                 @relation(fields: [sectionId], references: [id])
-  groupId                     Int?
-  group                       Group?                  @relation(fields: [groupId], references: [id])
-  topics                      Topic[]
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id          Int          @id @default(autoincrement())
+  userId      Int          @unique
+  user        User         @relation(fields: [userId], references: [id])
+  sectionId   Int
+  section     Section      @relation(fields: [sectionId], references: [id])
+  groupId     Int?
+  group       Group?       @relation(fields: [groupId], references: [id])
+  ledGroup    Group?       @relation("GroupLeader")
+  invitations Invitation[]
+  topics      Topic[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
 
   @@index([deletedAt])
 }
 
 model Group {
-  id                         Int                      @id @default(autoincrement())
-  groupName                  String
-  sectionId                  Int
-  section                    Section                  @relation(fields: [sectionId], references: [id])
-  students                   Student[]
-  topics                     Topic[]
-  capstone                   Capstone?
-  milestones                 Milestone[]
-  capstoneArchive            CapstoneArchive?
-  createdAt                  DateTime                 @default(now())
-  updatedAt                  DateTime                 @updatedAt
-  deletedAt                  DateTime?
+  id              Int              @id @default(autoincrement())
+  groupName       String
+  sectionId       Int
+  section         Section          @relation(fields: [sectionId], references: [id])
+  leaderStudentId Int?             @unique
+  leaderStudent   Student?         @relation("GroupLeader", fields: [leaderStudentId], references: [id])
+  adviserId       Int?
+  adviser         Adviser?         @relation(fields: [adviserId], references: [id])
+  students        Student[]
+  topics          Topic[]
+  capstone        Capstone?
+  milestones      Milestone[]
+  capstoneArchive CapstoneArchive?
+  invitations     Invitation[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
 
   @@index([sectionId])
   @@index([deletedAt])
@@ -205,22 +220,22 @@ model Group {
 enum TopicStatus {
   PENDING
   APPROVED
-  REJECTED
+  NEED_REVISION
 }
 
 model Topic {
-  id                          Int                     @id @default(autoincrement())
-  groupId                     Int
-  group                       Group                   @relation(fields: [groupId], references: [id])
-  title                       String
-  background                  String
-  uploadedById                Int?
-  uploadedBy                  Student?                @relation(fields: [uploadedById], references: [id])
-  status                      TopicStatus             @default(PENDING)
-  capstone                    Capstone?
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id           Int         @id @default(autoincrement())
+  groupId      Int
+  group        Group       @relation(fields: [groupId], references: [id])
+  title        String
+  background   String
+  uploadedById Int?
+  uploadedBy   Student?    @relation(fields: [uploadedById], references: [id])
+  status       TopicStatus @default(PENDING)
+  capstone     Capstone?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
 
   @@index([groupId])
   @@index([uploadedById])
@@ -234,17 +249,17 @@ enum CapstonePhase {
 }
 
 model Capstone {
-  id                          Int                     @id @default(autoincrement())
-  groupId                     Int                     @unique
-  group                       Group                   @relation(fields: [groupId], references: [id])
-  topicId                     Int                     @unique
-  topic                       Topic                   @relation(fields: [topicId], references: [id])
-  adviserId                   Int?
-  adviser                     Adviser?                @relation(fields: [adviserId], references: [id])
-  milestones                  Milestone[]
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id         Int         @id @default(autoincrement())
+  groupId    Int         @unique
+  group      Group       @relation(fields: [groupId], references: [id])
+  topicId    Int         @unique
+  topic      Topic       @relation(fields: [topicId], references: [id])
+  adviserId  Int?
+  adviser    Adviser?    @relation(fields: [adviserId], references: [id])
+  milestones Milestone[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  deletedAt  DateTime?
 
   @@index([topicId])
   @@index([adviserId])
@@ -262,17 +277,17 @@ enum Chapter {
 }
 
 model Milestone {
-  id                          Int                     @id @default(autoincrement())
-  groupId                     Int
-  group                       Group                   @relation(fields: [groupId], references: [id])
-  phase                       CapstonePhase
-  chapter                     Chapter
-  capstoneId                  Int
-  capstone                    Capstone                @relation(fields: [capstoneId], references: [id])
-  submissions                 MilestoneSubmission[]
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id          Int                   @id @default(autoincrement())
+  groupId     Int
+  group       Group                 @relation(fields: [groupId], references: [id])
+  phase       CapstonePhase
+  chapter     Chapter
+  capstoneId  Int
+  capstone    Capstone              @relation(fields: [capstoneId], references: [id])
+  submissions MilestoneSubmission[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  deletedAt   DateTime?
 
   @@index([groupId])
   @@index([capstoneId])
@@ -286,19 +301,19 @@ enum SubmissionStatus {
 }
 
 model MilestoneSubmission {
-  id                          Int                     @id @default(autoincrement())
-  milestoneId                 Int
-  milestone                   Milestone               @relation(fields: [milestoneId], references: [id])
-  submittedBy                 Int
-  user                        User                    @relation(fields: [submittedBy], references: [id])
-  fileName                    String
-  blobUrl                     String
-  mimeType                    String
-  size                        Int
-  status                      SubmissionStatus        @default(PENDING)
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
-  deletedAt                   DateTime?
+  id          Int              @id @default(autoincrement())
+  milestoneId Int
+  milestone   Milestone        @relation(fields: [milestoneId], references: [id])
+  submittedBy Int
+  user        User             @relation(fields: [submittedBy], references: [id])
+  fileName    String
+  blobUrl     String
+  mimeType    String
+  size        Int
+  status      SubmissionStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
 
   @@index([milestoneId])
   @@index([submittedBy])
@@ -308,39 +323,38 @@ model MilestoneSubmission {
 // ───────────────────────────── Repository ─────────────────────────────
 
 model CapstoneArchive {
-  id                              Int                     @id @default(autoincrement())
-  groupId                         Int                     @unique
-  group                           Group                   @relation(fields: [groupId], references: [id])
-  title                           String
-  abstract                        String?
-  datePublished                   DateTime
-  fileName                        String
-  blobUrl                         String
-  mimeType                        String
-  size                            Int
-  uploadedById                    Int
-  uploadedBy                      User                    @relation(fields: [uploadedById], references: [id])
-  createdAt                       DateTime                @default(now())
-  updatedAt                       DateTime                @updatedAt
-  deletedAt                       DateTime?
+  id            Int       @id @default(autoincrement())
+  groupId       Int       @unique
+  group         Group     @relation(fields: [groupId], references: [id])
+  title         String
+  abstract      String?
+  datePublished DateTime
+  fileName      String
+  blobUrl       String
+  mimeType      String
+  size          Int
+  uploadedById  Int
+  uploadedBy    User      @relation(fields: [uploadedById], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   @@index([deletedAt])
 }
 
 // ───────────────────────────── Template ─────────────────────────────
-
 model Template {
-  id                              Int                     @id @default(autoincrement())
-  name                            String
-  fileName                        String
-  blobUrl                         String
-  mimeType                        String
-  size                            Int
-  uploadedById                    Int
-  uploadedBy                      User                    @relation(fields: [uploadedById], references: [id])
-  createdAt                       DateTime                @default(now())
-  updatedAt                       DateTime                @updatedAt
-  deletedAt                       DateTime?
+  id           Int       @id @default(autoincrement())
+  name         String
+  fileName     String
+  blobUrl      String
+  mimeType     String
+  size         Int
+  uploadedById Int
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   @@index([deletedAt])
   @@index([uploadedById])

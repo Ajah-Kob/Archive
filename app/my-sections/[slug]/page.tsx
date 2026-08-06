@@ -63,7 +63,7 @@ export default async function MySectionDetailPage({
         </div>
       </div>
 
-      <div className="flex-1 pb-[30px]">
+      <div className="flex-1 pb-[30px] flex flex-col min-h-0">
         <MySectionStudents students={students} />
       </div>
     </section>

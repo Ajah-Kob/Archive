@@ -759,18 +759,39 @@ export async function removeStudentFromSection(studentId: number) {
 
     // Business rule: a group cannot exist without a student.
     if (groupId) {
-      const remaining = await prisma.student.count({
+      const remaining = await prisma.student.findMany({
         where: { groupId, deletedAt: null },
+        orderBy: { id: 'asc' },
+        select: { id: true },
       })
-      if (remaining === 0) {
+      if (remaining.length === 0) {
         await prisma.group.update({
           where: { id: groupId },
-          data: { deletedAt: new Date() },
+          data: { deletedAt: new Date(), leaderStudentId: null },
         })
+      } else {
+        // If the removed student led the group, auto-transfer leadership to
+        // the earliest remaining member (lowest Student.id).
+        const group = await prisma.group.findFirst({
+          where: { id: groupId },
+          select: { leaderStudentId: true },
+        })
+        if (
+          group &&
+          (group.leaderStudentId === null || group.leaderStudentId === student.id)
+        ) {
+          await prisma.group.update({
+            where: { id: groupId },
+            data: { leaderStudentId: remaining[0].id },
+          })
+        }
       }
     }
 
     revalidateCoordinatorCache(student.sectionId)
+    revalidateTag(`workspace-${student.userId}`, 'max')
+    revalidateTag(`classmates-${student.userId}`, 'max')
+    if (groupId) revalidateTag(`journey-${groupId}`, 'max')
     return { success: true, message: 'Student removed from the section.' }
   } catch (error) {
     console.error('[removeStudentFromSection | Error]:', error)

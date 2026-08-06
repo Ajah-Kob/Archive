@@ -47,6 +47,8 @@ const MEMBER_ALLOWED = new Set([
   '/dashboard/user/profile',
 ])
 
+const STUDENT_ALLOWED = new Set([...MEMBER_ALLOWED, '/milestones'])
+
 const COORDINATOR_ALLOWED = new Set([
   '/dashboard',
   '/faculty',
@@ -88,11 +90,13 @@ function useNavItems() {
       ...base.slice(insertAt),
     ]
   }
-  const allowed =
-    session?.user?.isFaculty || session?.user?.isStudent
-      ? MEMBER_ALLOWED
-      : GUEST_ALLOWED
-  return navItems.filter((item) => allowed.has(item.href))
+  if (session?.user?.isStudent) {
+    return navItems.filter((item) => STUDENT_ALLOWED.has(item.href))
+  }
+  if (session?.user?.isFaculty) {
+    return navItems.filter((item) => MEMBER_ALLOWED.has(item.href))
+  }
+  return navItems.filter((item) => GUEST_ALLOWED.has(item.href))
 }
 
 export function CollapsedNavLink({ pathname }: { pathname: string }) {

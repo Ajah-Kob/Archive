@@ -2,7 +2,6 @@
 
 import { useState, useRef, useTransition } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
@@ -15,8 +14,6 @@ export default function FormLogin({ className }: { className?: string }) {
   const formRef = useRef<HTMLFormElement>(null)
 
   // Hooks
-  const router = useRouter()
-  const { push: redirect } = router
   const [pending, startTransition] = useTransition()
   const { isFormValid, checkFormValidity } = useAuthFormValidity(formRef)
 
@@ -82,7 +79,7 @@ export default function FormLogin({ className }: { className?: string }) {
 
           // Wait 1 second before redirecting
           setTimeout(() => {
-            redirect('/dashboard')
+            window.location.href = '/dashboard'
           }, 1000)
         } else {
           setState({

@@ -56,7 +56,7 @@ export function StudentTable({
   renderActions,
 }: StudentTableProps) {
   return (
-    <div className="w-full">
+    <div className="w-full flex flex-col flex-1">
       {/* Header Row */}
       <div
         className={`grid items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] ${
@@ -80,7 +80,7 @@ export function StudentTable({
       </div>
 
       {students.length === 0 ? (
-        <div className="flex flex-col items-center justify-center px-10 py-16 w-full">
+        <div className="flex flex-col items-center justify-center px-10 py-16 w-full flex-1">
           <h3 className="font-heading font-bold text-[14px] leading-[21px] text-[#3d4566] tracking-[-0.14px] text-center mb-1">
             No Students Found
           </h3>

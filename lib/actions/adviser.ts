@@ -6,17 +6,30 @@ import { revalidateTag, revalidatePath } from 'next/cache'
 const table = 'adviser'
 
 // CREATE — called when faculty accepts the adviser invitation.
-// Guards are intentionally omitted for now.
+// Idempotent: if the faculty already holds a live adviser record, returns it
+// instead of failing (both the role-grant and the assignment-accept paths rely
+// on this).
 export async function addAdviser(facultyId: number) {
   try {
     const existing = await prisma[table].findFirst({
       where: { facultyId, deletedAt: null },
+      include: {
+        faculty: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true, image: true },
+            },
+          },
+        },
+      },
     })
     if (existing) {
+      revalidateTag('advisers', 'max')
+      revalidateTag('faculty', 'max')
       return {
-        success: false,
-        payload: null,
-        message: 'This faculty member is already an adviser.',
+        success: true,
+        payload: existing,
+        message: 'Faculty is already an adviser.',
       }
     }
 

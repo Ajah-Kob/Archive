@@ -9,5 +9,6 @@
   "css.lint.unknownAtRules": "ignore",
   "scss.lint.unknownAtRules": "ignore",
   "tailwindCSS.experimental.configFile": "app/globals.css",
-  "tailwindCSS.validate": false
+  "tailwindCSS.validate": false,
+  "json.schemaTrustedUris": ["https://app.kilo.ai/config.json"]
 }

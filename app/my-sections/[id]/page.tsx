@@ -4,20 +4,29 @@ import { notFound } from 'next/navigation'
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { SectionCodeButton } from '@/components/my-sections/SectionCodeButton'
 import { MySectionStudents } from '@/components/my-sections/MySectionStudents'
+import { MilestonePhasesCard } from '@/components/my-sections/MilestonePhasesCard'
+import { SectionTabs, type SectionTabKey } from '@/components/my-sections/SectionTabs'
+import { ProgressOverview } from '@/components/my-sections/progress/ProgressOverview'
+import { TopicReviewQueue } from '@/components/my-sections/topics/TopicReviewQueue'
 import { getCoordinatorSectionById } from '@/lib/actions/sections'
 
 export default async function MySectionDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const { id } = await params
+  const { tab } = await searchParams
 
   const res = await getCoordinatorSectionById(parseInt(id))
   const payload = res.success && res.payload ? res.payload : null
   if (!payload) notFound()
 
-  const { section, students } = payload
+  const { section, students, groups, pendingTopics } = payload
+  const activeTab: SectionTabKey =
+    tab === 'progress' || tab === 'topics' ? tab : 'students'
 
   return (
     <section className="min-h-full flex flex-col gap-3">
@@ -36,15 +45,14 @@ export default async function MySectionDetailPage({
           </h1>
           <Link
             href="/my-sections"
-            className="flex gap-[7px] items-center h-[30px] px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
+            className="flex gap-[7px] items-center h-[30px] px-[11px] bg-white border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#f7f7ff] transition-colors shrink-0"
           >
             <ArrowLeft className="size-3.5" />
             Back to My Sections
           </Link>
         </div>
         <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] mt-1">
-          Manage students enrolled in {section.name}, their groups, and recent
-          activity.
+          Manage students, groups, and capstone progress in {section.name}.
         </p>
 
         <div className="flex flex-wrap items-center gap-x-[20px] gap-y-[10px] mt-[18px]">
@@ -64,7 +72,21 @@ export default async function MySectionDetailPage({
       </div>
 
       <div className="flex-1 pb-[30px] flex flex-col min-h-0">
-        <MySectionStudents students={students} />
+        <SectionTabs
+          activeTab={activeTab}
+          pendingTopics={pendingTopics.length}
+          studentsPanel={<MySectionStudents students={students} />}
+          progressPanel={
+            <div className="flex flex-col gap-[16px] flex-1 min-h-0">
+              <MilestonePhasesCard
+                sectionId={section.id}
+                capstone2OpenedAt={section.capstone2OpenedAt}
+              />
+              <ProgressOverview groups={groups} />
+            </div>
+          }
+          topicsPanel={<TopicReviewQueue topics={pendingTopics} />}
+        />
       </div>
     </section>
   )

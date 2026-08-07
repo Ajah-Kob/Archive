@@ -2,146 +2,16 @@
 
 import prisma from '@/lib/prisma'
 import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
-import { requireStudent, unauthorized } from '@/lib/actions/guard'
+import { requireStudent, requireUser, unauthorized } from '@/lib/actions/guard'
 import { ADVISER_CAP } from '@/config/constants'
+import { buildJourneyRows } from '@/lib/journey'
 import {
   GROUP_CAP,
   type AdviserOption,
   type AdviserState,
   type Classmate,
-  type JourneyRow,
   type WorkspaceData,
 } from '@/types/milestones'
-
-const CHAPTER_SLUG: Record<string, string> = {
-  CHAPTER_1: 'chapter-1',
-  CHAPTER_2: 'chapter-2',
-  CHAPTER_3: 'chapter-3',
-  CHAPTER_4: 'chapter-4',
-  CHAPTER_5: 'chapter-5',
-}
-
-type JourneySource = {
-  topics: { status: string; deletedAt: Date | null }[]
-  capstone: { topicId: number } | null
-  milestones: {
-    chapter: string
-    submissions: { status: string }[]
-  }[]
-  capstoneArchive: { deletedAt: Date | null } | null
-}
-
-// Derives the 8 journey rows from a group's data. Passing `null` (groupless)
-// renders every row locked — there is no data to derive from.
-function buildJourneyRows(group: JourneySource | null): JourneyRow[] {
-  if (!group) {
-    return JOURNEY_ROWS_EMPTY
-  }
-
-  const topics = group.topics.filter((t) => !t.deletedAt)
-  const approved = topics.filter((t) => t.status === 'APPROVED')
-  const needsRevision = topics.filter((t) => t.status === 'NEED_REVISION')
-  const pending = topics.filter((t) => t.status === 'PENDING')
-
-  const rows: JourneyRow[] = []
-
-  // Topic Submission — derived from Topic rows.
-  const topicSubmission: JourneyRow = {
-    slug: 'topic-submission',
-    label: 'Topic Submission',
-    header: 'INITIAL',
-    state: 'DEFAULT',
-  }
-  if (needsRevision.length > 0) {
-    topicSubmission.state = 'NEEDS_REVISION'
-    topicSubmission.sublabel = `${needsRevision.length} ${
-      needsRevision.length === 1 ? 'needs' : 'need'
-    } revision`
-  } else if (approved.length > 0 && pending.length === 0) {
-    topicSubmission.state = 'APPROVED'
-    topicSubmission.sublabel = `${approved.length} Approved`
-  } else if (pending.length > 0) {
-    topicSubmission.state = 'SUBMITTED'
-    topicSubmission.sublabel = `${pending.length} Submitted`
-  }
-  rows.push(topicSubmission)
-
-  // Topic Selection — unlocked by an approved topic; green once selected.
-  const topicSelection: JourneyRow = {
-    slug: 'topic-selection',
-    label: 'Topic Selection',
-    header: 'INITIAL',
-    state: 'DEFAULT',
-  }
-  if (approved.length === 0) {
-    topicSelection.state = 'LOCKED'
-  } else if (group.capstone?.topicId) {
-    topicSelection.state = 'APPROVED'
-    topicSelection.sublabel = 'Topic Selected'
-  }
-  rows.push(topicSelection)
-
-  // Chapters — render from Milestone rows when they exist (created by the
-  // future capstone workspace); otherwise the coordinator gate keeps them locked.
-  const milestoneByChapter = new Map(
-    group.milestones.map((m) => [m.chapter, m]),
-  )
-  for (const chapter of ['CHAPTER_1', 'CHAPTER_2', 'CHAPTER_3', 'CHAPTER_4', 'CHAPTER_5']) {
-    const slug = CHAPTER_SLUG[chapter]
-    const milestone = milestoneByChapter.get(chapter)
-    const row: JourneyRow = {
-      slug,
-      label: `Chapter ${chapter.slice(-1)}`,
-      header: slug.startsWith('chapter-4') || slug.startsWith('chapter-5')
-        ? 'CAPSTONE 2'
-        : 'CAPSTONE 1',
-      state: 'LOCKED',
-    }
-    if (milestone) {
-      const latest = milestone.submissions[0]
-      if (!latest) {
-        row.state = 'DEFAULT'
-      } else if (latest.status === 'APPROVED') {
-        row.state = 'APPROVED'
-        row.sublabel = 'Approved'
-      } else if (latest.status === 'NEED_REVISION') {
-        row.state = 'NEEDS_REVISION'
-        row.sublabel = 'Needs Revision'
-      } else {
-        row.state = 'SUBMITTED'
-        row.sublabel = 'Submitted'
-      }
-    }
-    rows.push(row)
-  }
-
-  // Archiving — derived from CapstoneArchive.
-  const archiving: JourneyRow = {
-    slug: 'archiving',
-    label: 'Archiving',
-    header: 'FINAL',
-    state: 'LOCKED',
-  }
-  if (group.capstoneArchive && !group.capstoneArchive.deletedAt) {
-    archiving.state = 'APPROVED'
-    archiving.sublabel = 'Archived'
-  }
-  rows.push(archiving)
-
-  return rows
-}
-
-// Statically built groupless journey (all locked) so we never allocate it per request.
-const JOURNEY_ROWS_EMPTY: JourneyRow[] = [
-  { slug: 'topic-submission', label: 'Topic Submission', header: 'INITIAL', state: 'LOCKED' },
-  { slug: 'topic-selection', label: 'Topic Selection', header: 'INITIAL', state: 'LOCKED' },
-  { slug: 'chapter-1', label: 'Chapter 1', header: 'CAPSTONE 1', state: 'LOCKED' },
-  { slug: 'chapter-2', label: 'Chapter 2', header: 'CAPSTONE 1', state: 'LOCKED' },
-  { slug: 'chapter-3', label: 'Chapter 3', header: 'CAPSTONE 1', state: 'LOCKED' },
-  { slug: 'chapter-4', label: 'Chapter 4', header: 'CAPSTONE 2', state: 'LOCKED' },
-  { slug: 'chapter-5', label: 'Chapter 5', header: 'CAPSTONE 2', state: 'LOCKED' },
-  { slug: 'archiving', label: 'Archiving', header: 'FINAL', state: 'LOCKED' },
-]
 
 function revalidateWorkspace(userId?: number, groupId?: number) {
   if (userId) revalidateTag(`workspace-${userId}`, 'max')
@@ -172,7 +42,7 @@ export async function getMyWorkspace(userId: number): Promise<{
     where: { userId, deletedAt: null },
     include: {
       user: { select: { id: true, name: true, email: true, image: true } },
-      section: { select: { id: true, section: true } },
+      section: { select: { id: true, section: true, capstone2OpenedAt: true } },
       group: {
         include: {
           students: {
@@ -298,6 +168,7 @@ export async function getMyWorkspace(userId: number): Promise<{
         state: 'pending',
         canManage: isLeader,
         invitationId: pendingAdviser.id,
+        facultyId: pendingAdviser.facultyId,
         name: facultyUser?.name,
         email: facultyUser?.email,
         image: facultyUser?.image ?? null,
@@ -329,24 +200,26 @@ export async function getMyWorkspace(userId: number): Promise<{
       adviser,
       invitations,
     },
-    journey: buildJourneyRows(group),
+    journey: buildJourneyRows(group, !!student.section.capstone2OpenedAt),
   }
 
   return { success: true, message: '', payload }
 }
 
 // Same-section classmates who are not yet in a group and can be invited.
-export async function getAvailableClassmates(userId: number): Promise<{
+// Plain server action (no 'use cache'): the picker must show current data on
+// every open — a cached entry would go stale indefinitely because no page
+// render reads this tag, and 'max'-profile revalidation is page-driven.
+export async function getAvailableClassmates(): Promise<{
   success: boolean
   message: string
   payload: Classmate[] | null
 }> {
-  'use cache'
-  cacheTag(`classmates-${userId}`)
-  cacheLife('max')
+  const session = await requireStudent()
+  if (!session?.user?.id) return unauthorized
 
   const leader = await prisma.student.findFirst({
-    where: { userId, deletedAt: null },
+    where: { userId: +session.user.id, deletedAt: null },
     select: { id: true, sectionId: true, groupId: true },
   })
   if (!leader) {
@@ -395,15 +268,15 @@ export async function getAvailableClassmates(userId: number): Promise<{
 }
 
 // All active faculty (coordinators and program chair included) with workload.
+// Plain server action (no 'use cache') — see getAvailableClassmates for why
+// client-invoked picker queries must not be cached.
 export async function getAvailableAdvisers(): Promise<{
   success: boolean
   message: string
   payload: AdviserOption[] | null
 }> {
-  'use cache'
-  cacheTag('advisers')
-  cacheTag('faculty')
-  cacheLife('max')
+  const session = await requireUser()
+  if (!session?.user?.id) return unauthorized
 
   const faculty = await prisma.faculty.findMany({
     where: { deletedAt: null },
@@ -438,9 +311,9 @@ export async function getAvailableAdvisers(): Promise<{
 
 // ───────────────────────────── Mutations ─────────────────────────────
 
-// Creates a group with the caller as leader and sends GROUP invites to the
-// selected classmates (they join by accepting from the bell panel).
-export async function createGroup(name: string, memberIds: number[]) {
+// Creates a group with the caller as leader. Members are invited afterwards
+// from the group dashboard (leader-only, via inviteGroupMembers).
+export async function createGroup(name: string) {
   const session = await requireStudent()
   if (!session?.user?.id) return unauthorized
 
@@ -461,14 +334,6 @@ export async function createGroup(name: string, memberIds: number[]) {
     return { success: false, message: 'You are already in a group.' }
   }
 
-  const memberIdsUnique = [...new Set(memberIds)]
-  if (memberIdsUnique.length > GROUP_CAP - 1) {
-    return {
-      success: false,
-      message: `You can invite up to ${GROUP_CAP - 1} classmates.`,
-    }
-  }
-
   const duplicate = await prisma.group.findFirst({
     where: {
       sectionId: leader.sectionId,
@@ -481,25 +346,6 @@ export async function createGroup(name: string, memberIds: number[]) {
     return {
       success: false,
       message: 'A group with this name already exists in your section.',
-    }
-  }
-
-  const classmates =
-    memberIdsUnique.length > 0
-      ? await prisma.student.findMany({
-          where: {
-            id: { in: memberIdsUnique },
-            sectionId: leader.sectionId,
-            groupId: null,
-            deletedAt: null,
-          },
-          include: { user: { select: { id: true } } },
-        })
-      : []
-  if (classmates.length !== memberIdsUnique.length) {
-    return {
-      success: false,
-      message: 'Some selected students are no longer available.',
     }
   }
 
@@ -516,24 +362,9 @@ export async function createGroup(name: string, memberIds: number[]) {
         where: { id: leader.id },
         data: { groupId: created.id },
       })
-      if (classmates.length > 0) {
-        await tx.invitation.createMany({
-          data: classmates.map((s) => ({
-            studentId: s.id,
-            groupId: created.id,
-            role: 'GROUP',
-            invitedById: +session.user.id!,
-            status: 'PENDING',
-          })),
-        })
-      }
       return created
     })
 
-    for (const c of classmates) {
-      revalidateTag(`my-invitations-${c.user.id}`, 'max')
-      revalidateTag(`classmates-${c.user.id}`, 'max')
-    }
     revalidateTag(`workspace-${session.user.id}`, 'max')
     revalidateTag(`classmates-${session.user.id}`, 'max')
     revalidateTag('sections', 'max')
@@ -747,7 +578,8 @@ export async function transferLeadership(memberId: number) {
   }
 }
 
-// Non-leader only: leave the group. Leaders must transfer leadership first.
+// Leave the group. Leaders auto-transfer to the next oldest member, or
+// the group is deleted if they are the last member.
 export async function leaveGroup() {
   const session = await requireStudent()
   if (!session?.user?.id) return unauthorized
@@ -757,29 +589,60 @@ export async function leaveGroup() {
     include: { group: { select: { id: true, leaderStudentId: true } } },
   })
   if (!student?.group) return { success: false, message: 'You are not in a group.' }
-  if (student.group.leaderStudentId === student.id) {
-    return {
-      success: false,
-      message: 'Transfer leadership to another member before leaving.',
-    }
-  }
+
+  const isLeader = student.group.leaderStudentId === student.id
 
   try {
-    await prisma.student.update({
-      where: { id: student.id },
-      data: { groupId: null },
-    })
-    const remaining = await prisma.student.count({
-      where: { groupId: student.group.id, deletedAt: null },
-    })
-    if (remaining === 0) {
-      await prisma.group.update({
-        where: { id: student.group.id },
-        data: { deletedAt: new Date() },
+    if (isLeader) {
+      const nextLeader = await prisma.student.findFirst({
+        where: { groupId: student.group.id, deletedAt: null, id: { not: student.id } },
+        orderBy: { id: 'asc' },
+        include: { user: { select: { id: true } } },
       })
+
+      if (nextLeader) {
+        await prisma.group.update({
+          where: { id: student.group.id },
+          data: { leaderStudentId: nextLeader.id },
+        })
+        await prisma.student.update({
+          where: { id: student.id },
+          data: { groupId: null },
+        })
+        revalidateWorkspace(+session.user.id, student.group.id)
+        if (nextLeader.user?.id) {
+          revalidateTag(`workspace-${nextLeader.user.id}`, 'max')
+        }
+        return { success: true, message: 'You left the group. Leadership transferred.' }
+      } else {
+        await prisma.group.update({
+          where: { id: student.group.id },
+          data: { deletedAt: new Date() },
+        })
+        await prisma.student.update({
+          where: { id: student.id },
+          data: { groupId: null },
+        })
+        revalidateWorkspace(+session.user.id, student.group.id)
+        return { success: true, message: 'You left the group.' }
+      }
+    } else {
+      await prisma.student.update({
+        where: { id: student.id },
+        data: { groupId: null },
+      })
+      const remaining = await prisma.student.count({
+        where: { groupId: student.group.id, deletedAt: null },
+      })
+      if (remaining === 0) {
+        await prisma.group.update({
+          where: { id: student.group.id },
+          data: { deletedAt: new Date() },
+        })
+      }
+      revalidateWorkspace(+session.user.id, student.group.id)
+      return { success: true, message: 'You left the group.' }
     }
-    revalidateWorkspace(+session.user.id, student.group.id)
-    return { success: true, message: 'You left the group.' }
   } catch {
     return { success: false, message: 'Failed to leave the group.' }
   }

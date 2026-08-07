@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { Search, Users } from 'lucide-react'
 import { getAvailableClassmates } from '@/lib/actions/groups'
 import type { Classmate } from '@/types/milestones'
@@ -27,16 +26,13 @@ export function ClassmatesPicker({
   selected,
   onToggle,
 }: ClassmatesPickerProps) {
-  const { data: session } = useSession()
   const [classmates, setClassmates] = useState<Classmate[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
 
   useEffect(() => {
-    const userId = session?.user?.id ? +session.user.id : null
-    if (!userId) return
     let cancelled = false
-    getAvailableClassmates(userId).then((res) => {
+    getAvailableClassmates().then((res) => {
       if (cancelled) return
       setClassmates(res.success ? (res.payload ?? []) : [])
       setLoading(false)
@@ -44,7 +40,7 @@ export function ClassmatesPicker({
     return () => {
       cancelled = true
     }
-  }, [session?.user?.id])
+  }, [])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

@@ -51,6 +51,7 @@ export type AdviserState =
       state: 'pending'
       canManage: boolean
       invitationId: number
+      facultyId: number
       name?: string
       email?: string
       image?: string | null

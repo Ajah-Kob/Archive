@@ -4,8 +4,6 @@ import { useState } from 'react'
 import { Loader2, TriangleAlert, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createGroup } from '@/lib/actions/groups'
-import { GROUP_CAP } from '@/types/milestones'
-import { ClassmatesPicker } from '@/components/milestones/ClassmatesPicker'
 
 interface CreateGroupModalProps {
   onClose: () => void
@@ -14,26 +12,14 @@ interface CreateGroupModalProps {
 
 export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) {
   const [name, setName] = useState('')
-  const [selected, setSelected] = useState<number[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const maxSelect = GROUP_CAP - 1
-
-  const toggle = (id: number) => {
-    setError(null)
-    setSelected((prev) => {
-      if (prev.includes(id)) return prev.filter((s) => s !== id)
-      if (prev.length >= maxSelect) return prev
-      return [...prev, id]
-    })
-  }
 
   const handleSubmit = async () => {
     if (!name.trim()) return
     setSubmitting(true)
     setError(null)
-    const res = await createGroup(name, selected)
+    const res = await createGroup(name)
     setSubmitting(false)
     if (!res.success) {
       setError(res.message)
@@ -54,8 +40,8 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
               Create a Capstone Group
             </p>
             <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pt-[4px]">
-              You&apos;ll be the Group Leader. Only students in your section
-              appear below.
+              You&apos;ll be the Group Leader. Invite classmates after the
+              group is created.
             </p>
           </div>
           <button
@@ -83,12 +69,6 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
               className="w-full h-[42.25px] bg-white border border-[#dddff0] rounded-[9px] px-[15px] text-[13.5px] font-medium text-[#12143a] placeholder:text-[rgba(18,20,58,0.5)] outline-none focus:border-[#707dff] transition-colors"
             />
           </div>
-
-          <ClassmatesPicker
-            limit={maxSelect}
-            selected={selected}
-            onToggle={toggle}
-          />
 
           {error && (
             <div className="flex gap-[6px] items-start w-full">

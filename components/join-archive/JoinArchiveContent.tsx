@@ -25,11 +25,11 @@ export default function JoinArchiveContent() {
     setActiveModal(null)
   }
 
-  function handleSuccess(description: string) {
+  function handleSuccess(description: string, path = '/dashboard') {
     setActiveModal(null)
     toast.success("You've joined successfully!", { description })
     update()
-    router.push('/dashboard')
+    router.push(path)
   }
 
   return (
@@ -84,6 +84,7 @@ export default function JoinArchiveContent() {
           onSuccess={() =>
             handleSuccess(
               'You now have access to your class section and milestone workspace.',
+              '/milestones',
             )
           }
         >

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Users } from 'lucide-react'
+import { ArrowRight, TriangleAlert, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { copySectionJoinCode } from '@/lib/actions/sections'
@@ -67,10 +67,28 @@ export function MySectionsCard({ section, onEdit, onRemove }: MySectionsCardProp
           <span className="font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
             Created {section.dateCreated}
           </span>
+          <span className="font-sans text-[12px] leading-[18px] text-[#dde0f0]">
+            ·
+          </span>
+          <span
+            className={`px-[9px] py-[3px] rounded-full font-sans font-semibold text-[11px] leading-[16.5px] ${
+              section.capstone2OpenedAt
+                ? 'bg-[#eefbf2] border border-[rgba(34,197,94,0.25)] text-[#22c55e]'
+                : 'bg-[#f4f5fc] border border-[#e8ebf8] text-[#8a93b4]'
+            }`}
+          >
+            Capstone 2: {section.capstone2OpenedAt ? 'Open' : 'Closed'}
+          </span>
         </div>
       </div>
 
       <div className="flex gap-[8px] items-center shrink-0">
+        {section.pendingTopics > 0 && (
+          <span className="flex gap-[6px] items-center h-[32px] px-[10px] rounded-[9px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.22)] font-sans font-bold text-[12px] leading-[18px] text-[#f59e0b] whitespace-nowrap">
+            <TriangleAlert className="size-[13px]" />
+            Pending Reviews {section.pendingTopics}
+          </span>
+        )}
         <button
           onClick={() => router.push(`/my-sections/${section.id}`)}
           className="flex gap-[7px] items-center px-[16px] py-[9px] rounded-[9px] font-sans font-bold text-[12.5px] leading-[18.75px] text-white hover:opacity-90 active:scale-[0.98] transition-all"
@@ -81,7 +99,7 @@ export function MySectionsCard({ section, onEdit, onRemove }: MySectionsCardProp
           }}
         >
           <Users className="size-[13px]" />
-          Manage Students
+          Manage Section
           <ArrowRight className="size-[12px]" />
         </button>
 

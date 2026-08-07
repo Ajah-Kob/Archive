@@ -40,6 +40,7 @@ model User {
   capstoneArchives     CapstoneArchive[]
   milestoneSubmissions MilestoneSubmission[]
   invitationsSent      Invitation[]          @relation("InvitationSender")
+  topicReviews         Topic[]               @relation("TopicReviewer")
 
   @@index([email, deletedAt])
 }
@@ -169,6 +170,7 @@ model Section {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   deletedAt     DateTime?
+  capstone2OpenedAt DateTime?
 
   @@unique([coordinatorId, section])
   @@index([deletedAt])
@@ -232,6 +234,10 @@ model Topic {
   uploadedById Int?
   uploadedBy   Student?    @relation(fields: [uploadedById], references: [id])
   status       TopicStatus @default(PENDING)
+  reviewNote   String?
+  reviewedById Int?
+  reviewedBy   User?       @relation("TopicReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
   capstone     Capstone?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt

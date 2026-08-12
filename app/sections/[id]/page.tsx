@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
-import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { StudentList } from '@/components/sections/students/StudentList'
 import { getSectionById } from '@/lib/actions/sections'
 
@@ -19,14 +18,6 @@ export default async function SectionDetailPage({
   return (
     <section className="min-h-full flex flex-col gap-3">
       <div className="flex flex-col">
-        <Breadcrumbs
-          items={[
-            { label: 'ARCHIVE' },
-            { label: 'Sections' },
-            { label: payload.section.name, isActive: true },
-          ]}
-        />
-
         <div className="flex items-center justify-between">
           <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
             {payload.section.name}

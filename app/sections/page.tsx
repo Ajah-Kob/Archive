@@ -1,5 +1,4 @@
 import { Layers } from 'lucide-react'
-import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { SectionTable } from '@/components/sections/main/SectionTable'
 import { getSections } from '@/lib/actions/sections'
 
@@ -10,16 +9,8 @@ export default async function SectionsPage() {
 
   return (
     <section className="min-h-full flex flex-col gap-3">
-      {/* Headings and Breadcrumbs */}
+      {/* Headings */}
       <div className="flex flex-col">
-        {/* Breadcrumbs */}
-        <Breadcrumbs
-          items={[
-            { label: 'ARCHIVE' },
-            { label: 'Sections', isActive: true },
-          ]}
-        />
-
         {/* Headings*/}
         <div className="flex flex-col w-full">
           <div className="flex gap-[10px] items-center">

@@ -11,7 +11,6 @@ import AddUserModal from '@/components/features/users/modal/AddUserModal'
 import EditUserModal from '@/components/features/users/modal/EditUserModal'
 import DeleteUserModal from '@/components/features/users/modal/DeleteUserModal'
 import ConfirmChairModal from '@/components/features/users/modal/ConfirmChairModal'
-import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { getUsers } from '@/lib/actions/user'
 
 export default function DashboardUsersPage() {
@@ -185,9 +184,6 @@ export default function DashboardUsersPage() {
   return (
     <div className="flex flex-col w-full gap-5 h-full">
       <div className="flex flex-col gap-[12px]">
-        <Breadcrumbs
-          items={[{ label: 'DASHBOARD' }, { label: 'Users', isActive: true }]}
-        />
         <div className="flex">
           <div className="flex flex-col w-full gap-1">
             <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">

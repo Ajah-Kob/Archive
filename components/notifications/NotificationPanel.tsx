@@ -29,10 +29,6 @@ interface InvitationNotification {
   invitedBy: { id: number; name: string; image: string | null }
 }
 
-interface NotificationPanelProps {
-  variant: 'collapsed' | 'expanded'
-}
-
 const ROLE_META: Record<string, { article: string; callout: string }> = {
   COORDINATOR: {
     article: 'a Coordinator',
@@ -63,7 +59,7 @@ function roleCallout(role: string): string {
   )
 }
 
-export default function NotificationPanel({ variant }: NotificationPanelProps) {
+export default function NotificationPanel() {
   const { data: session, update } = useSession()
   const router = useRouter()
   const userId = session?.user?.id ? +session.user.id : null
@@ -207,40 +203,27 @@ export default function NotificationPanel({ variant }: NotificationPanelProps) {
   ) : null
 
   return (
-    <div ref={wrapperRef} className="relative w-full">
-      {variant === 'collapsed' ? (
-        <button
-          onClick={handleToggle}
-          aria-label="Notifications"
-          className="relative flex items-center justify-center w-full px-[19px] py-[11px] rounded-[9px] hover:bg-[rgba(112,125,255,0.05)] transition-colors"
-        >
-          <div className="relative">
-            <Bell size={17} className="text-[#5a6382]" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-[3px] -right-[3px] size-[8px] rounded-full bg-[#fe6f6f] border border-[#fafbff]" />
-            )}
-          </div>
-        </button>
-      ) : (
-        <button
-          onClick={handleToggle}
-          className="flex gap-1 items-center w-full px-[19px] py-[11px] rounded-[9px] hover:bg-[rgba(112,125,255,0.05)] transition-colors text-left"
-        >
-          <div className="relative">
-            <Bell size={17} className="text-[#5a6382]" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-[3px] -right-[3px] size-[8px] rounded-full bg-[#fe6f6f] border border-[#fafbff]" />
-            )}
-          </div>
-          <span className="flex-1 text-[13.5px] font-medium text-[#5a6382] min-w-px">
-            Notifications
+    <div ref={wrapperRef} className="relative">
+      <button
+        onClick={handleToggle}
+        aria-label="Notifications"
+        className="relative flex items-center justify-center size-10 rounded-full hover:bg-[#f0f1f7] transition-colors"
+      >
+        <div className="relative">
+          <Bell size={18} className="text-[#5a6382]" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-[3px] -right-[3px] size-[8px] rounded-full bg-[#fe6f6f] border border-white" />
+          )}
+        </div>
+        {unreadCount > 0 && (
+          <span className="absolute top-[3px] right-[3px] min-w-[16px] h-[16px] px-[4px] rounded-[8px] bg-[#fe6f6f] text-white text-[9px] font-bold flex items-center justify-center shadow-[0px_1px_2px_rgba(254,111,111,0.4)]">
+            {unreadCount}
           </span>
-          {badge}
-        </button>
-      )}
+        )}
+      </button>
 
       {isOpen && (
-        <div className="absolute bottom-full left-full ml-2 z-50 bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_20px_60px_0px_rgba(16,20,58,0.18),0px_4px_16px_0px_rgba(0,0,0,0.06)] w-[378px] max-w-[calc(100vw-2rem)] flex flex-col">
+        <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_20px_60px_0px_rgba(16,20,58,0.18),0px_4px_16px_0px_rgba(0,0,0,0.06)] w-[378px] max-w-[calc(100vw-2rem)] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-[18px] pt-4 pb-[17px] border-b border-[#eceef8]">
             <div className="flex gap-2 items-center">

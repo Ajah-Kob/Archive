@@ -7,7 +7,6 @@ import TemplatesToolbar from '@/components/templates/main/TemplatesToolbar'
 import TemplateTable from '@/components/templates/main/TemplatesTable'
 import UploadTemplateModal from '@/components/templates/modal/UploadTemplateModal'
 import RemoveTemplateModal from '@/components/templates/modal/RemoveTemplateModal'
-import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { getTemplates } from '@/lib/actions/template'
 
 export type UserRole = 'student' | 'faculty'
@@ -106,16 +105,8 @@ export default function TemplatesPage() {
   return (
     <>
       <div className="flex flex-col w-full gap-5 h-full">
-        {/* Headings and Breadcrumbs */}
+        {/* Headings */}
         <div className="flex flex-col gap-[12px]">
-          {/* Breadcrumbs */}
-          <Breadcrumbs
-            items={[
-              { label: 'ARCHIVE' },
-              { label: 'Templates', isActive: true },
-            ]}
-          />
-
           <div className="flex">
             {/* Heading */}
             <div className="flex flex-col w-full gap-1">

@@ -46,7 +46,7 @@ export function StudentDataRow({ data, renderActions }: StudentDataRowProps) {
         {data.group ? (
           <span className="inline-flex items-center gap-2 px-[10px] py-[4px] bg-[#f4f6ff] border border-[#e5e8ff] rounded-full font-sans font-semibold text-[11px] leading-[16.5px] text-[#707dff] whitespace-nowrap">
             <Users className="size-[11px]" />
-            {data.group.name} · {data.group.members}
+            {data.group.name}
           </span>
         ) : (
           <span className="font-sans font-medium italic text-[12.5px] leading-[18.75px] text-[#c4cadf]">

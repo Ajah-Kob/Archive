@@ -15,6 +15,7 @@ import {
   Layers,
   type LucideIcon,
 } from 'lucide-react'
+import { SectionsGroup } from './SectionsGroup'
 
 type NavItem = {
   label: string
@@ -66,10 +67,8 @@ const PROGRAM_CHAIR_ALLOWED = new Set([
   '/dashboard/user/profile',
 ])
 
-const MY_SECTIONS_NAV: NavItem = {
-  label: 'My Sections',
-  href: '/my-sections',
-  icon: Layers,
+function isNavActive(pathname: string, href: string) {
+  return pathname === href
 }
 
 function useNavItems() {
@@ -81,14 +80,7 @@ function useNavItems() {
     return navItems.filter((item) => PROGRAM_CHAIR_ALLOWED.has(item.href))
   }
   if (session?.user?.isCoordinator) {
-    const base = navItems.filter((item) => COORDINATOR_ALLOWED.has(item.href))
-    const dashboardIndex = base.findIndex((item) => item.href === '/dashboard')
-    const insertAt = dashboardIndex >= 0 ? dashboardIndex + 1 : 1
-    return [
-      ...base.slice(0, insertAt),
-      MY_SECTIONS_NAV,
-      ...base.slice(insertAt),
-    ]
+    return navItems.filter((item) => COORDINATOR_ALLOWED.has(item.href))
   }
   if (session?.user?.isStudent) {
     return navItems.filter((item) => STUDENT_ALLOWED.has(item.href))
@@ -99,86 +91,66 @@ function useNavItems() {
   return navItems.filter((item) => GUEST_ALLOWED.has(item.href))
 }
 
-export function CollapsedNavLink({ pathname }: { pathname: string }) {
+export function NavLinks({
+  pathname,
+  minimize,
+}: {
+  pathname: string
+  minimize: boolean
+}) {
   const items = useNavItems()
+  const { data: session } = useSession()
+  const isCoordinator = !!session?.user?.isCoordinator
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-1">
       {items.map((item) => {
-        const isActive = pathname === item.href
+        const isActive = isNavActive(pathname, item.href)
         const Icon = item.icon
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`group relative flex items-center justify-center h-10 w-full rounded-[10px] transition-colors ${
+            title={minimize ? item.label : undefined}
+            aria-current={isActive ? 'page' : undefined}
+            className={`group relative flex items-center h-11 w-full rounded-[10px] pl-[10px] pr-[10px] gap-3 overflow-hidden transition-colors ${
               isActive
                 ? 'bg-[rgba(112,125,255,0.1)]'
                 : 'hover:bg-[rgba(112,125,255,0.05)]'
             }`}
           >
-
             {isActive && (
-              <span className="absolute left-0 w-1 h-5 bg-[#707dff] rounded-r-[3px]" />
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-full bg-[#707dff]" />
             )}
 
-            <Icon
-              size={20}
-              className={`${
-                isActive
-                  ? 'text-[rgb(112,125,255)]'
-                  : 'text-[rgb(90,99,130)] group-hover:text-[rgb(112,125,255)]'
-              }`}
-            />
-          </Link>
-        )
-      })}
-    </div>
-  )
-}
-
-export function ExpandedNavLink({ pathname }: { pathname: string }) {
-  const items = useNavItems()
-  return (
-    <div className="flex flex-col gap-0.5">
-      {items.map((item) => {
-        const isActive = pathname === item.href
-        const Icon = item.icon
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`group relative flex items-center h-10 w-full rounded-[10px] px-4 transition-colors gap-3 ${
-              isActive
-                ? 'bg-[rgba(112,125,255,0.1)]'
-                : 'hover:bg-[rgba(112,125,255,0.05)]'
-            }`}
-          >
-
-            {isActive && (
-              <span className="absolute left-0 w-1 h-5 bg-[#707dff] rounded-r-[3px]" />
-            )}
-
-            <div className="flex items-center justify-center shrink-0">
+            <span className="flex items-center justify-center w-5 shrink-0">
               <Icon
                 size={20}
-                className={`${isActive ? 'text-[#707dff]' : 'text-[#5a6382] group-hover:text-[#707dff] '}`}
-              />
-            </div>
-
-            <div>
-              <span
-                className={`text-[13px] whitespace-nowrap ${
+                className={`${
                   isActive
-                    ? 'font-bold text-[#707dff]'
-                    : 'font-medium text-[#5a6382] group-hover:text-[#707dff]'
+                    ? 'text-[#707dff]'
+                    : 'text-[#5a6382] group-hover:text-[#707dff]'
                 }`}
-              >
-                {item.label}
-              </span>
-            </div>
+              />
+            </span>
+
+            <span
+              className={`text-[13px] whitespace-nowrap shrink-0 transition-opacity duration-300 ${
+                minimize ? 'opacity-0' : 'opacity-100'
+              } ${
+                isActive
+                  ? 'font-bold text-[#707dff]'
+                  : 'font-medium text-[#5a6382] group-hover:text-[#707dff]'
+              }`}
+            >
+              {item.label}
+            </span>
           </Link>
         )
       })}
+
+      {isCoordinator && (
+        <SectionsGroup pathname={pathname} minimize={minimize} />
+      )}
     </div>
   )
 }

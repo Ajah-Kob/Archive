@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma'
 import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
 import { requireStudent, requireUser, unauthorized } from '@/lib/actions/guard'
 import { ADVISER_CAP } from '@/config/constants'
-import { buildJourneyRows } from '@/lib/journey'
+import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
 import {
   GROUP_CAP,
   type AdviserOption,
@@ -42,7 +42,14 @@ export async function getMyWorkspace(userId: number): Promise<{
     where: { userId, deletedAt: null },
     include: {
       user: { select: { id: true, name: true, email: true, image: true } },
-      section: { select: { id: true, section: true, capstone2OpenedAt: true } },
+      section: {
+        select: {
+          id: true,
+          section: true,
+          capstone2OpenedAt: true,
+          milestoneAvailability: { select: { key: true, openedAt: true } },
+        },
+      },
       group: {
         include: {
           students: {
@@ -113,11 +120,16 @@ export async function getMyWorkspace(userId: number): Promise<{
     section: { id: student.section.id, name: student.section.section },
   }
 
+  const availability = resolveSectionAvailability(
+    !!student.section.capstone2OpenedAt,
+    student.section.milestoneAvailability,
+  )
+
   if (!student.group) {
     return {
       success: true,
       message: '',
-      payload: { ...base, group: null, journey: buildJourneyRows(null) },
+      payload: { ...base, group: null, journey: buildJourneyRows(null, availability) },
     }
   }
 
@@ -200,10 +212,56 @@ export async function getMyWorkspace(userId: number): Promise<{
       adviser,
       invitations,
     },
-    journey: buildJourneyRows(group, !!student.section.capstone2OpenedAt),
+    journey: buildJourneyRows(group, availability),
   }
 
   return { success: true, message: '', payload }
+}
+
+// Group context for the group-scoped milestone routes. Returns the group the
+// authenticated student belongs to ONLY when it matches the requested id, so a
+// student can never read another group's header. Plain action (no 'use cache'):
+// the header must reflect a rename immediately and it is a single indexed lookup.
+export async function getGroupContext(groupId: number): Promise<{
+  success: boolean
+  message: string
+  payload: { id: number; name: string; isLeader: boolean; topicTitle: string | null } | null
+}> {
+  const session = await requireStudent()
+  if (!session?.user?.id) return unauthorized
+
+  const student = await prisma.student.findFirst({
+    where: { userId: +session.user.id, deletedAt: null },
+    include: {
+      group: {
+        select: {
+          id: true,
+          groupName: true,
+          leaderStudentId: true,
+          topics: {
+            where: { deletedAt: null, status: 'APPROVED' },
+            select: { title: true },
+            take: 1,
+            orderBy: { reviewedAt: 'desc' },
+          },
+        },
+      },
+    },
+  })
+  if (!student?.group || student.group.id !== groupId) {
+    return { success: false, message: 'Group not found', payload: null }
+  }
+
+  return {
+    success: true,
+    message: '',
+    payload: {
+      id: student.group.id,
+      name: student.group.groupName,
+      isLeader: student.group.leaderStudentId === student.id,
+      topicTitle: student.group.topics[0]?.title ?? null,
+    },
+  }
 }
 
 // Same-section classmates who are not yet in a group and can be invited.

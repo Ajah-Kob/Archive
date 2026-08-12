@@ -1,14 +1,27 @@
+import Link from 'next/link'
 import { Check, Clock, Lock, TriangleAlert } from 'lucide-react'
 import type { JourneyRow } from '@/types/milestones'
 
 const HEADER_ORDER: JourneyRow['header'][] = [
-  'INITIAL',
   'CAPSTONE 1',
   'CAPSTONE 2',
-  'FINAL',
 ]
 
-function RowIcon({ state }: { state: JourneyRow['state'] }) {
+function RowIcon({
+  state,
+  isActive,
+}: {
+  state: JourneyRow['state']
+  isActive: boolean
+}) {
+  if (isActive) {
+    return (
+      <div className="bg-[#707dff] rounded-[11px] size-[22px] flex items-center justify-center shrink-0 drop-shadow-[0px_1px_2px_rgba(112,125,255,0.4)]">
+        <span className="size-[7px] rounded-full bg-white" />
+      </div>
+    )
+  }
+
   if (state === 'LOCKED') {
     return (
       <div className="bg-[#f0f2fa] border border-[#e8ebf8] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
@@ -19,15 +32,15 @@ function RowIcon({ state }: { state: JourneyRow['state'] }) {
 
   if (state === 'DEFAULT') {
     return (
-      <div className="bg-[#707dff] rounded-[11px] size-[22px] flex items-center justify-center shrink-0 drop-shadow-[0px_1px_2px_rgba(112,125,255,0.4)]">
-        <span className="size-[7px] rounded-full bg-white" />
+      <div className="bg-[#f0f2fa] border border-[#e8ebf8] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
+        <span className="size-[7px] rounded-full bg-[#c4cadf]" />
       </div>
     )
   }
 
   if (state === 'NEEDS_REVISION') {
     return (
-      <div className="bg-[rgba(245,158,11,0.1)] border border-[rgba(245,158,11,0.3)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
+      <div className="bg-[#fef5e7] border border-[rgba(245,158,11,0.3)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
         <TriangleAlert className="size-[12px] text-[#f59e0b]" strokeWidth={2.25} />
       </div>
     )
@@ -35,7 +48,7 @@ function RowIcon({ state }: { state: JourneyRow['state'] }) {
 
   if (state === 'SUBMITTED') {
     return (
-      <div className="bg-[rgba(112,125,255,0.1)] border border-[rgba(112,125,255,0.25)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
+      <div className="bg-[#f1f2ff] border border-[rgba(112,125,255,0.25)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
         <Clock className="size-[12px] text-[#707dff]" strokeWidth={2.25} />
       </div>
     )
@@ -48,7 +61,13 @@ function RowIcon({ state }: { state: JourneyRow['state'] }) {
   )
 }
 
-function MilestoneRow({ row }: { row: JourneyRow }) {
+interface MilestoneRowProps {
+  row: JourneyRow
+  isActive: boolean
+  groupId?: number
+}
+
+function MilestoneRow({ row, isActive, groupId }: MilestoneRowProps) {
   const locked = row.state === 'LOCKED'
 
   const sublabelColor: Record<JourneyRow['state'], string> = {
@@ -59,15 +78,18 @@ function MilestoneRow({ row }: { row: JourneyRow }) {
     LOCKED: 'text-transparent',
   }
 
-  return (
-    <div
-      className={`relative flex items-center gap-[10px] px-[6px] py-[8px] rounded-[9px] h-[50px] ${
-        row.state === 'DEFAULT'
-          ? 'bg-[#f8f9ff] border border-[rgba(112,125,255,0.13)]'
-          : 'border border-transparent'
-      }`}
-    >
-      <RowIcon state={row.state} />
+  const baseClasses =
+    'relative flex items-center gap-[10px] px-[6px] py-[8px] rounded-[9px] h-[50px]'
+
+  const rowClasses = locked
+    ? `${baseClasses} border border-transparent cursor-not-allowed`
+    : isActive
+      ? `${baseClasses} bg-[#edf0ff] border border-[rgba(112,125,255,0.32)] cursor-pointer transition-colors`
+      : `${baseClasses} border border-transparent cursor-pointer transition-colors hover:bg-[#f4f5ff]`
+
+  const content = (
+    <>
+      <RowIcon state={row.state} isActive={isActive} />
       <div className="flex-1 min-w-px">
         <p
           className={`truncate font-sans font-semibold text-[12px] leading-[15.6px] ${
@@ -82,22 +104,41 @@ function MilestoneRow({ row }: { row: JourneyRow }) {
           >
             {row.sublabel}
           </p>
-        ) : (
-          <div className="h-[16px]" />
-        )}
+        ) : null}
       </div>
-    </div>
+    </>
+  )
+
+  if (locked) {
+    return <div className={rowClasses}>{content}</div>
+  }
+
+  return (
+    <Link
+      href={groupId ? `/milestones/${groupId}/${row.slug}` : `/milestones/${row.slug}`}
+      className={rowClasses}
+    >
+      {content}
+    </Link>
   )
 }
 
-export function CapstoneJourney({ journey }: { journey: JourneyRow[] }) {
+export function CapstoneJourney({
+  journey,
+  activeSlug,
+  groupId,
+}: {
+  journey: JourneyRow[]
+  activeSlug?: string
+  groupId?: number
+}) {
   const groups = HEADER_ORDER.map((header) => ({
     header,
     rows: journey.filter((row) => row.header === header),
   })).filter((group) => group.rows.length > 0)
 
   return (
-    <aside className="h-full bg-white border border-[#e8ebf8] border-l-0 rounded-r-[12px] rounded-l-none shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] w-[200px] shrink-0 flex flex-col gap-[12px] px-[13px] py-[26px] overflow-hidden">
+    <aside className="self-stretch bg-white shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] w-[200px] shrink-0 flex flex-col gap-[12px] px-[13px] py-[26px] overflow-hidden">
       <p className="font-heading font-bold text-[12.5px] leading-[18.75px] text-[#1e3a8a] tracking-[-0.125px] px-[4px]">
         Capstone Journey
       </p>
@@ -112,7 +153,12 @@ export function CapstoneJourney({ journey }: { journey: JourneyRow[] }) {
               <div className="absolute left-[17px] top-[9px] bottom-[9px] w-[2px] rounded-full bg-gradient-to-b from-[#e0e3f0] to-[#f0f2fa]" />
               <div className="relative flex flex-col gap-[5px]">
                 {group.rows.map((row) => (
-                  <MilestoneRow key={row.slug} row={row} />
+                  <MilestoneRow
+                    key={row.slug}
+                    row={row}
+                    isActive={row.slug === activeSlug}
+                    groupId={groupId}
+                  />
                 ))}
               </div>
             </div>

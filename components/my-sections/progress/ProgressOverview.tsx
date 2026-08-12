@@ -50,23 +50,6 @@ function TopicPill({ status }: { status: SectionGroupProgress['topicStatus'] }) 
 export function ProgressOverview({ groups }: ProgressOverviewProps) {
   const [activeGroupId, setActiveGroupId] = useState<number | null>(null)
 
-  if (groups.length === 0) {
-    return (
-      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col items-center justify-center px-10 py-16">
-        <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
-          <Users className="size-5 text-[#707dff]" strokeWidth={1.75} />
-        </div>
-        <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#1e3a8a] tracking-[-0.16px] mb-2">
-          No Groups Yet
-        </h3>
-        <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] text-center max-w-[360px]">
-          Once students form groups in this section, their capstone progress
-          will appear here.
-        </p>
-      </div>
-    )
-  }
-
   return (
     <>
       <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
@@ -79,7 +62,21 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
           </span>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        {groups.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center px-10 py-16">
+            <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
+              <Users className="size-5 text-[#707dff]" strokeWidth={1.75} />
+            </div>
+            <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#1e3a8a] tracking-[-0.16px] mb-2">
+              No Groups Yet
+            </h3>
+            <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] text-center max-w-[360px]">
+              Once students form groups in this section, their capstone progress
+              will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1fr_1.6fr] items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0">
             <span className="font-sans font-bold text-[11px] leading-[16.5px] uppercase tracking-[0.6px] text-[#9ea8c6]">
               Group
@@ -139,7 +136,8 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
               </span>
             </button>
           ))}
-        </div>
+          </div>
+        )}
       </div>
 
       <GroupProgressDrawer

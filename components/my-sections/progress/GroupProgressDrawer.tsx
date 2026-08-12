@@ -5,7 +5,7 @@ import { X } from 'lucide-react'
 import { JourneyTracker } from '@/components/milestones/JourneyTracker'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { getInitials } from '@/lib/helper'
-import { getCoordinatorGroupDetail, type SectionGroupDetail } from '@/lib/actions/sections'
+import { getCoordinatorGroupDetail, type SectionGroupDetail, type SectionGroupTopic } from '@/lib/actions/sections'
 
 interface GroupProgressDrawerProps {
   groupId: number | null
@@ -20,7 +20,7 @@ function formatDate(iso: string) {
   })
 }
 
-function TopicStatusPill({ status }: { status: SectionGroupDetail['topics'][number]['status'] }) {
+function TopicStatusPill({ status }: { status: SectionGroupTopic['status'] }) {
   if (status === 'APPROVED') {
     return (
       <span className="inline-flex items-center px-[9px] py-[3px] rounded-full bg-[#eefbf2] border border-[rgba(34,197,94,0.25)] font-sans font-bold text-[10.5px] leading-[15.75px] text-[#22c55e] whitespace-nowrap">
@@ -153,35 +153,28 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
               </div>
 
               <div className="flex flex-col gap-[10px]">
-                <SectionHeading>Topic Proposals</SectionHeading>
-                {detail.topics.length === 0 ? (
-                  <p className="font-sans font-medium italic text-[12.5px] leading-[18.75px] text-[#c4cadf]">
-                    No topics submitted yet.
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-[8px]">
-                    {detail.topics.map((t) => (
-                      <div
-                        key={t.id}
-                        className="border border-[#eceef8] rounded-[9px] px-[14px] py-[11px]"
-                      >
-                        <div className="flex items-center justify-between gap-[12px]">
-                          <p className="min-w-0 truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
-                            {t.title}
-                          </p>
-                          <TopicStatusPill status={t.status} />
-                        </div>
-                        {t.note && (
-                          <p className="font-sans font-medium text-[12px] leading-[18px] text-[#6b7399] pt-[6px]">
-                            {t.note}
-                          </p>
-                        )}
-                        <p className="font-sans font-medium text-[11px] leading-[16.5px] text-[#9ea8c6] pt-[6px]">
-                          {t.submittedBy || 'Unknown'} · {formatDate(t.createdAt)}
-                        </p>
-                      </div>
-                    ))}
+                <SectionHeading>Topic</SectionHeading>
+                {detail.topic ? (
+                  <div className="border border-[#eceef8] rounded-[9px] px-[14px] py-[11px]">
+                    <div className="flex items-center justify-between gap-[12px]">
+                      <p className="min-w-0 truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
+                        {detail.topic.title}
+                      </p>
+                      <TopicStatusPill status={detail.topic.status} />
+                    </div>
+                    {detail.topic.note && (
+                      <p className="font-sans font-medium text-[12px] leading-[18px] text-[#6b7399] pt-[6px]">
+                        {detail.topic.note}
+                      </p>
+                    )}
+                    <p className="font-sans font-medium text-[11px] leading-[16.5px] text-[#9ea8c6] pt-[6px]">
+                      {detail.topic.submittedBy || 'Unknown'} · {formatDate(detail.topic.createdAt)}
+                    </p>
                   </div>
+                ) : (
+                  <p className="font-sans font-medium italic text-[12.5px] leading-[18.75px] text-[#c4cadf]">
+                    No topic selected yet.
+                  </p>
                 )}
               </div>
             </div>

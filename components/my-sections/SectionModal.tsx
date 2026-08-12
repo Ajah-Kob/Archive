@@ -11,9 +11,11 @@ import {
   type MySectionCardData,
 } from '@/lib/actions/sections'
 
+type SectionRef = Pick<MySectionCardData, 'id' | 'name'>
+
 interface SectionModalProps {
   mode: 'create' | 'edit'
-  section?: MySectionCardData
+  section?: SectionRef
   onClose: () => void
   onSuccess: () => void
 }
@@ -27,7 +29,6 @@ export function SectionModal({ mode, section, onClose, onSuccess }: SectionModal
   const canSubmit =
     trimmed.length >= 3 &&
     trimmed.length <= 60 &&
-    /^[A-Za-z0-9 .-]+$/.test(trimmed) &&
     name === trimmed
 
   useEffect(() => {

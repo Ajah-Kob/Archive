@@ -16,7 +16,7 @@ interface SectionTabsProps {
 
 const TABS: { key: SectionTabKey; label: string }[] = [
   { key: 'students', label: 'Students' },
-  { key: 'progress', label: 'Progress' },
+  { key: 'progress', label: 'Milestones' },
   { key: 'topics', label: 'Topic Reviews' },
 ]
 
@@ -44,7 +44,7 @@ export function SectionTabs({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-1 border-b border-[#e8ebf8] shrink-0">
+      <div className="flex items-center gap-1 px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0">
         {TABS.map((t) => {
           const isActive = tab === t.key
           return (
@@ -73,7 +73,7 @@ export function SectionTabs({
         })}
       </div>
 
-      <div className="flex-1 min-h-0 pt-[16px] flex flex-col">
+      <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
         {panels[tab]}
       </div>
     </div>

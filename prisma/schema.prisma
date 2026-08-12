@@ -171,9 +171,38 @@ model Section {
   updatedAt     DateTime    @updatedAt
   deletedAt     DateTime?
   capstone2OpenedAt DateTime?
+  milestoneAvailability MilestoneAvailability[]
 
   @@unique([coordinatorId, section])
   @@index([deletedAt])
+}
+
+enum MilestoneKey {
+  TOPIC_SUBMISSION
+  TOPIC_SELECTION
+  CHAPTER_1
+  CHAPTER_2
+  CHAPTER_3
+  CHAPTER_4
+  CHAPTER_5
+  ARCHIVING
+}
+
+// Section-level availability of each milestone. A row with a set `openedAt`
+// means the milestone is open to all groups in the section; `openedAt: null`
+// means it is locked. Missing rows fall back to defaults (see
+// buildMilestoneAvailability in lib/actions/sections.ts).
+model MilestoneAvailability {
+  id        Int         @id @default(autoincrement())
+  sectionId Int
+  section   Section     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  key       MilestoneKey
+  openedAt  DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([sectionId, key])
+  @@index([sectionId])
 }
 
 model Student {
@@ -226,14 +255,15 @@ enum TopicStatus {
 }
 
 model Topic {
-  id           Int         @id @default(autoincrement())
-  groupId      Int
-  group        Group       @relation(fields: [groupId], references: [id])
-  title        String
-  background   String
-  uploadedById Int?
-  uploadedBy   Student?    @relation(fields: [uploadedById], references: [id])
-  status       TopicStatus @default(PENDING)
+  id            Int         @id @default(autoincrement())
+  groupId       Int
+  group         Group       @relation(fields: [groupId], references: [id])
+  topicGroupKey String?
+  title         String
+  background    String
+  uploadedById  Int?
+  uploadedBy    Student?    @relation(fields: [uploadedById], references: [id])
+  status        TopicStatus @default(PENDING)
   reviewNote   String?
   reviewedById Int?
   reviewedBy   User?       @relation("TopicReviewer", fields: [reviewedById], references: [id])

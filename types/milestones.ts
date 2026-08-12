@@ -17,21 +17,21 @@ export type JourneyState =
 export interface JourneyRow {
   slug: string
   label: string
-  header: 'INITIAL' | 'CAPSTONE 1' | 'CAPSTONE 2' | 'FINAL'
+  header: 'CAPSTONE 1' | 'CAPSTONE 2'
   state: JourneyState
   sublabel?: string
 }
 
 export const JOURNEY_ROWS: ReadonlyArray<Omit<JourneyRow, 'state' | 'sublabel'>> =
   [
-    { slug: 'topic-submission', label: 'Topic Submission', header: 'INITIAL' },
-    { slug: 'topic-selection', label: 'Topic Selection', header: 'INITIAL' },
+    { slug: 'topic-submission', label: 'Topic Submission', header: 'CAPSTONE 1' },
+    { slug: 'topic-selection', label: 'Topic Selection', header: 'CAPSTONE 1' },
     { slug: 'chapter-1', label: 'Chapter 1', header: 'CAPSTONE 1' },
     { slug: 'chapter-2', label: 'Chapter 2', header: 'CAPSTONE 1' },
     { slug: 'chapter-3', label: 'Chapter 3', header: 'CAPSTONE 1' },
     { slug: 'chapter-4', label: 'Chapter 4', header: 'CAPSTONE 2' },
     { slug: 'chapter-5', label: 'Chapter 5', header: 'CAPSTONE 2' },
-    { slug: 'archiving', label: 'Archiving', header: 'FINAL' },
+    { slug: 'archiving', label: 'Archiving', header: 'CAPSTONE 2' },
   ]
 
 export const WORKSPACE_SLUGS = JOURNEY_ROWS.map((row) => row.slug)
@@ -117,4 +117,40 @@ export interface AdviserOption {
   image: string | null
   workload: number
   atCap: boolean
+}
+
+export type TopicSubmissionStatus = 'PENDING' | 'APPROVED' | 'NEED_REVISION'
+
+export interface TopicActionResult {
+  success: boolean
+  message: string
+}
+
+export interface TopicSubmissionItem {
+  id: number
+  title: string
+  background: string
+  status: TopicSubmissionStatus
+  version: number
+  index: number
+  createdAt: string
+  updatedAt: string
+  reviewNote: string | null
+  reviewedAt: string | null
+  submittedBy: string | null
+}
+
+export interface TopicSubmissionPayload {
+  group: {
+    id: number
+    groupName: string
+    sectionId: number
+  } | null
+  journey: JourneyRow[]
+  topics: TopicSubmissionItem[]
+  history: TopicSubmissionItem[]
+  count: number
+  cap: number
+  hasApproved: boolean
+  canSubmit: boolean
 }

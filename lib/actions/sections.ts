@@ -8,8 +8,12 @@ import type { SectionData } from '@/components/sections/main/SectionDataRow'
 import type { StudentData } from '@/components/sections/students/StudentDataRow'
 import { generateJoinCode, getInitials, timeAgo } from '@/lib/helper'
 import { requireCoordinator } from '@/lib/actions/guard'
-import { buildJourneyRows } from '@/lib/journey'
-import type { JourneyRow } from '@/types/milestones'
+import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
+import type {
+  JourneyRow,
+  TopicSubmissionStatus,
+} from '@/types/milestones'
+import type { MilestoneKey } from '@prisma/client'
 
 const gradients = [
   'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)',
@@ -94,13 +98,23 @@ export interface SectionGroupProgress {
   journey: JourneyRow[]
 }
 
+export interface PendingTopicMember {
+  id: number
+  name: string
+  email: string
+  isLeader: boolean
+}
+
 export interface PendingTopic {
   id: number
+  groupId: number
   groupName: string
+  members: PendingTopicMember[]
   title: string
   background: string
   submittedBy: string
   createdAt: string
+  status: TopicSubmissionStatus
 }
 
 export interface SectionDetailData {
@@ -312,8 +326,6 @@ export async function joinSection(formData: FormData) {
     updateTag('my-sections')
     updateTag(`my-section-${joinCode.section.id}`)
     revalidatePath('/sections')
-    revalidatePath('/my-sections')
-    revalidatePath(`/my-sections/${joinCode.section.id}`)
 
     return { success: true, message: 'Successfully joined the section.' }
   } catch (error) {
@@ -383,7 +395,6 @@ function revalidateCoordinatorCache(sectionId?: number) {
   revalidateTag('my-sections', 'max')
   revalidateTag('sections', 'max')
   revalidateTag('join-code', 'max')
-  revalidatePath('/my-sections')
   revalidatePath('/sections')
   if (sectionId) revalidateTag(`my-section-${sectionId}`, 'max')
 }
@@ -445,6 +456,7 @@ async function getCoordinatorSectionData(sectionId: number) {
     where: { id: sectionId, deletedAt: null },
     include: {
       joinCode: true,
+      milestoneAvailability: { select: { key: true, openedAt: true } },
       _count: { select: { groups: true } },
       students: {
         where: { deletedAt: null },
@@ -467,7 +479,10 @@ async function getCoordinatorSectionData(sectionId: number) {
       },
       groups: {
         where: { deletedAt: null },
-        include: {
+        select: {
+          id: true,
+          groupName: true,
+          leaderStudentId: true,
           adviser: {
             include: {
               faculty: {
@@ -479,7 +494,12 @@ async function getCoordinatorSectionData(sectionId: number) {
               },
             },
           },
-          students: { where: { deletedAt: null }, select: { id: true } },
+          students: {
+            where: { deletedAt: null },
+            include: {
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
           topics: {
             where: { deletedAt: null },
             include: {
@@ -521,6 +541,10 @@ async function getCoordinatorSectionData(sectionId: number) {
   }))
 
   const capstone2Open = !!section.capstone2OpenedAt
+  const availability = resolveSectionAvailability(
+    capstone2Open,
+    section.milestoneAvailability,
+  )
 
   const groups: SectionGroupProgress[] = section.groups.map((g) => {
     const activeTopics = g.topics.filter((t) => !t.deletedAt)
@@ -558,7 +582,7 @@ async function getCoordinatorSectionData(sectionId: number) {
           })),
           capstoneArchive: g.capstoneArchive,
         },
-        capstone2Open,
+        availability,
       ),
     }
   })
@@ -567,16 +591,24 @@ async function getCoordinatorSectionData(sectionId: number) {
     .flatMap((g) =>
       g.topics
         .filter((t) => t.status === 'PENDING' && !t.deletedAt)
-        .map((t) => ({ topic: t, groupName: g.groupName })),
+        .map((t) => ({ topic: t, group: g })),
     )
     .sort((a, b) => b.topic.createdAt.getTime() - a.topic.createdAt.getTime())
-    .map(({ topic, groupName }) => ({
+    .map(({ topic, group }) => ({
       id: topic.id,
-      groupName,
+      groupId: group.id,
+      groupName: group.groupName,
+      members: group.students.map((s) => ({
+        id: s.id,
+        name: s.user.name,
+        email: s.user.email,
+        isLeader: group.leaderStudentId === s.id,
+      })),
       title: topic.title,
       background: topic.background,
       submittedBy: topic.uploadedBy?.user.name ?? '',
       createdAt: topic.createdAt.toISOString(),
+      status: topic.status,
     }))
 
   return {
@@ -601,6 +633,7 @@ async function getCoordinatorSectionData(sectionId: number) {
     students,
     groups,
     pendingTopics,
+    milestones: buildMilestoneAvailability(section),
   }
 }
 
@@ -657,7 +690,237 @@ export async function getCoordinatorSectionById(id: number) {
   }
 }
 
-const SECTION_NAME_PATTERN = /^[A-Za-z0-9 .-]+$/
+// ───────────────────────────── Topic versions ─────────────────────────────
+
+export interface TopicVersionInfo {
+  id: number
+  topicNumber: number
+  version: number
+  title: string
+  background: string
+  submittedBy: string
+  createdAt: string
+  status: TopicSubmissionStatus
+  isCurrent: boolean
+  reviewNote: string | null
+}
+
+// All versions of a topic's revision chain (topicGroupKey). Version numbers
+// mirror the student-side derivation: position in the chain + 1, ordered by
+// createdAt. Previous versions are the soft-deleted rows in the chain.
+export async function getTopicVersions(topicId: number) {
+  const coordinator = await requireCoordinatorRow()
+  if (!coordinator) {
+    return { success: false, message: 'Not authorized', payload: null }
+  }
+
+  try {
+    const topic = await prisma.topic.findFirst({
+      where: { id: topicId, deletedAt: null },
+      include: {
+        group: {
+          include: { section: { select: { coordinatorId: true } } },
+        },
+      },
+    })
+    if (!topic || topic.group.section.coordinatorId !== coordinator.id) {
+      return { success: false, message: 'Topic not found.', payload: null }
+    }
+
+    const groupTopics = await prisma.topic.findMany({
+      where: { groupId: topic.groupId },
+      orderBy: { createdAt: 'asc' },
+      include: { uploadedBy: { include: { user: { select: { name: true } } } } },
+    })
+
+    // Group topics into revision chains (topicGroupKey), then order the chains
+    // by their first submission. The chain's position in that order is the
+    // topic number (1, 2, 3…) the student submitted — shared by every version
+    // in the chain. Mirrors the student-side derivation in getTopicSubmissionData.
+    const chains = new Map<string, typeof groupTopics>()
+    for (const t of groupTopics) {
+      const key = t.topicGroupKey ?? `legacy-${t.id}`
+      const chain = chains.get(key) ?? []
+      chain.push(t)
+      chains.set(key, chain)
+    }
+    const orderedChains = [...chains.values()].sort(
+      (a, b) => a[0].createdAt.getTime() - b[0].createdAt.getTime(),
+    )
+    const chainIndex = orderedChains.findIndex((chain) =>
+      chain.some((t) => t.id === topic.id),
+    )
+    const chain = orderedChains[chainIndex] ?? []
+    const topicNumber = chainIndex + 1
+
+    const versions: TopicVersionInfo[] = chain.map((t, index) => ({
+      id: t.id,
+      topicNumber,
+      version: index + 1,
+      title: t.title,
+      background: t.background,
+      submittedBy: t.uploadedBy?.user.name ?? '',
+      createdAt: t.createdAt.toISOString(),
+      status: t.status,
+      isCurrent: t.id === topic.id && !t.deletedAt,
+      reviewNote: t.reviewNote,
+    }))
+
+    return { success: true, message: '', payload: { versions } }
+  } catch (error) {
+    console.error('[getTopicVersions | Error]:', error)
+    return {
+      success: false,
+      message: 'Failed to load topic versions.',
+      payload: null,
+    }
+  }
+}
+
+// ───────────────────────────── Milestone availability ─────────────────────────────
+
+export interface MilestoneAvailabilityItem {
+  key: MilestoneKey
+  label: string
+  phase: 'CAPSTONE 1' | 'CAPSTONE 2'
+  open: boolean
+  openedAt: string | null
+}
+
+// Chronological order of the milestones a coordinator can manage per section.
+// Mirrors the student journey rows (JOURNEY_ROWS in types/milestones.ts).
+const MILESTONE_DEFS: ReadonlyArray<{
+  key: MilestoneKey
+  label: string
+  phase: 'CAPSTONE 1' | 'CAPSTONE 2'
+}> = [
+  { key: 'TOPIC_SUBMISSION', label: 'Topic Submission', phase: 'CAPSTONE 1' },
+  { key: 'TOPIC_SELECTION', label: 'Topic Selection', phase: 'CAPSTONE 1' },
+  { key: 'CHAPTER_1', label: 'Chapter 1', phase: 'CAPSTONE 1' },
+  { key: 'CHAPTER_2', label: 'Chapter 2', phase: 'CAPSTONE 1' },
+  { key: 'CHAPTER_3', label: 'Chapter 3', phase: 'CAPSTONE 1' },
+  { key: 'CHAPTER_4', label: 'Chapter 4', phase: 'CAPSTONE 2' },
+  { key: 'CHAPTER_5', label: 'Chapter 5', phase: 'CAPSTONE 2' },
+  { key: 'ARCHIVING', label: 'Archiving', phase: 'CAPSTONE 2' },
+]
+
+const CAPSTONE2_KEYS: MilestoneKey[] = ['CHAPTER_4', 'CHAPTER_5']
+
+// Resolves each milestone's availability for a section. Explicit rows win;
+// missing rows fall back to: Topic Submission open by default, Chapters 4/5
+// following the legacy capstone2OpenedAt phase gate, everything else locked.
+// Shares the same resolution as the student journey (resolveSectionAvailability).
+function buildMilestoneAvailability(section: {
+  capstone2OpenedAt: Date | null
+  milestoneAvailability: { key: MilestoneKey; openedAt: Date | null }[]
+}): MilestoneAvailabilityItem[] {
+  const open = resolveSectionAvailability(
+    !!section.capstone2OpenedAt,
+    section.milestoneAvailability,
+  )
+  const openedByKey = new Map(
+    section.milestoneAvailability.map((r) => [r.key, r.openedAt]),
+  )
+  return MILESTONE_DEFS.map((def) => ({
+    key: def.key,
+    label: def.label,
+    phase: def.phase,
+    open: open[def.key] ?? false,
+    openedAt: openedByKey.has(def.key)
+      ? (openedByKey.get(def.key)?.toISOString() ?? null)
+      : null,
+  }))
+}
+
+// Unlocks or locks a milestone for a section. Locking reopens nothing; an open
+// milestone can always be locked again. Chapter 4/5 changes stay in sync with
+// the legacy capstone2OpenedAt gate so existing journey logic keeps working.
+export async function setMilestoneAvailability(
+  sectionId: number,
+  key: MilestoneKey,
+  open: boolean,
+) {
+  const coordinator = await requireCoordinatorRow()
+  if (!coordinator) {
+    return { success: false, message: 'Not authorized', payload: null }
+  }
+
+  try {
+    const section = await prisma.section.findFirst({
+      where: { id: sectionId, coordinatorId: coordinator.id, deletedAt: null },
+      select: {
+        id: true,
+        capstone2OpenedAt: true,
+        milestoneAvailability: { select: { key: true, openedAt: true } },
+      },
+    })
+    if (!section) {
+      return { success: false, message: 'Section not found.', payload: null }
+    }
+    if (!MILESTONE_DEFS.some((def) => def.key === key)) {
+      return { success: false, message: 'Unknown milestone.', payload: null }
+    }
+
+    await prisma.milestoneAvailability.upsert({
+      where: { sectionId_key: { sectionId: section.id, key } },
+      create: {
+        sectionId: section.id,
+        key,
+        openedAt: open ? new Date() : null,
+      },
+      update: { openedAt: open ? new Date() : null },
+    })
+
+    // Keep the Capstone 2 phase gate aligned with Chapter 4/5 availability.
+    if (CAPSTONE2_KEYS.includes(key)) {
+      const fresh = await prisma.section.findUnique({
+        where: { id: section.id },
+        select: {
+          milestoneAvailability: { select: { key: true, openedAt: true } },
+        },
+      })
+      const anyChapterOpen = (fresh?.milestoneAvailability ?? []).some(
+        (r) => CAPSTONE2_KEYS.includes(r.key) && !!r.openedAt,
+      )
+      if (open && !section.capstone2OpenedAt) {
+        await prisma.section.update({
+          where: { id: section.id },
+          data: { capstone2OpenedAt: new Date() },
+        })
+      } else if (!open && !anyChapterOpen && section.capstone2OpenedAt) {
+        await prisma.section.update({
+          where: { id: section.id },
+          data: { capstone2OpenedAt: null },
+        })
+      }
+    }
+
+    revalidateTag(`my-section-${section.id}`, 'max')
+    revalidateTag('my-sections', 'max')
+    revalidateTag('sections', 'max')
+
+    // Students read availability through their per-user workspace / per-group
+    // journey caches — bust every student in the section so the change shows
+    // up immediately instead of staying stale until a cache expires.
+    const sectionStudents = await prisma.student.findMany({
+      where: { sectionId: section.id, deletedAt: null, groupId: { not: null } },
+      select: { userId: true, groupId: true },
+    })
+    for (const s of sectionStudents) {
+      if (s.userId) revalidateTag(`workspace-${s.userId}`, 'max')
+      if (s.groupId) revalidateTag(`journey-${s.groupId}`, 'max')
+    }
+
+    return {
+      success: true,
+      message: open ? 'Milestone unlocked.' : 'Milestone locked.',
+      payload: { key, open },
+    }
+  } catch (error) {
+    console.error('[setMilestoneAvailability | Error]:', error)
+    return { success: false, message: 'Failed to update milestone.', payload: null }
+  }
+}
 
 function validateSectionName(raw: string): string | null {
   const name = raw.trim()
@@ -666,9 +929,6 @@ function validateSectionName(raw: string): string | null {
   }
   if (name !== raw) {
     return 'Section name cannot have leading or trailing spaces.'
-  }
-  if (!SECTION_NAME_PATTERN.test(name)) {
-    return 'Section name can only contain letters, numbers, spaces, periods, and dashes.'
   }
   return name
 }
@@ -1069,57 +1329,6 @@ export async function reviewTopic(
   }
 }
 
-// Coordinator opens Capstone 2 for a section. This unlocks Chapter 4/5 in the
-// affected groups' journeys and records when the phase opened.
-export async function openCapstone2(sectionId: number) {
-  const coordinator = await requireCoordinatorRow()
-  if (!coordinator) {
-    return { success: false, message: 'You are not authorized to perform this action.' }
-  }
-
-  try {
-    const section = await prisma.section.findFirst({
-      where: { id: sectionId, coordinatorId: coordinator.id, deletedAt: null },
-      include: {
-        students: { where: { deletedAt: null }, select: { userId: true } },
-        groups: { where: { deletedAt: null }, select: { id: true } },
-      },
-    })
-    if (!section) {
-      return { success: false, message: 'Section not found.' }
-    }
-    if (section.capstone2OpenedAt) {
-      return {
-        success: true,
-        message: 'Capstone 2 is already open for this section.',
-      }
-    }
-
-    await prisma.section.update({
-      where: { id: section.id },
-      data: { capstone2OpenedAt: new Date() },
-    })
-
-    revalidateTag('my-sections', 'max')
-    revalidateTag('sections', 'max')
-    revalidateTag(`my-section-${section.id}`, 'max')
-    for (const student of section.students) {
-      revalidateTag(`workspace-${student.userId}`, 'max')
-    }
-    for (const group of section.groups) {
-      revalidateTag(`journey-${group.id}`, 'max')
-    }
-
-    return {
-      success: true,
-      message: 'Capstone 2 is now open for this section.',
-    }
-  } catch (error) {
-    console.error('[openCapstone2 | Error]:', error)
-    return { success: false, message: 'Failed to open Capstone 2.' }
-  }
-}
-
 export interface SectionGroupMember {
   id: number
   name: string
@@ -1143,7 +1352,7 @@ export interface SectionGroupDetail {
   capstone2OpenedAt: string | null
   members: SectionGroupMember[]
   adviser: { name: string; email: string; image: string | null } | null
-  topics: SectionGroupTopic[]
+  topic: SectionGroupTopic | null
   journey: JourneyRow[]
 }
 
@@ -1167,7 +1376,12 @@ export async function getCoordinatorGroupDetail(groupId: number) {
         section: { coordinatorId: coordinator.id, deletedAt: null },
       },
       include: {
-        section: { select: { capstone2OpenedAt: true } },
+        section: {
+          select: {
+            capstone2OpenedAt: true,
+            milestoneAvailability: { select: { key: true, openedAt: true } },
+          },
+        },
         students: {
           where: { deletedAt: null },
           include: {
@@ -1185,12 +1399,18 @@ export async function getCoordinatorGroupDetail(groupId: number) {
         },
         topics: {
           where: { deletedAt: null },
-          include: {
-            uploadedBy: { include: { user: { select: { name: true } } } },
-          },
+          select: { status: true, deletedAt: true },
           orderBy: { createdAt: 'desc' },
         },
-        capstone: { select: { topicId: true } },
+        capstone: {
+          include: {
+            topic: {
+              include: {
+                uploadedBy: { include: { user: { select: { name: true } } } },
+              },
+            },
+          },
+        },
         milestones: {
           where: { deletedAt: null },
           include: {
@@ -1226,7 +1446,10 @@ export async function getCoordinatorGroupDetail(groupId: number) {
         })),
         capstoneArchive: group.capstoneArchive,
       },
-      !!group.section.capstone2OpenedAt,
+      resolveSectionAvailability(
+        !!group.section.capstone2OpenedAt,
+        group.section.milestoneAvailability,
+      ),
     )
 
     return {
@@ -1250,14 +1473,16 @@ export async function getCoordinatorGroupDetail(groupId: number) {
               image: group.adviser.faculty.user.image,
             }
           : null,
-        topics: group.topics.map((t) => ({
-          id: t.id,
-          title: t.title,
-          status: t.status as 'PENDING' | 'APPROVED' | 'NEED_REVISION',
-          note: t.reviewNote,
-          submittedBy: t.uploadedBy?.user.name ?? '',
-          createdAt: t.createdAt.toISOString(),
-        })),
+        topic: group.capstone
+          ? {
+              id: group.capstone.topic.id,
+              title: group.capstone.topic.title,
+              status: group.capstone.topic.status as 'PENDING' | 'APPROVED' | 'NEED_REVISION',
+              note: group.capstone.topic.reviewNote,
+              submittedBy: group.capstone.topic.uploadedBy?.user.name ?? '',
+              createdAt: group.capstone.topic.createdAt.toISOString(),
+            }
+          : null,
         journey,
       } satisfies SectionGroupDetail,
     }

@@ -6,8 +6,10 @@ import { toast } from 'sonner'
 import { removeSection } from '@/lib/actions/sections'
 import type { MySectionCardData } from '@/lib/actions/sections'
 
+type SectionRef = Pick<MySectionCardData, 'id' | 'name'>
+
 interface RemoveSectionModalProps {
-  section: MySectionCardData | null
+  section: SectionRef | null
   onClose: () => void
   onSuccess: () => void
 }

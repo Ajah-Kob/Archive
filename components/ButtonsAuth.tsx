@@ -23,9 +23,9 @@ export function ButtonSignOut({ className }: { className?: string }) {
       onClick={() => {
         signOut()
       }}
-      className={`button w-full justify-start ${className}`}
+      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[8px] text-[13px] font-medium text-[#e85555] hover:bg-[rgba(254,111,111,0.07)] transition-colors ${className}`}
     >
-      <LogOut className="inline mr-2 mb-1" />
+      <LogOut className="size-4 shrink-0" />
       Logout
     </button>
   )

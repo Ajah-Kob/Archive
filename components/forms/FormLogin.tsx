@@ -1,16 +1,21 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useTransition } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { AuthInput } from '@/components/ui/AuthInput'
+import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
+import { PasswordToggle } from '@/components/ui/PasswordToggle'
+import { useAuthFormValidity } from '@/components/forms/useAuthFormValidity'
+import { isValidEmail } from '@/lib/helper'
 
 export default function FormLogin({ className }: { className?: string }) {
   // Refs
   const formRef = useRef<HTMLFormElement>(null)
 
   // Hooks
-  const router = useRouter()
-  const { push: redirect } = router
+  const [pending, startTransition] = useTransition()
+  const { isFormValid, checkFormValidity } = useAuthFormValidity(formRef)
 
   // State
   const [state, setState] = useState({
@@ -21,88 +26,105 @@ export default function FormLogin({ className }: { className?: string }) {
       password: '',
     },
   })
-  const [pending, setPending] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    setPending(true)
+    startTransition(async () => {
+      const formData = new FormData(formRef.current)
+      const email = formData.get('email')?.toString().trim()
+      const password = formData.get('password')?.toString().trim()
 
-    const formData = new FormData(formRef.current)
-    const email = formData.get('email')?.toString().trim()
-    const password = formData.get('password')?.toString().trim()
-
-    if (!email || !password) {
-      setState({
-        message: null,
-        success: false,
-        errors: {
-          email: !email ? 'Email is required.' : '',
-          password: !password ? 'Password is required.' : '',
-        },
-      })
-      setPending(false)
-      return
-    }
-
-    try {
-      const res = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      })
-
-      // console.log('res: ', res)
-
-      if (res?.ok === true) {
+      if (!email || !password) {
         setState({
-          message: 'Logged in successfully',
-          success: true,
+          message: null,
+          success: false,
           errors: {
-            email: '',
+            email: !email ? 'Email is required.' : '',
+            password: !password ? 'Password is required.' : '',
+          },
+        })
+        return
+      }
+
+      if (!isValidEmail(email)) {
+        setState({
+          message: null,
+          success: false,
+          errors: {
+            email: 'Please enter a valid email address.',
             password: '',
           },
         })
+        return
+      }
 
-        // Wait 1 second before redirecting
-        setTimeout(() => {
-          redirect('/dashboard')
-        }, 1000)
+      try {
+        const res = await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        })
 
-        //
-      } else {
+        if (res?.ok === true) {
+          setState({
+            message: 'Logged in successfully',
+            success: true,
+            errors: {
+              email: '',
+              password: '',
+            },
+          })
+
+          // Wait 1 second before redirecting
+          setTimeout(() => {
+            window.location.href = '/dashboard'
+          }, 1000)
+        } else {
+          setState({
+            message: null,
+            success: false,
+            errors: {
+              email: '',
+              password: 'Invalid email or password.',
+            },
+          })
+        }
+      } catch (error) {
+        console.log('error: ', error)
+
         setState({
-          message: 'Failed to login',
+          message: null,
           success: false,
           errors: {
             email: '',
-            password: '',
+            password: 'Invalid email or password.',
           },
         })
       }
-
-      setPending(false)
-    } catch (error) {
-      console.log('error: ', error)
-
-      setState({
-        message: 'Failed to login',
-        success: false,
-        errors: {
-          email: '',
-          password: '',
-        },
-      })
-    }
+    })
   }
 
   return (
     <form
       ref={formRef}
       onSubmit={handleSubmit}
+      onInput={checkFormValidity}
       noValidate
-      className={`${className} flex flex-col gap-5`}
+      className={`${className} flex flex-col gap-4`}
     >
+      {/* Header Section */}
+      <div className=" text-left flex flex-col gap-2.5">
+        <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-normal">
+          Login to your account
+        </h2>
+        <p className="text-gray-500 font-inter text-[13px] non-italic font-medium leading-[20.8px]">
+          Enter your email below to login to your account
+        </p>
+      </div>
+
+      {/* Error/Success Alert Banner */}
       {state?.message && (
         <p
           className={`alert ${
@@ -113,42 +135,66 @@ export default function FormLogin({ className }: { className?: string }) {
         </p>
       )}
 
-      <div className="form-control">
-        <label>Email address</label>
-        <input
-          required
-          type="email"
+      <div className="flex flex-col gap-4">
+        {/* Email Field */}
+        <AuthInput
+          label="Email"
           name="email"
+          type="email"
           placeholder="johnthomas@email.com"
-          className={`input w-full`}
-        />
-        {state?.errors?.email && (
-          <p className="error">{state?.errors?.email}</p>
-        )}
-      </div>
-
-      <div className="form-control">
-        <label>Password</label>
-        <input
+          error={state?.errors?.email}
           required
-          type="password"
-          name="password"
-          placeholder="********"
-          className={`input w-full`}
         />
-        {state?.errors?.password && (
-          <p className="error">{state?.errors?.password}</p>
-        )}
+
+        {/* Password Field */}
+        <AuthInput
+          label="Password"
+          name="password"
+          type={showPassword ? 'text' : 'password'}
+          placeholder="Enter your password"
+          error={state?.errors?.password}
+          required
+        >
+          <PasswordToggle
+            shown={showPassword}
+            onToggle={() => setShowPassword((shown) => !shown)}
+          />
+        </AuthInput>
+
+        {/* 4. Remember Me & Forgot Password Links Row */}
+        <div className="flex items-center justify-between mt-1 text-sm">
+          <label className="flex items-center gap-2 text-slate-500 font-medium cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="remember"
+              className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 accent-indigo-500"
+            />
+            Remember me
+          </label>
+          <Link
+            href="/forgot-password"
+            className="font-medium text-indigo-400 hover:text-indigo-500 transition-colors"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
+        <AuthSubmitButton
+          pending={pending}
+          label="Sign in →"
+          disabled={!isFormValid}
+        />
       </div>
 
-      <div>
-        <button
-          type="submit"
-          className="button button--accent w-full justify-center disabled:animate-pulse disabled:opacity-50"
-          disabled={pending}
+      {/* Footer Registration Navigation link */}
+      <div className="mt-2 text-center text-sm text-slate-500 font-medium">
+        Don't have an account?{' '}
+        <Link
+          href="/signup"
+          className="font-medium text-indigo-400 hover:text-indigo-500 transition-colors"
         >
-          {pending ? 'Please wait...' : 'Login'}
-        </button>
+          Sign Up
+        </Link>
       </div>
     </form>
   )

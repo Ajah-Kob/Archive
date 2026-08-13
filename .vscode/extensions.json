@@ -1,0 +1,20 @@
+{
+  "recommendations": [
+    "bradlc.vscode-tailwindcss",
+    "christian-kohler.path-intellisense",
+    "esbenp.prettier-vscode",
+    "eamodio.gitlens",
+    "prisma.prisma",
+    "usernamehw.errorlens",
+    "emmanuelbeziat.vscode-great-icons",
+    "sst-dev.opencode",
+    "vinirossa.vscode-gitandgithub-pack",
+    "alefragnani.bookmarks",
+    "pflannery.vscode-versionlens",
+    "ecmel.vscode-html-css",
+    "formulahendry.auto-rename-tag",
+    "pranaygp.vscode-css-peek",
+    "zignd.html-css-class-completion",
+    "vscode-icons-team.vscode-icons"
+  ]
+}

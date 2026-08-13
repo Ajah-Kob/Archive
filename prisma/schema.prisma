@@ -12,35 +12,386 @@ datasource db {
   provider = "postgresql"
 }
 
+// ───────────────────────────── User ─────────────────────────────
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  FACULTY
+  STUDENT
+  GUEST
+}
+
 model User {
-  id                          Int                  @id @default(autoincrement())
-  name                        String
-  email                       String               @unique
-  image                       String?
-  role                        Role                 @default(USER)
-  activatedAt                 DateTime?
-  createdAt                   DateTime             @default(now())
-  loggedInAt                  DateTime?            @default(now())
-  deletedAt                   DateTime?
-  password                    String?
-  updatedAt                   DateTime?            @updatedAt
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String                @unique
+  image                String?
+  role                 Role                  @default(GUEST)
+  activatedAt          DateTime?
+  createdAt            DateTime              @default(now())
+  loggedInAt           DateTime?             @default(now())
+  deletedAt            DateTime?
+  password             String?
+  updatedAt            DateTime?             @updatedAt
+  faculty              Faculty?
+  student              Student?
+  templates            Template[]
+  capstoneArchives     CapstoneArchive[]
+  milestoneSubmissions MilestoneSubmission[]
+  invitationsSent      Invitation[]          @relation("InvitationSender")
+  topicReviews         Topic[]               @relation("TopicReviewer")
 
   @@index([email, deletedAt])
 }
 
 model ResetPasswordToken {
-  id                          BigInt   @id(map: "idx_30320_primary") @default(autoincrement())
-  email                       String   @db.VarChar(191)
-  token                       String   @unique(map: "idx_30320_resetpasswordtoken_token_key") @db.VarChar(191)
-  expires                     DateTime @db.Timestamptz(6)
-  created_at                  DateTime @default(now()) @db.Timestamptz(6)
+  id         Int      @id(map: "idx_30320_primary") @default(autoincrement())
+  email      String   @db.VarChar(191)
+  token      String   @unique(map: "idx_30320_resetpasswordtoken_token_key") @db.VarChar(191)
+  expires    DateTime @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
 
   @@unique([email, token], map: "idx_30320_resetpasswordtoken_email_token_key")
-
 }
 
-enum Role {
-  SUPERADMIN
-  ADMIN
-  USER
+// ───────────────────────────── Faculty ─────────────────────────────
+
+model Faculty {
+  id             Int          @id @default(autoincrement())
+  userId         Int          @unique
+  user           User         @relation(fields: [userId], references: [id])
+  isProgramChair Boolean      @default(false)
+  coordinator    Coordinator?
+  adviser        Adviser?
+  invitations    Invitation[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  @@index([deletedAt])
+}
+
+model Coordinator {
+  id        Int       @id @default(autoincrement())
+  facultyId Int       @unique
+  faculty   Faculty   @relation(fields: [facultyId], references: [id])
+  section   Section[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([deletedAt])
+}
+
+model Adviser {
+  id        Int        @id @default(autoincrement())
+  facultyId Int        @unique
+  faculty   Faculty    @relation(fields: [facultyId], references: [id])
+  capstones Capstone[]
+  groups    Group[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+
+  @@index([deletedAt])
+}
+
+// ───────────────────────────── joinCode ─────────────────────────────
+
+enum JoinType {
+  STUDENT
+  FACULTY
+}
+
+model JoinCode {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique
+  type      JoinType
+  section   Section?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@index([deletedAt])
+}
+
+// ───────────────────────────── Invitation ─────────────────────────────
+
+enum InvitationRole {
+  COORDINATOR
+  ADVISER
+  PANELIST
+  GROUP
+  ADVISER_ASSIGNMENT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+  REJECTED
+}
+
+model Invitation {
+  id          Int              @id @default(autoincrement())
+  facultyId   Int?
+  faculty     Faculty?         @relation(fields: [facultyId], references: [id])
+  studentId   Int?
+  student     Student?         @relation(fields: [studentId], references: [id])
+  groupId     Int?
+  group       Group?           @relation(fields: [groupId], references: [id])
+  role        InvitationRole
+  invitedById Int
+  invitedBy   User             @relation("InvitationSender", fields: [invitedById], references: [id])
+  status      InvitationStatus @default(PENDING)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+  deletedAt   DateTime?
+
+  @@index([facultyId])
+  @@index([studentId])
+  @@index([groupId])
+  @@index([invitedById])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────── Section & Student & Group ─────────────────────────────
+
+model Section {
+  id            Int         @id @default(autoincrement())
+  joinCodeId    Int?        @unique
+  joinCode      JoinCode?   @relation(fields: [joinCodeId], references: [id], onDelete: SetNull)
+  coordinatorId Int
+  coordinator   Coordinator @relation(fields: [coordinatorId], references: [id])
+  section       String
+  students      Student[]
+  groups        Group[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+  capstone2OpenedAt DateTime?
+  milestoneAvailability MilestoneAvailability[]
+
+  @@unique([coordinatorId, section])
+  @@index([deletedAt])
+}
+
+enum MilestoneKey {
+  TOPIC_SUBMISSION
+  TOPIC_SELECTION
+  CHAPTER_1
+  CHAPTER_2
+  CHAPTER_3
+  CHAPTER_4
+  CHAPTER_5
+  ARCHIVING
+}
+
+// Section-level availability of each milestone. A row with a set `openedAt`
+// means the milestone is open to all groups in the section; `openedAt: null`
+// means it is locked. Missing rows fall back to defaults (see
+// buildMilestoneAvailability in lib/actions/sections.ts).
+model MilestoneAvailability {
+  id        Int         @id @default(autoincrement())
+  sectionId Int
+  section   Section     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  key       MilestoneKey
+  openedAt  DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([sectionId, key])
+  @@index([sectionId])
+}
+
+model Student {
+  id          Int          @id @default(autoincrement())
+  userId      Int          @unique
+  user        User         @relation(fields: [userId], references: [id])
+  sectionId   Int
+  section     Section      @relation(fields: [sectionId], references: [id])
+  groupId     Int?
+  group       Group?       @relation(fields: [groupId], references: [id])
+  ledGroup    Group?       @relation("GroupLeader")
+  invitations Invitation[]
+  topics      Topic[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  @@index([deletedAt])
+}
+
+model Group {
+  id              Int              @id @default(autoincrement())
+  groupName       String
+  sectionId       Int
+  section         Section          @relation(fields: [sectionId], references: [id])
+  leaderStudentId Int?             @unique
+  leaderStudent   Student?         @relation("GroupLeader", fields: [leaderStudentId], references: [id])
+  adviserId       Int?
+  adviser         Adviser?         @relation(fields: [adviserId], references: [id])
+  students        Student[]
+  topics          Topic[]
+  capstone        Capstone?
+  milestones      Milestone[]
+  capstoneArchive CapstoneArchive?
+  invitations     Invitation[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  @@index([sectionId])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────── Topic & Capstone ─────────────────────────────
+
+enum TopicStatus {
+  PENDING
+  APPROVED
+  NEED_REVISION
+}
+
+model Topic {
+  id            Int         @id @default(autoincrement())
+  groupId       Int
+  group         Group       @relation(fields: [groupId], references: [id])
+  topicGroupKey String?
+  title         String
+  background    String
+  uploadedById  Int?
+  uploadedBy    Student?    @relation(fields: [uploadedById], references: [id])
+  status        TopicStatus @default(PENDING)
+  reviewNote   String?
+  reviewedById Int?
+  reviewedBy   User?       @relation("TopicReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  capstone     Capstone?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  @@index([groupId])
+  @@index([uploadedById])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+enum CapstonePhase {
+  CAPSTONE_1
+  CAPSTONE_2
+}
+
+model Capstone {
+  id         Int         @id @default(autoincrement())
+  groupId    Int         @unique
+  group      Group       @relation(fields: [groupId], references: [id])
+  topicId    Int         @unique
+  topic      Topic       @relation(fields: [topicId], references: [id])
+  adviserId  Int?
+  adviser    Adviser?    @relation(fields: [adviserId], references: [id])
+  milestones Milestone[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  deletedAt  DateTime?
+
+  @@index([topicId])
+  @@index([adviserId])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────── Milestone & Submission ─────────────────────────────
+
+enum Chapter {
+  CHAPTER_1
+  CHAPTER_2
+  CHAPTER_3
+  CHAPTER_4
+  CHAPTER_5
+}
+
+model Milestone {
+  id          Int                   @id @default(autoincrement())
+  groupId     Int
+  group       Group                 @relation(fields: [groupId], references: [id])
+  phase       CapstonePhase
+  chapter     Chapter
+  capstoneId  Int
+  capstone    Capstone              @relation(fields: [capstoneId], references: [id])
+  submissions MilestoneSubmission[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  deletedAt   DateTime?
+
+  @@index([groupId])
+  @@index([capstoneId])
+  @@index([deletedAt])
+}
+
+enum SubmissionStatus {
+  PENDING
+  NEED_REVISION
+  APPROVED
+}
+
+model MilestoneSubmission {
+  id          Int              @id @default(autoincrement())
+  milestoneId Int
+  milestone   Milestone        @relation(fields: [milestoneId], references: [id])
+  submittedBy Int
+  user        User             @relation(fields: [submittedBy], references: [id])
+  fileName    String
+  blobUrl     String
+  mimeType    String
+  size        Int
+  status      SubmissionStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  @@index([milestoneId])
+  @@index([submittedBy])
+  @@index([deletedAt])
+}
+
+// ───────────────────────────── Repository ─────────────────────────────
+
+model CapstoneArchive {
+  id            Int       @id @default(autoincrement())
+  groupId       Int       @unique
+  group         Group     @relation(fields: [groupId], references: [id])
+  title         String
+  abstract      String?
+  datePublished DateTime
+  fileName      String
+  blobUrl       String
+  mimeType      String
+  size          Int
+  uploadedById  Int
+  uploadedBy    User      @relation(fields: [uploadedById], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([deletedAt])
+}
+
+// ───────────────────────────── Template ─────────────────────────────
+model Template {
+  id           Int       @id @default(autoincrement())
+  name         String
+  fileName     String
+  blobUrl      String
+  mimeType     String
+  size         Int
+  uploadedById Int
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  @@index([deletedAt])
+  @@index([uploadedById])
 }

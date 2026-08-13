@@ -5,13 +5,12 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ButtonSignOut } from '@/components/ButtonsAuth'
 import {
-  User,
-  UserPen,
-  CircleUserRound,
-  ShieldEllipsis,
   LayoutDashboard,
+  ShieldEllipsis,
+  UserPen,
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
+import { getInitials } from '@/lib/helper'
 
 export default function DrawerProfile() {
   // Ref
@@ -19,7 +18,6 @@ export default function DrawerProfile() {
 
   // Hooks
   const { data: session } = useSession()
-  // console.log('DrawerProfile - Session data:', session)
 
   // State
   const [isOpen, setIsOpen] = useState(false)
@@ -44,67 +42,96 @@ export default function DrawerProfile() {
     }
   }, [isOpen])
 
+  const name = session?.user?.name || 'User'
+  const initials = session?.user?.name ? getInitials(session.user.name) : '?'
+
+  const avatar = session?.user?.image ? (
+    <Image
+      src={session.user.image}
+      alt="Profile"
+      width={40}
+      height={40}
+      className="size-10 object-cover"
+    />
+  ) : (
+    <div
+      className="size-full flex items-center justify-center"
+      style={{
+        backgroundImage:
+          'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)',
+      }}
+    >
+      <span className="text-white text-[12.5px] font-bold tracking-[0.5px]">
+        {initials}
+      </span>
+    </div>
+  )
+
+  const menuLinkClass =
+    'flex items-center gap-2.5 px-3 py-2.5 rounded-[8px] text-[13px] font-medium text-[#3c4268] hover:bg-[#f4f6ff] hover:text-[#12143a] transition-colors'
+
   return (
     <div className="relative" ref={drawerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="button button--circle"
+        aria-label="Profile"
+        className="size-10 rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-[#eceef8] shadow-[0px_2px_4px_rgba(0,0,0,0.14)] hover:opacity-90 transition-opacity"
       >
-        <User />
+        {avatar}
       </button>
+
       {isOpen && (
-        <div className="animated absolute right-0 mt-2 w-48 bg-white border border-secondary rounded z-10">
-          <div className="px-2 py-3 border-b border-secondary flex gap-2">
-            <div className="min-w-8">
-              {session?.user?.image ? (
-                <Image
-                  src={session?.user?.image}
-                  alt="Profile"
-                  className="w-8 h-8 rounded-full object-cover"
-                  width={32}
-                  height={32}
-                />
-              ) : (
-                <CircleUserRound size={24} className="inline mr-2 mb-1" />
-              )}
-            </div>
-            <div>
-              <p>{session?.user?.name}</p>
-              <p className="text-gray-500">{session?.user?.email}</p>
+        <div className="absolute right-0 mt-2 w-60 bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_20px_60px_0px_rgba(16,20,58,0.18),0px_4px_16px_0px_rgba(0,0,0,0.06)] z-50">
+          <div className="px-3 pt-3 pb-[13px] border-b border-[#eceef8]">
+            <div className="flex gap-3 items-center">
+              <div className="size-10 rounded-full overflow-hidden shrink-0">
+                {avatar}
+              </div>
+              <div className="min-w-px flex flex-col">
+                <p className="font-sans font-bold text-[13.5px] text-[#12143a] truncate">
+                  {name}
+                </p>
+                <p className="font-sans font-medium text-[11.5px] text-[#8a93b4] truncate">
+                  {session?.user?.email}
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex flex-col justify-center py-3 px-1">
+
+          <div className="p-1.5 flex flex-col gap-0.5">
             {(session?.user?.role === 'SUPERADMIN' ||
               session?.user?.role === 'ADMIN') && (
               <Link
                 href="/dashboard"
-                className="hover:bg-primary p-2 rounded animated"
+                className={menuLinkClass}
                 onClick={() => setIsOpen(false)}
               >
-                <LayoutDashboard className="inline mr-2 mb-1" />
+                <LayoutDashboard className="size-4 text-[#9ea8c6] shrink-0" />
                 Dashboard
               </Link>
             )}
 
             <Link
               href="/dashboard/user/profile"
-              className="hover:bg-primary p-2 rounded animated"
-              onClick={() => setIsOpen(!isOpen)}
+              className={menuLinkClass}
+              onClick={() => setIsOpen(false)}
             >
-              <UserPen className="inline mr-2 mb-1" />
+              <UserPen className="size-4 text-[#9ea8c6] shrink-0" />
               Profile
             </Link>
 
             <Link
               href="/dashboard/user/security"
-              className="hover:bg-primary p-2 rounded animated"
-              onClick={() => setIsOpen(!isOpen)}
+              className={menuLinkClass}
+              onClick={() => setIsOpen(false)}
             >
-              <ShieldEllipsis className="inline mr-2 mb-1" />
+              <ShieldEllipsis className="size-4 text-[#9ea8c6] shrink-0" />
               Security
             </Link>
 
-            <ButtonSignOut />
+            <div className="pt-1.5 mt-0.5 border-t border-[#eceef8]">
+              <ButtonSignOut />
+            </div>
           </div>
         </div>
       )}

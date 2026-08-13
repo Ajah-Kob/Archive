@@ -1,5 +1,6 @@
 import { getServerSession, Session } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
+import prisma from '@/lib/prisma'
 
 const ADMIN_ROLES = ['SUPERADMIN', 'ADMIN']
 
@@ -32,10 +33,96 @@ export async function requireAdmin(): Promise<Session | null> {
   return session
 }
 
+// Guards a server action for admins (SUPERADMIN/ADMIN) or the program chair
+// (a faculty member with isProgramChair). Checked against the DB so a change
+// of program chair takes effect without waiting for a session refresh.
+export async function requireAdminOrProgramChair(): Promise<Session | null> {
+  const session = await requireAdmin()
+  if (session) return session
+
+  const current = await getSession()
+  if (!current?.user?.id) return null
+  const programChair = await prisma.faculty.findFirst({
+    where: { userId: +current.user.id, deletedAt: null, isProgramChair: true },
+  })
+  return programChair ? current : null
+}
+
+// Guards a server action for users with a coordinator record.
+export async function requireCoordinator(): Promise<Session | null> {
+  const session = await requireUser()
+  if (!session) return null
+  const coordinatorTable = 'coordinator' as const
+  const coordinator = await prisma[coordinatorTable].findFirst({
+    where: {
+      faculty: { userId: +session.user.id, deletedAt: null },
+      deletedAt: null,
+    },
+  })
+  console.log(coordinator)
+  return coordinator ? session : null
+}
+
+// Guards a server action for anyone with coordinator-scoped access: admins,
+// the program chair, or a live coordinator record. Checked against the DB so
+// removed coordinators lose access without waiting for a session refresh.
+export async function requireCoordinatorAccess(): Promise<Session | null> {
+  const session = await getSession()
+  if (!session?.user?.id) return null
+  const role = (session.user.role as string) ?? ''
+  if (ADMIN_ROLES.includes(role)) return session
+
+  const faculty = await prisma.faculty.findFirst({
+    where: {
+      userId: +session.user.id,
+      deletedAt: null,
+      OR: [
+        { isProgramChair: true },
+        { coordinator: { deletedAt: null } },
+      ],
+    },
+  })
+  return faculty ? session : null
+}
+
+// Guards a server action for users with an adviser record.
+export async function requireAdviser(): Promise<Session | null> {
+  const session = await requireUser()
+  if (!session) return null
+  const adviserTable = 'adviser' as const
+  const adviser = await prisma[adviserTable].findFirst({
+    where: {
+      faculty: { userId: +session.user.id, deletedAt: null },
+      deletedAt: null,
+    },
+  })
+  console.log(adviser)
+  return adviser ? session : null
+}
+
+// Guards a server action for users with a student record.
+export async function requireStudent(): Promise<Session | null> {
+  const session = await requireUser()
+  if (!session) return null
+  const studentTable = 'student' as const
+  const student = await prisma[studentTable].findFirst({
+    where: { userId: +session.user.id, deletedAt: null },
+  })
+  return student ? session : null
+}
+
+// Guards a server action for users with a panelist record.
+// Note: Panelist model does not exist in the schema yet — always returns null.
+export async function requirePanelist(): Promise<Session | null> {
+  const session = await requireUser()
+  if (!session) return null
+  return null
+}
+
 // Strips the password hash (and any other secrets) before a user row is sent
 // to the client. Accepts a single row or an array.
 export function sanitizeUser<T extends { password?: unknown } | null>(
-  user: T
+  user: T,
 ): T {
   if (!user) return user
   const { password, ...safe } = user as Record<string, unknown>
@@ -43,7 +130,7 @@ export function sanitizeUser<T extends { password?: unknown } | null>(
 }
 
 export function sanitizeUsers<T extends { password?: unknown }>(
-  users: T[] | null | undefined
+  users: T[] | null | undefined,
 ): T[] {
   if (!users) return []
   return users.map((u) => sanitizeUser(u))

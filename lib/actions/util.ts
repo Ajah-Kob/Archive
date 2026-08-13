@@ -28,6 +28,7 @@ export async function forgotPassword(_prevState: any, formData: FormData) {
       success: false,
       payload: null,
       message: 'Please enter a valid email address.',
+      errors: { email: 'Please enter a valid email address.' },
     }
   }
 
@@ -85,7 +86,15 @@ export async function resetPassword(_prevState: any, formData: FormData) {
   const confirmPassword = formData.get('confirmPassword')?.toString().trim()
 
   if (!token || !email || !password) {
-    return { success: false, payload: null, message: 'All fields are required.' }
+    return {
+      success: false,
+      payload: null,
+      message: 'All fields are required.',
+      errors: {
+        password: !password ? 'Password is required.' : '',
+        confirmPassword: !confirmPassword ? 'Please confirm your password.' : '',
+      },
+    }
   }
 
   if (password.length < MIN_PASSWORD_LENGTH) {
@@ -93,11 +102,17 @@ export async function resetPassword(_prevState: any, formData: FormData) {
       success: false,
       payload: null,
       message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`,
+      errors: { password: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.` },
     }
   }
 
   if (password !== confirmPassword) {
-    return { success: false, payload: null, message: 'Passwords do not match.' }
+    return {
+      success: false,
+      payload: null,
+      message: 'Passwords do not match.',
+      errors: { confirmPassword: 'Passwords do not match.' },
+    }
   }
 
   try {

@@ -10,3 +10,5 @@ export const SMTP_FROM_NAME = 'NextCrud'
 export const SMTP_FROM_EMAIL = 'hello@domain.com'
 
 export const USERS_PER_PAGE = 5
+
+export const ADVISER_CAP = 8

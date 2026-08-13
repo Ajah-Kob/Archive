@@ -10,10 +10,10 @@ Branch names should clearly describe the work being done and follow a consistent
 
 ## General Rules
 
-* Keep branch names short and descriptive.
-* Use **kebab-case** (`-`) for the descriptive portion.
-* Prefix every branch with the appropriate branch type.
-* Include an issue number when applicable.
+- Keep branch names short and descriptive.
+- Use **kebab-case** (`-`) for the descriptive portion.
+- Prefix every branch with the appropriate branch type.
+- Include an issue number when applicable.
 
 ---
 
@@ -75,11 +75,11 @@ hotfix/login-redirect
 
 ## Branch Guidelines
 
-* Keep names under **50 characters** whenever possible.
-* Separate words using hyphens (`-`).
-* Avoid using personal names in branch names.
-* Avoid generic names such as `test`, `new`, `update`, or `branch`.
-* Create a new branch for every feature, bug fix, or documentation change.
+- Keep names under **50 characters** whenever possible.
+- Separate words using hyphens (`-`).
+- Avoid using personal names in branch names.
+- Avoid generic names such as `test`, `new`, `update`, or `branch`.
+- Create a new branch for every feature, bug fix, or documentation change.
 
 ---
 
@@ -99,11 +99,11 @@ Every commit should clearly describe the change it introduces. We follow a light
 
 ### Components
 
-* **type** – Category of the change.
-* **scope** – Optional area of the project (e.g., `auth`, `calendar`, `sidebar`).
-* **short summary** – Brief description written in the present tense.
-* **body** – Optional explanation describing the reason for the change.
-* **footer** – Optional metadata such as issue references.
+- **type** – Category of the change.
+- **scope** – Optional area of the project (e.g., `auth`, `calendar`, `sidebar`).
+- **short summary** – Brief description written in the present tense.
+- **body** – Optional explanation describing the reason for the change.
+- **footer** – Optional metadata such as issue references.
 
 ---
 
@@ -130,32 +130,21 @@ Every commit should clearly describe the change it introduces. We follow a light
 
 ```text
 feat(calendar): add month navigation
-```
 
-### Bug Fix
-
-```text
 fix(auth): prevent redirect loop on login
-```
 
-### Documentation
-
-```text
 docs(readme): add getting started section
-```
 
-### Refactoring
-
-```text
 refactor(sidebar): simplify navigation layout
+
 ```
 
 ---
 
 ## Commit Guidelines
 
-* Keep the subject line under **50 characters** whenever possible.
-* Use the **present tense**.
+- Keep the subject line under **50 characters** whenever possible.
+- Use the **present tense**.
 
 ✅ Good
 
@@ -173,10 +162,10 @@ fixed login validation
 updating sidebar
 ```
 
-* Do **not** end the subject line with a period.
-* Write meaningful commit messages that explain **what** changed.
-* Include a commit body when additional context is helpful.
-* Reference related issues using:
+- Do **not** end the subject line with a period.
+- Write meaningful commit messages that explain **what** changed.
+- Include a commit body when additional context is helpful.
+- Reference related issues using:
 
 ```text
 Closes #123
@@ -190,22 +179,15 @@ when the commit or pull request resolves an issue.
 
 ```text
 feat(calendar): add month navigation
-```
 
-```text
 fix(repository): resolve duplicate upload issue
-```
 
-```text
 docs(project): add Git workflow documentation
-```
 
-```text
 refactor(auth): simplify validation logic
-```
 
-```text
 chore(deps): update React to latest version
+
 ```
 
 ---
@@ -214,11 +196,11 @@ chore(deps): update React to latest version
 
 Before opening a Pull Request:
 
-* Ensure your branch is up to date with the latest `develop` branch.
-* Verify that your code follows the project's coding standards.
-* Test your changes locally.
-* Push your feature branch to your fork.
-* Follow the Pull Request template described in the **Pull Request Guide**.
+- Ensure your branch is up to date with the latest `develop` branch.
+- Verify that your code follows the project's coding standards.
+- Test your changes locally.
+- Push your feature branch to your fork.
+- Follow the Pull Request template described in the **Pull Request Guide**.
 
 ---
 

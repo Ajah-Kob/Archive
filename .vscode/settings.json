@@ -5,5 +5,10 @@
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "prettier.semi": false,
-  "prettier.singleQuote": true
+  "prettier.singleQuote": true,
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "tailwindCSS.experimental.configFile": "app/globals.css",
+  "tailwindCSS.validate": false,
+  "json.schemaTrustedUris": ["https://app.kilo.ai/config.json"]
 }

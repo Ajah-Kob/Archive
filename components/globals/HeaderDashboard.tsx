@@ -1,25 +1,26 @@
 import Link from 'next/link'
-import { APP_NAME } from '@/config/constants'
+import NotificationPanel from '@/components/notifications/NotificationPanel'
 import DrawerProfile from '@/components/globals/DrawerProfile'
 import ButtonDrawer from '@/components/ui/ButtonDrawer'
 
 export default async function HeaderDashboard() {
   return (
-    <header className="bg-secondary sticky top-0 z-10">
-      <div className="px-5 py-2 h-16 flex items-center justify-between">
-        <div className="flex justify-between items-center gap-5 w-full">
-          <div className="flex items-center gap-3">
-            <ButtonDrawer />
+    <header className="h-16 shrink-0 bg-white border-b border-[#eceef8] flex items-center px-5 md:px-8">
+      <div className="flex items-center gap-3">
+        <ButtonDrawer />
+        <Link
+          href="/"
+          className="font-['Sora',sans-serif] font-bold text-[14.5px] text-[#12143a] tracking-[2.1025px]"
+        >
+          ARCHIVE
+        </Link>
+      </div>
 
-            <h1 className="">
-              <Link href="/">{APP_NAME}</Link>
-            </h1>
-          </div>
+      <div className="flex-1" />
 
-          <div className="flex items-center gap-5">
-            <DrawerProfile />
-          </div>
-        </div>
+      <div className="flex items-center gap-1">
+        <NotificationPanel />
+        <DrawerProfile />
       </div>
     </header>
   )

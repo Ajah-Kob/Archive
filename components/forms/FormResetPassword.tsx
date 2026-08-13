@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useActionState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { resetPassword } from '@/lib/actions/util'
+import { AuthInput } from '@/components/ui/AuthInput'
 
 export default function FormResetPassword({
   className,
@@ -19,12 +20,24 @@ export default function FormResetPassword({
   // State
   const [email, setEmail] = useState('')
   const [token, setToken] = useState('')
+  const [isFormValid, setIsFormValid] = useState(false)
 
   const [state, handleSubmit, isPending] = useActionState(resetPassword, {
     success: false,
     message: null,
     errors: null,
   })
+
+  function checkFormValidity() {
+    const form = formRef.current
+    if (!form) return
+    const inputs = form.querySelectorAll('input[required]:not([type="hidden"])')
+    setIsFormValid(
+      Array.from(inputs).every(
+        (input) => (input as HTMLInputElement).value.trim() !== ''
+      )
+    )
+  }
 
   useEffect(() => {
     const tokenParam = searchParams.get('token')
@@ -36,20 +49,25 @@ export default function FormResetPassword({
     }
   }, [searchParams])
 
-  //if no token and email return:
+  // if no token and email return:
   if (!email && !token) {
     return (
-      <div className="boreder-black m-auto w-full max-w-lg space-y-14">
-        <div className="space-y-6">
-          <h1 className="text-left text-3xl font-bold">
-            Reset password invalid link!
-          </h1>
-          <p className="text-muted-foreground text-left">
+      <div className="w-full max-w-[340px] p-6 md:p-8 rounded-3xl bg-[#ffffff] shadow-[0px_4px_24px_0px_rgba(0,0,0,0.03),0px_20px_60px_-4px_rgba(112,125,255,0.16),0px_0px_0px_1px_rgba(112,125,255,0.06)] flex flex-col gap-5">
+        <div className="text-left flex flex-col gap-2.5">
+          <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-normal">
+            Invalid reset link
+          </h2>
+          <p className="text-gray-500 font-inter text-[13px] non-italic font-medium leading-[20.8px]">
             Please check your email for the reset password link.
           </p>
         </div>
-        <Link href="/login" className="button button--secondary">
-          Go back to Homepage
+        <Link
+          href="/login"
+          className="self-stretch h-9 px-3.5 py-3.5 bg-gradient-to-r from-indigo-400 via-violet-400 via-[57%] to-red-400 to-[140%] rounded-md shadow-[0px_2px_8px_0px_rgba(0,0,0,0.08),0px_4px_22px_0px_rgba(112,125,255,0.27)] inline-flex justify-center items-center transition-all hover:opacity-95"
+        >
+          <span className="text-center justify-start text-white text-sm font-semibold leading-5 tracking-tight">
+            Go back to Login
+          </span>
         </Link>
       </div>
     )
@@ -59,79 +77,37 @@ export default function FormResetPassword({
     <form
       ref={formRef}
       action={handleSubmit}
+      onInput={checkFormValidity}
       noValidate
-      data-loading={isPending}
-      className={`flex flex-col gap-5 ${className}`}
+      className={`flex flex-col gap-4 ${className}`}
     >
-      <div className="w-full form-control">
-        <label className="auth-label" htmlFor="email">
-          Email*
-        </label>
-        <input
-          required
-          className={`${
-            !state?.success && state?.errors?.includes('email')
-              ? 'has-errors'
-              : 'border-gray-400 text-gray-400'
-          } auth-input w-full`}
-          type="email"
-          name="email"
-          value={email}
-          readOnly
-        />
-      </div>
+      <AuthInput
+        label="Email"
+        name="email"
+        type="email"
+        value={email}
+        readOnly
+        required
+        className="text-gray-400"
+      />
 
-      <div className="w-full form-control">
-        <span className="flex flex-row justify-between">
-          <label className="auth-label" htmlFor="password">
-            Password*{' '}
-          </label>
-        </span>
-        <input
-          required
-          className={`${
-            !state?.success && state?.errors?.password
-              ? 'has-errors'
-              : 'border-black'
-          } auth-input w-full`}
-          name="password"
-          type="password"
-          placeholder="********"
-        />
-        {/* Field Alert */}
-        {state?.errors?.password && (
-          <div className="error text-red-500 text-[12px] font-semibold">
-            {' '}
-            {state?.errors?.password}{' '}
-          </div>
-        )}
-      </div>
+      <AuthInput
+        label="Password"
+        name="password"
+        type="password"
+        placeholder="********"
+        error={state?.errors?.password}
+        required
+      />
 
-      <div className="w-full form-control">
-        <span className="flex flex-row justify-between">
-          <label className="auth-label" htmlFor="confirmpassword">
-            Confirm Password*{' '}
-          </label>
-        </span>
-        <input
-          required
-          className={`${
-            !state?.success && state?.errors?.confirmpassword
-              ? 'has-errors'
-              : 'border-black'
-          } auth-input w-full`}
-          name="confirmPassword"
-          type="password"
-          placeholder="********"
-        />
-        {/* Field Alert */}
-        {state?.errors?.confirmpassword && (
-          <div className="error text-red-500 text-[12px] font-semibold">
-            {' '}
-            {state?.errors?.confirmpassword}{' '}
-          </div>
-        )}
-      </div>
+      <AuthInput
+        label="Confirm Password"
+        name="confirmPassword"
+        type="password"
+        placeholder="********"
+        error={state?.errors?.confirmPassword}
+        required
+      />
 
       {/* Alert */}
       {state.message && (
@@ -150,10 +126,12 @@ export default function FormResetPassword({
       <div>
         <button
           type="submit"
-          className="button button--accent w-full justify-center disabled:animate-pulse disabled:opacity-50"
-          disabled={isPending}
+          disabled={isPending || !isFormValid}
+          className="self-stretch h-9 px-3.5 py-3.5 bg-gradient-to-r from-indigo-400 via-violet-400 via-[57%] to-red-400 to-[140%] rounded-md shadow-[0px_2px_8px_0px_rgba(0,0,0,0.08),0px_4px_22px_0px_rgba(112,125,255,0.27)] inline-flex justify-center items-center disabled:animate-pulse disabled:opacity-50 transition-all hover:opacity-95 w-full"
         >
-          {isPending ? 'Please wait...' : 'Reset Password'}
+          <div className="text-center justify-start text-white text-sm font-semibold leading-5 tracking-tight">
+            {isPending ? 'Please wait...' : 'Reset Password'}
+          </div>
         </button>
       </div>
     </form>

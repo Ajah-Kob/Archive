@@ -31,11 +31,8 @@ Before this workflow begins:
 ## Part A – Group Creation
 
 1. A student navigates to the **Group Management** page.
-
 2. The student selects **Create Group**.
-
 3. The system creates a new capstone group and assigns the student as the **Group Leader**.
-
 4. The Group Leader enters the required group information.
 
 ---
@@ -43,9 +40,7 @@ Before this workflow begins:
 ## Part B – Member Invitation
 
 1. The Group Leader opens the list of students belonging to the same class section.
-
 2. The Group Leader selects the students to become group members.
-
 3. The system sends a group invitation to each selected student.
 
 ---
@@ -53,13 +48,9 @@ Before this workflow begins:
 ## Part C – Invitation Response
 
 1. The invited student receives the group invitation.
-
 2. The student reviews the invitation.
-
 3. The student accepts the invitation.
-
 4. The system adds the student to the capstone group.
-
 5. This process repeats until all intended members have joined.
 
 ---

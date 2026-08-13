@@ -23,30 +23,49 @@ Read this before making any changes. This is the canonical reference for AI agen
 
 ## Project Identity
 
-**nextcrud** — Next.js 16 full-stack CRUD boilerplate.
+**Archive** — a Capstone Management System (CMS) for the Bachelor of Science in Information Systems (BSIS) program. It replaces the manual capstone workflow (Messenger, Drive, email) with a centralized platform for submitting capstone documents, getting adviser feedback, and tracking progress through the capstone lifecycle.
+
 Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 
-Features: JWT auth (Credentials), role-based user management, soft-delete, file uploads, email (password reset), paginated data tables, responsive layout with sidebar/drawer.
+**Feature areas**
+
+- **Role-based access** — `GUEST`, `STUDENT`, `FACULTY`, `ADMIN`, `SUPERADMIN`. Faculty hold adviser/coordinator records; Program Chair is a flag on `Faculty`, not a role.
+- **Join by invitation code** — guests join as student or faculty via a code (`/join-archive`).
+- **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`).
+- **Sections** — coordinators own sections, students enroll; monitored via `/sections` and `/sections/[slug]`.
+- **Templates** — capstone document templates (upload/remove) at `/templates`.
+- **Repository** — capstone repository at `/repository`.
+- **Notifications** — in-app notification panel in the aside footer.
+- **Admin** — user management at `/dashboard/users`; soft-delete.
+
+**Planned (aside nav placeholders, no pages yet):** Milestones, Defense,
+Calendar.
+
+**Workflow docs:** the complete capstone lifecycle — coordinator assignment → section management → group management → adviser assignment → Capstone 1 (topic, ch. 1–3, adviser review, proposal defense) → Capstone 2 (ch. 4–5, final defense) → progress monitoring — is documented in `docs/workflow/`. Start at `docs/workflow/00-overview.md`; each numbered file (`01-…`–`10-…`) details one business process.
+
+> Repo caveat: grew out of the `nextcrud` boilerplate — `package.json`,
+> `config/constants.ts`, and some docs still say "NextCrud". Treat those as
+> stale; do not rename casually.
 
 ---
 
 ## Tech Stack (exact versions)
 
-| Layer | Package | Version |
-|---|---|---|
-| Framework | `next` | 16.2.4 |
-| React | `react` / `react-dom` | 19.2.x |
-| Auth | `next-auth` | 4.24.x |
-| ORM | `prisma` / `@prisma/client` | 7.x |
-| DB driver | `@neondatabase/serverless` | 1.x |
-| Prisma adapter | `@prisma/adapter-neon` | 7.x |
-| File storage | `@vercel/blob` | 2.x |
-| State | `zustand` | 5.x |
-| Email | `nodemailer` | 7.x |
-| Toasts | `sonner` | 2.x |
-| Icons | `lucide-react` | 1.x |
-| CSS | `tailwindcss` | 4.x (PostCSS, no config file) |
-| TypeScript | `typescript` | 6.x |
+| Layer          | Package                     | Version                       |
+| -------------- | --------------------------- | ----------------------------- |
+| Framework      | `next`                      | 16.2.4                        |
+| React          | `react` / `react-dom`       | 19.2.x                        |
+| Auth           | `next-auth`                 | 4.24.x                        |
+| ORM            | `prisma` / `@prisma/client` | 7.x                           |
+| DB driver      | `@neondatabase/serverless`  | 1.x                           |
+| Prisma adapter | `@prisma/adapter-neon`      | 7.x                           |
+| File storage   | `@vercel/blob`              | 2.x                           |
+| State          | `zustand`                   | 5.x                           |
+| Email          | `nodemailer`                | 7.x                           |
+| Toasts         | `sonner`                    | 2.x                           |
+| Icons          | `lucide-react`              | 1.x                           |
+| CSS            | `tailwindcss`               | 4.x (PostCSS, no config file) |
+| TypeScript     | `typescript`                | 6.x                           |
 
 **TypeScript strict mode is OFF** — `"strict": false` in tsconfig.
 
@@ -114,50 +133,14 @@ types/                               # Shared TypeScript types
 
 ## Database Schema
 
-### User
+The Prisma schema at `prisma/schema.prisma` is the single source of truth for all models, relations, and enums. Read it before writing any query — do not rely on model definitions duplicated in this file.
 
-```prisma
-model User {
-  id          Int       @id @default(autoincrement())
-  name        String?
-  email       String    @unique
-  image       String?
-  role        Role      @default(USER)
-  password    String?
-  activatedAt DateTime?
-  loggedInAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-
-  @@index([email, deletedAt])
-}
-
-enum Role {
-  SUPERADMIN
-  ADMIN
-  USER
-}
-```
-
-### ResetPasswordToken
-
-```prisma
-model ResetPasswordToken {
-  id         Int      @id @default(autoincrement())
-  email      String
-  token      String   @unique
-  expires    DateTime
-  created_at DateTime @default(now())
-
-  @@unique([email, token])
-}
-```
+Current models: `User`, `ResetPasswordToken`, `Faculty`, `Coordinator`, `Adviser`, `JoinCode`, `Invitation`, `Section`, `Student`, `Group`, `Topic`, `Capstone`, `Milestone`, `MilestoneSubmission`, `CapstoneArchive`, `Template`.
 
 ### Critical conventions
 
 - **Always** query with `where: { deletedAt: null }` unless intentionally querying deleted users.
-- Role hierarchy: `SUPERADMIN` > `ADMIN` > `USER`.
+- Role enum: `SUPERADMIN`, `ADMIN`, `FACULTY`, `STUDENT`, `GUEST` (no `USER`). Adviser/coordinator/program-chair are `Faculty` records/flags, not enum values.
 - Passwords: `bcrypt`, 12 rounds in server actions, 10 rounds in seed.
 
 ---
@@ -221,23 +204,23 @@ Form-bound actions accept `(_prevState: any, formData: FormData)`.
 
 ### user.ts — Admin CRUD
 
-| Function | Signature | Cache |
-|---|---|---|
-| `getUser(id)` | `async (id: number) => User \| null` | `'use cache'`, tag `user-${id}` |
-| `getUsers(page?, perPage?)` | `async (page?, perPage?) => { users, totalPages, ... }` | `'use cache'`, tag `users` |
-| `createUser(_prev, formData)` | mutation | revalidates tag `users` |
-| `softDeleteUser(id)` | `async (id: number)` | revalidates tag `users` |
-| `updateUser(_prev, formData)` | mutation | revalidates tag `users` |
+| Function                      | Signature                                               | Cache                           |
+| ----------------------------- | ------------------------------------------------------- | ------------------------------- |
+| `getUser(id)`                 | `async (id: number) => User \| null`                    | `'use cache'`, tag `user-${id}` |
+| `getUsers(page?, perPage?)`   | `async (page?, perPage?) => { users, totalPages, ... }` | `'use cache'`, tag `users`      |
+| `createUser(_prev, formData)` | mutation                                                | revalidates tag `users`         |
+| `softDeleteUser(id)`          | `async (id: number)`                                    | revalidates tag `users`         |
+| `updateUser(_prev, formData)` | mutation                                                | revalidates tag `users`         |
 
 All queries filter `deletedAt: null`. `getUser` throws `NotFoundError` if no match.
 
 ### me.ts — Current user
 
-| Function | Purpose | Cache |
-|---|---|---|
-| `getMe()` | Fetch authenticated user | `react cache()` (per-request dedup) |
-| `updateMe(_prev, formData)` | Update name/email/image | mutation (client calls `update()`) |
-| `updateMePassword(_prev, formData)` | Verify current password, set new hash | mutation |
+| Function                            | Purpose                               | Cache                               |
+| ----------------------------------- | ------------------------------------- | ----------------------------------- |
+| `getMe()`                           | Fetch authenticated user              | `react cache()` (per-request dedup) |
+| `updateMe(_prev, formData)`         | Update name/email/image               | mutation (client calls `update()`)  |
+| `updateMePassword(_prev, formData)` | Verify current password, set new hash | mutation                            |
 
 `getMe()` uses `react cache()` — NOT `'use cache'`. It is deduplicated per HTTP request only.
 
@@ -247,25 +230,27 @@ import { cache } from 'react'
 export const getMe = cache(async () => {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return null
-  return prisma.user.findFirst({ where: { id: session.user.id, deletedAt: null } })
+  return prisma.user.findFirst({
+    where: { id: session.user.id, deletedAt: null },
+  })
 })
 ```
 
 ### media.ts — File storage
 
-| Function | Purpose |
-|---|---|
+| Function                                       | Purpose                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
 | `uploadMedia(userId: number, imageFile: File)` | Uploads to Blob at `user/{userId}/{random}-{filename}`, returns URL |
-| `deleteMedia(_prev, formData)` | Deletes blob URL from formData |
+| `deleteMedia(_prev, formData)`                 | Deletes blob URL from formData                                      |
 
 Blob domain allowlisted in `next.config.ts`: `tosysoik0rjt4ojn.public.blob.vercel-storage.com`
 
 ### util.ts — Auth utilities
 
-| Function | Purpose |
-|---|---|
-| `forgotPassword(_prev, formData)` | Creates `ResetPasswordToken`, sends email via Nodemailer/Brevo |
-| `resetPassword(_prev, formData)` | Validates token, hashes new password (12 rounds), deletes used token |
+| Function                          | Purpose                                                              |
+| --------------------------------- | -------------------------------------------------------------------- |
+| `forgotPassword(_prev, formData)` | Creates `ResetPasswordToken`, sends email via Nodemailer/Brevo       |
+| `resetPassword(_prev, formData)`  | Validates token, hashes new password (12 rounds), deletes used token |
 
 ---
 
@@ -279,7 +264,10 @@ For read queries that return list/detail data:
 
 ```typescript
 'use server'
-import { unstable_cacheTag as cacheTag, unstable_cacheLife as cacheLife } from 'next/cache'
+import {
+  unstable_cacheTag as cacheTag,
+  unstable_cacheLife as cacheLife,
+} from 'next/cache'
 
 export async function getUsers(page = 1, perPage = USERS_PER_PAGE) {
   'use cache'
@@ -314,10 +302,10 @@ export const getMe = cache(async () => { ... })
 
 Client-only UI state. Never stores server data.
 
-| Store | State | Used by |
-|---|---|---|
-| `useAside` | `minimized: boolean` + `toggleMinimized()` | Sidebar collapse |
-| `useDrawer` | `isOpen: boolean` + `open()` + `close()` | Mobile drawer |
+| Store       | State                                      | Used by          |
+| ----------- | ------------------------------------------ | ---------------- |
+| `useAside`  | `minimized: boolean` + `toggleMinimized()` | Sidebar collapse |
+| `useDrawer` | `isOpen: boolean` + `open()` + `close()`   | Mobile drawer    |
 
 Wrap components reading Zustand state in `<HydrationZustand>` (from `templates/hydrationZustand.tsx`) to prevent SSR mismatch. Dashboard layout handles this at the template level.
 
@@ -325,11 +313,11 @@ Wrap components reading Zustand state in `<HydrationZustand>` (from `templates/h
 
 ## Routing & Templates
 
-| Route | Protection | Template | Notes |
-|---|---|---|---|
-| `/` | Public | `Default` | |
-| `/login`, `/signup`, `/forgot-password`, `/reset-password` | Public (redirect if authed) | `Blank` | |
-| `/dashboard/*` | Auth required | `Dashboard` | Each page checks `getServerSession()` |
+| Route                                                      | Protection                  | Template    | Notes                                 |
+| ---------------------------------------------------------- | --------------------------- | ----------- | ------------------------------------- |
+| `/`                                                        | Public                      | `Default`   |                                       |
+| `/login`, `/signup`, `/forgot-password`, `/reset-password` | Public (redirect if authed) | `Blank`     |                                       |
+| `/dashboard/*`                                             | Auth required               | `Dashboard` | Each page checks `getServerSession()` |
 
 **No middleware.ts exists.** Do not create one. Route protection is per-page.
 
@@ -391,15 +379,15 @@ await prisma.user.findMany({
 
 All from `.env.local` (pulled via `vercel env pull .env.local`).
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | Pooled Neon — Prisma runtime |
+| Variable                | Purpose                             |
+| ----------------------- | ----------------------------------- |
+| `DATABASE_URL`          | Pooled Neon — Prisma runtime        |
 | `DATABASE_URL_UNPOOLED` | Direct Neon — Prisma CLI migrations |
-| `NEXTAUTH_SECRET` | JWT signing key |
-| `NEXTAUTH_URL` | Base URL for auth callbacks |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob API token |
-| `SMTP_HOST` | Brevo SMTP host |
-| `SMTP_KEY` | Brevo SMTP API key |
+| `NEXTAUTH_SECRET`       | JWT signing key                     |
+| `NEXTAUTH_URL`          | Base URL for auth callbacks         |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob API token               |
+| `SMTP_HOST`             | Brevo SMTP host                     |
+| `SMTP_KEY`              | Brevo SMTP API key                  |
 
 Derived constants in `config/constants.ts`: `APP_NAME`, `APP_BASE_URL`, `SMTP_FROM_NAME`, `SMTP_FROM_EMAIL`, `USERS_PER_PAGE`.
 
@@ -423,6 +411,46 @@ Run `npm run db:seed`. The seed script uses `new PrismaClient()` directly (not t
 - **Dev:** `npm run dev` (Turbopack)
 - **Server Actions body limit:** 2 MB (`next.config.ts`)
 - **Node.js:** 22.14.x required
+
+---
+
+## React Conventions
+
+Two Vercel skill sets govern how we write React components. Full rules live in `.agents/skills/`; this section is the quick-reference.
+
+- **Composition Patterns** → `.agents/skills/vercel-composition-patterns/AGENTS.md`
+- **React Best Practices** → `.agents/skills/vercel-react-best-practices/AGENTS.md`
+
+### Component Architecture
+
+- **No boolean prop proliferation.** Don't add `isEditing`, `isThread`, etc. to customize behavior. Use composition or explicit variant components instead.
+- **Use compound components** for complex UI (modals, forms, cards). Shared state lives in a context provider; subcomponents read from it via `use()`.
+- **Lift state into providers.** If two sibling components need the same state, move it to a provider above them — not prop-drilling or useEffect syncing.
+- **Explicit variants > boolean modes.** `ThreadComposer` and `EditComposer` are better than `<Composer isThread isEditing />`.
+
+### State Management
+
+- **Decouple state from UI.** The provider is the only place that knows how state is managed (useState, Zustand, server sync). UI components consume the context interface.
+- **Generic context interface.** Define `state`, `actions`, and `meta` parts. Any provider can implement the same interface.
+- **Zustand for global UI state** (sidebar, drawer). React context for scoped component state (modals, forms).
+
+### Performance (Critical)
+
+- **No waterfalls.** Check cheap sync conditions before `await`. Use `Promise.all()` for independent async operations.
+- **Server components by default.** Only add `'use client'` when the component needs interactivity (event handlers, hooks, browser APIs).
+- **Dynamic imports for heavy components.** Use `next/dynamic` for large components not needed on initial render.
+- **Authenticate server actions inside the action** — don't rely solely on middleware or page-level checks.
+
+### Rendering
+
+- **Hoist static JSX** outside components. Decorative elements, constants, and static markup should not re-render.
+- **Conditional rendering with ternary**, not `&&` (avoids rendering `0` as empty).
+- **No inline component definitions.** Define components outside the parent to avoid remounting on every render.
+
+### React 19
+
+- **No `forwardRef`.** `ref` is a regular prop in React 19.
+- **`use()` instead of `useContext()`.** Can be called conditionally.
 
 ---
 

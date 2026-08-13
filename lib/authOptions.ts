@@ -69,36 +69,34 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger }) {
-      // On profile update, re-read the authoritative record from the DB rather
-      // than trusting client-supplied session fields.
-      if (trigger === 'update' && token.id) {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+      }
+
+      // Always re-read the authoritative record from the DB so role changes
+      // (e.g. a coordinator being removed) are picked up on the next session
+      // poll without waiting for a re-login.
+      if (token.id) {
         const dbUser = await prisma.user.findFirst({
           where: { id: +(token.id as string), deletedAt: null },
+          include: { faculty: { include: { coordinator: true } }, student: true },
         })
         if (dbUser) {
           token.name = dbUser.name
           token.email = dbUser.email
           token.image = dbUser.image
           token.role = dbUser.role
+          token.isProgramChair = dbUser.faculty?.isProgramChair ?? false
+          token.isFaculty = !!dbUser.faculty && dbUser.faculty.deletedAt === null
+          token.isStudent = !!dbUser.student && dbUser.student.deletedAt === null
+          // Relation includes don't respect soft-deletes — check deletedAt
+          // explicitly so a removed coordinator loses their access flags.
+          const coordinator = dbUser.faculty?.coordinator
+          token.isCoordinator = !!coordinator && coordinator.deletedAt === null
         }
       }
 
-      if (user) {
-        const dbUser = await prisma.user.findUnique({
-          where: {
-            id: +user.id,
-          },
-        })
-
-        if (dbUser) {
-          token.id = dbUser.id
-          token.name = dbUser.name
-          token.email = dbUser.email
-          token.image = dbUser.image
-          token.role = dbUser.role
-        }
-      }
       return token
     },
     async session({ session, token }) {
@@ -108,6 +106,10 @@ export const authOptions: NextAuthOptions = {
       session.user.email = token.email as string
       session.user.image = token.image as string
       session.user.role = token.role as string
+      session.user.isProgramChair = token.isProgramChair as boolean
+      session.user.isFaculty = token.isFaculty as boolean
+      session.user.isStudent = token.isStudent as boolean
+      session.user.isCoordinator = token.isCoordinator as boolean
 
       return session
     },

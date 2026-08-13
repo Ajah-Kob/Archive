@@ -31,32 +31,23 @@ Before this workflow begins:
 ## Part A – Section Creation
 
 1. The Coordinator navigates to the **Section Management** page.
-
-2. The Coordinator creates a new class section by entering the required section information (e.g., academic year, section code, semester, and other required details).
-
+2. The Coordinator creates a new class section by entering the required section information (e.g., academic year, section code, and other required details).
 3. The system validates the entered information.
-
 4. The system creates the class section.
-
-5. The system generates a unique invitation link for the newly created section.
-
-6. The Coordinator shares the invitation link with students belonging to that academic section.
+5. The system generates a unique invitaion code for the newly created section.
+6. The Coordinator shares the invitation code with students belonging to that academic section.
 
 ---
 
 ## Part B – Student Joins Section
 
-1. A student opens the invitation link.
-
-2. The system verifies the invitation.
-
-3. The student confirms the request to join the section.
-
-4. The system adds the student to the class section.
-
-5. The student gains access to section-specific features.
-
-6. The student may now create or join a capstone group.
+1. The user receives an invitation/join code from the assigned Section Coordinator.
+2. The user enters the invitation/join code in the system.
+3. The system validates the invitation/join code.
+4. Upon successful validation, the system registers the user as a Student and stores the student's information in the database.
+5. The system adds the student to the corresponding class section.
+6. The student gains access to student-specific features within the system.
+7. The student may now create a new capstone group or join an existing capstone group within their assigned section.
 
 ---
 
@@ -81,28 +72,22 @@ If the coordinator attempts to create a section that already exists within Archi
 
 ## AF-02: Invalid Invitation Link
 
-If a student accesses an invalid, expired, or revoked invitation link, the system denies the request and informs the student that the invitation is no longer valid.
+If a student accesses an invalid, expired, or revoked invitation code, the system denies the request and informs the student that the invitation is no longer valid.
 
 ---
 
 ## AF-03: Student Already Joined a Section
 
-If a student already belongs to an active class section, the system prevents the student from joining another section.
-
----
-
-## AF-04: Student Already Belongs to the Section
-
-If the student is already a member of the selected class section, the system informs the student and no changes are made.
+Once a user has joined a section and become a student, they shouldn't even be able to access the page where the user can join a role.
 
 ---
 
 # Business Notes
 
-- Only Coordinators may create and manage class sections.
-- Each class section has a unique invitation link.
+- Only assigned Coordinators may create and manage class sections.
+- Each class section has a unique invitation code.
 - Students may belong to only one active class section at a time.
-- Students must join a class section before accessing capstone management features.
+- Students must join a class section before accessing the student-specific features.
 - Students who have not joined a class section may only access the Capstone Repository and account-related features.
 - Creating a class section does not automatically create capstone groups.
 - Group creation is handled separately in the **Group Management Workflow**.

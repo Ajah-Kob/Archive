@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { MoreVertical } from 'lucide-react'
 
 export interface ActionItem {
   label: string
   onClick: () => void
   variant?: 'default' | 'danger'
+  icon?: ReactNode
 }
 
 interface ActionMenuProps {
@@ -47,10 +48,11 @@ export function ActionMenu({ items }: ActionMenuProps) {
                     item.onClick()
                     setIsOpen(false)
                   }}
-                  className={`w-full text-left px-[14px] py-[9px] font-sans font-semibold text-[13px] hover:bg-[#fafbff] transition-colors ${
+                  className={`w-full text-left px-[14px] py-[9px] font-sans font-semibold text-[13px] hover:bg-[#fafbff] transition-colors flex items-center gap-[8px] ${
                     item.variant === 'danger' ? 'text-[#ef4444]' : 'text-[#3d4566]'
                   }`}
                 >
+                  {item.icon}
                   {item.label}
                 </button>
               </div>

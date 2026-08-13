@@ -84,7 +84,7 @@ export default function JoinArchiveContent() {
           onSuccess={() =>
             handleSuccess(
               'You now have access to your class section and milestone workspace.',
-              '/milestones',
+              '/milestone',
             )
           }
         >

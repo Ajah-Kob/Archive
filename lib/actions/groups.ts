@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
+import { revalidateTag } from 'next/cache'
 import { requireStudent, requireUser, unauthorized } from '@/lib/actions/guard'
 import { ADVISER_CAP } from '@/config/constants'
 import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
@@ -28,16 +28,13 @@ function revalidateAdviserCaches() {
 // ───────────────────────────── Reads ─────────────────────────────
 
 // The full student workspace: section, group (members / adviser / invites)
-// and the derived journey rows. Keyed by userId so 'use cache' stays per-user.
+// and the derived journey rows. Read uncached so topic status and the
+// journey always reflect the persisted state on every load.
 export async function getMyWorkspace(userId: number): Promise<{
   success: boolean
   message: string
   payload: WorkspaceData | null
 }> {
-  'use cache'
-  cacheTag(`workspace-${userId}`)
-  cacheLife('max')
-
   const student = await prisma.student.findFirst({
     where: { userId, deletedAt: null },
     include: {
@@ -134,7 +131,6 @@ export async function getMyWorkspace(userId: number): Promise<{
   }
 
   const group = student.group
-  cacheTag(`journey-${group.id}`)
 
   const isLeader = group.leaderStudentId === student.id
   const members = group.students.map((s) => ({

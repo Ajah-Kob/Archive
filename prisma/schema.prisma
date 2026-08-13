@@ -268,6 +268,7 @@ model Topic {
   reviewedById Int?
   reviewedBy   User?       @relation("TopicReviewer", fields: [reviewedById], references: [id])
   reviewedAt   DateTime?
+  selectedAt   DateTime?
   capstone     Capstone?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt

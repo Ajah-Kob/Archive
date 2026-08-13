@@ -11,7 +11,7 @@ export function EmptyGroupState() {
 
   return (
     <>
-      <div className="h-full bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center px-[41px] py-[53px]">
+      <div className="flex-1 min-h-0 bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center px-[41px] py-[53px]">
         <div className="size-[96px] rounded-full bg-gradient-to-br from-[#707dff] to-[#5565ff] flex items-center justify-center shadow-[0px_12px_24px_0px_rgba(112,125,255,0.28)]">
           <Users className="size-10 text-white" strokeWidth={1.75} />
         </div>

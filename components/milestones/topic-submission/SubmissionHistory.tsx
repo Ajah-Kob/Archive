@@ -17,16 +17,23 @@ function formatDate(iso: string): string {
 
 export function SubmissionHistory({ history, onView }: SubmissionHistoryProps) {
   return (
-    <div className="w-[383px] h-full shrink-0 bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] p-[20px] flex flex-col min-h-0">
-      <div className="flex items-center gap-[8px]">
-        <p className="font-heading font-bold text-[15px] leading-[22.5px] text-[#12143a] tracking-[-0.15px]">
-          Submission History
-        </p>
-        {history.length > 0 && (
-          <span className="bg-[#f4f6ff] border border-[#e5e8ff] rounded-full px-[8px] py-[2px] font-sans font-bold text-[10.5px] text-[#707dff]">
-            {history.length}
-          </span>
-        )}
+    <div className="w-[383px] shrink-0 bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col min-h-0">
+      <div className="border-b border-[#f0f2fa] px-[16px] py-[14px] shrink-0">
+        <div className="flex items-center justify-between gap-[12px]">
+          <div className="flex items-center gap-[8px] min-w-0">
+            <div className="size-[26px] rounded-[8px] bg-[rgba(112,125,255,0.04)] border border-[rgba(112,125,255,0.09)] flex items-center justify-center shrink-0">
+              <History className="size-[12px] text-[#707dff]" strokeWidth={2} />
+            </div>
+            <p className="font-heading font-bold text-[12.5px] leading-[18.75px] text-[#1e3a8a] tracking-[-0.125px] truncate">
+              Submission History
+            </p>
+          </div>
+          {history.length > 0 && (
+            <span className="bg-[#f4f6ff] border border-[#e5e8ff] rounded-full px-[8px] py-[2px] font-sans font-bold text-[10.5px] text-[#707dff] shrink-0">
+              {history.length}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pt-[12px] pr-[2px]">

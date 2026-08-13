@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
   { label: 'Faculty', href: '/faculty', icon: Users },
   { label: 'Sections', href: '/sections', icon: Layers },
   { label: 'Templates', href: '/templates', icon: FileText },
-  { label: 'Milestones', href: '/milestones', icon: Flag },
+  { label: 'Milestones', href: '/milestone', icon: Flag },
   { label: 'Defense', href: '/defense', icon: Shield },
   { label: 'Calendar', href: '/calendar', icon: Calendar },
   { label: 'Repository', href: '/repository', icon: BookMarked },
@@ -48,7 +48,7 @@ const MEMBER_ALLOWED = new Set([
   '/dashboard/user/profile',
 ])
 
-const STUDENT_ALLOWED = new Set([...MEMBER_ALLOWED, '/milestones'])
+const STUDENT_ALLOWED = new Set([...MEMBER_ALLOWED, '/milestone'])
 
 const COORDINATOR_ALLOWED = new Set([
   '/dashboard',

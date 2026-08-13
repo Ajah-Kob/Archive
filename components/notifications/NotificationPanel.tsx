@@ -154,7 +154,7 @@ export default function NotificationPanel() {
       )
       await update()
       if (current?.role === 'GROUP') {
-        router.push('/milestones')
+        router.push('/milestone')
         router.refresh()
       }
     } else {

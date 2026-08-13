@@ -123,19 +123,23 @@ export function buildJourneyRows(
   }
   rows.push(topicSubmission)
 
-  // Topic Selection — unlocked by the coordinator and an approved topic;
-  // green once selected.
+  // Topic Selection — gated by the coordinator's availability, like the other
+  // milestones: it becomes available (clickable) as soon as the coordinator
+  // opens it, regardless of whether a topic has been approved yet. It turns
+  // green once a topic has actually been selected (capstone linked).
   const topicSelection: JourneyRow = {
     slug: 'topic-selection',
     label: 'Topic Selection',
     header: 'CAPSTONE 1',
-    state: 'DEFAULT',
+    state: 'LOCKED',
   }
-  if (!isOpen('TOPIC_SELECTION') || approved.length === 0) {
-    topicSelection.state = 'LOCKED'
-  } else if (group.capstone?.topicId) {
-    topicSelection.state = 'APPROVED'
-    topicSelection.sublabel = 'Topic Selected'
+  if (isOpen('TOPIC_SELECTION')) {
+    if (group.capstone?.topicId) {
+      topicSelection.state = 'APPROVED'
+      topicSelection.sublabel = 'Topic Selected'
+    } else {
+      topicSelection.state = 'DEFAULT'
+    }
   }
   rows.push(topicSelection)
 

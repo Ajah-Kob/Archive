@@ -64,10 +64,9 @@ function RowIcon({
 interface MilestoneRowProps {
   row: JourneyRow
   isActive: boolean
-  groupId?: number
 }
 
-function MilestoneRow({ row, isActive, groupId }: MilestoneRowProps) {
+function MilestoneRow({ row, isActive }: MilestoneRowProps) {
   const locked = row.state === 'LOCKED'
 
   const sublabelColor: Record<JourneyRow['state'], string> = {
@@ -114,10 +113,7 @@ function MilestoneRow({ row, isActive, groupId }: MilestoneRowProps) {
   }
 
   return (
-    <Link
-      href={groupId ? `/milestones/${groupId}/${row.slug}` : `/milestones/${row.slug}`}
-      className={rowClasses}
-    >
+    <Link href={`/milestone/${row.slug}`} className={rowClasses}>
       {content}
     </Link>
   )
@@ -126,11 +122,9 @@ function MilestoneRow({ row, isActive, groupId }: MilestoneRowProps) {
 export function CapstoneJourney({
   journey,
   activeSlug,
-  groupId,
 }: {
   journey: JourneyRow[]
   activeSlug?: string
-  groupId?: number
 }) {
   const groups = HEADER_ORDER.map((header) => ({
     header,
@@ -157,7 +151,6 @@ export function CapstoneJourney({
                     key={row.slug}
                     row={row}
                     isActive={row.slug === activeSlug}
-                    groupId={groupId}
                   />
                 ))}
               </div>

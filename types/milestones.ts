@@ -138,6 +138,18 @@ export interface TopicSubmissionItem {
   reviewNote: string | null
   reviewedAt: string | null
   submittedBy: string | null
+  selectedAt?: string | null
+}
+
+export interface TopicSelectionPayload {
+  group: {
+    id: number
+    groupName: string
+    sectionId: number
+  } | null
+  journey: JourneyRow[]
+  topics: TopicSubmissionItem[]
+  confirmedTopicId: number | null
 }
 
 export interface TopicSubmissionPayload {

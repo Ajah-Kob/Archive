@@ -31,6 +31,12 @@
       "skillPath": "skills/neon-postgres/SKILL.md",
       "computedHash": "fe0e1361f906b293991050071d2fea3f9e107a2ee87857917ab15b5996d062d4"
     },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "7e3c9cd74e9e2b4828527a857170e86310f2dab5ea8030a9043df2c7e6c88857"
+    },
     "vercel-composition-patterns": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",

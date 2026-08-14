@@ -64,6 +64,8 @@ Calendar.
 | Email          | `nodemailer`                | 7.x                           |
 | Toasts         | `sonner`                    | 2.x                           |
 | Icons          | `lucide-react`              | 1.x                           |
+| PDF viewing    | `@embedpdf/react-pdf-viewer`       | 2.15.x                       |
+| PDF engine     | `@embedpdf/core` / `@embedpdf/engines` | 2.15.x                   |
 | CSS            | `tailwindcss`               | 4.x (PostCSS, no config file) |
 | TypeScript     | `typescript`                | 6.x                           |
 
@@ -466,3 +468,4 @@ Two Vercel skill sets govern how we write React components. Full rules live in `
 8. **No middleware.ts** — no global route guard. Each dashboard page must call `getServerSession()`.
 9. **Password rounds:** 12 in all server actions, 10 in seed.
 10. **Server action responses** are plain objects — never throw. Pattern: `{ success, message, payload? }`.
+11. **EmbedPDF viewers are client-only.** Render `<PDFViewer>` (drop-in) or the headless `<EmbedPDF>` provider from `'use client'` components (Canvas/WASM). See `.agents/skills/embedpdf/SKILL.md`.

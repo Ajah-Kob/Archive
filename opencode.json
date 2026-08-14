@@ -19,5 +19,6 @@
       "url": "http://127.0.0.1:3845/mcp",
       "enabled": true
     }
-  }
+  },
+  "plugin": ["opencode-helicone-session", "psinetron-opencode-visualizer"]
 }

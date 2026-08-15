@@ -161,7 +161,7 @@ export function TopicReviewQueue({ topics }: TopicReviewQueueProps) {
   return (
     <>
       <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
-        <div className="flex items-center gap-2.5 px-5 py-[12px] border-b border-[#f0f2fa] shrink-0">
+        <div className="flex items-center gap-2.5 p-5 border-b border-[#f0f2fa] shrink-0">
           <div className="relative flex-[0_0_320px] max-w-[320px] min-w-[180px]">
             <Search className="absolute left-[12.5px] top-1/2 -translate-y-1/2 size-[10px] text-[#8a93b4]" />
             <input

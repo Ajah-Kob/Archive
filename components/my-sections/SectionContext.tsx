@@ -75,52 +75,44 @@ export function SectionContext({ section }: SectionContextProps) {
   function handleRemoveSuccess() {
     setRemoveOpen(false)
     bump()
-    router.push('/dashboard')
+    router.push('/faculty')
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] py-[14px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0">
-      <div className="flex items-center min-w-0">
-        <h1 className="font-['Sora',sans-serif] font-bold text-[22px] leading-[33px] text-[#12143a] tracking-[-0.22px] truncate">
-          {section.name}
-        </h1>
-      </div>
+    <>
+      <button
+        type="button"
+        onClick={handleCopy}
+        disabled={!section.joinCode || copied}
+        className={`flex gap-[7px] items-center h-[30px] px-[11px] rounded-[9px] font-sans font-bold text-[12.5px] transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+          copied
+            ? 'bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.25)] text-[#22c55e]'
+            : 'bg-white border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#f7f7ff]'
+        }`}
+      >
+        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        {copied ? 'Copied' : 'Copy Invite Code'}
+      </button>
 
-      <div className="flex items-center gap-[8px] shrink-0">
-        <button
-          type="button"
-          onClick={handleCopy}
-          disabled={!section.joinCode || copied}
-          className={`flex gap-[7px] items-center h-[30px] px-[11px] rounded-[9px] font-sans font-bold text-[12.5px] transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-            copied
-              ? 'bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.25)] text-[#22c55e]'
-              : 'bg-white border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#f7f7ff]'
-          }`}
-        >
-          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          {copied ? 'Copied' : 'Copy Invite Code'}
-        </button>
-
-        <ActionMenu
-          items={[
-            {
-              label: section.hasJoinCode
-                ? 'Regenerate Invite Code'
-                : 'Generate Invite Code',
-              onClick: handleRegenerate,
-            },
-            {
-              label: 'Edit Section',
-              onClick: () => setEditOpen(true),
-            },
-            {
-              label: 'Remove Section',
-              onClick: () => setRemoveOpen(true),
-              variant: 'danger',
-            },
-          ]}
-        />
-      </div>
+      <ActionMenu
+        items={[
+          {
+            label: section.hasJoinCode
+              ? 'Regenerate Invite Code'
+              : 'Generate Invite Code',
+            onClick: handleRegenerate,
+          },
+          {
+            label: 'Edit Section',
+            onClick: () => setEditOpen(true),
+          },
+          {
+            label: 'Remove Section',
+            onClick: () => setRemoveOpen(true),
+            variant: 'danger',
+          },
+        ]}
+      />
 
       {editOpen && (
         <SectionModal
@@ -138,6 +130,6 @@ export function SectionContext({ section }: SectionContextProps) {
           onSuccess={handleRemoveSuccess}
         />
       )}
-    </div>
+    </>
   )
 }

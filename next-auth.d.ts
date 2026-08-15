@@ -12,6 +12,7 @@ declare module "next-auth" {
       isFaculty?: boolean;
       isStudent?: boolean;
       isCoordinator?: boolean;
+      isAdviser?: boolean;
     };
   }
 

@@ -1,10 +1,9 @@
 import { ReactNode } from 'react'
-import TemplateMain from '@/templates/Main'
 import { redirect } from 'next/navigation'
-import { requireAdminOrProgramChair } from '@/lib/actions/guard'
+import { requireCoordinatorAccess } from '@/lib/actions/guard'
 
 export default async function SectionsLayout({ children }: { children: ReactNode }) {
-  if (!(await requireAdminOrProgramChair())) redirect('/dashboard')
+  if (!(await requireCoordinatorAccess())) redirect('/dashboard')
 
-  return <TemplateMain>{children}</TemplateMain>
+  return <>{children}</>
 }

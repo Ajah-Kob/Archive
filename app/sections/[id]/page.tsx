@@ -1,43 +1,61 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
-import { StudentList } from '@/components/sections/students/StudentList'
-import { getSectionById } from '@/lib/actions/sections'
+import { SectionContext } from '@/components/my-sections/SectionContext'
+import { MySectionStudents } from '@/components/my-sections/MySectionStudents'
+import { MilestoneManagement } from '@/components/my-sections/MilestoneManagement'
+import { SectionTabs, type SectionTabKey } from '@/components/my-sections/SectionTabs'
+import { ProgressOverview } from '@/components/my-sections/progress/ProgressOverview'
+import { TopicReviewQueue } from '@/components/my-sections/topics/TopicReviewQueue'
+import { getCoordinatorSectionById } from '@/lib/actions/sections'
 
 export default async function SectionDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const { id } = await params
+  const { tab } = await searchParams
 
-  const res = await getSectionById(parseInt(id))
+  const res = await getCoordinatorSectionById(parseInt(id))
   const payload = res.success && res.payload ? res.payload : null
   if (!payload) notFound()
 
+  const { section, students, groups, pendingTopics } = payload
+  const activeTab: SectionTabKey =
+    tab === 'progress' || tab === 'topics' ? tab : 'students'
+
   return (
-    <section className="min-h-full flex flex-col gap-3">
-      <div className="flex flex-col">
-        <div className="flex items-center justify-between">
-          <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
-            {payload.section.name}
-          </h1>
-          <Link
-            href="/sections"
-            className="flex gap-[7px] items-center h-[30px] px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
-          >
-            <ArrowLeft className="size-3.5" />
-            Back to Sections
-          </Link>
-        </div>
-        <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] mt-1">
-          All students enrolled in {payload.section.name}, their groups, and
-          recent activity.
-        </p>
-      </div>
+    <section className="min-h-full flex flex-col">
+      <SectionContext
+        section={{
+          id: section.id,
+          name: section.name,
+          hasJoinCode: section.hasJoinCode,
+          joinCode: section.joinCode,
+        }}
+      />
 
       <div className="flex-1 pb-[30px] flex flex-col min-h-0">
-        <StudentList students={payload.students} />
+        <SectionTabs
+          activeTab={activeTab}
+          pendingTopics={pendingTopics.length}
+          studentsPanel={<MySectionStudents students={students} />}
+          progressPanel={
+            <div className="flex flex-col xl:flex-row gap-[16px] flex-1 min-h-0">
+              <div className="shrink-0 min-w-0 xl:w-[400px]">
+                <MilestoneManagement
+                  sectionId={section.id}
+                  initial={payload.milestones}
+                />
+              </div>
+              <div className="flex-1 min-h-0 min-w-0 flex flex-col">
+                <ProgressOverview groups={groups} />
+              </div>
+            </div>
+          }
+          topicsPanel={<TopicReviewQueue topics={pendingTopics} />}
+        />
       </div>
     </section>
   )

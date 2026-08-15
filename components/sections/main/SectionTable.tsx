@@ -99,7 +99,7 @@ export function SectionTable({ sections }: SectionTableProps) {
       <TableListHeader title="Sections" />
 
       {/* Header Row */}
-      <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_150px] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]">
+      <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_150px] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]">
         <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
           Coordinator
         </div>

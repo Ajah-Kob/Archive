@@ -27,7 +27,7 @@ export function SectionDataRow({ data }: SectionDataRowProps) {
   const router = useRouter()
 
   return (
-    <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_150px] items-center px-[20px] h-[63px] border-b border-[#f0f2fa] hover:bg-slate-50/40 transition-colors">
+    <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_150px] items-center px-[20px] h-[63px] border-b border-[#f0f2fa] hover:bg-slate-50/40 transition-colors">
       <div className="min-w-0 pr-4">
         <UserProfile
           initials={data.coordinator.initials}
@@ -38,11 +38,9 @@ export function SectionDataRow({ data }: SectionDataRowProps) {
       </div>
 
       <div className="pr-4">
-        <div className="w-24 px-3 py-[3px] bg-red-400/10 rounded-2xl outline outline-1 outline-offset-[-1px] outline-red-400/20 inline-flex justify-center items-center gap-2.5">
-          <span className="text-red-400 text-xs font-bold font-sans leading-4 tracking-tight">
-            {data.section}
-          </span>
-        </div>
+        <span className="font-sans font-medium text-[13px] leading-[19.5px] text-[#8a93b4]">
+          {data.section}
+        </span>
       </div>
 
       <div className="pr-4">

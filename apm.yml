@@ -1,0 +1,15 @@
+name: Archive
+version: 1.0.0
+description: APM project for Archive
+author: Aaron Jacob Gutierrez
+# Which agent platforms to deploy to.
+# Resolution order: --target flag > this field > auto-detect from filesystem.
+# Accepted values: agent-skills, antigravity, claude, codex, copilot, cursor, gemini, grok-build, kiro, opencode, windsurf
+targets:
+  - opencode
+dependencies:
+  apm:
+    - mubaidr/gem-team
+  mcp: []
+includes: auto
+scripts: {}

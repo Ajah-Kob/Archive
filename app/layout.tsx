@@ -16,9 +16,9 @@ const sora = Sora({
 })
 
 export const metadata: Metadata = {
-  title: 'NEXT.js CRUD template with Zustand and NextAuth',
+  title: 'Archive',
   description:
-    'A template for building a CRUD application using NEXT.js, Zustand for state management, and NextAuth for authentication.',
+    'A capstone management system that unifies submission, review, and milestone tracking for the BSIS program.',
 }
 
 export default function RootLayout({

@@ -4,7 +4,7 @@ export const APP_BASE_URL =
     ? 'https://bsis-archive.vercel.app'
     : 'http://localhost:3000'
 
-export const SCHOOL_NAME = 'NextCrud'
+export const SCHOOL_NAME = 'Bulacan State University'
 export const SMTP_FROM_NAME = 'Archive'
 export const SMTP_FROM_EMAIL = 'archive@domain.com'
 export const USERS_PER_PAGE = 5

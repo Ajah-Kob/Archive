@@ -44,8 +44,8 @@ next-env.d.ts
 .env*.local
 
 .agents
+.opencode
 PROMPT.md
-PLAN.md
 
 # ui-ux-pro-max skill (local-only tooling)
 .agents/skills/ui-ux-pro-max/

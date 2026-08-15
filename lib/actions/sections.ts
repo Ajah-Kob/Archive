@@ -1,9 +1,10 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag, revalidatePath, revalidateTag, updateTag } from 'next/cache'
+import { cacheLife, cacheTag, revalidateTag, updateTag } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
+import { revalidateFeature } from '@/lib/actions/revalidate'
 import type { SectionData } from '@/components/sections/main/SectionDataRow'
 import type { StudentData } from '@/components/sections/students/StudentDataRow'
 import { generateJoinCode, getInitials, timeAgo } from '@/lib/helper'
@@ -325,7 +326,7 @@ export async function joinSection(formData: FormData) {
     updateTag('sections')
     updateTag('my-sections')
     updateTag(`my-section-${joinCode.section.id}`)
-    revalidatePath('/sections')
+    revalidateFeature('sections')
 
     return { success: true, message: 'Successfully joined the section.' }
   } catch (error) {
@@ -358,7 +359,7 @@ export async function softDeleteSection(id: string) {
     })
 
     revalidateTag('sections', 'max')
-    revalidatePath('/dashboard/sections')
+    revalidateFeature('sections')
 
     return {
       success: true,
@@ -395,7 +396,7 @@ function revalidateCoordinatorCache(sectionId?: number) {
   revalidateTag('my-sections', 'max')
   revalidateTag('sections', 'max')
   revalidateTag('join-code', 'max')
-  revalidatePath('/sections')
+  revalidateFeature('sections')
   if (sectionId) revalidateTag(`my-section-${sectionId}`, 'max')
 }
 
@@ -1204,7 +1205,7 @@ export async function removeStudentFromSection(studentId: number) {
 
     revalidateCoordinatorCache(student.sectionId)
     revalidateTag('users', 'max')
-    revalidatePath('/dashboard/users')
+    revalidateFeature('users')
     revalidateTag(`workspace-${student.userId}`, 'max')
     revalidateTag(`classmates-${student.userId}`, 'max')
     if (groupId) revalidateTag(`journey-${groupId}`, 'max')
@@ -1504,3 +1505,4 @@ export async function getCoordinatorGroupDetail(groupId: number) {
     }
   }
 }
+

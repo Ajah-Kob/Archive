@@ -1,7 +1,8 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { revalidateTag, revalidatePath } from 'next/cache'
+import { revalidateTag } from 'next/cache'
+import { revalidateFeature } from '@/lib/actions/revalidate'
 
 const table = 'adviser'
 
@@ -52,7 +53,7 @@ export async function addAdviser(facultyId: number) {
     })
 
     revalidateTag('advisers', 'max')
-    revalidatePath('/faculty')
+    revalidateFeature('faculty-list')
 
     return {
       success: true,

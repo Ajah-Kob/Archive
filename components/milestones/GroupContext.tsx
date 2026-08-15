@@ -53,7 +53,7 @@ export function GroupContext({ group }: GroupContextProps) {
     if (res.success) {
       toast.success(res.message)
       setConfirm(null)
-      router.push('/milestone')
+      router.push('/student/milestone')
     } else {
       toast.error(res.message)
       setConfirm(null)

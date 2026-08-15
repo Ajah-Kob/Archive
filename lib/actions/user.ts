@@ -2,7 +2,8 @@
 
 import prisma from "@/lib/prisma"
 import { hash } from "bcrypt"
-import { revalidateTag, revalidatePath } from "next/cache"
+import { revalidateTag } from "next/cache"
+import { revalidateFeature } from "@/lib/actions/revalidate"
 import { cacheLife, cacheTag } from "next/cache"
 import { USERS_PER_PAGE } from "@/config/constants"
 import { isValidEmail } from "@/lib/helper"
@@ -183,7 +184,7 @@ async function persistNewUser(data: { name: string; email: string; password: str
     })
 
     revalidateTag("users", "max")
-    revalidatePath("/dashboard/users")
+    revalidateFeature("users")
 
     return { success: true, message: "User created successfully", payload: sanitizeUser(user) }
   } catch {
@@ -225,7 +226,7 @@ export async function softDeleteUser(id: string) {
     })
 
     revalidateTag("users", "max")
-    revalidatePath("/dashboard/users")
+    revalidateFeature("users")
 
     return { success: true, payload: sanitizeUser(user) }
   } catch {
@@ -291,10 +292,11 @@ export async function updateUser(_prevState: any, formData: FormData) {
     })
 
     revalidateTag("users", "max")
-    revalidatePath("/dashboard/users")
+    revalidateFeature("users")
 
     return { success: true, message: "User updated successfully.", payload: sanitizeUser(user) }
   } catch {
     return { success: false, payload: null, message: "Failed to update user." }
   }
 }
+

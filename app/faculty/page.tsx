@@ -1,33 +1,58 @@
-import { ChevronRight } from 'lucide-react'
+import { ClipboardCheck, FileText, Layers, Users } from 'lucide-react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import { redirect } from 'next/navigation'
-import { FacultyList } from '@/components/faculty/FacultyList'
+import Link from 'next/link'
 
-export default async function FacultyPage() {
+export default async function FacultyHomePage() {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) redirect('/login')
-  
+
+  const links: { label: string; href: string; icon: typeof Users }[] = []
+  if (session.user.isAdviser)
+    links.push({ label: 'Evaluation', href: '/faculty/evaluation', icon: ClipboardCheck })
+  if (session.user.isCoordinator || session.user.isProgramChair)
+    links.push({ label: 'Faculty list', href: '/faculty/faculty-list', icon: Users })
+  if (session.user.isProgramChair)
+    links.push({ label: 'Sections', href: '/faculty/sections', icon: Layers })
+  if (session.user.isCoordinator || session.user.isProgramChair)
+    links.push({ label: 'Templates', href: '/faculty/templates', icon: FileText })
+
   return (
-    <section className="bg-[#f4f6ff] min-h-full flex flex-col gap-3 pt-[30px] px-[30px]">
-      <div className="flex gap-[6px] items-center h-[18px]">
-        <span className="font-sans font-medium text-[12px] leading-[18px] text-[rgba(16,19,58,0.5)]">
-          ARCHIVE
-        </span>
-        <ChevronRight className="size-3 text-[rgba(16,19,58,0.5)]" />
-        <span className="font-sans font-bold text-[12px] leading-[18px] text-[#707dff]">Faculty</span>
-      </div>
+    <section className="min-h-full flex flex-col gap-6 pt-[30px] px-[30px] pb-[30px]">
       <div className="flex flex-col">
         <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
           Faculty
         </h1>
         <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] mt-1">
-          Monitor faculty adviser workload to help avoid overloading advisers with capstone groups.
+          Welcome, {session.user.name}.
         </p>
       </div>
-      <div className="flex-1 pb-[30px]">
-        <FacultyList />
-      </div>
+
+      {links.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {links.map((link) => {
+            const Icon = link.icon
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="bg-white border border-[#eceef8] rounded-[14px] p-5 flex flex-col gap-3 shadow-[0_2px_12px_rgba(30,58,138,0.06)] hover:border-[#707dff] transition-colors"
+              >
+                <div className="size-9 bg-indigo-500/10 rounded-lg inline-flex justify-center items-center">
+                  <Icon className="size-4 text-indigo-500" />
+                </div>
+                <span className="font-sans font-semibold text-[14px] text-[#12143a]">
+                  {link.label}
+                </span>
+              </Link>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="font-sans font-medium text-[13.5px] text-[#8a93b4]">
+          Your faculty profile is active. Explore your workspace from the
+          sidebar.
+        </p>
+      )}
     </section>
   )
 }

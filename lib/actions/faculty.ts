@@ -8,7 +8,8 @@ import {
   unstable_cacheTag as cacheTag,
   unstable_cacheLife as cacheLife,
 } from 'next/cache'
-import { revalidatePath, revalidateTag } from 'next/cache'
+import { revalidateTag } from 'next/cache'
+import { revalidateFeature } from '@/lib/actions/revalidate'
 
 // A faculty member is considered "active now" if they signed in within this window.
 const ACTIVE_NOW_MS = 5 * 60 * 1000
@@ -275,8 +276,8 @@ export async function removeFaculty(facultyId: number) {
 
   revalidateTag('faculty', 'max')
   revalidateTag('coordinators', 'max')
-  revalidatePath('/faculty')
-  revalidatePath('/sections')
+  revalidateFeature('faculty-list')
+  revalidateFeature('sections')
 
   return { success: true, message: 'Faculty removed.' }
 }
@@ -315,7 +316,7 @@ export async function joinFaculty(formData: FormData) {
 
   revalidateTag('users', 'max')
   revalidateTag('faculty', 'max')
-  revalidatePath('/faculty')
+  revalidateFeature('faculty-list')
 
   return { success: true, message: 'Faculty registration successful.' }
 }
@@ -360,7 +361,7 @@ export async function toggleProgramChair(id: number) {
     })
 
     revalidateTag('users', 'max')
-    revalidatePath('/dashboard/users')
+    revalidateFeature('users')
 
     return {
       success: true,

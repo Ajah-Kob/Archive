@@ -45,7 +45,7 @@ export default function UsersTable({
   const [formMessage, setFormMessage] = useState<string | null>(null)
 
   function goToPage(p: number) {
-    router.push(`/dashboard/users?page=${p}`)
+    router.push(`/admin/users?page=${p}`)
   }
 
   function openAdd() {

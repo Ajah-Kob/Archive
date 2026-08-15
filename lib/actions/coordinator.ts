@@ -1,7 +1,8 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { revalidateTag, revalidatePath } from 'next/cache'
+import { revalidateTag } from 'next/cache'
+import { revalidateFeature } from '@/lib/actions/revalidate'
 import { USERS_PER_PAGE } from '@/config/constants'
 import { requireAdminOrProgramChair, requireUser } from '@/lib/actions/guard'
 
@@ -93,7 +94,7 @@ export async function addCoordinator(facultyId: number) {
 
     revalidateTag('coordinators', 'max')
     revalidateTag('faculty', 'max')
-    revalidatePath('/sections')
+    revalidateFeature('sections')
 
     return {
       success: true,
@@ -152,7 +153,7 @@ export async function removeCoordinator(id: string) {
 
     revalidateTag('coordinators', 'max')
     revalidateTag('faculty', 'max')
-    revalidatePath('/sections')
+    revalidateFeature('sections')
 
     return {
       success: true,
@@ -167,3 +168,4 @@ export async function removeCoordinator(id: string) {
     }
   }
 }
+

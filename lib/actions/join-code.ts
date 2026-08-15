@@ -1,8 +1,9 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { revalidateTag, revalidatePath } from 'next/cache'
+import { revalidateTag } from 'next/cache'
 import { cacheLife, cacheTag } from 'next/cache'
+import { revalidateFeature } from '@/lib/actions/revalidate'
 import { generateJoinCode } from '@/lib/helper'
 import { USERS_PER_PAGE } from '@/config/constants'
 import { JoinCode, JoinType } from '@prisma/client'
@@ -73,7 +74,8 @@ async function createJoinCode(type: JoinType) {
     })
 
     revalidateTag('join-code', 'max')
-    type === 'STUDENT' ? revalidatePath('/section') : revalidatePath('/faculty')
+    if (type === 'STUDENT') revalidateFeature('sections')
+    else revalidateFeature('faculty-list')
 
     return {
       success: true,

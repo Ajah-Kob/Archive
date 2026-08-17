@@ -132,17 +132,17 @@ export function UploadDropzone({
   }
 
   return (
-    <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] overflow-hidden">
-      <div className="flex items-center gap-[8px] px-[16px] py-[14px] border-b border-[#f0f2fa]">
+    <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className="flex items-center gap-[8px] px-[16px] pt-[12px] pb-[13px] border-b border-[#f0f2fa]">
         <div className="flex size-[26px] items-center justify-center rounded-[7px] bg-[rgba(112,125,255,0.05)] shrink-0">
-          <UploadCloud className="size-[14px] text-[#707dff]" strokeWidth={2} />
+          <UploadCloud className="size-[12px] text-[#707dff]" strokeWidth={2} />
         </div>
-        <p className="font-sora text-[12px] font-semibold text-[#1e3a8a]">
+        <p className="font-sora text-[12px] font-bold text-[#1e3a8a]">
           {isResubmitting ? `Resubmit ${chapterLabel}` : `Upload ${chapterLabel}`}
         </p>
       </div>
 
-      <div className="p-[18px] flex flex-col gap-[12px]">
+      <div className="p-[14px] flex flex-col gap-[12px]">
         <input
           ref={inputRef}
           type="file"
@@ -155,11 +155,11 @@ export function UploadDropzone({
         {isLocked ? (
           <div className="flex flex-col gap-[10px] rounded-[10px] border border-[rgba(112,125,255,0.13)] bg-[#f8f9ff] p-[16px]">
             <div className="flex items-center gap-[10px] min-w-0">
-              <div className="flex size-[36px] items-center justify-center rounded-[8px] bg-[#eef0fb] shrink-0">
+              <div className="flex size-[36px] items-center justify-center rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] shrink-0">
                 <FileText className="size-[16px] text-[#707dff]" strokeWidth={1.75} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3c4268]">
+                <p className="truncate font-sans font-bold text-[12.5px] leading-[18.75px] text-[#1e3a8a]">
                   {currentFileName ?? 'Submitted document'}
                 </p>
                 <div className="flex items-center gap-[6px] mt-[2px]">
@@ -194,53 +194,26 @@ export function UploadDropzone({
             </div>
           </div>
         ) : draft ? (
-          <div className="flex flex-col gap-[12px] rounded-[10px] border border-[rgba(112,125,255,0.13)] bg-[#f8f9ff] p-[16px]">
-            <div className="flex items-center gap-[10px] min-w-0">
-              <div className="flex size-[36px] items-center justify-center rounded-[8px] bg-[#eef0fb] shrink-0">
+          <div className="flex flex-col gap-[10px]">
+            <div className="flex items-center gap-[11px] px-[14px] py-[12px] rounded-[10px] bg-[#f8f9ff] border border-[rgba(112,125,255,0.13)]">
+              <div className="flex size-[36px] items-center justify-center rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] shrink-0">
                 <FileText className="size-[16px] text-[#707dff]" strokeWidth={1.75} />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3c4268]">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-sans font-bold text-[12.5px] leading-[18.75px] text-[#1e3a8a]">
                   {draft.name}
                 </p>
-                <div className="flex items-center gap-[6px] mt-[2px]">
-                  <span className="flex size-[18px] items-center justify-center rounded-[5px] bg-[#f4f5fc] text-[8.5px] font-bold text-[#9ea8c6]">
-                    {draft.type.split('/')[1]?.toUpperCase() || 'PDF'}
-                  </span>
-                  <span className="font-sans font-medium text-[11px] text-[#8a93b4]">
-                    {formatSize(draft.size)}
-                  </span>
-                </div>
+                <p className="pt-[2px] font-sans font-medium text-[11px] leading-[16.5px] text-[#9ea8c6]">
+                  PDF · {formatSize(draft.size)}
+                </p>
               </div>
-            </div>
-
-            <div className="flex items-center gap-[8px]">
-              <button
-                type="button"
-                onClick={openPicker}
-                disabled={submitting}
-                className="flex items-center gap-[5px] h-[26px] px-[10px] bg-white border border-[#e8ebf8] rounded-[7px] font-sans font-semibold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <UploadCloud className="size-[11px]" />
-                Replace
-              </button>
-              <button
-                type="button"
-                onClick={handleRemove}
-                disabled={submitting}
-                aria-label={`Remove ${draft.name}`}
-                className="flex items-center gap-[5px] font-sans font-semibold text-[11px] text-[#e11d48] hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-              >
-                <X className="size-[11px]" />
-                Remove
-              </button>
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={!draft || !!error || submitting || !canSubmit}
-                className="flex items-center gap-[6px] h-[34px] px-[13px] rounded-[9px] text-white font-sans font-semibold text-[12px] hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed ml-auto shrink-0"
+                className="flex items-center gap-[7px] px-[18px] py-[8px] rounded-[9px] border border-[rgba(112,125,255,0.6)] text-white font-sans font-bold text-[12px] drop-shadow-[0px_3px_4px_rgba(112,125,255,0.2)] transition-opacity hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 style={{
-                  backgroundImage: 'linear-gradient(175deg, #707dff 0%, #5565ff 100%)',
+                  backgroundImage: 'linear-gradient(159deg, #707dff 0%, #5565ff 100%)',
                 }}
               >
                 {submitting ? (
@@ -248,10 +221,30 @@ export function UploadDropzone({
                 ) : (
                   <UploadCloud className="size-[12px]" />
                 )}
-                {isResubmitting ? `Resubmit ${chapterLabel}` : `Submit ${chapterLabel}`}
+                Submit
+              </button>
+              <button
+                type="button"
+                onClick={openPicker}
+                disabled={submitting}
+                className="flex items-center justify-center px-[16px] py-[8px] rounded-[9px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={submitting}
+                aria-label={`Remove ${draft.name}`}
+                className="flex items-center gap-[5px] p-[5px] font-sans font-semibold text-[12px] text-[#ef4444] hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              >
+                <X className="size-[11px]" />
+                Remove
               </button>
             </div>
-
+            <p className="font-sans font-medium text-[11.5px] leading-[18.4px] text-[#9ea8c6]">
+              This document has not been submitted yet. Submit it when you're ready to send it to your adviser for review.
+            </p>
             {submitting && (
               <div className="h-[4px] rounded-full bg-[#f0f2fa] overflow-hidden">
                 <div className="h-full rounded-full bg-[#707dff] w-full animate-pulse motion-reduce:w-1/2 motion-reduce:animate-none" />
@@ -273,25 +266,28 @@ export function UploadDropzone({
             }`}
           >
             <div className="flex size-[48px] items-center justify-center rounded-[24px] bg-[#eef0fb]">
-              <UploadCloud className="size-[24px] text-[#707dff]" strokeWidth={1.75} />
+              <UploadCloud className="size-[20px] text-[#707dff]" strokeWidth={1.75} />
             </div>
-            <p className="pt-[12px] font-sans font-semibold text-[13px] text-[#1e3a8a]">
+            <p className="pt-[14px] font-sora text-[14px] font-bold text-[#1e3a8a]">
               Drag and drop your document here
             </p>
-            <div className="flex items-center gap-[8px] pt-[6px]">
-              <span className="font-sans font-medium text-[12px] text-[#5a6382]">or</span>
+            <div className="flex items-center gap-[7px] pt-[6px]">
+              <span className="font-sans font-medium text-[12.5px] text-[#8a93b4]">or</span>
               <button
                 type="button"
                 onClick={openPicker}
-                className="flex items-center gap-[5px] h-[26px] px-[12px] rounded-[8px] text-white font-sans font-semibold text-[12px] hover:opacity-95 transition-opacity"
+                className="flex items-center gap-[7px] px-[20px] py-[9px] rounded-[9px] text-white font-sans font-bold text-[12.5px] drop-shadow-[0px_4px_6px_rgba(112,125,255,0.21)] transition-opacity hover:opacity-95"
                 style={{
-                  backgroundImage: 'linear-gradient(175deg, #707dff 0%, #5565ff 100%)',
+                  backgroundImage: 'linear-gradient(165deg, #707dff 0%, #5565ff 100%)',
                 }}
               >
+                <UploadCloud className="size-[12px]" />
                 Browse Files
               </button>
             </div>
-            <p className="pt-[10px] text-[11px] text-[#bbc0d8]">PDF only · Maximum file size: 20 MB</p>
+            <p className="pt-[10px] font-sans font-medium text-[11px] text-[#bbc0d8]">
+              PDF only · Maximum file size: 20 MB
+            </p>
           </div>
         )}
 
@@ -300,12 +296,6 @@ export function UploadDropzone({
             <TriangleAlert className="size-[13px] text-[#e11d48] shrink-0 mt-px" />
             <p className="font-medium text-[12px] leading-[17.4px] text-[#e11d48]">{error}</p>
           </div>
-        )}
-
-        {!canSubmit && !isLocked && (
-          <p className="font-sans font-medium text-[11px] text-[#8a93b4]">
-            Confirm your capstone topic before submitting.
-          </p>
         )}
 
         {isResubmitting && currentFileName && (

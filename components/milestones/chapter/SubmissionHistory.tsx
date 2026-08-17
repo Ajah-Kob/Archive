@@ -48,7 +48,7 @@ interface SubmissionHistoryProps {
 
 export function SubmissionHistory({ history }: SubmissionHistoryProps) {
   return (
-    <div className='mt-8 overflow-hidden rounded-[14px] border border-[#eceef8] bg-white shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)]'>
+    <div className='overflow-hidden rounded-[14px] border border-[#eceef8] bg-white shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)]'>
       <div className='flex items-center justify-between gap-[12px] px-[16px] py-[14px] border-b border-[#f0f2fa]'>
         <h3 className='font-sora text-[12.5px] font-semibold text-[#1e3a8a]'>Submission History</h3>
       </div>

@@ -298,12 +298,6 @@ export function UploadDropzone({
           </div>
         )}
 
-        {!canSubmit && !isLocked && (
-          <p className="font-sans font-medium text-[11px] text-[#8a93b4]">
-            Confirm your capstone topic before submitting.
-          </p>
-        )}
-
         {isResubmitting && currentFileName && (
           <p className="font-sans font-medium text-[11px] text-[#9ea8c6]">
             Current version: {currentFileName}

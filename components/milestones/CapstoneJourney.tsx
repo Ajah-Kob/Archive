@@ -113,7 +113,7 @@ function MilestoneRow({ row, isActive }: MilestoneRowProps) {
   }
 
   return (
-    <Link href={`/milestone/${row.slug}`} className={rowClasses}>
+    <Link href={`/student/milestone/${row.slug}`} className={rowClasses}>
       {content}
     </Link>
   )

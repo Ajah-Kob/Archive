@@ -1,0 +1,469 @@
+'use server'
+
+import { put } from '@vercel/blob'
+import prisma from '@/lib/prisma'
+import { revalidateTag } from 'next/cache'
+import { requireStudent, unauthorized } from '@/lib/actions/guard'
+import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
+import {
+  CHAPTER_LABELS,
+  CHAPTER_PHASE,
+  type ChapterKey,
+  type ChapterSubmissionPayload,
+  type ChapterVersionItem,
+  type ChapterViewState,
+  type SubmissionViewStatus,
+} from '@/types/milestones'
+
+// Chapter documents are PDF only, up to 20MB (matches the Figma dropzone copy
+// and the serverActions body limit + proxy cap in next.config.ts).
+const MAX_SIZE_BYTES = 20 * 1024 * 1024
+
+// DB enum (underscore) version of the phase derived from the chapter.
+const DB_PHASE: Record<ChapterKey, 'CAPSTONE_1' | 'CAPSTONE_2'> = {
+  CHAPTER_1: 'CAPSTONE_1',
+  CHAPTER_2: 'CAPSTONE_1',
+  CHAPTER_3: 'CAPSTONE_1',
+  CHAPTER_4: 'CAPSTONE_2',
+  CHAPTER_5: 'CAPSTONE_2',
+}
+
+// Revalidates every cache that surfaces a group's chapter progress: each
+// member's workspace, the group journey, the coordinator's section views and
+// the adviser's evaluation queue. Pass `{ expireNow: true }` to force-expire
+// (revalidateTag with { expire: 0 }) instead of stale-while-revalidate, so the
+// acting user's next load reflects the change immediately.
+function revalidateChapterGroup(
+  group: {
+    id: number
+    sectionId: number
+    adviserId: number | null
+    students: { userId: number }[]
+  },
+  opts?: { expireNow?: boolean },
+) {
+  const config = opts?.expireNow ? ({ expire: 0 } as const) : 'max'
+  for (const member of group.students) {
+    revalidateTag(`workspace-${member.userId}`, config)
+  }
+  revalidateTag(`journey-${group.id}`, config)
+  revalidateTag(`my-section-${group.sectionId}`, config)
+  revalidateTag('my-sections', config)
+  revalidateTag('sections', config)
+  if (group.adviserId) revalidateTag(`evaluations-${group.adviserId}`, config)
+}
+
+// The section's resolved milestone availability (same source of truth as the
+// coordinator's management UI).
+async function getAvailability(sectionId: number): Promise<Record<string, boolean>> {
+  const section = await prisma.section.findFirst({
+    where: { id: sectionId, deletedAt: null },
+    select: {
+      capstone2OpenedAt: true,
+      milestoneAvailability: { select: { key: true, openedAt: true } },
+    },
+  })
+  return resolveSectionAvailability(
+    section?.capstone2OpenedAt != null,
+    section?.milestoneAvailability ?? [],
+  )
+}
+
+// Whether the chapter milestone is open for the group's section.
+async function chapterIsOpen(sectionId: number, chapter: ChapterKey) {
+  const availability = await getAvailability(sectionId)
+  return availability[chapter] ?? false
+}
+
+// The current student's live group row (with active members), or null when
+// they are not a member of a non-deleted group. The student is derived from
+// the session — callers never supply a userId.
+async function getStudentGroup(sessionUserId: number) {
+  const student = await prisma.student.findFirst({
+    where: { userId: sessionUserId, deletedAt: null },
+    select: {
+      id: true,
+      sectionId: true,
+      group: {
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          sectionId: true,
+          adviserId: true,
+          students: {
+            where: { deletedAt: null },
+            select: { id: true, userId: true },
+          },
+        },
+      },
+    },
+  })
+  if (!student?.group) return null
+  const isMember = student.group.students.some((s) => s.id === student.id)
+  if (!isMember) return null
+  return { ...student.group, sectionId: student.sectionId }
+}
+
+// Maps a DB submission row to the client version item. `version` is the
+// position + 1 within the full chain (mirrors the topic chain derivation).
+function toVersionItem(
+  row: {
+    id: number
+    fileName: string
+    blobUrl: string
+    mimeType: string
+    size: number
+    status: string
+    createdAt: Date
+    reviewedAt: Date | null
+    reviewNote: string | null
+    user: { name: string }
+  },
+  index: number,
+  isCurrent: boolean,
+): ChapterVersionItem {
+  const rawStatus = row.status as 'PENDING' | 'NEED_REVISION' | 'APPROVED'
+  const status: SubmissionViewStatus =
+    rawStatus === 'APPROVED'
+      ? 'APPROVED'
+      : rawStatus === 'NEED_REVISION'
+        ? 'NEEDS_REVISION'
+        : 'IN_REVIEW'
+  return {
+    id: row.id,
+    version: index + 1,
+    fileName: row.fileName,
+    blobUrl: row.blobUrl,
+    mimeType: row.mimeType,
+    size: row.size,
+    status,
+    submittedBy: row.user.name,
+    submittedAt: row.createdAt.toISOString(),
+    reviewedAt: row.reviewedAt?.toISOString() ?? null,
+    reviewNote: row.reviewNote,
+    isCurrent,
+    commentCount: 0, // comments model not yet built
+  }
+}
+
+// The full chapter payload for the student view. Reads the group membership,
+// the section availability, the lazy-created milestone (when it exists) and
+// the version chain. Not 'use cache': the page re-fetches on focus so state
+// always reflects the persisted submission + review.
+export async function getChapterData(
+  chapter: ChapterKey,
+): Promise<{ success: boolean; message: string; payload: ChapterSubmissionPayload | null }> {
+  const session = await requireStudent()
+  if (!session?.user?.id) return { ...unauthorized, payload: null }
+
+  const student = await prisma.student.findFirst({
+    where: { userId: +session.user.id, deletedAt: null },
+    select: {
+      id: true,
+      sectionId: true,
+      group: {
+        where: { deletedAt: null },
+        include: {
+          students: { where: { deletedAt: null }, select: { id: true } },
+          topics: {
+            where: { deletedAt: null },
+            select: { status: true, deletedAt: true },
+          },
+          capstone: { select: { topicId: true } },
+          milestones: {
+            where: { deletedAt: null },
+            include: {
+              submissions: { select: { status: true } },
+            },
+          },
+          capstoneArchive: { select: { deletedAt: true } },
+        },
+      },
+    },
+  })
+
+  if (!student) return { ...unauthorized, payload: null }
+
+  const group = student.group ?? null
+  const isMember = !!group?.students.some((s) => s.id === student.id)
+  const effectiveGroup = isMember ? group : null
+
+  const availability = effectiveGroup
+    ? await getAvailability(student.sectionId)
+    : resolveSectionAvailability(false, [])
+  const open = effectiveGroup ? (availability[chapter] ?? false) : false
+
+  const journey = buildJourneyRows(
+    effectiveGroup
+      ? {
+          topics: effectiveGroup.topics,
+          capstone: effectiveGroup.capstone,
+          milestones: effectiveGroup.milestones.map((m) => ({
+            chapter: m.chapter,
+            submissions: m.submissions,
+          })),
+          capstoneArchive: effectiveGroup.capstoneArchive,
+        }
+      : null,
+    availability,
+  )
+
+  const milestone = effectiveGroup?.milestones.find((m) => m.chapter === chapter) ?? null
+  const requiresCapstone = !!effectiveGroup && !effectiveGroup.capstone
+
+  let current: ChapterVersionItem | null = null
+  let history: ChapterVersionItem[] = []
+  let state: ChapterViewState = 'DEFAULT'
+  if (open && milestone) {
+    const chain = await prisma.milestoneSubmission.findMany({
+      where: { milestoneId: milestone.id },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { name: true } } },
+    })
+    history = chain.map((row, index) => toVersionItem(row, index, !row.deletedAt))
+    current = history.find((v) => v.isCurrent) ?? null
+    state = !current
+      ? 'DEFAULT'
+      : current.status === 'APPROVED'
+        ? 'APPROVED'
+        : current.status === 'NEEDS_REVISION'
+          ? 'NEEDS_REVISION'
+          : 'IN_REVIEW'
+  }
+
+  return {
+    success: true,
+    message: '',
+    payload: {
+      chapter: {
+        key: chapter,
+        label: CHAPTER_LABELS[chapter],
+        phase: CHAPTER_PHASE[chapter],
+      },
+      open,
+      milestoneId: milestone?.id ?? null,
+      current,
+      history,
+      state,
+      canSubmit: open && !requiresCapstone,
+      requiresCapstone,
+      journey,
+    },
+  }
+}
+
+// Validates the uploaded chapter file. Server-side checks mirror the dropzone
+// client checks (PDF only, 20MB max) so a crafted request cannot bypass them.
+function validateChapterFile(file: File | null): string | null {
+  if (!file || file.size === 0) return 'No file provided.'
+  if (file.type !== 'application/pdf') {
+    return 'Unsupported file type. Only PDF files are allowed.'
+  }
+  if (file.size > MAX_SIZE_BYTES) {
+    return 'File is too large (max 20MB).'
+  }
+  return null
+}
+
+// Shared guard for submit/resubmit: the caller must be a student, a member of
+// the group, the chapter must be open, and the group must have an approved
+// topic (a Capstone row). Returns the group + milestone (existing or to be
+// created) or an error result.
+async function authorizeChapterMutation(
+  chapter: ChapterKey,
+  sessionUserId: number,
+): Promise<
+  | { ok: true; group: { id: number; sectionId: number; adviserId: number | null; students: { userId: number }[] }; milestoneId: number | null }
+  | { ok: false; result: { success: boolean; message: string } }
+> {
+  const group = await getStudentGroup(sessionUserId)
+  if (!group) return { ok: false, result: { success: false, message: 'You are not a member of a group.' } }
+
+  const open = await chapterIsOpen(group.sectionId, chapter)
+  if (!open) return { ok: false, result: { success: false, message: 'This chapter is locked.' } }
+
+  const capstone = await prisma.capstone.findFirst({
+    where: { groupId: group.id, deletedAt: null },
+    select: { id: true },
+  })
+  if (!capstone) {
+    return { ok: false, result: { success: false, message: 'Confirm your capstone topic before submitting.' } }
+  }
+
+  const milestone = await prisma.milestone.findFirst({
+    where: { groupId: group.id, chapter, deletedAt: null },
+    select: { id: true },
+  })
+
+  return { ok: true, group, milestoneId: milestone?.id ?? null }
+}
+
+// Uploads the validated file to Vercel Blob under the chapter path and
+// creates the milestone + submission rows inside a transaction. Returns the
+// milestoneId (newly created or existing) so resubmit can target it.
+async function persistChapterSubmission(
+  groupId: number,
+  capstoneId: number,
+  phase: 'CAPSTONE_1' | 'CAPSTONE_2',
+  chapter: ChapterKey,
+  userId: number,
+  file: File,
+) {
+  const arrayBuffer = await file.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+  const blob = await put(`chapter/${groupId}/${chapter}/${file.name}`, buffer, {
+    access: 'public',
+    contentType: 'application/pdf',
+    addRandomSuffix: true,
+  })
+
+  return prisma.$transaction(async (tx) => {
+    const milestone = await tx.milestone.upsert({
+      where: { groupId_chapter: { groupId, chapter } },
+      update: {},
+      create: {
+        groupId,
+        capstoneId,
+        phase,
+        chapter,
+      },
+    })
+    const submission = await tx.milestoneSubmission.create({
+      data: {
+        milestoneId: milestone.id,
+        submittedBy: userId,
+        fileName: file.name,
+        blobUrl: blob.url,
+        mimeType: 'application/pdf',
+        size: file.size,
+        status: 'PENDING',
+      },
+    })
+    return { milestoneId: milestone.id, submissionId: submission.id }
+  })
+}
+
+// First-time submission: creates the milestone row lazily and the first
+// PENDING submission. Guarded so the group cannot have two current (live)
+// submissions for the same milestone.
+export async function submitChapter(
+  chapter: ChapterKey,
+  formData: FormData,
+): Promise<{ success: boolean; message: string; payload?: { milestoneId: number } }> {
+  const session = await requireStudent()
+  if (!session?.user?.id) return { ...unauthorized }
+
+  const file = formData.get('file') as File | null
+  if (!file) return { success: false, message: 'No file provided.' }
+  const fileError = validateChapterFile(file)
+  if (fileError) return { success: false, message: fileError }
+
+  const auth = await authorizeChapterMutation(chapter, +session.user.id)
+  if (auth.ok === false) return auth.result
+
+  try {
+    const capstone = await prisma.capstone.findFirst({
+      where: { groupId: auth.group.id, deletedAt: null },
+      select: { id: true },
+    })
+    if (!capstone) {
+      return { success: false, message: 'Confirm your capstone topic before submitting.' }
+    }
+
+    // Guard: only one live (non-soft-deleted) submission may exist for the
+    // milestone. The Postgres partial unique index enforces this at the DB
+    // level; this check gives a friendly message before the constraint fires.
+    if (auth.milestoneId) {
+      const existing = await prisma.milestoneSubmission.findFirst({
+        where: { milestoneId: auth.milestoneId, deletedAt: null },
+        select: { id: true },
+      })
+      if (existing) {
+        return { success: false, message: 'This chapter already has a submission under review.' }
+      }
+    }
+
+    const { milestoneId } = await persistChapterSubmission(
+      auth.group.id,
+      capstone.id,
+      DB_PHASE[chapter],
+      chapter,
+      +session.user.id,
+      file,
+    )
+
+    await revalidateChapterGroup(auth.group, { expireNow: true })
+
+    return { success: true, message: `${CHAPTER_LABELS[chapter]} submitted for review.`, payload: { milestoneId } }
+  } catch (error) {
+    console.error('[submitChapter | Error]:', error)
+    return { success: false, message: 'Failed to submit the chapter. Please try again.' }
+  }
+}
+
+// Resubmission after an adviser requested revisions: soft-deletes the current
+// submission and creates a new PENDING row so the chain preserves versioning.
+export async function resubmitChapter(
+  chapter: ChapterKey,
+  formData: FormData,
+): Promise<{ success: boolean; message: string; payload?: { milestoneId: number } }> {
+  const session = await requireStudent()
+  if (!session?.user?.id) return { ...unauthorized }
+
+  const file = formData.get('file') as File | null
+  if (!file) return { success: false, message: 'No file provided.' }
+  const fileError = validateChapterFile(file)
+  if (fileError) return { success: false, message: fileError }
+
+  const auth = await authorizeChapterMutation(chapter, +session.user.id)
+  if (auth.ok === false) return auth.result
+
+  // Resubmission is only valid when the current submission needs revisions.
+  if (auth.milestoneId) {
+    const current = await prisma.milestoneSubmission.findFirst({
+      where: { milestoneId: auth.milestoneId, deletedAt: null },
+      select: { status: true },
+    })
+    if (!current || current.status !== 'NEED_REVISION') {
+      return { success: false, message: 'This chapter cannot be resubmitted until the adviser requests revisions.' }
+    }
+  } else {
+    return { success: false, message: 'No submission to resubmit.' }
+  }
+
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    const blob = await put(`chapter/${auth.group.id}/${chapter}/${file.name}`, buffer, {
+      access: 'public',
+      contentType: 'application/pdf',
+      addRandomSuffix: true,
+    })
+
+    const { milestoneId } = await prisma.$transaction(async (tx) => {
+      await tx.milestoneSubmission.updateMany({
+        where: { milestoneId: auth.milestoneId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      })
+      await tx.milestoneSubmission.create({
+        data: {
+          milestoneId: auth.milestoneId,
+          submittedBy: +session.user.id,
+          fileName: file.name,
+          blobUrl: blob.url,
+          mimeType: 'application/pdf',
+          size: file.size,
+          status: 'PENDING',
+        },
+      })
+      return { milestoneId: auth.milestoneId }
+    })
+
+    await revalidateChapterGroup(auth.group, { expireNow: true })
+
+    return { success: true, message: `${CHAPTER_LABELS[chapter]} resubmitted for review.`, payload: { milestoneId } }
+  } catch (error) {
+    console.error('[resubmitChapter | Error]:', error)
+    return { success: false, message: 'Failed to resubmit the chapter. Please try again.' }
+  }
+}

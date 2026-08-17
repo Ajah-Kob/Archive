@@ -6,8 +6,9 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      bodySizeLimit: '24mb',
     },
+    proxyClientMaxBodySize: '24mb',
   },
   images: {
     remotePatterns: [

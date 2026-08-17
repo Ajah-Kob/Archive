@@ -1,8 +1,8 @@
 'use server'
 
+import { revalidateTag } from 'next/cache'
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag } from 'next/cache'
-import { requireAdviser } from '@/lib/actions/guard'
+import { requireAdviser, unauthorized } from '@/lib/actions/guard'
 
 export interface EvaluationItem {
   id: number
@@ -13,6 +13,7 @@ export interface EvaluationItem {
   dateSubmitted: string
   submittedBy: string
   fileName: string
+  blobUrl: string
   mimeType: string
   size: number
 }
@@ -21,9 +22,12 @@ export interface EvaluationVersion {
   id: number
   version: number
   fileName: string
+  blobUrl: string
   submittedBy: string
   createdAt: string
   isCurrent: boolean
+  status: 'PENDING' | 'NEED_REVISION' | 'APPROVED'
+  reviewedAt: string | null
 }
 
 export interface EvaluationVersionsPayload {
@@ -39,7 +43,9 @@ const CHAPTER_LABELS: Record<string, string> = {
   CHAPTER_5: 'Chapter 5',
 }
 
-// Returns the live adviser record for the current user, or null.
+// Returns the live adviser record (id + reviewer User.id) for the current
+// user, or null. The reviewer User.id (adviser.faculty.userId) is stored on
+// reviewedById, matching Topic.reviewedById.
 async function requireAdviserRow() {
   const session = await requireAdviser()
   if (!session) return null
@@ -48,18 +54,14 @@ async function requireAdviserRow() {
       faculty: { userId: +session.user.id, deletedAt: null },
       deletedAt: null,
     },
-    select: { id: true },
+    select: { id: true, faculty: { select: { userId: true } } },
   })
 }
 
 // Current submissions of the adviser's assigned groups, newest first. A
 // "current" submission is the live (non-soft-deleted) row of a milestone —
 // previous versions are the soft-deleted rows in the same milestone.
-async function getEvaluationsData(adviserId: number) {
-  'use cache'
-  cacheTag(`evaluations-${adviserId}`)
-  cacheLife('max')
-
+async function getEvaluationsData(adviserId: number): Promise<EvaluationItem[]> {
   const submissions = await prisma.milestoneSubmission.findMany({
     where: {
       deletedAt: null,
@@ -70,7 +72,6 @@ async function getEvaluationsData(adviserId: number) {
     },
     include: {
       milestone: {
-        select: { chapter: true, phase: true, groupId: true },
         include: { group: { select: { groupName: true } } },
       },
       user: { select: { name: true } },
@@ -88,6 +89,7 @@ async function getEvaluationsData(adviserId: number) {
       dateSubmitted: s.createdAt.toISOString(),
       submittedBy: s.user.name,
       fileName: s.fileName,
+      blobUrl: s.blobUrl,
       mimeType: s.mimeType,
       size: s.size,
     }),
@@ -96,9 +98,7 @@ async function getEvaluationsData(adviserId: number) {
 
 export async function getEvaluations() {
   const adviser = await requireAdviserRow()
-  if (!adviser) {
-    return { success: false, message: 'Not authorized', payload: null }
-  }
+  if (!adviser) return { ...unauthorized, payload: null }
 
   try {
     const payload = await getEvaluationsData(adviser.id)
@@ -115,12 +115,10 @@ export async function getEvaluations() {
 
 // All versions of a chapter submission (current + soft-deleted previous rows).
 // Version numbers mirror the topic chain derivation: position + 1, ordered by
-// createdAt. Not 'use cache': the drawer fetches on open so it stays fresh.
+// createdAt.
 export async function getEvaluationVersions(submissionId: number) {
   const adviser = await requireAdviserRow()
-  if (!adviser) {
-    return { success: false, message: 'Not authorized', payload: null }
-  }
+  if (!adviser) return { ...unauthorized, payload: null }
 
   try {
     const submission = await prisma.milestoneSubmission.findFirst({
@@ -150,9 +148,12 @@ export async function getEvaluationVersions(submissionId: number) {
       id: s.id,
       version: index + 1,
       fileName: s.fileName,
+      blobUrl: s.blobUrl,
       submittedBy: s.user.name,
       createdAt: s.createdAt.toISOString(),
       isCurrent: !s.deletedAt,
+      status: s.status as 'PENDING' | 'NEED_REVISION' | 'APPROVED',
+      reviewedAt: s.reviewedAt ? s.reviewedAt.toISOString() : null,
     }))
 
     const payload: EvaluationVersionsPayload = {
@@ -168,5 +169,99 @@ export async function getEvaluationVersions(submissionId: number) {
       message: 'Failed to load submission.',
       payload: null,
     }
+  }
+}
+
+// Adviser reviews the current submission of an assigned group's chapter.
+// Only the live (non-soft-deleted) row is reviewable; the write is a
+// conditional updateMany so a concurrent resubmit that soft-deleted the row
+// cannot receive a review.
+export async function reviewSubmission(
+  submissionId: number,
+  decision: 'APPROVED' | 'NEED_REVISION',
+  note: string | null,
+) {
+  const adviser = await requireAdviserRow()
+  if (!adviser) return { ...unauthorized }
+
+  const trimmedNote = note?.trim() ?? ''
+  if (decision === 'NEED_REVISION' && !trimmedNote) {
+    return {
+      success: false,
+      message: 'Feedback is required when requesting revisions.',
+    }
+  }
+
+  try {
+    const submission = await prisma.milestoneSubmission.findFirst({
+      where: {
+        id: submissionId,
+        deletedAt: null,
+        milestone: {
+          deletedAt: null,
+          group: { deletedAt: null, adviserId: adviser.id },
+        },
+      },
+      select: {
+        id: true,
+        milestone: {
+          select: {
+            group: {
+              select: {
+                id: true,
+                sectionId: true,
+                students: {
+                  where: { deletedAt: null },
+                  select: { userId: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+    if (!submission) {
+      return {
+        success: false,
+        message: 'Submission not found in your assigned groups.',
+      }
+    }
+
+    const result = await prisma.milestoneSubmission.updateMany({
+      where: { id: submission.id, deletedAt: null },
+      data: {
+        status: decision,
+        reviewNote: decision === 'NEED_REVISION' ? trimmedNote : null,
+        reviewedById: adviser.faculty.userId,
+        reviewedAt: new Date(),
+      },
+    })
+    if (result.count === 0) {
+      return {
+        success: false,
+        message:
+          'This submission was superseded by a newer version and can no longer be reviewed.',
+      }
+    }
+
+    const group = submission.milestone.group
+    const config = { expire: 0 } as const
+    for (const student of group.students) {
+      revalidateTag(`workspace-${student.userId}`, config)
+    }
+    revalidateTag(`journey-${group.id}`, config)
+    revalidateTag(`evaluations-${adviser.id}`, config)
+    revalidateTag(`my-section-${group.sectionId}`, config)
+
+    return {
+      success: true,
+      message:
+        decision === 'APPROVED'
+          ? 'Submission approved.'
+          : 'Revision requested for this submission.',
+    }
+  } catch (error) {
+    console.error('[reviewSubmission | Error]:', error)
+    return { success: false, message: 'Failed to review the submission.' }
   }
 }

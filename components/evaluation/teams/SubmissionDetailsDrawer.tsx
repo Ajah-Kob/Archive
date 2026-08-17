@@ -1,13 +1,29 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ClipboardCheck, FileText, History, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import {
+  CalendarDays,
+  Check,
+  ClipboardCheck,
+  FileText,
+  History,
+  Loader2,
+  RotateCcw,
+  X,
+} from 'lucide-react'
 import type {
   EvaluationItem,
   EvaluationVersion,
   EvaluationVersionsPayload,
 } from '@/lib/actions/evaluation'
-import { getEvaluationVersions } from '@/lib/actions/evaluation'
+import {
+  getEvaluationVersions,
+  reviewSubmission,
+} from '@/lib/actions/evaluation'
+import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
+import type { SubmissionViewStatus } from '@/types/milestones'
 
 interface SubmissionDetailsDrawerProps {
   submission: EvaluationItem | null
@@ -28,6 +44,16 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+// Map the DB review status to the shared view status. SUPERSEDED is a
+// UI-only display state: every non-current (soft-deleted) version renders
+// the muted Superseded treatment regardless of its historical DB status.
+function toViewStatus(version: EvaluationVersion): SubmissionViewStatus {
+  if (!version.isCurrent) return 'SUPERSEDED'
+  if (version.status === 'NEED_REVISION') return 'NEEDS_REVISION'
+  if (version.status === 'APPROVED') return 'APPROVED'
+  return 'IN_REVIEW'
+}
+
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
     <p className="font-sans font-extrabold text-[10px] leading-[15px] tracking-[0.9px] uppercase text-[#bbc0d8]">
@@ -40,20 +66,59 @@ export function SubmissionDetailsDrawer({
   submission,
   onClose,
 }: SubmissionDetailsDrawerProps) {
+  const router = useRouter()
   const [detail, setDetail] = useState<EvaluationVersionsPayload | null>(null)
   const [loading, setLoading] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewMode, setReviewMode] = useState<'approve' | 'revision' | null>(
+    null,
+  )
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const loadVersions = useCallback(async (submissionId: number) => {
+    const res = await getEvaluationVersions(submissionId)
+    if (res.success) setDetail(res.payload ?? null)
+  }, [])
 
   useEffect(() => {
     if (!submission) return
     setLoading(true)
     setDetail(null)
-    getEvaluationVersions(submission.id).then((res) => {
-      setDetail(res.success ? (res.payload ?? null) : null)
-      setLoading(false)
-    })
-  }, [submission])
+    setReviewOpen(false)
+    setReviewMode(null)
+    setNote('')
+    setBusy(false)
+    loadVersions(submission.id).finally(() => setLoading(false))
+  }, [submission, loadVersions])
+
+  async function submitReview(decision: 'APPROVED' | 'NEED_REVISION') {
+    if (!submission) return
+    if (decision === 'NEED_REVISION' && !note.trim()) {
+      toast.error('Feedback is required when requesting revisions.')
+      return
+    }
+    setBusy(true)
+    const res = await reviewSubmission(
+      submission.id,
+      decision,
+      note.trim() || null,
+    )
+    setBusy(false)
+    if (res.success) {
+      toast.success(res.message)
+      setReviewOpen(false)
+      setReviewMode(null)
+      setNote('')
+      loadVersions(submission.id)
+      router.refresh()
+    } else {
+      toast.error(res.message)
+    }
+  }
 
   const isOpen = submission != null
+  const currentVersion = detail?.versions.find((v) => v.isCurrent)
   const previousVersions = (detail?.versions ?? []).filter((v) => !v.isCurrent)
 
   return (
@@ -75,7 +140,7 @@ export function SubmissionDetailsDrawer({
               Submission Details
             </p>
             <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pt-[4px]">
-              Read-only view of this chapter submission.
+              Review this chapter submission and request revisions if needed.
             </p>
           </div>
           <button
@@ -97,9 +162,11 @@ export function SubmissionDetailsDrawer({
                     <p className="truncate font-sans font-bold text-[14px] leading-[21px] text-[#1e2145]">
                       {submission.groupName}
                     </p>
-                    <span className="bg-[#f4f6ff] border border-[#e5e8ff] rounded-full px-[8px] py-[2px] font-sans font-bold text-[10px] text-[#707dff] shrink-0">
-                      Current
-                    </span>
+                    {currentVersion && (
+                      <SubmissionStatusBadge
+                        status={toViewStatus(currentVersion)}
+                      />
+                    )}
                   </div>
                   <p className="pt-[4px] font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3d4566]">
                     {submission.chapter}
@@ -122,6 +189,18 @@ export function SubmissionDetailsDrawer({
                       <p className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
                         {formatSize(submission.size)}
                       </p>
+                      <div className="flex-1" />
+                      <a
+                        href={submission.blobUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View current document"
+                        aria-label={`View ${submission.fileName} (opens in new tab)`}
+                        className="flex items-center gap-[5px] h-[26px] px-[10px] bg-white border border-[#e8ebf8] rounded-[7px] font-sans font-semibold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] shrink-0"
+                      >
+                        <FileText className="size-[11px]" />
+                        View
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -195,17 +274,31 @@ export function SubmissionDetailsDrawer({
                               {version.fileName}
                             </p>
                           </div>
-                          <button
-                            type="button"
+                          <a
+                            href={version.blobUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             title="View document"
-                            aria-label={`View ${version.fileName}`}
-                            className="flex items-center gap-[5px] h-[26px] px-[10px] bg-white border border-[#e8ebf8] rounded-[7px] font-sans font-semibold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
+                            aria-label={`View ${version.fileName} (opens in new tab)`}
+                            className="flex items-center gap-[5px] h-[26px] px-[10px] bg-white border border-[#e8ebf8] rounded-[7px] font-sans font-semibold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] shrink-0"
                           >
                             <FileText className="size-[11px]" />
                             View
-                          </button>
+                          </a>
                         </div>
-                        <p className="pt-[5px] font-sans font-medium text-[11px] text-[#9ea8c6]">
+                        <div className="pt-[5px] flex items-center gap-[8px]">
+                          <SubmissionStatusBadge status={toViewStatus(version)} />
+                          {version.reviewedAt && (
+                            <span className="flex items-center gap-[5px] font-sans font-medium text-[11px] text-[#9ea8c6]">
+                              <CalendarDays
+                                className="size-[11px] text-[#9ea8c6]"
+                                strokeWidth={1.75}
+                              />
+                              Reviewed {formatDate(version.reviewedAt)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="pt-[4px] font-sans font-medium text-[11px] text-[#9ea8c6]">
                           Submitted {formatDate(version.createdAt)} by{' '}
                           {version.submittedBy || 'Unknown'}
                         </p>
@@ -216,14 +309,99 @@ export function SubmissionDetailsDrawer({
               </div>
 
               <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-[10px] pb-[4px]">
-                <button
-                  type="button"
-                  title="Evaluate current document"
-                  className="flex items-center justify-center gap-[8px] w-full h-[40px] rounded-[10px] bg-[#16a34a] font-sans font-bold text-[13px] text-white hover:bg-[#15803d] transition-colors"
-                >
-                  <ClipboardCheck className="size-[16px]" strokeWidth={2.25} />
-                  Evaluate Current Document
-                </button>
+                {!reviewOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewOpen(true)
+                      setReviewMode(null)
+                      setNote('')
+                    }}
+                    title="Evaluate current document"
+                    className="flex items-center justify-center gap-[8px] w-full h-[40px] rounded-[10px] bg-[#16a34a] font-sans font-bold text-[13px] text-white hover:bg-[#15803d] transition-colors"
+                  >
+                    <ClipboardCheck className="size-[16px]" strokeWidth={2.25} />
+                    Evaluate Current Document
+                  </button>
+                ) : reviewMode === 'revision' ? (
+                  <div className="border border-[#eceef8] rounded-[10px] bg-white p-[14px] flex flex-col gap-[10px] shadow-[0_8px_24px_rgba(112,125,255,0.12)]">
+                    <p className="font-sans font-bold text-[12.5px] leading-[18.75px] text-[#3d4566]">
+                      Request Revisions
+                    </p>
+                    <label className="font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382]">
+                      Revision note <span className="text-[#e11d48]">*</span>
+                    </label>
+                    <textarea
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      rows={3}
+                      maxLength={500}
+                      placeholder="Explain what the group needs to revise…"
+                      className="w-full px-[12px] py-[9px] bg-white border border-[#e8ebf8] rounded-[8px] font-sans font-medium text-[12.5px] leading-[18.75px] text-[#3d4566] outline-none focus:border-[rgba(112,125,255,0.5)] transition-colors resize-none"
+                    />
+                    <div className="flex items-center justify-end gap-[8px]">
+                      <button
+                        type="button"
+                        onClick={() => setReviewMode(null)}
+                        disabled={busy}
+                        className="h-[32px] px-[12px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors disabled:opacity-60"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitReview('NEED_REVISION')}
+                        disabled={busy || !note.trim()}
+                        className="flex items-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[11px] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {busy ? (
+                          <Loader2 className="size-[13px] animate-spin" />
+                        ) : (
+                          <RotateCcw className="size-[13px]" />
+                        )}
+                        Send Revision Request
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-[#eceef8] rounded-[10px] bg-white p-[14px] flex flex-col gap-[10px] shadow-[0_8px_24px_rgba(112,125,255,0.12)]">
+                    <p className="font-sans font-bold text-[12.5px] leading-[18.75px] text-[#3d4566]">
+                      Evaluate Current Document
+                    </p>
+                    <div className="flex items-center gap-[8px]">
+                      <button
+                        type="button"
+                        onClick={() => submitReview('APPROVED')}
+                        disabled={busy}
+                        className="flex-1 flex items-center justify-center gap-[6px] h-[36px] rounded-[9px] bg-[#16a34a] font-sans font-bold text-[12px] text-white hover:bg-[#15803d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {busy ? (
+                          <Loader2 className="size-[13px] animate-spin" />
+                        ) : (
+                          <Check className="size-[13px]" strokeWidth={2.5} />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReviewMode('revision')}
+                        disabled={busy}
+                        className="flex-1 flex items-center justify-center gap-[6px] h-[36px] rounded-[9px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[12px] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <RotateCcw className="size-[13px]" />
+                        Request Revisions
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReviewOpen(false)}
+                      disabled={busy}
+                      className="self-center font-sans font-semibold text-[11px] text-[#9ea8c6] hover:text-[#5a6382] transition-colors disabled:opacity-60"
+                    >
+                      Cancel review
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

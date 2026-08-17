@@ -14,7 +14,8 @@ import { JOURNEY_ROWS, SLUG_TO_CHAPTER, WORKSPACE_SLUGS } from '@/types/mileston
 import { LockedGroupPlaceholder } from '@/components/milestones/topic-submission/LockedGroupPlaceholder'
 import { TopicSelectionView } from '@/components/milestones/topic-selection/TopicSelectionView'
 import { TopicSubmissionView } from '@/components/milestones/topic-submission/TopicSubmissionView'
-import { ChapterSubmissionView, LockedChapterPlaceholder } from '@/components/milestones/chapter/ChapterSubmissionView'
+import { ChapterSubmissionView } from '@/components/milestones/chapter/ChapterSubmissionView'
+import { LockedChapterPlaceholder } from '@/components/milestones/chapter/LockedChapterPlaceholder'
 
 export const metadata: Metadata = {
   title: 'Milestones',
@@ -109,7 +110,7 @@ export default async function MilestoneDetailPage({
             {data.open ? (
               <ChapterSubmissionView payload={data} />
             ) : (
-              <LockedChapterPlaceholder label={data.chapter.label} />
+              <LockedChapterPlaceholder chapterLabel={data.chapter.label} />
             )}
           </div>
         </div>

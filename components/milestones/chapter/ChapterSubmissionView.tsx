@@ -1,74 +1,66 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import type { ChapterSubmissionPayload } from '@/types/milestones'
 import { StatusCallout } from './StatusCallout'
 import { UploadDropzone } from './UploadDropzone'
 import { SubmissionHistory } from './SubmissionHistory'
-import { type ChapterSubmissionPayload } from '@/types/milestones'
-import { submitChapter, resubmitChapter } from '@/lib/actions/chapter'
-import { toast } from 'sonner'
+import { ReviewFeedbackModal } from './ReviewFeedbackModal'
 
-export function ChapterSubmissionView({ payload }: { payload: ChapterSubmissionPayload }) {
-  const [file, setFile] = useState<File | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+export function ChapterSubmissionView({
+  payload,
+}: {
+  payload: ChapterSubmissionPayload
+}) {
+  const router = useRouter()
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
-  const handleSubmit = async () => {
-    if (!file) return
-    setIsSubmitting(true)
-    const formData = new FormData()
-    formData.append('file', file)
-    
-    const action = payload.current ? resubmitChapter : submitChapter
-    const result = await action(payload.chapter.key, formData)
-    
-    setIsSubmitting(false)
-    if (result.success) {
-      toast.success(result.message)
-    } else {
-      toast.error(result.message)
+  useEffect(() => {
+    const syncFromServer = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh()
+      }
     }
-  }
+
+    window.addEventListener('focus', syncFromServer)
+    document.addEventListener('visibilitychange', syncFromServer)
+    return () => {
+      window.removeEventListener('focus', syncFromServer)
+      document.removeEventListener('visibilitychange', syncFromServer)
+    }
+  }, [router])
+
+  const refresh = () => router.refresh()
 
   return (
-    <div className="space-y-6">
-      {payload.current && (
-        <StatusCallout
-          status={
-            payload.state === 'NEEDS_REVISION' 
-              ? 'NEED_REVISION' 
-              : payload.state === 'APPROVED' 
-                ? 'APPROVED' 
-                : 'PENDING'
-          }
-          message={payload.state === 'NEEDS_REVISION' ? 'Please review the adviser feedback and resubmit.' : 'Your submission is being reviewed by your adviser.'}
-          onAction={payload.state === 'NEEDS_REVISION' ? () => {} : undefined}
-          actionLabel="View Feedback"
-        />
-      )}
-      
-      {payload.canSubmit && (
-        <div className="rounded-[14px] border border-[#e0e3f0] p-6 bg-white">
-          <UploadDropzone onFileSelect={setFile} disabled={isSubmitting} />
-          <button
-            onClick={handleSubmit}
-            disabled={!file || isSubmitting}
-            className="mt-6 w-full rounded-[10px] bg-[#707dff] px-6 py-3 font-sora text-[14px] font-semibold text-white shadow-[0px_4px_8px_rgba(112,125,255,0.2)] disabled:opacity-50"
-          >
-            {isSubmitting ? 'Submitting...' : payload.current ? 'Resubmit Chapter' : 'Submit Chapter'}
-          </button>
-        </div>
-      )}
+    <div className="flex flex-col gap-[16px]">
+      <StatusCallout
+        state={payload.state}
+        chapterLabel={payload.chapter.label}
+        current={payload.current}
+        onReviewFeedback={() => setFeedbackOpen(true)}
+      />
+
+      <UploadDropzone
+        chapter={payload.chapter.key}
+        chapterLabel={payload.chapter.label}
+        state={payload.state}
+        currentFileName={payload.current?.fileName ?? null}
+        submittedAt={payload.current?.submittedAt ?? null}
+        currentSize={payload.current?.size ?? null}
+        canSubmit={payload.canSubmit}
+        onSubmitted={refresh}
+      />
 
       <SubmissionHistory history={payload.history} />
-    </div>
-  )
-}
 
-export function LockedChapterPlaceholder({ label }: { label: string }) {
-  return (
-    <div className="flex h-[300px] flex-col items-center justify-center rounded-[14px] border border-[#e0e3f0] bg-[#f8f9ff]">
-      <p className="font-sora text-[14px] font-semibold text-[#1e3a8a]">{label} is currently locked.</p>
-      <p className="text-[12px] text-[#5a6382]">Please wait for your coordinator to open this chapter.</p>
+      {feedbackOpen && payload.current && (
+        <ReviewFeedbackModal
+          item={payload.current}
+          onClose={() => setFeedbackOpen(false)}
+        />
+      )}
     </div>
   )
 }

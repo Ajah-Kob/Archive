@@ -21,17 +21,21 @@ describe('W2-T1 StatusCallout', () => {
   })
 
   test('headline uses Sora 15px with state color', () => {
-    expect(src).toMatch(/font-sora text-\[15px\]/)
+    expect(src).toMatch(/font-sora text-\[15px\] font-semibold/)
   })
 
   test('context copy is 13px #5a6382', () => {
     expect(src).toMatch(/text-\[13px\] text-\[#5a6382\]/)
   })
 
-  test('state palette covers PENDING/NEED_REVISION/APPROVED', () => {
-    for (const state of ['PENDING', 'NEED_REVISION', 'APPROVED']) {
+  test('state palette covers all four view states', () => {
+    for (const state of ['DEFAULT', 'IN_REVIEW', 'NEEDS_REVISION', 'APPROVED']) {
       expect(src).toMatch(new RegExp(`${state}:`))
     }
+  })
+
+  test('accepts a ChapterViewState prop (always rendered, state-driven)', () => {
+    expect(src).toMatch(/state: ChapterViewState/)
   })
 
   test('red review-feedback button follows the Figma spec', () => {

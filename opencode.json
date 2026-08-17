@@ -20,9 +20,5 @@
       "enabled": true
     }
   },
-  "plugin": [
-    "opencode-helicone-session",
-    "psinetron-opencode-visualizer",
-    "@mohak34/opencode-notifier@latest"
-  ]
+  "plugin": ["@mohak34/opencode-notifier@latest"]
 }

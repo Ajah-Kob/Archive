@@ -39,8 +39,9 @@ model User {
   templates            Template[]
   capstoneArchives     CapstoneArchive[]
   milestoneSubmissions MilestoneSubmission[]
-  invitationsSent      Invitation[]          @relation("InvitationSender")
-  topicReviews         Topic[]               @relation("TopicReviewer")
+  invitationsSent              Invitation[]          @relation("InvitationSender")
+  topicReviews                 Topic[]               @relation("TopicReviewer")
+  milestoneSubmissionsReviewed MilestoneSubmission[] @relation("MilestoneSubmissionReviewer")
 
   @@index([email, deletedAt])
 }
@@ -326,6 +327,7 @@ model Milestone {
   updatedAt   DateTime              @updatedAt
   deletedAt   DateTime?
 
+  @@unique([groupId, chapter])
   @@index([groupId])
   @@index([capstoneId])
   @@index([deletedAt])
@@ -338,19 +340,23 @@ enum SubmissionStatus {
 }
 
 model MilestoneSubmission {
-  id          Int              @id @default(autoincrement())
-  milestoneId Int
-  milestone   Milestone        @relation(fields: [milestoneId], references: [id])
-  submittedBy Int
-  user        User             @relation(fields: [submittedBy], references: [id])
-  fileName    String
-  blobUrl     String
-  mimeType    String
-  size        Int
-  status      SubmissionStatus @default(PENDING)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  deletedAt   DateTime?
+  id           Int              @id @default(autoincrement())
+  milestoneId  Int
+  milestone    Milestone        @relation(fields: [milestoneId], references: [id])
+  submittedBy  Int
+  user         User             @relation(fields: [submittedBy], references: [id])
+  fileName     String
+  blobUrl      String
+  mimeType     String
+  size         Int
+  status       SubmissionStatus @default(PENDING)
+  reviewedAt   DateTime?
+  reviewNote   String?
+  reviewedById Int?
+  reviewedBy   User?            @relation("MilestoneSubmissionReviewer", fields: [reviewedById], references: [id])
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
 
   @@index([milestoneId])
   @@index([submittedBy])

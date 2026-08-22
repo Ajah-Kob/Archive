@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   FileText,
   History,
+  LayoutPanelLeft,
   Loader2,
   RotateCcw,
   X,
@@ -190,6 +191,21 @@ export function SubmissionDetailsDrawer({
                         {formatSize(submission.size)}
                       </p>
                       <div className="flex-1" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose()
+                          router.push(
+                            `/faculty/evaluation/${submission.id}`,
+                          )
+                        }}
+                        title="Open full review workspace"
+                        aria-label={`Open review workspace for ${submission.groupName} ${submission.chapter}`}
+                        className="flex items-center gap-[5px] h-[26px] px-[10px] bg-[#707dff] rounded-[7px] font-sans font-semibold text-[11px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-1 shrink-0"
+                      >
+                        <LayoutPanelLeft className="size-[11px]" strokeWidth={2.25} />
+                        Open Workspace
+                      </button>
                       <a
                         href={submission.blobUrl}
                         target="_blank"

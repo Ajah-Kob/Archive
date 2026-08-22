@@ -210,6 +210,24 @@ export type SubmissionViewStatus =
   | 'APPROVED'
   | 'SUPERSEDED'
 
+/** Submission metadata for the adviser document workspace. */
+export interface SubmissionMeta {
+  id: number
+  groupName: string
+  chapter: string
+  phase: 'CAPSTONE 1' | 'CAPSTONE 2'
+  submittedBy: string
+  dateSubmitted: string
+  fileName: string
+  blobUrl: string
+  mimeType: string
+  size: number
+  status: SubmissionViewStatus
+  reviewedBy?: string | null
+  reviewedAt?: string | null
+  reviewNote?: string | null
+}
+
 export interface ChapterVersionItem {
   id: number
   version: number

@@ -172,6 +172,80 @@ export async function getEvaluationVersions(submissionId: number) {
   }
 }
 
+export interface SubmissionDetail {
+  id: number
+  groupId: number
+  groupName: string
+  chapter: string
+  phase: 'CAPSTONE 1' | 'CAPSTONE 2'
+  dateSubmitted: string
+  submittedBy: string
+  fileName: string
+  blobUrl: string
+  mimeType: string
+  size: number
+  status: 'PENDING' | 'NEED_REVISION' | 'APPROVED'
+  reviewedBy: string | null
+  reviewedAt: string | null
+  reviewNote: string | null
+}
+
+// Single live submission of the adviser's assigned groups, with the metadata
+// the document workspace needs (header + Detail panel). Every hop in the
+// relation chain must be live (deletedAt: null) — soft-delete rule.
+export async function getSubmission(submissionId: number) {
+  const adviser = await requireAdviserRow()
+  if (!adviser) return { ...unauthorized, payload: null }
+
+  try {
+    const submission = await prisma.milestoneSubmission.findFirst({
+      where: {
+        id: submissionId,
+        deletedAt: null,
+        milestone: {
+          deletedAt: null,
+          group: { deletedAt: null, adviserId: adviser.id },
+        },
+      },
+      include: {
+        milestone: {
+          include: { group: { select: { id: true, groupName: true } } },
+        },
+        user: { select: { name: true } },
+        reviewedBy: { select: { name: true } },
+      },
+    })
+    if (!submission) {
+      return { success: false, message: 'Submission not found.', payload: null }
+    }
+
+    const payload: SubmissionDetail = {
+      id: submission.id,
+      groupId: submission.milestone.group.id,
+      groupName: submission.milestone.group.groupName,
+      chapter:
+        CHAPTER_LABELS[submission.milestone.chapter] ?? submission.milestone.chapter,
+      phase:
+        submission.milestone.phase === 'CAPSTONE_2' ? 'CAPSTONE 2' : 'CAPSTONE 1',
+      dateSubmitted: submission.createdAt.toISOString(),
+      submittedBy: submission.user.name,
+      fileName: submission.fileName,
+      blobUrl: submission.blobUrl,
+      mimeType: submission.mimeType,
+      size: submission.size,
+      status: submission.status,
+      reviewedBy: submission.reviewedBy?.name ?? null,
+      reviewedAt: submission.reviewedAt ? submission.reviewedAt.toISOString() : null,
+      reviewNote: submission.reviewNote,
+    }
+
+    return { success: true, message: '', payload }
+  } catch (error) {
+    console.error('[getSubmission | Error]:', error)
+    return { success: false, message: 'Failed to load submission.', payload: null }
+  }
+}
+
 // Adviser reviews the current submission of an assigned group's chapter.
 // Only the live (non-soft-deleted) row is reviewable; the write is a
 // conditional updateMany so a concurrent resubmit that soft-deleted the row
@@ -185,12 +259,6 @@ export async function reviewSubmission(
   if (!adviser) return { ...unauthorized }
 
   const trimmedNote = note?.trim() ?? ''
-  if (decision === 'NEED_REVISION' && !trimmedNote) {
-    return {
-      success: false,
-      message: 'Feedback is required when requesting revisions.',
-    }
-  }
 
   try {
     const submission = await prisma.milestoneSubmission.findFirst({
@@ -231,7 +299,7 @@ export async function reviewSubmission(
       where: { id: submission.id, deletedAt: null },
       data: {
         status: decision,
-        reviewNote: decision === 'NEED_REVISION' ? trimmedNote : null,
+        reviewNote: decision === 'NEED_REVISION' ? trimmedNote || null : null,
         reviewedById: adviser.faculty.userId,
         reviewedAt: new Date(),
       },

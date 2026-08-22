@@ -20,5 +20,6 @@
       "enabled": true
     }
   },
-  "plugin": ["@mohak34/opencode-notifier@latest"]
+  "plugin": ["@mohak34/opencode-notifier@latest"],
+  "lsp": true
 }

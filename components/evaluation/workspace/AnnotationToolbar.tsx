@@ -91,8 +91,10 @@ export function AnnotationToolbar({
   }, [api, onActiveToolChange])
 
   function selectTool(tool: ToolId | null) {
-    onActiveToolChange(tool)
-    api?.setActiveTool(tool)
+    // Clicking the already-active tool toggles it off (back to the cursor).
+    const next = activeTool === tool && tool !== null ? null : tool
+    onActiveToolChange(next)
+    api?.setActiveTool(next)
   }
 
   function deleteSelected() {

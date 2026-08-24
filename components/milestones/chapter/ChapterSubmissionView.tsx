@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ChapterSubmissionPayload } from '@/types/milestones'
 import { StatusCallout } from './StatusCallout'
 import { UploadDropzone } from './UploadDropzone'
 import { SubmissionHistory } from './SubmissionHistory'
-import { ReviewFeedbackModal } from './ReviewFeedbackModal'
 
 export function ChapterSubmissionView({
   payload,
@@ -14,7 +13,6 @@ export function ChapterSubmissionView({
   payload: ChapterSubmissionPayload
 }) {
   const router = useRouter()
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   useEffect(() => {
     const syncFromServer = () => {
@@ -34,12 +32,17 @@ export function ChapterSubmissionView({
   const refresh = () => router.refresh()
 
   return (
-    <div className="flex flex-col gap-[16px]">
+    <div className="flex min-h-0 flex-1 flex-col gap-[16px]">
       <StatusCallout
         state={payload.state}
         chapterLabel={payload.chapter.label}
         current={payload.current}
-        onReviewFeedback={() => setFeedbackOpen(true)}
+        onReviewFeedback={
+          payload.current
+            ? () =>
+                router.push(`/student/milestone/review/${payload.current!.id}`)
+            : undefined
+        }
       />
 
       <UploadDropzone
@@ -53,14 +56,8 @@ export function ChapterSubmissionView({
         onSubmitted={refresh}
       />
 
+      {/* Fills the remaining page height; its rows scroll internally. */}
       <SubmissionHistory history={payload.history} />
-
-      {feedbackOpen && payload.current && (
-        <ReviewFeedbackModal
-          item={payload.current}
-          onClose={() => setFeedbackOpen(false)}
-        />
-      )}
     </div>
   )
 }

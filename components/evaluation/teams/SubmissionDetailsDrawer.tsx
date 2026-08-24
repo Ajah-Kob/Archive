@@ -2,16 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import {
   CalendarDays,
-  Check,
   ClipboardCheck,
   FileText,
   History,
   LayoutPanelLeft,
-  Loader2,
-  RotateCcw,
   X,
 } from 'lucide-react'
 import type {
@@ -19,10 +15,7 @@ import type {
   EvaluationVersion,
   EvaluationVersionsPayload,
 } from '@/lib/actions/evaluation'
-import {
-  getEvaluationVersions,
-  reviewSubmission,
-} from '@/lib/actions/evaluation'
+import { getEvaluationVersions } from '@/lib/actions/evaluation'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
 import type { SubmissionViewStatus } from '@/types/milestones'
 
@@ -70,12 +63,6 @@ export function SubmissionDetailsDrawer({
   const router = useRouter()
   const [detail, setDetail] = useState<EvaluationVersionsPayload | null>(null)
   const [loading, setLoading] = useState(false)
-  const [reviewOpen, setReviewOpen] = useState(false)
-  const [reviewMode, setReviewMode] = useState<'approve' | 'revision' | null>(
-    null,
-  )
-  const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
 
   const loadVersions = useCallback(async (submissionId: number) => {
     const res = await getEvaluationVersions(submissionId)
@@ -86,37 +73,8 @@ export function SubmissionDetailsDrawer({
     if (!submission) return
     setLoading(true)
     setDetail(null)
-    setReviewOpen(false)
-    setReviewMode(null)
-    setNote('')
-    setBusy(false)
     loadVersions(submission.id).finally(() => setLoading(false))
   }, [submission, loadVersions])
-
-  async function submitReview(decision: 'APPROVED' | 'NEED_REVISION') {
-    if (!submission) return
-    if (decision === 'NEED_REVISION' && !note.trim()) {
-      toast.error('Feedback is required when requesting revisions.')
-      return
-    }
-    setBusy(true)
-    const res = await reviewSubmission(
-      submission.id,
-      decision,
-      note.trim() || null,
-    )
-    setBusy(false)
-    if (res.success) {
-      toast.success(res.message)
-      setReviewOpen(false)
-      setReviewMode(null)
-      setNote('')
-      loadVersions(submission.id)
-      router.refresh()
-    } else {
-      toast.error(res.message)
-    }
-  }
 
   const isOpen = submission != null
   const currentVersion = detail?.versions.find((v) => v.isCurrent)
@@ -141,7 +99,7 @@ export function SubmissionDetailsDrawer({
               Submission Details
             </p>
             <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pt-[4px]">
-              Review this chapter submission and request revisions if needed.
+              View submission details and version history.
             </p>
           </div>
           <button
@@ -190,33 +148,6 @@ export function SubmissionDetailsDrawer({
                       <p className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
                         {formatSize(submission.size)}
                       </p>
-                      <div className="flex-1" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose()
-                          router.push(
-                            `/faculty/evaluation/${submission.id}`,
-                          )
-                        }}
-                        title="Open full review workspace"
-                        aria-label={`Open review workspace for ${submission.groupName} ${submission.chapter}`}
-                        className="flex items-center gap-[5px] h-[26px] px-[10px] bg-[#707dff] rounded-[7px] font-sans font-semibold text-[11px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-1 shrink-0"
-                      >
-                        <LayoutPanelLeft className="size-[11px]" strokeWidth={2.25} />
-                        Open Workspace
-                      </button>
-                      <a
-                        href={submission.blobUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="View current document"
-                        aria-label={`View ${submission.fileName} (opens in new tab)`}
-                        className="flex items-center gap-[5px] h-[26px] px-[10px] bg-white border border-[#e8ebf8] rounded-[7px] font-sans font-semibold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] shrink-0"
-                      >
-                        <FileText className="size-[11px]" />
-                        View
-                      </a>
                     </div>
                   </div>
                 </div>
@@ -291,11 +222,11 @@ export function SubmissionDetailsDrawer({
                             </p>
                           </div>
                           <a
-                            href={version.blobUrl}
+                            href={`/faculty/evaluation/${version.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title="View document"
-                            aria-label={`View ${version.fileName} (opens in new tab)`}
+                            title="Open this version in its own workspace (new tab)"
+                            aria-label={`Open version ${version.version} of ${version.fileName} in a new workspace tab`}
                             className="flex items-center gap-[5px] h-[26px] px-[10px] bg-white border border-[#e8ebf8] rounded-[7px] font-sans font-semibold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] shrink-0"
                           >
                             <FileText className="size-[11px]" />
@@ -324,101 +255,40 @@ export function SubmissionDetailsDrawer({
                 </div>
               </div>
 
-              <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-[10px] pb-[4px]">
-                {!reviewOpen ? (
+              {/* Primary action — verdicts happen in the workspace only, and
+                  only while the submission is still PENDING. Finalized
+                  submissions get a read-only "View Evaluation" path to the
+                  locked workspace (committed annotations, no editing). */}
+              {currentVersion && (
+                <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-[10px] pb-[4px]">
                   <button
                     type="button"
                     onClick={() => {
-                      setReviewOpen(true)
-                      setReviewMode(null)
-                      setNote('')
+                      onClose()
+                      router.push(`/faculty/evaluation/${submission.id}`)
                     }}
-                    title="Evaluate current document"
-                    className="flex items-center justify-center gap-[8px] w-full h-[40px] rounded-[10px] bg-[#16a34a] font-sans font-bold text-[13px] text-white hover:bg-[#15803d] transition-colors"
+                    title={
+                      currentVersion.status === 'PENDING'
+                        ? 'Evaluate Document'
+                        : 'View Evaluation'
+                    }
+                    className={`flex items-center justify-center gap-[8px] w-full h-[40px] rounded-[10px] font-sans font-bold text-[13px] text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 outline-none ${
+                      currentVersion.status === 'PENDING'
+                        ? 'bg-[#16a34a] hover:bg-[#15803d] focus-visible:ring-[rgba(22,163,74,0.4)]'
+                        : 'bg-[#707dff] hover:bg-[#5565ff] focus-visible:ring-[#707dff]'
+                    }`}
                   >
-                    <ClipboardCheck className="size-[16px]" strokeWidth={2.25} />
-                    Evaluate Current Document
+                    {currentVersion.status === 'PENDING' ? (
+                      <ClipboardCheck className="size-[16px]" strokeWidth={2.25} />
+                    ) : (
+                      <LayoutPanelLeft className="size-[15px]" strokeWidth={2.25} />
+                    )}
+                    {currentVersion.status === 'PENDING'
+                      ? 'Evaluate Document'
+                      : 'View Evaluation'}
                   </button>
-                ) : reviewMode === 'revision' ? (
-                  <div className="border border-[#eceef8] rounded-[10px] bg-white p-[14px] flex flex-col gap-[10px] shadow-[0_8px_24px_rgba(112,125,255,0.12)]">
-                    <p className="font-sans font-bold text-[12.5px] leading-[18.75px] text-[#3d4566]">
-                      Request Revisions
-                    </p>
-                    <label className="font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382]">
-                      Revision note <span className="text-[#e11d48]">*</span>
-                    </label>
-                    <textarea
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      rows={3}
-                      maxLength={500}
-                      placeholder="Explain what the group needs to revise…"
-                      className="w-full px-[12px] py-[9px] bg-white border border-[#e8ebf8] rounded-[8px] font-sans font-medium text-[12.5px] leading-[18.75px] text-[#3d4566] outline-none focus:border-[rgba(112,125,255,0.5)] transition-colors resize-none"
-                    />
-                    <div className="flex items-center justify-end gap-[8px]">
-                      <button
-                        type="button"
-                        onClick={() => setReviewMode(null)}
-                        disabled={busy}
-                        className="h-[32px] px-[12px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors disabled:opacity-60"
-                      >
-                        Back
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => submitReview('NEED_REVISION')}
-                        disabled={busy || !note.trim()}
-                        className="flex items-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[11px] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {busy ? (
-                          <Loader2 className="size-[13px] animate-spin" />
-                        ) : (
-                          <RotateCcw className="size-[13px]" />
-                        )}
-                        Send Revision Request
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border border-[#eceef8] rounded-[10px] bg-white p-[14px] flex flex-col gap-[10px] shadow-[0_8px_24px_rgba(112,125,255,0.12)]">
-                    <p className="font-sans font-bold text-[12.5px] leading-[18.75px] text-[#3d4566]">
-                      Evaluate Current Document
-                    </p>
-                    <div className="flex items-center gap-[8px]">
-                      <button
-                        type="button"
-                        onClick={() => submitReview('APPROVED')}
-                        disabled={busy}
-                        className="flex-1 flex items-center justify-center gap-[6px] h-[36px] rounded-[9px] bg-[#16a34a] font-sans font-bold text-[12px] text-white hover:bg-[#15803d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {busy ? (
-                          <Loader2 className="size-[13px] animate-spin" />
-                        ) : (
-                          <Check className="size-[13px]" strokeWidth={2.5} />
-                        )}
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setReviewMode('revision')}
-                        disabled={busy}
-                        className="flex-1 flex items-center justify-center gap-[6px] h-[36px] rounded-[9px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[12px] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        <RotateCcw className="size-[13px]" />
-                        Request Revisions
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setReviewOpen(false)}
-                      disabled={busy}
-                      className="self-center font-sans font-semibold text-[11px] text-[#9ea8c6] hover:text-[#5a6382] transition-colors disabled:opacity-60"
-                    >
-                      Cancel review
-                    </button>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>

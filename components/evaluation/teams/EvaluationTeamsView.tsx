@@ -1,19 +1,63 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, ClipboardCheck, FileText, Search } from 'lucide-react'
 import type { EvaluationItem } from '@/lib/actions/evaluation'
 import { SubmissionDetailsDrawer } from './SubmissionDetailsDrawer'
 
-const GRID_COLS = 'grid-cols-[2fr_0.8fr_0.6fr_0.6fr_0.4fr]'
+const GRID_COLS = 'grid-cols-[2fr_0.8fr_0.6fr_0.6fr_0.7fr_0.55fr]'
 
 type SortKey = 'groupName' | 'chapter' | 'submittedBy' | 'dateSubmitted'
+
+type StatusFilter = 'all' | 'PENDING' | 'NEED_REVISION' | 'APPROVED'
 
 const SORT_LABELS: Record<SortKey, string> = {
   groupName: 'Team',
   chapter: 'Chapter',
   submittedBy: 'Submitted by',
   dateSubmitted: 'Date',
+}
+
+const CHAPTER_OPTIONS = [
+  'Chapter 1',
+  'Chapter 2',
+  'Chapter 3',
+  'Chapter 4',
+  'Chapter 5',
+] as const
+
+const STATUS_FILTER_OPTIONS: ReadonlyArray<{
+  value: StatusFilter
+  label: string
+}> = [
+  { value: 'all', label: 'All Status' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'NEED_REVISION', label: 'Need Revision' },
+  { value: 'APPROVED', label: 'Approved' },
+]
+
+/** Pill badge for the Teams table — labels per the evaluation spec. */
+const TEAM_STATUS_STYLES = {
+  PENDING: 'bg-[rgba(112,125,255,0.07)] border-[rgba(112,125,255,0.2)] text-[#707dff]',
+  NEED_REVISION:
+    'bg-[rgba(245,158,11,0.07)] border-[rgba(245,158,11,0.2)] text-[#f59e0b]',
+  APPROVED: 'bg-[rgba(22,163,74,0.07)] border-[rgba(22,163,74,0.2)] text-[#16a34a]',
+} as const
+
+function TeamsStatusBadge({ status }: { status: EvaluationItem['status'] }) {
+  const labels = {
+    PENDING: 'Pending',
+    NEED_REVISION: 'Need Revision',
+    APPROVED: 'Approved',
+  } as const
+  return (
+    <span
+      className={`inline-flex items-center rounded-[7px] border px-[9px] py-[2px] text-[11px] font-bold leading-[16px] ${TEAM_STATUS_STYLES[status]}`}
+    >
+      {labels[status]}
+    </span>
+  )
 }
 
 function SortHeader({
@@ -49,6 +93,83 @@ function SortHeader({
   )
 }
 
+interface FilterOption {
+  value: string
+  label: string
+}
+
+/**
+ * Self-contained dropdown filter (trigger + menu + click-outside close).
+ * Clones the pill-dropdown markup previously inlined for the team filter so
+ * the toolbar can host several filters without duplicated state wiring.
+ */
+function FilterDropdown({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  value: string
+  options: ReadonlyArray<FilterOption>
+  onChange: (value: string) => void
+  ariaLabel: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedLabel =
+    options.find((o) => o.value === value)?.label ?? options[0]?.label ?? ''
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        onClick={() => setOpen(!open)}
+        className="flex gap-[7px] items-center h-[37.5px] px-[14px] py-[9px] bg-[#f4f5fc] border border-[#dddff0] rounded-[9px] font-sans font-semibold text-[13px] text-[#5a6382]"
+      >
+        {selectedLabel}
+        <ChevronDown className="size-[13px]" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-10 pt-1">
+          <div className="bg-white border border-[#eceef8] rounded-[10px] w-[168px] py-1 shadow-[0_8px_24px_rgba(112,125,255,0.14),0_2px_6px_rgba(0,0,0,0.06)]">
+            {options.map((option, index) => (
+              <div key={option.value}>
+                {index > 0 && index === 1 && (
+                  <div className="mx-[10px] h-px bg-[#f0f2fa]" />
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value)
+                    setOpen(false)
+                  }}
+                  className={`w-full text-left px-[14px] py-[9px] font-sans font-semibold text-[13px] hover:bg-[#fafbff] transition-colors ${
+                    value === option.value ? 'text-[#707dff]' : 'text-[#3d4566]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
@@ -68,23 +189,17 @@ interface EvaluationTeamsViewProps {
 }
 
 export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [filterOpen, setFilterOpen] = useState(false)
+  const [teamFilter, setTeamFilter] = useState('all')
+  // The active table lists PENDING submissions only; archived evaluations
+  // (APPROVED / NEED_REVISION) surface through this filter ("All Status"
+  // includes them).
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('PENDING')
+  const [chapterFilter, setChapterFilter] = useState('all')
   const [sortField, setSortField] = useState<SortKey>('dateSubmitted')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [detailsTarget, setDetailsTarget] = useState<EvaluationItem | null>(null)
-  const filterRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
-        setFilterOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   const handleSort = (field: SortKey) => {
     if (sortField !== field) {
@@ -95,15 +210,28 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
     }
   }
 
-  const groupNames = useMemo(
-    () => Array.from(new Set(items.map((i) => i.groupName))),
-    [items],
+  const teamOptions = useMemo<FilterOption[]>(() => {
+    const names = Array.from(new Set(items.map((i) => i.groupName)))
+    return [
+      { value: 'all', label: 'All Teams' },
+      ...names.map((name) => ({ value: name, label: name })),
+    ]
+  }, [items])
+
+  const chapterOptions = useMemo<FilterOption[]>(
+    () => [
+      { value: 'all', label: 'All Chapters' },
+      ...CHAPTER_OPTIONS.map((chapter) => ({ value: chapter, label: chapter })),
+    ],
+    [],
   )
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
     const rows = items.filter((i) => {
-      if (filter !== 'all' && i.groupName !== filter) return false
+      if (statusFilter !== 'all' && i.status !== statusFilter) return false
+      if (chapterFilter !== 'all' && i.chapter !== chapterFilter) return false
+      if (teamFilter !== 'all' && i.groupName !== teamFilter) return false
       if (!term) return true
       return (
         i.groupName.toLowerCase().includes(term) ||
@@ -128,10 +256,7 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
     })
 
     return rows
-  }, [items, search, filter, sortField, sortDir])
-
-  const actionButtonClass =
-    'flex items-center justify-center size-[30px] rounded-[8px] border transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
+  }, [items, search, teamFilter, chapterFilter, statusFilter, sortField, sortDir])
 
   if (items.length === 0) {
     return (
@@ -165,56 +290,24 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
             />
           </div>
 
-          <div className="relative" ref={filterRef}>
-            <button
-              type="button"
-              onClick={() => setFilterOpen(!filterOpen)}
-              className="flex gap-[7px] items-center h-[37.5px] px-[14px] py-[9px] bg-[#f4f5fc] border border-[#dddff0] rounded-[9px] font-sans font-semibold text-[13px] text-[#5a6382]"
-            >
-              {filter === 'all' ? 'All Teams' : filter}
-              <ChevronDown className="size-[13px]" />
-            </button>
-            {filterOpen && (
-              <div className="absolute left-0 top-full z-10 pt-1">
-                <div className="bg-white border border-[#eceef8] rounded-[10px] w-[168px] py-1 shadow-[0_8px_24px_rgba(112,125,255,0.14),0_2px_6px_rgba(0,0,0,0.06)]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilter('all')
-                      setFilterOpen(false)
-                    }}
-                    className={`w-full text-left px-[14px] py-[9px] font-sans font-semibold text-[13px] hover:bg-[#fafbff] transition-colors ${
-                      filter === 'all' ? 'text-[#707dff]' : 'text-[#3d4566]'
-                    }`}
-                  >
-                    All Teams
-                  </button>
-                  {groupNames.length > 0 && (
-                    <>
-                      <div className="mx-[10px] h-px bg-[#f0f2fa]" />
-                      {groupNames.map((name) => (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => {
-                            setFilter(name)
-                            setFilterOpen(false)
-                          }}
-                          className={`w-full text-left px-[14px] py-[9px] font-sans font-semibold text-[13px] hover:bg-[#fafbff] transition-colors ${
-                            filter === name
-                              ? 'text-[#707dff]'
-                              : 'text-[#3d4566]'
-                          }`}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <FilterDropdown
+            value={teamFilter}
+            options={teamOptions}
+            onChange={setTeamFilter}
+            ariaLabel="Filter by team"
+          />
+          <FilterDropdown
+            value={chapterFilter}
+            options={chapterOptions}
+            onChange={setChapterFilter}
+            ariaLabel="Filter by chapter"
+          />
+          <FilterDropdown
+            value={statusFilter}
+            options={STATUS_FILTER_OPTIONS}
+            onChange={(v) => setStatusFilter(v as StatusFilter)}
+            ariaLabel="Filter by status"
+          />
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
@@ -231,6 +324,9 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
                 onSort={handleSort}
               />
             ))}
+            <span className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.6px] uppercase select-none">
+              Status
+            </span>
             <span>{/* Hidden Action Label */}</span>
           </div>
 
@@ -280,25 +376,35 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
                   </span>
                 </span>
 
+                <span className="min-w-0 pr-4">
+                  <TeamsStatusBadge status={item.status} />
+                </span>
+
                 <span className="flex items-center justify-end gap-[6px]">
-                  <button
-                    type="button"
-                    onClick={() => setDetailsTarget(item)}
-                    title="View Details"
-                    aria-label={`View details of ${item.groupName} ${item.chapter}`}
-                    className={`${actionButtonClass} bg-white border-[#e8ebf8] text-[#5a6382] hover:bg-gray-50`}
-                  >
-                    <FileText className="size-[15px]" strokeWidth={2.25} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDetailsTarget(item)}
-                    title="Evaluate"
-                    aria-label={`Evaluate ${item.groupName} ${item.chapter}`}
-                    className={`${actionButtonClass} bg-[rgba(34,197,94,0.08)] border-[rgba(34,197,94,0.25)] text-[#16a34a] hover:bg-[rgba(34,197,94,0.16)]`}
-                  >
-                    <ClipboardCheck className="size-[15px]" strokeWidth={2.25} />
-                  </button>
+                  {item.status === 'PENDING' ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(`/faculty/evaluation/${item.id}`)
+                      }
+                      title="Evaluate Document"
+                      aria-label={`Evaluate ${item.groupName} ${item.chapter}`}
+                      className="flex items-center gap-[5px] h-[28px] px-[11px] bg-[#707dff] rounded-[7px] font-sans font-semibold text-[11px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-1"
+                    >
+                      <ClipboardCheck className="size-[12px]" strokeWidth={2.25} />
+                      Evaluate Document
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDetailsTarget(item)}
+                      title="View Details"
+                      aria-label={`View details of ${item.groupName} ${item.chapter}`}
+                      className="flex items-center justify-center size-[30px] rounded-[8px] border bg-white border-[#e8ebf8] text-[#5a6382] hover:bg-gray-50 transition-colors"
+                    >
+                      <FileText className="size-[15px]" strokeWidth={2.25} />
+                    </button>
+                  )}
                 </span>
               </div>
             ))

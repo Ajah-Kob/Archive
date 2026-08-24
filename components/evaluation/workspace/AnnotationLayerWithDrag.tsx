@@ -8,12 +8,19 @@ import {
 import type { CustomAnnotationRendererProps } from '@embedpdf/plugin-annotation/react'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import type { PdfAnnotationObject } from '@embedpdf/models'
+import { getAnnotationSegments } from '@/components/evaluation/workspace/review-annotations'
 
 interface AnnotationLayerWithDragProps {
   /** Active document id — its annotations are rendered. */
   documentId: string
   /** Page index rendered by this layer. */
   pageIndex: number
+  /**
+   * Read-only mode (student workspace): annotations render and stay
+   * selectable, but the press-and-drag move surface is never mounted —
+   * annotations cannot be moved.
+   */
+  readOnly?: boolean
 }
 
 /**
@@ -22,11 +29,17 @@ interface AnnotationLayerWithDragProps {
  * idle on the same gesture), so unselected annotations could never be dragged
  * in one motion. The extra surface below makes press-and-drag move the
  * annotation immediately, without a prior click-to-select gesture.
+ *
+ * Ink and sticky-note (TEXT) annotations are single-rect — their
+ * getAnnotationSegments() is exactly their bounds, so the surface covers only
+ * the annotation itself.
  */
 const DRAGGABLE_TYPES = new Set<PdfAnnotationSubtype>([
   PdfAnnotationSubtype.HIGHLIGHT,
   PdfAnnotationSubtype.STRIKEOUT,
   PdfAnnotationSubtype.FREETEXT,
+  PdfAnnotationSubtype.INK,
+  PdfAnnotationSubtype.TEXT,
 ])
 
 /**
@@ -44,6 +57,9 @@ const DRAGGABLE_TYPES = new Set<PdfAnnotationSubtype>([
  *    stays mounted after selection (pointer capture keeps the gesture alive)
  *    and turns `pointer-events: none` so the plugin's own drag surface takes
  *    over for subsequent gestures.
+ * 3. Selection/hover outlines are NOT rendered here at all — AnnotationHover's
+ *    viewer-space overlay draws them (tight per-fragment boxes for text
+ *    markup) so hovering and selecting share one geometry pipeline.
  *
  * Renders the AnnotationLayer with the custom renderer — must live inside the
  * EmbedPDF tree (uses plugin hooks).
@@ -51,6 +67,7 @@ const DRAGGABLE_TYPES = new Set<PdfAnnotationSubtype>([
 export function AnnotationLayerWithDrag({
   documentId,
   pageIndex,
+  readOnly = false,
 }: AnnotationLayerWithDragProps) {
   const { plugin } = useAnnotationPlugin()
   const dragStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -66,82 +83,95 @@ export function AnnotationLayerWithDrag({
       onSelect,
     }: CustomAnnotationRendererProps<PdfAnnotationObject>) => {
       const type = annotation.type
-      const draggable = DRAGGABLE_TYPES.has(type)
+      const draggable = !readOnly && DRAGGABLE_TYPES.has(type)
 
-      const dragSurface = draggable ? (
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: isSelected ? 'none' : 'auto',
-            cursor: isSelected ? 'default' : 'move',
-            zIndex: 1,
-          }}
-          onPointerDown={(e) => {
-            // Select (or toggle with ctrl/meta) + stop propagation so the
-            // selection plugin never starts a text selection over the
-            // annotation — dragging an existing annotation moves it instead of
-            // duplicating its text.
-            onSelect?.(e)
-            if (!plugin) return
-            dragStartRef.current = { x: e.clientX, y: e.clientY }
-            plugin.startDrag(documentId, {
-              annotationIds: [annotation.id],
-              pageSize: { width: pageWidth, height: pageHeight },
-            })
-            e.currentTarget.setPointerCapture(e.pointerId)
-          }}
-          onPointerMove={(e) => {
-            const start = dragStartRef.current
-            if (!start || !plugin) return
-            // Screen delta → page delta (the plugin's drag API works in page
-            // coordinates; page rotation is 0 in this workspace).
-            plugin.updateDrag(documentId, {
-              x: (e.clientX - start.x) / scale,
-              y: (e.clientY - start.y) / scale,
-            })
-          }}
-          onPointerUp={(e) => {
-            if (!dragStartRef.current || !plugin) return
-            dragStartRef.current = null
-            plugin.commitDrag(documentId)
-            if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
-              e.currentTarget.releasePointerCapture(e.pointerId)
-            }
-          }}
-          onPointerCancel={(e) => {
-            if (!dragStartRef.current || !plugin) return
-            dragStartRef.current = null
-            plugin.cancelDrag(documentId)
-            if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
-              e.currentTarget.releasePointerCapture(e.pointerId)
-            }
-          }}
-        />
+      // One drag surface PER annotated fragment (getAnnotationSegments):
+      // text markup only captures the pointer over its actual quads, so
+      // unannotated text between/after fragments keeps normal hover + text
+      // selection for creating new annotations. FreeText (single segment =
+      // full rect) behaves exactly like the old full-box surface.
+      const dragSurfaces = draggable ? (
+        getAnnotationSegments(annotation).map((seg, i) => (
+          <div
+            key={i}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: (seg.origin.x - annotation.rect.origin.x) * scale,
+              top: (seg.origin.y - annotation.rect.origin.y) * scale,
+              width: seg.size.width * scale,
+              height: seg.size.height * scale,
+              pointerEvents: isSelected ? 'none' : 'auto',
+              cursor: isSelected ? 'default' : 'move',
+              zIndex: 1,
+            }}
+            onPointerDown={(e) => {
+              // Select (or toggle with ctrl/meta) + stop propagation so the
+              // selection plugin never starts a text selection over the
+              // annotation — dragging an existing annotation moves it instead of
+              // duplicating its text.
+              onSelect?.(e)
+              if (!plugin) return
+              dragStartRef.current = { x: e.clientX, y: e.clientY }
+              plugin.startDrag(documentId, {
+                annotationIds: [annotation.id],
+                pageSize: { width: pageWidth, height: pageHeight },
+              })
+              e.currentTarget.setPointerCapture(e.pointerId)
+            }}
+            onPointerMove={(e) => {
+              const start = dragStartRef.current
+              if (!start || !plugin) return
+              // Screen delta → page delta (the plugin's drag API works in page
+              // coordinates; page rotation is 0 in this workspace).
+              plugin.updateDrag(documentId, {
+                x: (e.clientX - start.x) / scale,
+                y: (e.clientY - start.y) / scale,
+              })
+            }}
+            onPointerUp={(e) => {
+              if (!dragStartRef.current || !plugin) return
+              dragStartRef.current = null
+              plugin.commitDrag(documentId)
+              if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+              }
+            }}
+            onPointerCancel={(e) => {
+              if (!dragStartRef.current || !plugin) return
+              dragStartRef.current = null
+              plugin.cancelDrag(documentId)
+              if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+              }
+            }}
+          />
+        ))
       ) : null
 
       return (
         <>
           {children}
-          {dragSurface}
+          {dragSurfaces}
         </>
       )
     },
-    [documentId, plugin],
+    [documentId, plugin, readOnly],
   )
 
   return (
     <AnnotationLayer
       documentId={documentId}
       pageIndex={pageIndex}
+      // The built-in outline hugs the union bounding /Rect, which for text
+      // markup includes unannotated text. Selection + hover outlines are drawn
+      // exclusively by AnnotationHover's viewer-space overlay (one geometry
+      // pipeline for both states), so the built-in border is made invisible.
+      // Its div stays mounted with the drag/double-click handlers attached.
       selectionOutline={{
-        color: '#707dff',
+        color: 'transparent',
         style: 'solid',
-        width: 1.5,
+        width: 0,
         offset: 2,
       }}
       customAnnotationRenderer={customAnnotationRenderer}

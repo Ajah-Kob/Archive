@@ -32,10 +32,16 @@ import {
 } from '@embedpdf/models'
 import type { PdfAnnotationObject } from '@embedpdf/models'
 import { WorkspacePanel } from '@/components/evaluation/workspace/WorkspacePanel'
+import { isReviewAnnotation } from '@/components/evaluation/workspace/review-annotations'
 
 interface CommentsPanelProps {
   /** Active document id from the headless DocumentManagerPluginPackage. */
   documentId: string
+  /**
+   * Read-only mode (student workspace): cards render contents only — no
+   * comment editor, no edit/delete actions. Jump-to-annotation still works.
+   */
+  readOnly?: boolean
   /** Annotation id whose comment editor should open focused (e.g. just created). */
   autoEditId?: string | null
   /** Annotation id whose comment card should be highlighted + scrolled into view. */
@@ -105,6 +111,7 @@ function getTypeMeta(type: PdfAnnotationObject['type']) {
 
 function CommentCard({
   comment,
+  readOnly = false,
   autoEdit = false,
   highlighted = false,
   onJump,
@@ -113,6 +120,8 @@ function CommentCard({
   onCancelEdit,
 }: {
   comment: CommentItem
+  /** Read-only (student workspace): no editor, no edit/delete actions. */
+  readOnly?: boolean
   /** Open the comment editor focused on mount (used for a just-created annotation). */
   autoEdit?: boolean
   /** Visually highlight the card + scroll it into view (e.g. annotation clicked). */
@@ -201,9 +210,14 @@ function CommentCard({
   // Single click jumps to the page; a second click within the window (double
   // click) edits the comment instead. The jump is deferred ~250ms so the
   // double-click can cancel it. While editing, the container click is inert so
-  // the textarea keeps focus.
+  // the textarea keeps focus. Read-only cards jump immediately — there is no
+  // edit gesture.
   function handleContainerClick() {
     if (editing) return
+    if (readOnly) {
+      onJump(comment)
+      return
+    }
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current)
       clickTimerRef.current = null
@@ -228,7 +242,9 @@ function CommentCard({
             : 'border-[#eceef8] hover:border-[rgba(112,125,255,0.5)] hover:bg-[#f4f6ff] hover:shadow-[0_2px_8px_rgba(112,125,255,0.12)]'
       }`}
     >
-      <div className="px-[14px] pt-[12px]">
+      {/* Read-only cards have no action footer — pad the body bottom so the
+          comment text doesn't sit flush against the card border. */}
+      <div className={`px-[14px] pt-[12px] ${readOnly ? 'pb-[12px]' : ''}`}>
         <div className="flex items-center gap-[8px] min-w-px">
           <span className="flex items-center justify-center size-[26px] rounded-[8px] bg-[#f4f6ff] border border-[#e5e8ff] shrink-0">
             <TypeIcon className="size-[13px] text-[#707dff]" strokeWidth={2} />
@@ -252,7 +268,7 @@ function CommentCard({
             {comment.author}
           </p>
         </div>
-        {editing && comment.canComment ? (
+        {editing && comment.canComment && !readOnly ? (
           <div className="pt-[8px]" onClick={(e) => e.stopPropagation()}>
             <textarea
               value={draft}
@@ -281,82 +297,85 @@ function CommentCard({
         )}
       </div>
 
-      {comment.canComment ? (
-        <div className="px-[10px] pt-[6px] pb-[8px]">
-          {editing ? (
-            <div
-              className="flex items-center justify-end gap-[6px]"
-              onClick={(e) => e.stopPropagation()}
+      {/* Action footer — reviewers only. Read-only cards render no actions. */}
+      {!readOnly ? (
+        comment.canComment ? (
+          <div className="px-[10px] pt-[6px] pb-[8px]">
+            {editing ? (
+              <div
+                className="flex items-center justify-end gap-[6px]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(false)
+                    onCancelEdit(comment)
+                  }}
+                  title="Cancel"
+                  className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382] transition-all hover:bg-gray-50 hover:text-[#3d4566] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!draft.trim()}
+                  title="Save comment (Enter)"
+                  className="flex items-center gap-[5px] h-[26px] px-[10px] rounded-[7px] bg-[#707dff] font-sans font-bold text-[11px] leading-[16px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save className="size-[12px]" strokeWidth={2} />
+                  Save
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-end gap-[6px]">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEditing(true)
+                  }}
+                  title={comment.contents ? 'Edit comment' : 'Add a comment'}
+                  className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382] transition-all hover:bg-gray-50 hover:text-[#3d4566] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
+                >
+                  <Pencil className="size-[12px]" strokeWidth={2} />
+                  {comment.contents ? 'Edit' : 'Add comment'}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete(comment)
+                  }}
+                  title="Delete annotation"
+                  aria-label={`Delete ${label} annotation`}
+                  className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#e11d48] transition-all hover:bg-[rgba(225,29,72,0.08)] hover:text-[#c81e45] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
+                >
+                  <Trash2 className="size-[12px]" strokeWidth={2} />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-end px-[10px] pb-[8px]">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(comment)
+              }}
+              title="Delete annotation"
+              aria-label={`Delete ${label} annotation`}
+              className="flex items-center gap-[5px] h-[24px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#e11d48] transition-all hover:bg-[rgba(225,29,72,0.08)] hover:text-[#c81e45] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setEditing(false)
-                  onCancelEdit(comment)
-                }}
-                title="Cancel"
-                className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382] transition-all hover:bg-gray-50 hover:text-[#3d4566] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!draft.trim()}
-                title="Save comment (Enter)"
-                className="flex items-center gap-[5px] h-[26px] px-[10px] rounded-[7px] bg-[#707dff] font-sans font-bold text-[11px] leading-[16px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Save className="size-[12px]" strokeWidth={2} />
-                Save
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-end gap-[6px]">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setEditing(true)
-                }}
-                title={comment.contents ? 'Edit comment' : 'Add a comment'}
-                className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382] transition-all hover:bg-gray-50 hover:text-[#3d4566] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
-              >
-                <Pencil className="size-[12px]" strokeWidth={2} />
-                {comment.contents ? 'Edit' : 'Add comment'}
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete(comment)
-                }}
-                title="Delete annotation"
-                aria-label={`Delete ${label} annotation`}
-                className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#e11d48] transition-all hover:bg-[rgba(225,29,72,0.08)] hover:text-[#c81e45] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
-              >
-                <Trash2 className="size-[12px]" strokeWidth={2} />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex items-center justify-end px-[10px] pb-[8px]">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(comment)
-            }}
-            title="Delete annotation"
-            aria-label={`Delete ${label} annotation`}
-            className="flex items-center gap-[5px] h-[24px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#e11d48] transition-all hover:bg-[rgba(225,29,72,0.08)] hover:text-[#c81e45] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
-          >
-            <Trash2 className="size-[12px]" strokeWidth={2} />
-            Delete
-          </button>
-        </div>
-      )}
+              <Trash2 className="size-[12px]" strokeWidth={2} />
+              Delete
+            </button>
+          </div>
+        )
+      ) : null}
     </div>
   )
 }
@@ -383,6 +402,7 @@ function CommentCard({
  */
 export function CommentsPanel({
   documentId,
+  readOnly = false,
   autoEditId = null,
   highlightId = null,
   onClose,
@@ -400,6 +420,9 @@ export function CommentsPanel({
         const tracked = state.byUid[uid]
         if (!tracked) continue
         const obj = tracked.object
+        // Native document annotations (hyperlinks are /Link annotations) are
+        // not reviewer feedback — they never appear as comment cards.
+        if (!isReviewAnnotation(obj)) continue
         // `created` is not guaranteed to be a Date (string/number/undefined) —
         // normalize to a numeric timestamp for stable sorting.
         const created =
@@ -465,7 +488,11 @@ export function CommentsPanel({
   return (
     <WorkspacePanel
       title="Comments"
-      subtitle="Annotations on this document. Click one to jump to its page."
+      subtitle={
+        readOnly
+          ? 'Reviewer annotations on this document. Click one to jump to its page.'
+          : 'Annotations on this document. Click one to jump to its page.'
+      }
       count={comments.length}
       onClose={onClose}
     >
@@ -490,7 +517,8 @@ export function CommentsPanel({
             <CommentCard
               key={comment.id}
               comment={comment}
-              autoEdit={comment.id === autoEditId}
+              readOnly={readOnly}
+              autoEdit={!readOnly && comment.id === autoEditId}
               highlighted={comment.id === highlightId}
               onJump={handleJump}
               onDelete={handleDelete}

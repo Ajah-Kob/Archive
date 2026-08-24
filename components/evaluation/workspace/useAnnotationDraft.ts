@@ -6,6 +6,7 @@ import { useAnnotation } from '@embedpdf/plugin-annotation/react'
 import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { deserializeAnnotations, serializeAnnotations } from '@/lib/annotations-serializer'
 import { saveAnnotationDraft } from '@/lib/actions/annotations'
+import { isReviewAnnotation } from '@/components/evaluation/workspace/review-annotations'
 
 /** Debounce window after the last committed annotation change (ms). */
 const DEBOUNCE_MS = 1500
@@ -51,6 +52,11 @@ export interface UseAnnotationDraftOptions {
    * Pending annotations are never persisted until the user saves a comment.
    */
   excludeIdsRef?: RefObject<Set<string>>
+  /**
+   * When false (student read-only mode) only auto-save is disabled. Hydration
+   * still runs — saved reviewer annotations must render for the student too.
+   */
+  enabled?: boolean
 }
 
 /**
@@ -68,6 +74,7 @@ export function useAnnotationDraft({
   documentId,
   initialAnnotations,
   excludeIdsRef,
+  enabled = true,
 }: UseAnnotationDraftOptions): { status: AnnotationDraftStatus } {
   const { provides } = useAnnotation(documentId)
 
@@ -103,6 +110,10 @@ export function useAnnotationDraft({
   // them again would push the same uids into `pages` a second time (the
   // reducer is NOT idempotent). So we wait for `loaded`, then import only
   // annotations that are NOT already in the store.
+  //
+  // Runs in BOTH modes: hydration is a read — students need the reviewer's
+  // committed annotations rendered just as much as the adviser does. Only
+  // auto-save (below) is gated by `enabled`.
   useEffect(() => {
     if (!provides || hydratedRef.current) return
 
@@ -144,7 +155,7 @@ export function useAnnotationDraft({
 
   // Debounced auto-save: exportAnnotations → serializeAnnotations → saveAnnotationDraft.
   useEffect(() => {
-    if (!ready) return
+    if (!enabled || !ready) return
     const scope = providesRef.current
     if (!scope) return
 
@@ -157,9 +168,20 @@ export function useAnnotationDraft({
             setStatus('idle')
             return
           }
+          // Native document annotations (hyperlinks are /Link annotations,
+          // Word exports add squares/lines…) live in the same store but are
+          // NOT reviewer feedback — persisting them would make a first-time
+          // submission "contain comments". Keep only the review tools.
+          const reviewItems = items.filter((item) =>
+            isReviewAnnotation(item.annotation),
+          )
+          if (reviewItems.length === 0) {
+            setStatus('idle')
+            return
+          }
           // Dedupe before persisting so a store that accumulated duplicates
           // (e.g. from a hot-reload remount) heals itself on the next save.
-          const unique = dedupeAnnotations(items)
+          const unique = dedupeAnnotations(reviewItems)
           if (unique.length === 0) {
             setStatus('idle')
             return
@@ -211,7 +233,7 @@ export function useAnnotationDraft({
         timerRef.current = null
       }
     }
-  }, [ready, documentId, submissionId])
+  }, [enabled, ready, documentId, submissionId])
 
   return { status }
 }

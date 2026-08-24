@@ -18,11 +18,9 @@ import type { LucideIcon } from 'lucide-react'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
+import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
 import {
-  DocumentContent,
   DocumentManagerPluginPackage,
-  useDocumentManagerCapability,
-  useOpenDocuments,
 } from '@embedpdf/plugin-document-manager/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
@@ -43,10 +41,7 @@ import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import type { FreeTextClickBehavior } from '@embedpdf/plugin-annotation'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import { serializeAnnotations } from '@/lib/annotations-serializer'
-import type { EvaluationVersion } from '@/lib/actions/evaluation'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
-import { WorkspaceTabBar } from '@/components/evaluation/workspace/WorkspaceTabBar'
-import type { WorkspaceTab } from '@/components/evaluation/workspace/WorkspaceTabBar'
 import { AnnotationToolbar } from '@/components/evaluation/workspace/AnnotationToolbar'
 import type { ToolId } from '@/components/evaluation/workspace/AnnotationToolbar'
 import { ToolSettingsPanel } from '@/components/evaluation/workspace/ToolSettingsPanel'
@@ -58,24 +53,33 @@ import { DisableTextSelection } from '@/components/evaluation/workspace/DisableT
 import { UndoRedo } from '@/components/evaluation/workspace/UndoRedo'
 import { ZoomControl } from '@/components/evaluation/workspace/ZoomControl'
 import { CommentsPanel } from '@/components/evaluation/workspace/CommentsPanel'
-import { VersionDrawer } from '@/components/evaluation/workspace/VersionDrawer'
 import { VerdictConfirmModal } from '@/components/evaluation/workspace/VerdictConfirmModal'
 import type { AnnotationSummary } from '@/components/evaluation/workspace/VerdictConfirmModal'
 import { useAnnotationDraft } from '@/components/evaluation/workspace/useAnnotationDraft'
 import type { AnnotationDraftStatus } from '@/components/evaluation/workspace/useAnnotationDraft'
+import { isReviewAnnotation } from '@/components/evaluation/workspace/review-annotations'
+import { VersionPanel } from '@/components/evaluation/workspace/VersionPanel'
+import type { StudentVersionListItem } from '@/lib/actions/student-review'
 import type { SubmissionMeta } from '@/types/milestones'
 
+/** Who is viewing the workspace: the adviser (full editing) or a student (strictly read-only). */
+export type WorkspaceMode = 'reviewer' | 'student'
+
 export interface DocumentWorkspaceProps {
-  /** Public Vercel Blob URL of the current submission's document. */
+  /** Viewer mode — student strips every editing affordance and write path. */
+  mode?: WorkspaceMode
+  /** Public Vercel Blob URL of the submission's document. */
   blobUrl: string
   /** Submission metadata for the header + Detail slide-over. */
   submission: SubmissionMeta
-  /** All versions of the chapter (current + previous) for the tab bar / Versions drawer. */
-  versions: EvaluationVersion[]
-  /** Saved annotation rows (serialized AnnotationTransferItem[]) for the current submission. */
+  /** Saved annotation rows (serialized AnnotationTransferItem[]) for this submission. */
   initialAnnotations: unknown[] | null
   /** Persistence status of the saved annotation row, if any. */
   draftStatus: 'DRAFT' | 'COMMITTED' | null
+  /** Version list for the student Version panel (student mode only). */
+  versions?: StudentVersionListItem[]
+  /** Back-link target (defaults to the adviser evaluations page). */
+  backHref?: string
 }
 
 /** Which right slide-over panel is open (if any). */
@@ -88,8 +92,8 @@ interface VerdictState {
   data: unknown | null
 }
 
-/** Stable document id for a version — matches the id passed to openDocumentUrl. */
-const versionDocumentId = (versionId: number) => `version-${versionId}`
+/** Stable document id for the single document open in this workspace. */
+const CURRENT_DOCUMENT_ID = 'submission-current'
 
 /**
  * Maps an annotation subtype to the summary key used by VerdictConfirmModal
@@ -106,6 +110,18 @@ const SUBTYPE_TO_SUMMARY_KEY: Partial<
   [PdfAnnotationSubtype.STRIKEOUT]: 'strikeout',
 }
 
+/**
+ * Maps an annotation subtype to the toolbar tool that creates it — used to
+ * activate the matching tool when an existing annotation is selected. Native
+ * TEXT (sticky note) has no toolbar tool, so it is intentionally absent.
+ */
+const SUBTYPE_TO_TOOL: Partial<Record<PdfAnnotationSubtype, ToolId>> = {
+  [PdfAnnotationSubtype.HIGHLIGHT]: 'highlight',
+  [PdfAnnotationSubtype.STRIKEOUT]: 'strikeout',
+  [PdfAnnotationSubtype.INK]: 'ink',
+  [PdfAnnotationSubtype.FREETEXT]: 'freeText',
+}
+
 /** Counts annotations per tool type from serialized AnnotationTransferItem[]. */
 function summarizeAnnotations(items: unknown[]): AnnotationSummary {
   const summary: AnnotationSummary = {}
@@ -119,60 +135,47 @@ function summarizeAnnotations(items: unknown[]): AnnotationSummary {
 }
 
 /**
- * Adviser document review workspace — the orchestrator that ties the whole
- * headless EmbedPDF review surface together (design spec 2026-08-18, Section 4).
+ * Adviser document review workspace — ONE specific document version per
+ * browser tab. Opening a different version navigates to its own workspace
+ * URL; there are no internal version tabs.
  *
- * Layout (top → bottom): browser-style version tab bar → header bar (back link
- * + group/chapter/status + annotation toolbar + Detail/Comments/Versions) →
- * full-width PDF viewer → sticky bottom action bar. Detail/Comments/Versions
- * open as right slide-over panels on demand.
+ * Layout (top → bottom): header bar (back link + group/chapter/status +
+ * annotation toolbar + Comments + verdict actions) → full-width PDF viewer.
+ * Comments opens as a right slide-over panel on demand.
  *
  * The ENTIRE layout lives inside a single `<EmbedPDF>` root so every child
- * (tab bar, header toolbar, panels) can use the plugin hooks
- * (`useAnnotation`, `useScroll`, `useDocumentManagerCapability`,
- * `useOpenDocuments`). The viewer is built inline here rather than reusing
- * `PdfViewer` (which owns its own EmbedPDF root) — nesting two providers would
- * create two independent plugin registries and break the shared context.
- *
- * Tab management is backed by the DocumentManagerPluginPackage multi-document
- * state: the current version is the default tab, opening a version from the
- * Versions drawer calls `openDocumentUrl` (adds a tab), switching tabs calls
- * `setActiveDocument`, and closing tabs calls `closeDocument` (the last tab is
- * guarded). The annotation draft auto-save is wired to the CURRENT version's
- * document (the submission being reviewed) — see WorkspaceLayout notes.
+ * (header toolbar, panels) can use the plugin hooks (`useAnnotation`,
+ * `useScroll`, ...). The annotation draft auto-save is wired to the
+ * submission's document scope.
  */
 export function DocumentWorkspace({
+  mode = 'reviewer',
   blobUrl,
   submission,
-  versions,
   initialAnnotations,
   draftStatus,
+  versions,
+  backHref,
 }: DocumentWorkspaceProps) {
+  const isStudent = mode === 'student'
   const { engine, isLoading, error } = usePdfiumEngine()
   const { data: session } = useSession()
 
   // The adviser's display name is stamped on every annotation they create.
   const annotationAuthor = session?.user?.name ?? 'Adviser'
 
-  // The current version is the default tab. Its document id is stable for the
-  // whole session so the annotation draft hook can key on it.
-  const currentVersion =
-    versions.find((v) => v.isCurrent) ?? versions[0] ?? null
-  const currentDocumentId = currentVersion
-    ? versionDocumentId(currentVersion.id)
-    : 'version-current'
-  const currentLabel = currentVersion ? `v${currentVersion.version}` : 'Current'
-
   // Plugin registration order matters — each plugin's dependencies must be
   // registered before it: document-manager → viewport → scroll → render →
-  // interaction-manager → selection → history → annotation. Mirrors PdfViewer
-  // but at the workspace level with multi-document support.
+  // interaction-manager → selection → history → annotation.
+  //
+  // In student (read-only) mode EVERY tool is registered with interaction
+  // overrides that disable drag/resize/rotate — otherwise a selected ink or
+  // sticky-note annotation can still be moved through the plugin's own
+  // drag surface even though our custom drag surfaces never mount.
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [
-          { url: blobUrl, documentId: currentDocumentId, name: currentLabel },
-        ],
+        initialDocuments: [{ url: blobUrl, documentId: CURRENT_DOCUMENT_ID }],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),
@@ -199,22 +202,50 @@ export function DocumentWorkspace({
           {
             id: 'highlight',
             behavior: { useAppearanceStream: false, selectAfterCreate: true },
-            interaction: { exclusive: false, isDraggable: true },
+            interaction: { exclusive: false, isDraggable: !isStudent },
           },
           {
             id: 'strikeout',
             behavior: { useAppearanceStream: false, selectAfterCreate: true },
-            interaction: { exclusive: false, isDraggable: true },
+            interaction: { exclusive: false, isDraggable: !isStudent },
           },
           {
             id: 'freeText',
             behavior: { editAfterCreate: false, selectAfterCreate: true },
             clickBehavior: { enabled: false } as FreeTextClickBehavior,
+            interaction: {
+              exclusive: false,
+              isDraggable: !isStudent,
+              isResizable: !isStudent,
+              isRotatable: false,
+            },
           },
+          // Read-only locks for tools without reviewer overrides above.
+          ...(isStudent
+            ? [
+                {
+                  id: 'ink',
+                  interaction: {
+                    exclusive: false,
+                    isDraggable: false,
+                    isResizable: false,
+                    isRotatable: false,
+                  },
+                },
+                {
+                  id: 'textComment',
+                  interaction: {
+                    exclusive: false,
+                    isDraggable: false,
+                    isResizable: false,
+                  },
+                },
+              ]
+            : []),
         ],
       }),
     ],
-    [blobUrl, currentDocumentId, currentLabel, annotationAuthor],
+    [blobUrl, annotationAuthor, isStudent],
   )
 
   if (error) {
@@ -244,12 +275,13 @@ export function DocumentWorkspace({
       <EmbedPDF engine={engine} plugins={plugins}>
         {({ activeDocumentId }) => (
           <WorkspaceLayout
+            mode={mode}
             activeDocumentId={activeDocumentId}
             submission={submission}
-            versions={versions}
             initialAnnotations={initialAnnotations}
             draftStatus={draftStatus}
-            currentDocumentId={currentDocumentId}
+            versions={versions}
+            backHref={backHref}
           />
         )}
       </EmbedPDF>
@@ -263,61 +295,48 @@ export function DocumentWorkspace({
  * function) so it does not remount on every parent render.
  */
 function WorkspaceLayout({
+  mode = 'reviewer',
   activeDocumentId,
   submission,
-  versions,
   initialAnnotations,
   draftStatus,
-  currentDocumentId,
+  versions,
+  backHref,
 }: {
+  mode?: WorkspaceMode
   activeDocumentId: string | null
   submission: SubmissionMeta
-  versions: EvaluationVersion[]
   initialAnnotations: unknown[] | null
   draftStatus: 'DRAFT' | 'COMMITTED' | null
-  currentDocumentId: string
+  versions?: StudentVersionListItem[]
+  backHref?: string
 }) {
+  const isStudent = mode === 'student'
   const router = useRouter()
   const viewerRef = useRef<HTMLDivElement>(null)
 
-  // --- Document manager (tabs) ---------------------------------------------
-  const { provides: dm } = useDocumentManagerCapability()
-  const dmRef = useRef(dm)
-  dmRef.current = dm
-
-  const openDocuments = useOpenDocuments()
-  const tabs: WorkspaceTab[] = useMemo(
-    () =>
-      openDocuments.map((doc) => ({
-        id: doc.id,
-        label: doc.name ?? 'Document',
-        isCurrent: doc.id === currentDocumentId,
-      })),
-    [openDocuments, currentDocumentId],
-  )
-
-  // --- Annotation draft auto-save ------------------------------------------
-  // Wired to the CURRENT version's document (the submission being reviewed),
-  // not the active tab. Annotations are persisted per submission row, and the
-  // server rejects saves for soft-deleted (previous) versions, so only the
-  // current document's scope may auto-save. The scope stays alive for the
-  // whole session (the last tab is guarded), so the hook hydrates the saved
-  // annotations exactly once — re-hydrating on tab switches would duplicate
-  // them (the annotation reducer is not idempotent).
+  // --- Annotation draft auto-save (REVIEWER ONLY) ---------------------------
+  // Wired to the submission's document scope. Annotations are persisted per
+  // submission row; the server rejects saves for soft-deleted (previous)
+  // versions, so only a live PENDING version can ever auto-save. Students
+  // never save — the hook is not even mounted in student mode.
   //
   // Freshly created highlight/strikeout annotations are tracked as "pending"
   // (no comment yet) and excluded from auto-save until a comment is submitted.
   const pendingCommentIdsRef = useRef<Set<string>>(new Set())
   const { status: liveDraftStatus } = useAnnotationDraft({
     submissionId: submission.id,
-    documentId: currentDocumentId,
+    documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
     excludeIdsRef: pendingCommentIdsRef,
+    enabled: !isStudent,
   })
 
-  // Whether the adviser has added any annotations on the current submission —
+  // Whether the adviser has added any annotations on this submission —
   // Request Revisions requires at least one annotation.
-  const { state: annotationState } = useAnnotation(currentDocumentId)
+  const { state: annotationState, provides: annotationApi } = useAnnotation(
+    CURRENT_DOCUMENT_ID,
+  )
   const hasAnnotations = Object.keys(annotationState.byUid).length > 0
 
   // Seed the bottom-bar status from the persisted row so an existing draft
@@ -362,6 +381,13 @@ function WorkspaceLayout({
     setPanel('comments')
   }
 
+  function handleDeselectAnnotation() {
+    annotationApi?.selectAnnotation(-1, '')
+    setOpenMenuId(null)
+  }
+
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+
   function handleActiveToolChange(tool: ToolId | null) {
     setActiveTool(tool)
     if (tool === 'highlight' || tool === 'strikeout') {
@@ -369,12 +395,38 @@ function WorkspaceLayout({
     }
   }
 
+  // Selecting an annotation activates its matching tool: the toolbar
+  // highlights it and the settings strip reads the annotation's own
+  // color/size (ToolSettingsPanel already prefers the selected object).
+  // Deselecting keeps the current tool — only a positive selection switches.
+  useEffect(() => {
+    const uid = annotationState.selectedUid
+    if (!uid) return
+    const type = annotationState.byUid[uid]?.object?.type
+    if (type === undefined) return
+    const tool = SUBTYPE_TO_TOOL[type as PdfAnnotationSubtype]
+    if (!tool || tool === activeTool) return
+    handleActiveToolChange(tool)
+    annotationApi?.setActiveTool(tool)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annotationState.selectedUid, annotationState.byUid])
+
   useEffect(() => {
     if (!annotationCapability) return
     const unsubscribe = annotationCapability.onAnnotationEvent((event) => {
       if (event.type !== 'create' || !event.committed) return
       // Only react to annotations on the active tab.
       if (event.documentId !== activeDocumentId) return
+
+      // Task: Ensure new annotations (especially pen/ink) are selectable
+      // and show the delete menu immediately.
+      // The plugin might not auto-select new annotations.
+      annotationApi?.selectAnnotation(
+        event.annotation.pageIndex,
+        event.annotation.id,
+      )
+      setOpenMenuId(event.annotation.id)
+
       const type = event.annotation.type
       if (
         type !== PdfAnnotationSubtype.HIGHLIGHT &&
@@ -423,60 +475,23 @@ function WorkspaceLayout({
     pendingCommentIdsRef.current.clear()
   }
 
-  function selectTab(id: string) {
-    dmRef.current?.setActiveDocument(id)
-  }
-
-  function closeTab(id: string) {
-    // Guard the last open tab — the workspace always keeps at least one.
-    if (tabs.length <= 1) return
-    dmRef.current?.closeDocument(id).wait(
-      () => {},
-      (error) => {
-        console.error('[DocumentWorkspace] closeDocument failed:', error)
-      },
-    )
-  }
-
-  function openVersion(version: EvaluationVersion) {
-    const id = versionDocumentId(version.id)
-    const cap = dmRef.current
-    if (!cap) return
-    // Already open — just switch to it.
-    if (cap.isDocumentOpen(id)) {
-      cap.setActiveDocument(id)
-      setPanel(null)
-      return
-    }
-    cap
-      .openDocumentUrl({
-        url: version.blobUrl,
-        documentId: id,
-        name: `v${version.version}`,
-        autoActivate: true,
-      })
-      .wait(
-        () => setPanel(null),
-        (error) => {
-          console.error('[DocumentWorkspace] openDocumentUrl failed:', error)
-        },
-      )
-  }
-
-  // Verdict flow: capture the CURRENT submission's annotations (the ones that
-  // will be committed to the submission row) as the serialized payload + a
-  // per-tool summary, then open the confirmation modal. Exporting the active
-  // tab instead would attach a previous version's annotations to the current
-  // submission — a data integrity bug.
+  // Verdict flow: capture THIS submission's annotations (the ones that will
+  // be committed to the submission row) as the serialized payload + a per-tool
+  // summary, then open the confirmation modal.
   async function openVerdict(decision: 'APPROVED' | 'NEED_REVISION') {
     const cap = annotationCapabilityRef.current
     let data: unknown = null
     let summary: AnnotationSummary = {}
     if (cap) {
-      await cap.exportAnnotations(undefined, currentDocumentId).wait(
+      await cap.exportAnnotations(undefined, CURRENT_DOCUMENT_ID).wait(
         (items) => {
-          if (items.length === 0) return
-          const serialized = serializeAnnotations(items)
+          // Native document annotations (hyperlinks etc.) share the store —
+          // only review-tool annotations may be committed to the submission.
+          const reviewItems = items.filter((item) =>
+            isReviewAnnotation(item.annotation),
+          )
+          if (reviewItems.length === 0) return
+          const serialized = serializeAnnotations(reviewItems)
           data = serialized
           summary = summarizeAnnotations(serialized)
         },
@@ -509,28 +524,25 @@ function WorkspaceLayout({
       {/* Heal duplicate annotation uids in the store (behavior-only) */}
       {activeDocumentId && <AnnotationDedupe documentId={activeDocumentId} />}
 
-      {/* Delete freeText annotations with empty contents (behavior-only) */}
-      {activeDocumentId && <AnnotationEmptyGuard documentId={activeDocumentId} />}
+      {/* Mutation behaviors — REVIEWER ONLY. Students never get a client-side
+          path that creates, edits, or deletes an annotation. */}
+      {!isStudent && activeDocumentId && (
+        <>
+          {/* Delete freeText annotations with empty contents (behavior-only) */}
+          <AnnotationEmptyGuard documentId={activeDocumentId} />
 
-      {/* Delete selected annotation on Delete/Backspace (behavior-only) */}
-      {activeDocumentId && <AnnotationDeleteKey documentId={activeDocumentId} />}
+          {/* Delete selected annotation on Delete/Backspace (behavior-only) */}
+          <AnnotationDeleteKey documentId={activeDocumentId} />
+        </>
+      )}
 
       {/* Disable cursor text selection/copying (highlight tools unaffected) */}
       {activeDocumentId && <DisableTextSelection documentId={activeDocumentId} />}
 
-      {/* Browser-style version tab bar (top) */}
-      <WorkspaceTabBar
-        tabs={tabs}
-        activeTabId={activeDocumentId}
-        onSelectTab={selectTab}
-        onCloseTab={closeTab}
-        onOpenVersions={() => setPanel('versions')}
-      />
-
       {/* Header bar: back + context | draft status | tools | zoom | undo/redo | panels + verdict */}
       <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
         <Link
-          href="/faculty/evaluation"
+          href={backHref ?? '/faculty/evaluation'}
           className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
         >
           <ArrowLeft className="size-[14px]" strokeWidth={2} />
@@ -551,42 +563,44 @@ function WorkspaceLayout({
           <SubmissionStatusBadge status={submission.status} />
         </div>
 
-        {/* Draft save status (right of the stats) */}
-        <div className="flex items-center gap-[7px] min-w-0 shrink-0">
-          {draftSaveStatus === 'saving' ? (
-            <>
-              <Loader2
-                className="size-[12px] animate-spin text-[#8a93b4] shrink-0"
-                aria-hidden="true"
-              />
+        {/* Draft save status (right of the stats) — REVIEWER ONLY */}
+        {!isStudent && (
+          <div className="flex items-center gap-[7px] min-w-0 shrink-0">
+            {draftSaveStatus === 'saving' ? (
+              <>
+                <Loader2
+                  className="size-[12px] animate-spin text-[#8a93b4] shrink-0"
+                  aria-hidden="true"
+                />
+                <span
+                  className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
+                  aria-live="polite"
+                >
+                  Saving…
+                </span>
+              </>
+            ) : (
               <span
-                className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
+                className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
                 aria-live="polite"
               >
-                Saving…
+                <Check
+                  className={`size-[12px] shrink-0 ${
+                    draftSaveStatus === 'saved' ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
+                  }`}
+                  strokeWidth={2.5}
+                  aria-hidden="true"
+                />
+                {draftSaveStatus === 'saved' ? 'Draft saved' : 'Saved just now'}
               </span>
-            </>
-          ) : (
-            <span
-              className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
-              aria-live="polite"
-            >
-              <Check
-                className={`size-[12px] shrink-0 ${
-                  draftSaveStatus === 'saved' ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
-                }`}
-                strokeWidth={2.5}
-                aria-hidden="true"
-              />
-              {draftSaveStatus === 'saved' ? 'Draft saved' : 'Saved just now'}
-            </span>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <div className="flex-1" />
 
-        {/* Annotation toolbar — operates on the ACTIVE document */}
-        {activeDocumentId && (
+        {/* Annotation toolbar — REVIEWER ONLY (students get zero editing tools) */}
+        {!isStudent && activeDocumentId && (
           <AnnotationToolbar
             documentId={activeDocumentId}
             activeTool={activeTool}
@@ -594,13 +608,13 @@ function WorkspaceLayout({
           />
         )}
 
-        <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+        {!isStudent && <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />}
 
-        {/* Zoom controls — 20% to 200%, per active document */}
+        {/* Zoom controls — 20% to 200%, per active document (viewing tool) */}
         {activeDocumentId && <ZoomControl documentId={activeDocumentId} />}
 
-        {/* Undo / Redo */}
-        <UndoRedo />
+        {/* Undo / Redo — REVIEWER ONLY */}
+        {!isStudent && <UndoRedo />}
 
         <div className="flex-1" />
 
@@ -618,51 +632,62 @@ function WorkspaceLayout({
             <MessageSquareText className="size-[13px]" strokeWidth={1.75} />
             Comments
           </button>
-          <button
-            type="button"
-            onClick={() => setPanel(panel === 'versions' ? null : 'versions')}
-            aria-pressed={panel === 'versions'}
-            className={`flex items-center gap-[6px] h-[32px] px-[12px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none ${
-              panel === 'versions'
-                ? 'bg-[#f4f6ff] border border-[#e5e8ff] text-[#707dff]'
-                : 'bg-white border border-[#e8ebf8] text-[#5a6382] hover:bg-gray-50'
-            }`}
-          >
-            <History className="size-[13px]" strokeWidth={1.75} />
-            Versions
-          </button>
 
-          <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+          {/* Versions — STUDENT ONLY (the adviser navigates versions via the
+              teams drawer; each student version opens in its own tab) */}
+          {isStudent && versions && versions.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setPanel(panel === 'versions' ? null : 'versions')}
+                aria-pressed={panel === 'versions'}
+                className={`flex items-center gap-[6px] h-[32px] px-[12px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none ${
+                  panel === 'versions'
+                    ? 'bg-[#f4f6ff] border border-[#e5e8ff] text-[#707dff]'
+                    : 'bg-white border border-[#e8ebf8] text-[#5a6382] hover:bg-gray-50'
+                }`}
+              >
+                <History className="size-[13px]" strokeWidth={1.75} />
+                Versions
+              </button>
+            </>
+          )}
 
-          {/* Verdict actions */}
-          <button
-            type="button"
-            onClick={() => openVerdict('NEED_REVISION')}
-            disabled={!hasAnnotations}
-            title={
-              hasAnnotations
-                ? 'Request revisions to this submission'
-                : 'Add annotations before requesting revisions'
-            }
-            className="flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[8px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[11.5px] leading-[17px] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(245,158,11,0.4)] outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[rgba(245,158,11,0.08)]"
-          >
-            <RotateCcw className="size-[13px]" />
-            Request Revisions
-          </button>
-          <button
-            type="button"
-            onClick={() => openVerdict('APPROVED')}
-            title="Approve this submission"
-            className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#16a34a] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#15803d] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(22,163,74,0.4)] outline-none"
-          >
-            <Check className="size-[13px]" strokeWidth={2.5} />
-            Approve
-          </button>
+          {!isStudent && (
+            <>
+              <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+
+              {/* Verdict actions — REVIEWER ONLY */}
+              <button
+                type="button"
+                onClick={() => openVerdict('NEED_REVISION')}
+                disabled={!hasAnnotations}
+                title={
+                  hasAnnotations
+                    ? 'Request revisions to this submission'
+                    : 'Add annotations before requesting revisions'
+                }
+                className="flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[8px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[11.5px] leading-[17px] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(245,158,11,0.4)] outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[rgba(245,158,11,0.08)]"
+              >
+                <RotateCcw className="size-[13px]" />
+                Request Revisions
+              </button>
+              <button
+                type="button"
+                onClick={() => openVerdict('APPROVED')}
+                title="Approve this submission"
+                className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#16a34a] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#15803d] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(22,163,74,0.4)] outline-none"
+              >
+                <Check className="size-[13px]" strokeWidth={2.5} />
+                Approve
+              </button>
+            </>
+          )}
         </div>
       </header>
 
-      {/* Per-tool settings strip (color / size) — shown while a tool is active */}
-      {activeDocumentId && (
+      {/* Per-tool settings strip (color / size) — REVIEWER ONLY, while a tool is active */}
+      {!isStudent && activeDocumentId && (
         <ToolSettingsPanel documentId={activeDocumentId} activeTool={activeTool} />
       )}
 
@@ -719,6 +744,7 @@ function WorkspaceLayout({
                               <AnnotationLayerWithDrag
                                 documentId={activeDocumentId}
                                 pageIndex={pageIndex}
+                                readOnly={isStudent}
                               />
                             </PagePointerProvider>
                           </div>
@@ -733,12 +759,16 @@ function WorkspaceLayout({
             )}
           </div>
 
-          {/* Hover border + click selection menu on annotations (JS hit-testing) */}
+          {/* Hover border + click selection on annotations (JS hit-testing) —
+              the delete menu is reviewer-only */}
           {activeDocumentId && (
             <AnnotationHover
               documentId={activeDocumentId}
               viewerRef={viewerRef}
+              readOnly={isStudent}
               onSelectAnnotation={handleSelectAnnotation}
+              onDeselectAnnotation={handleDeselectAnnotation}
+              initialMenuId={openMenuId}
             />
           )}
         </div>
@@ -746,6 +776,7 @@ function WorkspaceLayout({
         {panel === 'comments' && activeDocumentId && (
           <CommentsPanel
             documentId={activeDocumentId}
+            readOnly={isStudent}
             autoEditId={autoEditId}
             highlightId={highlightCommentId}
             onClose={() => {
@@ -758,12 +789,8 @@ function WorkspaceLayout({
             onSaveComment={handleSaveComment}
           />
         )}
-        {panel === 'versions' && (
-          <VersionDrawer
-            submissionId={submission.id}
-            onClose={() => setPanel(null)}
-            onOpenVersion={openVersion}
-          />
+        {panel === 'versions' && isStudent && (
+          <VersionPanel versions={versions ?? []} onClose={() => setPanel(null)} />
         )}
       </div>
 
@@ -775,7 +802,14 @@ function WorkspaceLayout({
           annotationSummary={verdict.summary}
           annotationData={verdict.data}
           onClose={() => setVerdict(null)}
-          onCommitted={() => router.refresh()}
+          // The evaluation is finalized on success — return to the Teams tab
+          // (the default tab of /faculty/evaluation). refresh() first: it
+          // invalidates the client Router Cache so the list reflects the
+          // verdict immediately instead of serving the pre-verdict snapshot.
+          onCommitted={() => {
+            router.refresh()
+            router.push('/faculty/evaluation')
+          }}
         />
       )}
     </div>

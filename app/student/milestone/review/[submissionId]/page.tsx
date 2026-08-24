@@ -1,15 +1,15 @@
 import { redirect, notFound } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import { getVersionDetail } from '@/lib/actions/evaluation'
-import { getSubmissionAnnotations } from '@/lib/actions/annotations'
+import {
+  getStudentVersionDetail,
+  getStudentSubmissionAnnotations,
+  getStudentVersionList,
+} from '@/lib/actions/student-review'
 import { DocumentWorkspace } from '@/components/evaluation/workspace/DocumentWorkspace'
-import { FinalizedWorkspaceView } from '@/components/evaluation/workspace/FinalizedWorkspaceView'
 import type { SubmissionMeta } from '@/types/milestones'
 import type { SubmissionViewStatus } from '@/types/milestones'
 
-// Map the DB review status to the shared view status. The workspace only
-// opens submissions of live milestones, so SUPERSEDED never applies here.
 function toViewStatus(
   status: 'PENDING' | 'NEED_REVISION' | 'APPROVED',
 ): SubmissionViewStatus {
@@ -18,7 +18,10 @@ function toViewStatus(
   return 'IN_REVIEW'
 }
 
-export default async function SubmissionWorkspacePage({
+// Student read-only document workspace — ONE specific version per URL, same
+// per-version architecture as the adviser workspace. The student mode strips
+// every editing affordance; the read actions are group-scoped server-side.
+export default async function StudentReviewWorkspacePage({
   params,
 }: {
   params: Promise<{ submissionId: string }>
@@ -30,26 +33,24 @@ export default async function SubmissionWorkspacePage({
   const id = parseInt(submissionId, 10)
   if (Number.isNaN(id)) notFound()
 
-  // Each browser tab opens ONE specific document version. The version's own
-  // status/review metadata drives everything: a superseded version is always
-  // read-only, and the current version depends on its verdict state.
-  const [versionRes, annotationsRes] = await Promise.all([
-    getVersionDetail(id),
-    getSubmissionAnnotations(id),
+  const [detailRes, annotationsRes, versionsRes] = await Promise.all([
+    getStudentVersionDetail(id),
+    getStudentSubmissionAnnotations(id),
+    getStudentVersionList(id),
   ])
 
   const version =
-    versionRes.success && versionRes.payload ? versionRes.payload : null
+    detailRes.success && detailRes.payload ? detailRes.payload : null
   if (!version) notFound()
 
   const annotations =
     annotationsRes.success && annotationsRes.payload ? annotationsRes.payload : null
-
-  // Saved annotation rows are stored as a JSON array; the client workspace
-  // deserializes them (base64 → ArrayBuffer) before importAnnotations().
   const initialAnnotations = Array.isArray(annotations?.data)
     ? annotations.data
     : []
+
+  const versions =
+    versionsRes.success && versionsRes.payload ? versionsRes.payload : []
 
   const meta: SubmissionMeta = {
     id: version.id,
@@ -68,24 +69,15 @@ export default async function SubmissionWorkspacePage({
     reviewNote: version.reviewNote,
   }
 
-  // Any version with a verdict — current-finalized OR superseded — is locked:
-  // read-only viewing of that version's committed annotations.
-  if (!version.isCurrent || version.status !== 'PENDING') {
-    return (
-      <FinalizedWorkspaceView
-        submission={meta}
-        initialAnnotations={initialAnnotations}
-        isSuperseded={!version.isCurrent}
-      />
-    )
-  }
-
   return (
     <DocumentWorkspace
+      mode="student"
       blobUrl={version.blobUrl}
       submission={meta}
       initialAnnotations={initialAnnotations}
-      draftStatus={annotations?.status ?? null}
+      draftStatus={null}
+      versions={versions}
+      backHref={`/student/milestone/${version.chapterKey.toLowerCase().replace('_', '-')}`}
     />
   )
 }

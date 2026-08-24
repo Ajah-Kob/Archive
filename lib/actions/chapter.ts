@@ -1,6 +1,7 @@
 'use server'
 
-import { put } from '@vercel/blob'
+import { head } from '@vercel/blob'
+import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client'
 import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
@@ -14,10 +15,23 @@ import {
   type ChapterViewState,
   type SubmissionViewStatus,
 } from '@/types/milestones'
+import { type AnnotationTransferItem } from '@/lib/annotations-serializer'
+import { type PdfAnnotationObject } from '@embedpdf/models'
 
 // Chapter documents are PDF only, up to 20MB (matches the Figma dropzone copy
 // and the serverActions body limit + proxy cap in next.config.ts).
 const MAX_SIZE_BYTES = 20 * 1024 * 1024
+
+/**
+ * A file the CLIENT already uploaded to Vercel Blob via a scoped client token
+ * (requestChapterUploadToken). The submission actions verify the blob really
+ * exists under this group's chapter path before creating any rows.
+ */
+export interface ChapterSubmissionUpload {
+  blobUrl: string
+  fileName: string
+  size: number
+}
 
 // DB enum (underscore) version of the phase derived from the chapter.
 const DB_PHASE: Record<ChapterKey, 'CAPSTONE_1' | 'CAPSTONE_2'> = {
@@ -118,6 +132,7 @@ function toVersionItem(
     reviewedAt: Date | null
     reviewNote: string | null
     user: { name: string }
+    annotations: { data: any }[]
   },
   index: number,
   isCurrent: boolean,
@@ -129,6 +144,18 @@ function toVersionItem(
       : rawStatus === 'NEED_REVISION'
         ? 'NEEDS_REVISION'
         : 'IN_REVIEW'
+
+  const commentCount = row.annotations.reduce((count, ann) => {
+    const items = ann.data as AnnotationTransferItem[]
+    return (
+      count +
+      items.filter((item) => {
+        const obj = item.annotation as PdfAnnotationObject
+        return obj.contents && obj.contents.trim().length > 0
+      }).length
+    )
+  }, 0)
+
   return {
     id: row.id,
     version: index + 1,
@@ -142,7 +169,7 @@ function toVersionItem(
     reviewedAt: row.reviewedAt?.toISOString() ?? null,
     reviewNote: row.reviewNote,
     isCurrent,
-    commentCount: 0, // comments model not yet built
+    commentCount,
   }
 }
 
@@ -218,9 +245,17 @@ export async function getChapterData(
     const chain = await prisma.milestoneSubmission.findMany({
       where: { milestoneId: milestone.id },
       orderBy: { createdAt: 'asc' },
-      include: { user: { select: { name: true } } },
+      include: {
+        user: { select: { name: true } },
+        annotations: {
+          where: { deletedAt: null },
+          select: { data: true },
+        },
+      },
     })
-    history = chain.map((row, index) => toVersionItem(row, index, !row.deletedAt))
+    // Version numbers derive from the ascending chain position (index + 1),
+    // but the UI renders the LATEST version first — flip after mapping.
+    history = chain.map((row, index) => toVersionItem(row, index, !row.deletedAt)).reverse()
     current = history.find((v) => v.isCurrent) ?? null
     state = !current
       ? 'DEFAULT'
@@ -252,15 +287,95 @@ export async function getChapterData(
   }
 }
 
-// Validates the uploaded chapter file. Server-side checks mirror the dropzone
-// client checks (PDF only, 20MB max) so a crafted request cannot bypass them.
-function validateChapterFile(file: File | null): string | null {
-  if (!file || file.size === 0) return 'No file provided.'
-  if (file.type !== 'application/pdf') {
-    return 'Unsupported file type. Only PDF files are allowed.'
+// Sanitizes a client-supplied filename for the blob pathname: keeps word
+// characters, dot, dash and space; everything else becomes an underscore.
+function sanitizeBlobFilename(fileName: string): string {
+  const cleaned = fileName.replace(/[^\w.\- ]+/g, '_').trim()
+  return cleaned.length > 0 ? cleaned : 'document.pdf'
+}
+
+/**
+ * Issues a scoped Vercel Blob client-upload token for one chapter file.
+ *
+ * The full guard chain runs here (student → group member → chapter open →
+ * capstone confirmed), and the token is pinned to ONE exact pathname under
+ * `chapter/{groupId}/{chapter}/` — it cannot be reused for any other path,
+ * content type, or size. The client uploads directly against this token with
+ * real progress events, and only then calls submitChapter/resubmitChapter.
+ */
+export async function requestChapterUploadToken(
+  chapter: ChapterKey,
+  fileName: string,
+): Promise<{
+  success: boolean
+  message: string
+  payload?: { token: string; pathname: string }
+}> {
+  const session = await requireStudent()
+  if (!session?.user?.id) return { ...unauthorized }
+
+  if (typeof fileName !== 'string' || fileName.length === 0 || fileName.length > 255) {
+    return { success: false, message: 'Invalid file name.' }
   }
-  if (file.size > MAX_SIZE_BYTES) {
+
+  const auth = await authorizeChapterMutation(chapter, +session.user.id)
+  if (auth.ok === false) return auth.result
+
+  const pathname = `chapter/${auth.group.id}/${chapter}/${sanitizeBlobFilename(fileName)}`
+
+  try {
+    const token = await generateClientTokenFromReadWriteToken({
+      pathname,
+      allowedContentTypes: ['application/pdf'],
+      maximumSizeInBytes: MAX_SIZE_BYTES,
+      addRandomSuffix: true,
+    })
+    return { success: true, message: '', payload: { token, pathname } }
+  } catch (error) {
+    console.error('[requestChapterUploadToken | Error]:', error)
+    return { success: false, message: 'Could not start the upload. Please try again.' }
+  }
+}
+
+// Verifies that the client's upload actually completed before a submission is
+// recorded: the blob must exist, live under this group's chapter path, be a
+// PDF, and match the claimed size exactly.
+async function verifyChapterUpload(
+  groupId: number,
+  chapter: ChapterKey,
+  upload: ChapterSubmissionUpload,
+): Promise<string | null> {
+  if (
+    typeof upload?.blobUrl !== 'string' ||
+    typeof upload?.fileName !== 'string' ||
+    upload.fileName.length === 0 ||
+    upload.fileName.length > 255 ||
+    !Number.isFinite(upload?.size) ||
+    upload.size <= 0
+  ) {
+    return 'Invalid upload data.'
+  }
+  if (upload.size > MAX_SIZE_BYTES) {
     return 'File is too large (max 20MB).'
+  }
+
+  let meta
+  try {
+    meta = await head(upload.blobUrl)
+  } catch {
+    return 'The uploaded file could not be found. Please upload it again.'
+  }
+  if (!meta) {
+    return 'The uploaded file could not be found. Please upload it again.'
+  }
+  if (!meta.pathname.startsWith(`chapter/${groupId}/${chapter}/`)) {
+    return 'The uploaded file does not belong to this chapter.'
+  }
+  if (meta.contentType !== 'application/pdf') {
+    return 'Only PDF files are allowed.'
+  }
+  if (meta.size !== upload.size) {
+    return 'The uploaded file is incomplete. Please upload it again.'
   }
   return null
 }
@@ -298,25 +413,17 @@ async function authorizeChapterMutation(
   return { ok: true, group, milestoneId: milestone?.id ?? null }
 }
 
-// Uploads the validated file to Vercel Blob under the chapter path and
-// creates the milestone + submission rows inside a transaction. Returns the
-// milestoneId (newly created or existing) so resubmit can target it.
+// Creates the milestone + submission rows inside a transaction, referencing
+// the blob the client already uploaded (verified by verifyChapterSubmission).
+// Returns the milestoneId (newly created or existing) so resubmit can target it.
 async function persistChapterSubmission(
   groupId: number,
   capstoneId: number,
   phase: 'CAPSTONE_1' | 'CAPSTONE_2',
   chapter: ChapterKey,
   userId: number,
-  file: File,
+  upload: ChapterSubmissionUpload,
 ) {
-  const arrayBuffer = await file.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-  const blob = await put(`chapter/${groupId}/${chapter}/${file.name}`, buffer, {
-    access: 'public',
-    contentType: 'application/pdf',
-    addRandomSuffix: true,
-  })
-
   return prisma.$transaction(async (tx) => {
     const milestone = await tx.milestone.upsert({
       where: { groupId_chapter: { groupId, chapter } },
@@ -332,10 +439,10 @@ async function persistChapterSubmission(
       data: {
         milestoneId: milestone.id,
         submittedBy: userId,
-        fileName: file.name,
-        blobUrl: blob.url,
+        fileName: upload.fileName,
+        blobUrl: upload.blobUrl,
         mimeType: 'application/pdf',
-        size: file.size,
+        size: upload.size,
         status: 'PENDING',
       },
     })
@@ -344,22 +451,23 @@ async function persistChapterSubmission(
 }
 
 // First-time submission: creates the milestone row lazily and the first
-// PENDING submission. Guarded so the group cannot have two current (live)
-// submissions for the same milestone.
+// PENDING submission. The file must ALREADY be uploaded to Vercel Blob (via
+// requestChapterUploadToken + a client-side put); this action verifies that
+// upload before recording anything. Guarded so the group cannot have two
+// current (live) submissions for the same milestone.
 export async function submitChapter(
   chapter: ChapterKey,
-  formData: FormData,
+  upload: ChapterSubmissionUpload,
 ): Promise<{ success: boolean; message: string; payload?: { milestoneId: number } }> {
   const session = await requireStudent()
   if (!session?.user?.id) return { ...unauthorized }
 
-  const file = formData.get('file') as File | null
-  if (!file) return { success: false, message: 'No file provided.' }
-  const fileError = validateChapterFile(file)
-  if (fileError) return { success: false, message: fileError }
-
   const auth = await authorizeChapterMutation(chapter, +session.user.id)
   if (auth.ok === false) return auth.result
+
+  // The submission is only valid if the client's upload actually completed.
+  const uploadError = await verifyChapterUpload(auth.group.id, chapter, upload)
+  if (uploadError) return { success: false, message: uploadError }
 
   try {
     const capstone = await prisma.capstone.findFirst({
@@ -389,7 +497,7 @@ export async function submitChapter(
       DB_PHASE[chapter],
       chapter,
       +session.user.id,
-      file,
+      upload,
     )
 
     await revalidateChapterGroup(auth.group, { expireNow: true })
@@ -403,17 +511,14 @@ export async function submitChapter(
 
 // Resubmission after an adviser requested revisions: soft-deletes the current
 // submission and creates a new PENDING row so the chain preserves versioning.
+// The replacement file must already be uploaded to Vercel Blob (client-side);
+// the upload is verified before anything is recorded.
 export async function resubmitChapter(
   chapter: ChapterKey,
-  formData: FormData,
+  upload: ChapterSubmissionUpload,
 ): Promise<{ success: boolean; message: string; payload?: { milestoneId: number } }> {
   const session = await requireStudent()
   if (!session?.user?.id) return { ...unauthorized }
-
-  const file = formData.get('file') as File | null
-  if (!file) return { success: false, message: 'No file provided.' }
-  const fileError = validateChapterFile(file)
-  if (fileError) return { success: false, message: fileError }
 
   const auth = await authorizeChapterMutation(chapter, +session.user.id)
   if (auth.ok === false) return auth.result
@@ -431,15 +536,11 @@ export async function resubmitChapter(
     return { success: false, message: 'No submission to resubmit.' }
   }
 
-  try {
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    const blob = await put(`chapter/${auth.group.id}/${chapter}/${file.name}`, buffer, {
-      access: 'public',
-      contentType: 'application/pdf',
-      addRandomSuffix: true,
-    })
+  // The resubmission is only valid if the client's upload actually completed.
+  const uploadError = await verifyChapterUpload(auth.group.id, chapter, upload)
+  if (uploadError) return { success: false, message: uploadError }
 
+  try {
     const { milestoneId } = await prisma.$transaction(async (tx) => {
       await tx.milestoneSubmission.updateMany({
         where: { milestoneId: auth.milestoneId, deletedAt: null },
@@ -449,10 +550,10 @@ export async function resubmitChapter(
         data: {
           milestoneId: auth.milestoneId,
           submittedBy: +session.user.id,
-          fileName: file.name,
-          blobUrl: blob.url,
+          fileName: upload.fileName,
+          blobUrl: upload.blobUrl,
           mimeType: 'application/pdf',
-          size: file.size,
+          size: upload.size,
           status: 'PENDING',
         },
       })

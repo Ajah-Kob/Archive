@@ -40,8 +40,8 @@ function RowIcon({
 
   if (state === 'NEEDS_REVISION') {
     return (
-      <div className="bg-[#fef5e7] border border-[rgba(245,158,11,0.3)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
-        <TriangleAlert className="size-[12px] text-[#f59e0b]" strokeWidth={2.25} />
+      <div className="bg-[#fef2f2] border border-[rgba(239,68,68,0.3)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
+        <TriangleAlert className="size-[12px] text-[#ef4444]" strokeWidth={2.25} />
       </div>
     )
   }
@@ -71,7 +71,7 @@ function MilestoneRow({ row, isActive }: MilestoneRowProps) {
 
   const sublabelColor: Record<JourneyRow['state'], string> = {
     APPROVED: 'text-[#22c55e]',
-    NEEDS_REVISION: 'text-[#f59e0b]',
+    NEEDS_REVISION: 'text-[#ef4444]',
     SUBMITTED: 'text-[#707dff]',
     DEFAULT: 'text-transparent',
     LOCKED: 'text-transparent',

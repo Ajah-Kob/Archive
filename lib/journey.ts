@@ -115,7 +115,7 @@ export function buildJourneyRows(
       } revision`
     } else if (pending.length > 0) {
       topicSubmission.state = 'SUBMITTED'
-      topicSubmission.sublabel = `${pending.length} Submitted`
+      topicSubmission.sublabel = `${pending.length} In Review`
     } else {
       // The group exists but has no topics yet — the step is available.
       topicSubmission.state = 'DEFAULT'
@@ -169,10 +169,10 @@ export function buildJourneyRows(
           row.sublabel = 'Approved'
         } else if (latest.status === 'NEED_REVISION') {
           row.state = 'NEEDS_REVISION'
-          row.sublabel = 'Needs Revision'
+          row.sublabel = 'Need Revision'
         } else {
           row.state = 'SUBMITTED'
-          row.sublabel = 'Submitted'
+          row.sublabel = 'In Review'
         }
       } else {
         // The coordinator opened the milestone but the group hasn't started —

@@ -10,7 +10,6 @@ import {
   Shield,
   Calendar,
   BookMarked,
-  User,
   UserPlus,
   Layers,
   ClipboardCheck,
@@ -32,28 +31,25 @@ const ADMIN_ITEMS: NavItem[] = [
   { label: 'Faculty list', href: '/faculty/faculty-list', icon: Users },
   { label: 'Defense', href: '/defense', icon: Shield },
   { label: 'Calendar', href: '/calendar', icon: Calendar },
-  { label: 'Repository', href: '/repository', icon: BookMarked },
-  { label: 'Profile', href: '/account/profile', icon: User },
+  { label: 'Repositories', href: '/repository', icon: BookMarked },
 ]
 
 const GUEST_ITEMS: NavItem[] = [
   { label: 'Home', href: '/guest', icon: LayoutDashboard },
   { label: 'Join', href: '/guest/join-archive', icon: UserPlus },
-  { label: 'Repository', href: '/repository', icon: BookMarked },
-  { label: 'Profile', href: '/account/profile', icon: User },
+  { label: 'Repositories', href: '/repository', icon: BookMarked },
 ]
 
 const STUDENT_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/student', icon: LayoutDashboard },
   { label: 'Milestones', href: '/student/milestone', icon: Flag },
-  { label: 'Repository', href: '/repository', icon: BookMarked },
-  { label: 'Profile', href: '/account/profile', icon: User },
+  { label: 'Templates', href: '/student/templates', icon: FileText },
+  { label: 'Repositories', href: '/repository', icon: BookMarked },
 ]
 
 const FACULTY_MEMBER_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/faculty', icon: LayoutDashboard },
-  { label: 'Repository', href: '/repository', icon: BookMarked },
-  { label: 'Profile', href: '/account/profile', icon: User },
+  { label: 'Repositories', href: '/repository', icon: BookMarked },
 ]
 
 const COORDINATOR_ITEMS: NavItem[] = [

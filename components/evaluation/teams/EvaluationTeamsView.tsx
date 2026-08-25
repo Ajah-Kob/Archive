@@ -2,11 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronUp, ClipboardCheck, FileText, Search } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronUp,
+  ClipboardCheck,
+  FileText,
+  Search,
+} from 'lucide-react'
 import type { EvaluationItem } from '@/lib/actions/evaluation'
 import { SubmissionDetailsDrawer } from './SubmissionDetailsDrawer'
 
-const GRID_COLS = 'grid-cols-[2fr_0.8fr_0.6fr_0.6fr_0.7fr_0.55fr]'
+const GRID_COLS = 'grid-cols-[2fr_0.8fr_0.6fr_0.6fr_0.7fr_0.7fr]'
 
 type SortKey = 'groupName' | 'chapter' | 'submittedBy' | 'dateSubmitted'
 
@@ -39,10 +45,12 @@ const STATUS_FILTER_OPTIONS: ReadonlyArray<{
 
 /** Pill badge for the Teams table — labels per the evaluation spec. */
 const TEAM_STATUS_STYLES = {
-  PENDING: 'bg-[rgba(112,125,255,0.07)] border-[rgba(112,125,255,0.2)] text-[#707dff]',
+  PENDING:
+    'bg-[rgba(112,125,255,0.07)] border-[rgba(112,125,255,0.2)] text-[#707dff]',
   NEED_REVISION:
     'bg-[rgba(245,158,11,0.07)] border-[rgba(245,158,11,0.2)] text-[#f59e0b]',
-  APPROVED: 'bg-[rgba(22,163,74,0.07)] border-[rgba(22,163,74,0.2)] text-[#16a34a]',
+  APPROVED:
+    'bg-[rgba(22,163,74,0.07)] border-[rgba(22,163,74,0.2)] text-[#16a34a]',
 } as const
 
 function TeamsStatusBadge({ status }: { status: EvaluationItem['status'] }) {
@@ -199,7 +207,9 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
   const [chapterFilter, setChapterFilter] = useState('all')
   const [sortField, setSortField] = useState<SortKey>('dateSubmitted')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const [detailsTarget, setDetailsTarget] = useState<EvaluationItem | null>(null)
+  const [detailsTarget, setDetailsTarget] = useState<EvaluationItem | null>(
+    null,
+  )
 
   const handleSort = (field: SortKey) => {
     if (sortField !== field) {
@@ -256,13 +266,24 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
     })
 
     return rows
-  }, [items, search, teamFilter, chapterFilter, statusFilter, sortField, sortDir])
+  }, [
+    items,
+    search,
+    teamFilter,
+    chapterFilter,
+    statusFilter,
+    sortField,
+    sortDir,
+  ])
 
   if (items.length === 0) {
     return (
       <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col items-center justify-center px-10 py-16">
         <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
-          <ClipboardCheck className="size-5 text-[#707dff]" strokeWidth={1.75} />
+          <ClipboardCheck
+            className="size-5 text-[#707dff]"
+            strokeWidth={1.75}
+          />
         </div>
         <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#1e3a8a] tracking-[-0.16px] mb-2">
           No Submissions Yet
@@ -332,7 +353,10 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
 
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-10 py-16 w-full">
-              <FileText className="size-8 text-[#c4cadf] mb-3" strokeWidth={1.5} />
+              <FileText
+                className="size-8 text-[#c4cadf] mb-3"
+                strokeWidth={1.5}
+              />
               <h3 className="font-heading font-bold text-[14px] leading-[21px] text-[#3d4566] tracking-[-0.14px] text-center mb-1">
                 No Evaluations Found
               </h3>
@@ -365,14 +389,14 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
                 </span>
 
                 <span className="min-w-0 pr-4">
-                  <span className="block truncate font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
-                    {formatDate(item.dateSubmitted)}
+                  <span className="block truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3d4566]">
+                    {item.submittedBy || 'Unknown'}
                   </span>
                 </span>
 
                 <span className="min-w-0 pr-4">
-                  <span className="block truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3d4566]">
-                    {item.submittedBy || 'Unknown'}
+                  <span className="block truncate font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
+                    {formatDate(item.dateSubmitted)}
                   </span>
                 </span>
 
@@ -391,7 +415,10 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
                       aria-label={`Evaluate ${item.groupName} ${item.chapter}`}
                       className="flex items-center gap-[5px] h-[28px] px-[11px] bg-[#707dff] rounded-[7px] font-sans font-semibold text-[11px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-1"
                     >
-                      <ClipboardCheck className="size-[12px]" strokeWidth={2.25} />
+                      <ClipboardCheck
+                        className="size-[12px]"
+                        strokeWidth={2.25}
+                      />
                       Evaluate Document
                     </button>
                   ) : (

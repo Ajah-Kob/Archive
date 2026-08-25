@@ -48,8 +48,8 @@ function RowIcon({
 
   if (state === 'SUBMITTED') {
     return (
-      <div className="bg-[#f1f2ff] border border-[rgba(112,125,255,0.25)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
-        <Clock className="size-[12px] text-[#707dff]" strokeWidth={2.25} />
+      <div className="bg-[rgba(234,179,8,0.08)] border border-[rgba(234,179,8,0.25)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
+        <Clock className="size-[12px] text-[#eab308]" strokeWidth={2.25} />
       </div>
     )
   }
@@ -72,7 +72,7 @@ function MilestoneRow({ row, isActive }: MilestoneRowProps) {
   const sublabelColor: Record<JourneyRow['state'], string> = {
     APPROVED: 'text-[#22c55e]',
     NEEDS_REVISION: 'text-[#ef4444]',
-    SUBMITTED: 'text-[#707dff]',
+    SUBMITTED: 'text-[#eab308]',
     DEFAULT: 'text-transparent',
     LOCKED: 'text-transparent',
   }

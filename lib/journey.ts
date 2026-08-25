@@ -28,7 +28,7 @@ export type JourneySource = {
   capstone: { topicId: number } | null
   milestones: {
     chapter: string
-    submissions: { status: string }[]
+    submissions: { status: string; deletedAt: Date | null }[]
   }[]
   capstoneArchive: { deletedAt: Date | null } | null
 }
@@ -161,7 +161,9 @@ export function buildJourneyRows(
     }
     if (isOpen(chapter)) {
       if (milestone) {
-        const latest = milestone.submissions[0]
+        // The CURRENT live submission decides the row state — never a
+        // soft-deleted (superseded) one, regardless of query ordering.
+        const latest = milestone.submissions.find((s) => !s.deletedAt) ?? null
         if (!latest) {
           row.state = 'DEFAULT'
         } else if (latest.status === 'APPROVED') {

@@ -90,7 +90,7 @@ export async function getMyWorkspace(userId: number): Promise<{
             include: {
               submissions: {
                 where: { deletedAt: null },
-                select: { status: true },
+                select: { status: true, deletedAt: true },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
               },

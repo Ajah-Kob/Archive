@@ -200,7 +200,7 @@ export async function getChapterData(
           milestones: {
             where: { deletedAt: null },
             include: {
-              submissions: { select: { status: true } },
+              submissions: { select: { status: true, deletedAt: true } },
             },
           },
           capstoneArchive: { select: { deletedAt: true } },

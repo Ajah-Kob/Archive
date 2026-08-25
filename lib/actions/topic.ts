@@ -127,7 +127,7 @@ async function loadTopicWorkspace(userId: number) {
             include: {
               submissions: {
                 where: { deletedAt: null },
-                select: { status: true },
+                select: { status: true, deletedAt: true },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
               },

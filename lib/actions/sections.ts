@@ -513,7 +513,7 @@ async function getCoordinatorSectionData(sectionId: number) {
             include: {
               submissions: {
                 where: { deletedAt: null },
-                select: { status: true },
+                select: { status: true, deletedAt: true },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
               },
@@ -1426,7 +1426,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
           include: {
             submissions: {
               where: { deletedAt: null },
-              select: { status: true },
+              select: { status: true, deletedAt: true },
               orderBy: { createdAt: 'desc' },
               take: 1,
             },

@@ -20,6 +20,10 @@ export interface JourneyRow {
   header: 'CAPSTONE 1' | 'CAPSTONE 2'
   state: JourneyState
   sublabel?: string
+  /** Overrides the generic status text in tooltips (e.g., 'Selected'). */
+  stateLabel?: string
+  /** Extra tooltip line, e.g., '2 of 3 topics approved'. */
+  tooltipDetail?: string
 }
 
 export const JOURNEY_ROWS: ReadonlyArray<Omit<JourneyRow, 'state' | 'sublabel'>> =

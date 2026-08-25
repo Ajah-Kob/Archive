@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { Plus_Jakarta_Sans, Sora } from 'next/font/google'
 import HydrationZustand from '@/templates/hydrationZustand'
+import { RouteTracker } from '@/components/globals/RouteTracker'
 import { Providers } from './providers'
 import { Toaster } from 'sonner'
 import './globals.css'
@@ -33,6 +35,10 @@ export default function RootLayout({
       >
         <Providers>
           <HydrationZustand>{children}</HydrationZustand>
+          {/* Suspense: usePathname() must not block static prerendering. */}
+          <Suspense fallback={null}>
+            <RouteTracker />
+          </Suspense>
           <Toaster
             richColors
             position="top-center"

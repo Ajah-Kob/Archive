@@ -92,10 +92,9 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // Signed-in users skip the login page.
-  if (pathname.startsWith('/login') && token) {
-    return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-  }
+  // Signed-in users who open /login are sent back to their previous route by
+  // the client-side RedirectIfAuthed guard on the login page (the server
+  // cannot know where they came from). Expired sessions simply see the form.
 
   return NextResponse.next()
 }

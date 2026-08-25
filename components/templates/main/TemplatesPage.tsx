@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Upload } from 'lucide-react'
-import TemplatesToolbar from '@/components/templates/main/TemplatesToolbar'
 import TemplateTable from '@/components/templates/main/TemplatesTable'
 import UploadTemplateModal from '@/components/templates/modal/UploadTemplateModal'
 import RemoveTemplateModal from '@/components/templates/modal/RemoveTemplateModal'
@@ -21,8 +20,10 @@ export interface TemplateItem {
 
 export default function TemplatesPage({
   canUpload = true,
+  canRemove = true,
 }: {
   canUpload?: boolean
+  canRemove?: boolean
 }) {
   const [templates, setTemplates] = useState<TemplateItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,7 +83,9 @@ export default function TemplatesPage({
   }, [searchTerm, fetchTemplates])
 
   const handleUploadComplete = () => {
-    fetchTemplates(searchTerm)
+    // Clear any active search so the newly uploaded template is visible.
+    setSearchTerm('')
+    fetchTemplates('')
   }
 
   const handleViewFile = (file: TemplateItem) => {
@@ -132,14 +135,7 @@ export default function TemplatesPage({
         </div>
 
         <div className="flex flex-col gap-[10px] flex-1 min-h-px">
-          {/* Toolbar */}
-          <TemplatesToolbar
-            searchTerm={searchTerm}
-            onSearchChange={(e) => setSearchTerm(e.target.value)}
-            resultCount={templates.length}
-          />
-
-          {/* Data Table */}
+          {/* Data Table — search bar lives inside the table card, above the headers */}
           <TemplateTable
             templates={sortedTemplates}
             error={loading ? null : error}
@@ -148,14 +144,21 @@ export default function TemplatesPage({
             sortField={sortField}
             sortDir={sortDir}
             onSort={handleSort}
+            searchTerm={searchTerm}
+            onSearchChange={(e) => setSearchTerm(e.target.value)}
+            resultCount={templates.length}
             getRowActions={(item) => [
               { label: 'View', onClick: () => handleViewFile(item) },
               { label: 'Download', onClick: () => handleDownloadFile(item) },
-              {
-                label: 'Remove',
-                variant: 'danger',
-                onClick: () => setRemoveTarget(item),
-              },
+              ...(canRemove
+                ? [
+                    {
+                      label: 'Remove',
+                      variant: 'danger' as const,
+                      onClick: () => setRemoveTarget(item),
+                    },
+                  ]
+                : []),
             ]}
           />
         </div>

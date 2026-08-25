@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertCircle, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react'
+import { AlertCircle, FolderOpen, ChevronUp, ChevronDown, Search } from 'lucide-react'
 import { FileIcon } from '@/components/ui/FileIcon'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ActionMenu, type ActionItem } from '@/components/ui/ActionMenu'
@@ -26,6 +26,9 @@ interface TemplateTableProps {
   sortField?: string
   sortDir?: 'asc' | 'desc'
   onSort?: (field: string) => void
+  searchTerm?: string
+  onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+  resultCount?: number
 }
 
 function UserAvatar({ name }: { name: string }) {
@@ -77,7 +80,7 @@ function SortHeader({
   )
 }
 
-const GRID_COLS = 'grid-cols-[1fr_170px_170px_90px_80px]'
+const GRID_COLS = 'grid-cols-[1fr_1fr_1fr_1fr_80px]'
 
 export default function TemplateTable({
   templates,
@@ -88,23 +91,10 @@ export default function TemplateTable({
   sortField,
   sortDir,
   onSort,
+  searchTerm,
+  onSearchChange,
+  resultCount,
 }: TemplateTableProps) {
-  if (loading) {
-    return <TableSkeleton />
-  }
-
-  if (error) {
-    return (
-      <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)]">
-        <EmptyState
-          icon={<AlertCircle size={24} className="text-red-500" />}
-          heading="Failed to Load Templates"
-          description={error}
-        />
-      </div>
-    )
-  }
-
   return (
     <>
       <style>{`
@@ -141,8 +131,27 @@ export default function TemplateTable({
         }
       `}</style>
       <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
+        {/* Toolbar strip — lives inside the card, above the column headers */}
+        <div className="flex items-center gap-2.5 pb-[15px] pt-[14px] px-5 border-b border-[#f0f2fa] shrink-0">
+          <div className="relative flex-[0_0_320px] max-w-[320px] min-w-[180px]">
+            <Search className="absolute left-[12.5px] top-1/2 -translate-y-1/2 size-[10px] text-[#8a93b4]" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={onSearchChange}
+              placeholder="Search templates…"
+              className="w-full h-[37.5px] pl-[33px] pr-[13px] py-[9px] bg-[#f4f5fc] border border-[#dddff0] rounded-[9px] font-sans font-medium text-[13px] text-[rgba(16,19,58,0.5)] placeholder:text-[rgba(16,19,58,0.5)] outline-none"
+            />
+          </div>
+          {resultCount !== undefined && (
+            <span className="ml-auto text-[12px] font-medium text-[#9ea8c6] whitespace-nowrap">
+              {resultCount} result{resultCount !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
         {/* Header row */}
-        <div className="bg-[#f8f9fe] rounded-t-[14px] shrink-0 header-grid-gutter">
+        <div className="bg-[#f8f9fe] shrink-0 header-grid-gutter">
           <div
             className={`grid ${GRID_COLS} px-[20px] py-[15px] border-b border-[#eceef8] items-center`}
           >
@@ -170,7 +179,17 @@ export default function TemplateTable({
           </div>
         </div>
 
-        {templates.length === 0 ? (
+        {loading ? (
+          <TableSkeleton />
+        ) : error ? (
+          <div className="flex-1 min-h-0 flex items-center justify-center">
+            <EmptyState
+              icon={<AlertCircle size={24} className="text-red-500" />}
+              heading="Failed to Load Templates"
+              description={error}
+            />
+          </div>
+        ) : templates.length === 0 ? (
           <div className="flex-1 min-h-0 flex items-center justify-center">
             {isEmpty ? (
               <EmptyState

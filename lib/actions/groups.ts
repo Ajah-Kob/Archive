@@ -147,15 +147,11 @@ export async function getMyWorkspace(userId: number): Promise<{
 
   if (group.adviser) {
     const adviserRecord = group.adviser
-    const [groupCount, capstoneCount] = await prisma.$transaction([
-      prisma.group.count({
-        where: { adviserId: adviserRecord.id, deletedAt: null },
-      }),
-      prisma.capstone.count({
-        where: { adviserId: adviserRecord.id, deletedAt: null },
-      }),
-    ])
-    const workload = groupCount + capstoneCount
+    // Workload = distinct groups currently advised. Capstone.adviserId is a
+    // denormalized snapshot — never sum it on top of Group.adviserId.
+    const workload = await prisma.group.count({
+      where: { adviserId: adviserRecord.id, deletedAt: null },
+    })
     adviser = {
       state: 'assigned',
       canManage: isLeader,
@@ -339,7 +335,6 @@ export async function getAvailableAdvisers(): Promise<{
       adviser: {
         include: {
           groups: { where: { deletedAt: null }, select: { id: true } },
-          capstones: { where: { deletedAt: null }, select: { id: true } },
         },
       },
     },
@@ -347,8 +342,7 @@ export async function getAvailableAdvisers(): Promise<{
   })
 
   const payload: AdviserOption[] = faculty.map((f) => {
-    const workload =
-      (f.adviser?.groups.length ?? 0) + (f.adviser?.capstones.length ?? 0)
+    const workload = f.adviser?.groups.length ?? 0
     return {
       id: f.id,
       userId: f.userId,

@@ -1,12 +1,13 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { NoSectionIcon } from '@/assets/NoSectionIcon'
 import { TableListHeader } from './TableListHeader'
 import { SectionDataRow, type SectionData } from './SectionDataRow'
 
-type SortKey = 'section' | 'students' | 'groups'
+type SortKey = 'coordinator' | 'section' | 'dateCreated' | 'students' | 'groups'
 
 function SortHeader({
   field,
@@ -42,9 +43,10 @@ function SortHeader({
 
 interface SectionTableProps {
   sections: SectionData[]
+  actions?: ReactNode
 }
 
-export function SectionTable({ sections }: SectionTableProps) {
+export function SectionTable({ sections, actions }: SectionTableProps) {
   const [sortField, setSortField] = useState<SortKey>('section')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -61,8 +63,12 @@ export function SectionTable({ sections }: SectionTableProps) {
     const rows = [...sections]
     rows.sort((a, b) => {
       let cmp = 0
-      if (sortField === 'section') {
+      if (sortField === 'coordinator') {
+        cmp = a.coordinator.name.localeCompare(b.coordinator.name)
+      } else if (sortField === 'section') {
         cmp = a.section.localeCompare(b.section)
+      } else if (sortField === 'dateCreated') {
+        cmp = a.dateCreated.localeCompare(b.dateCreated)
       } else if (sortField === 'students') {
         cmp = a.students - b.students
       } else {
@@ -76,7 +82,7 @@ export function SectionTable({ sections }: SectionTableProps) {
   if (sections.length === 0) {
     return (
       <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0">
-        <TableListHeader title="Sections" />
+        <TableListHeader title="Sections" action={actions} />
         <div className="flex flex-col items-center justify-center px-10 py-16 w-full">
           <div className="mb-5">
             <NoSectionIcon />
@@ -96,21 +102,25 @@ export function SectionTable({ sections }: SectionTableProps) {
   return (
     <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0">
       {/* Table Header */}
-      <TableListHeader title="Sections" />
+      <TableListHeader title="Sections" action={actions} />
 
       {/* Header Row */}
       <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_150px] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]">
-        <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
-          Coordinator
-        </div>
+        <SortHeader
+          field="coordinator"
+          label="Coordinator"
+          {...{ sortField, sortDir, onSort: handleSort }}
+        />
         <SortHeader
           field="section"
           label="Section"
           {...{ sortField, sortDir, onSort: handleSort }}
         />
-        <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
-          Date Created
-        </div>
+        <SortHeader
+          field="dateCreated"
+          label="Date Created"
+          {...{ sortField, sortDir, onSort: handleSort }}
+        />
         <SortHeader
           field="students"
           label="Students"

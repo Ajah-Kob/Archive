@@ -265,7 +265,7 @@ export async function removeFaculty(facultyId: number) {
 
   revalidateTag('faculty', 'max')
   revalidateTag('coordinators', 'max')
-  revalidateFeature('faculty-list')
+  revalidateFeature('faculties')
   revalidateFeature('sections')
 
   return { success: true, message: 'Faculty removed.' }
@@ -305,7 +305,7 @@ export async function joinFaculty(formData: FormData) {
 
   revalidateTag('users', 'max')
   revalidateTag('faculty', 'max')
-  revalidateFeature('faculty-list')
+  revalidateFeature('faculties')
 
   return { success: true, message: 'Faculty registration successful.' }
 }

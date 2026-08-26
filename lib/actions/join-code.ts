@@ -75,7 +75,7 @@ async function createJoinCode(type: JoinType) {
 
     revalidateTag('join-code', 'max')
     if (type === 'STUDENT') revalidateFeature('sections')
-    else revalidateFeature('faculty-list')
+    else revalidateFeature('faculties')
 
     return {
       success: true,

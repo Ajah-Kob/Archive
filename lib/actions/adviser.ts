@@ -53,7 +53,7 @@ export async function addAdviser(facultyId: number) {
     })
 
     revalidateTag('advisers', 'max')
-    revalidateFeature('faculty-list')
+    revalidateFeature('faculties')
 
     return {
       success: true,

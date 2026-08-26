@@ -31,7 +31,7 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 
 - **Role-based access** — `GUEST`, `STUDENT`, `FACULTY`, `ADMIN`, `SUPERADMIN`. Faculty hold adviser/coordinator records; Program Chair is a flag on `Faculty`, not a role.
 - **Join by invitation code** — guests join as student or faculty via a code (`/guest/join-archive`).
-- **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`); the workload-monitoring list lives at `/faculty/faculty-list`.
+- **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`); the workload-monitoring list lives at `/faculty/faculties`.
 - **Sections** — coordinators own sections, students enroll; the overview is the admin/program-chair view (duplicated at `/admin/sections` and `/faculty/sections`), and the coordinator's own section workspace lives at `/faculty/my-section/[sectionId]`.
 - **Templates** — capstone document templates (upload/remove), duplicated at `/admin/templates` and `/faculty/templates`.
 - **Repository** — capstone repository at `/repository` (shared by any role).
@@ -324,7 +324,7 @@ only wrap templates — they do NOT guard.
 | `/`                                          | Public                                         | `Default`            | Public landing                                   |
 | `/login`, `/signup`, `/forgot-password`, `/reset-password` | Public (redirect if authed via `proxy.ts`)     | `Blank`              | Auth pages                                       |
 | `/admin`, `/admin/users`, `/admin/sections`, `/admin/templates` | role `SUPERADMIN`/`ADMIN`                       | `Main`               | Admin only                                       |
-| `/faculty`, `/faculty/faculty-list`, `/faculty/sections`, `/faculty/templates` | admin or role `FACULTY` + sub-role flags | `Main` (full-bleed) | Workload monitoring, sections, templates         |
+| `/faculty`, `/faculty/faculties`, `/faculty/coordinators`, `/faculty/templates` | admin or role `FACULTY` + sub-role flags | `Main` (full-bleed) | Workload monitoring, coordinators, templates         |
 | `/faculty/evaluation`                        | `isAdviser` (advisers only)                    | `Main` (full-bleed)  | Adviser evaluation                               |
 | `/faculty/my-section/[sectionId]`            | `isCoordinator`                                | `Main` (full-bleed)  | Coordinator section workspace                    |
 | `/student`, `/student/milestone`, `/student/milestone/[milestone]` | role `STUDENT`                  | `Main` (full-bleed)  | Student capstone journey                         |

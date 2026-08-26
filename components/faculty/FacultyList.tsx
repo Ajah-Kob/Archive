@@ -1,15 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, ChevronDown, UserCog } from 'lucide-react'
+import { Search, ChevronDown } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { FacultyTable, type FacultyMember } from './FacultyTable'
 import { CopyJoinCode } from '@/components/faculty/CopyJoinCode'
-import { ManageCoodinatorDrawer } from '@/components/faculty/drawer/ManageCoodinatorDrawer'
 import { FacultyProfileDrawer } from '@/components/faculty/drawer/FacultyProfileDrawer'
 import { RemoveFacultyModal } from '@/components/faculty/modal/RemoveFacultyModal'
-import { useCoordinatorDrawer } from '@/store/useCoordinatorDrawer'
 import { useFacultyDrawer } from '@/store/useFacultyDrawer'
 import { getInitials } from '@/lib/helper'
 import { getFacultyMembers, removeFaculty } from '@/lib/actions/faculty'
@@ -60,7 +58,6 @@ export function FacultyList() {
     ? FILTER_OPTIONS
     : FILTER_OPTIONS.filter((o) => o.value !== 'coordinators')
 
-  const openCoordinatorDrawer = useCoordinatorDrawer((s) => s.open)
   const openFacultyDrawer = useFacultyDrawer((s) => s.open)
   const [raw, setRaw] = useState<RawMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -215,18 +212,7 @@ export function FacultyList() {
         </div>
 
         <div className="flex-1 flex justify-end gap-[10px]">
-          {viewerCanManage && (
-            <>
-              <button
-                onClick={openCoordinatorDrawer}
-                className="flex gap-[7px] items-center h-[37px] px-[15px] py-[9px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[13px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
-              >
-                <UserCog className="size-4" />
-                Manage Coordinators
-              </button>
-              <CopyJoinCode />
-            </>
-          )}
+          {viewerCanManage && <CopyJoinCode />}
         </div>
       </div>
 
@@ -252,7 +238,6 @@ export function FacultyList() {
         />
       )}
 
-      {viewerCanManage && <ManageCoodinatorDrawer />}
       <FacultyProfileDrawer />
       <RemoveFacultyModal
         isOpen={!!removeTarget}

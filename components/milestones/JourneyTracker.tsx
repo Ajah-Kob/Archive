@@ -188,8 +188,13 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                 {tip.row.label}
               </p>
               <p className="font-sans font-medium text-[10px] leading-[14px] text-[rgba(255,255,255,0.65)] whitespace-nowrap">
-                {STATUS_LABEL[tip.row.state]}
+                {tip.row.stateLabel ?? STATUS_LABEL[tip.row.state]}
               </p>
+              {tip.row.tooltipDetail && (
+                <p className="font-sans font-semibold text-[10px] leading-[14px] text-white whitespace-nowrap pt-[2px]">
+                  {tip.row.tooltipDetail}
+                </p>
+              )}
             </div>
             <div className="size-[8px] -mt-[4px] rotate-45 bg-[#12143a]" />
           </div>

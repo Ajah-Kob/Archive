@@ -1,9 +1,10 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag, revalidatePath, revalidateTag, updateTag } from 'next/cache'
+import { cacheLife, cacheTag, revalidateTag, updateTag } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
+import { revalidateFeature } from '@/lib/actions/revalidate'
 import type { SectionData } from '@/components/sections/main/SectionDataRow'
 import type { StudentData } from '@/components/sections/students/StudentDataRow'
 import { generateJoinCode, getInitials, timeAgo } from '@/lib/helper'
@@ -325,7 +326,7 @@ export async function joinSection(formData: FormData) {
     updateTag('sections')
     updateTag('my-sections')
     updateTag(`my-section-${joinCode.section.id}`)
-    revalidatePath('/sections')
+    revalidateFeature('sections')
 
     return { success: true, message: 'Successfully joined the section.' }
   } catch (error) {
@@ -358,7 +359,7 @@ export async function softDeleteSection(id: string) {
     })
 
     revalidateTag('sections', 'max')
-    revalidatePath('/dashboard/sections')
+    revalidateFeature('sections')
 
     return {
       success: true,
@@ -395,7 +396,7 @@ function revalidateCoordinatorCache(sectionId?: number) {
   revalidateTag('my-sections', 'max')
   revalidateTag('sections', 'max')
   revalidateTag('join-code', 'max')
-  revalidatePath('/sections')
+  revalidateFeature('sections')
   if (sectionId) revalidateTag(`my-section-${sectionId}`, 'max')
 }
 
@@ -512,7 +513,7 @@ async function getCoordinatorSectionData(sectionId: number) {
             include: {
               submissions: {
                 where: { deletedAt: null },
-                select: { status: true },
+                select: { status: true, deletedAt: true },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
               },
@@ -895,9 +896,18 @@ export async function setMilestoneAvailability(
       }
     }
 
-    revalidateTag(`my-section-${section.id}`, 'max')
-    revalidateTag('my-sections', 'max')
-    revalidateTag('sections', 'max')
+    // NOTE: revalidateTag(tag, { expire: 0 }) is used — not updateTag and not
+    // revalidateTag(tag, 'max'). updateTag is the read-your-own-writes
+    // revalidation API: it guarantees the acting coordinator sees their change
+    // but does not reliably invalidate cached data consumed by other users
+    // (the students), so their 'use cache' workspace/journey entries stay
+    // stale. The 'max' profile is stale-while-revalidate and would keep serving
+    // the old locked journey to the next student load. { expire: 0 } force-
+    // expires the tags immediately, so every student in the section sees the
+    // updated unlock state on their next load.
+    revalidateTag(`my-section-${section.id}`, { expire: 0 })
+    revalidateTag('my-sections', { expire: 0 })
+    revalidateTag('sections', { expire: 0 })
 
     // Students read availability through their per-user workspace / per-group
     // journey caches — bust every student in the section so the change shows
@@ -907,8 +917,8 @@ export async function setMilestoneAvailability(
       select: { userId: true, groupId: true },
     })
     for (const s of sectionStudents) {
-      if (s.userId) revalidateTag(`workspace-${s.userId}`, 'max')
-      if (s.groupId) revalidateTag(`journey-${s.groupId}`, 'max')
+      if (s.userId) revalidateTag(`workspace-${s.userId}`, { expire: 0 })
+      if (s.groupId) revalidateTag(`journey-${s.groupId}`, { expire: 0 })
     }
 
     return {
@@ -1195,7 +1205,7 @@ export async function removeStudentFromSection(studentId: number) {
 
     revalidateCoordinatorCache(student.sectionId)
     revalidateTag('users', 'max')
-    revalidatePath('/dashboard/users')
+    revalidateFeature('users')
     revalidateTag(`workspace-${student.userId}`, 'max')
     revalidateTag(`classmates-${student.userId}`, 'max')
     if (groupId) revalidateTag(`journey-${groupId}`, 'max')
@@ -1309,11 +1319,11 @@ export async function reviewTopic(
       },
     })
 
-    revalidateTag('my-sections', 'max')
-    revalidateTag(`my-section-${topic.group.sectionId}`, 'max')
-    revalidateTag(`journey-${topic.group.id}`, 'max')
+    revalidateTag('my-sections', { expire: 0 })
+    revalidateTag(`my-section-${topic.group.sectionId}`, { expire: 0 })
+    revalidateTag(`journey-${topic.group.id}`, { expire: 0 })
     for (const student of topic.group.students) {
-      revalidateTag(`workspace-${student.userId}`, 'max')
+      revalidateTag(`workspace-${student.userId}`, { expire: 0 })
     }
 
     return {
@@ -1416,7 +1426,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
           include: {
             submissions: {
               where: { deletedAt: null },
-              select: { status: true },
+              select: { status: true, deletedAt: true },
               orderBy: { createdAt: 'desc' },
               take: 1,
             },
@@ -1495,3 +1505,4 @@ export async function getCoordinatorGroupDetail(groupId: number) {
     }
   }
 }
+

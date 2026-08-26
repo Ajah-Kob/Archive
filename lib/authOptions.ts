@@ -80,7 +80,10 @@ export const authOptions: NextAuthOptions = {
       if (token.id) {
         const dbUser = await prisma.user.findFirst({
           where: { id: +(token.id as string), deletedAt: null },
-          include: { faculty: { include: { coordinator: true } }, student: true },
+          include: {
+            faculty: { include: { coordinator: true, adviser: true } },
+            student: true,
+          },
         })
         if (dbUser) {
           token.name = dbUser.name
@@ -94,6 +97,8 @@ export const authOptions: NextAuthOptions = {
           // explicitly so a removed coordinator loses their access flags.
           const coordinator = dbUser.faculty?.coordinator
           token.isCoordinator = !!coordinator && coordinator.deletedAt === null
+          const adviser = dbUser.faculty?.adviser
+          token.isAdviser = !!adviser && adviser.deletedAt === null
         }
       }
 
@@ -110,6 +115,7 @@ export const authOptions: NextAuthOptions = {
       session.user.isFaculty = token.isFaculty as boolean
       session.user.isStudent = token.isStudent as boolean
       session.user.isCoordinator = token.isCoordinator as boolean
+      session.user.isAdviser = token.isAdviser as boolean
 
       return session
     },

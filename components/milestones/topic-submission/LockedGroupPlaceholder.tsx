@@ -3,7 +3,7 @@ import { FileLock2 } from 'lucide-react'
 
 export function LockedGroupPlaceholder() {
   return (
-    <div className="h-full bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center px-[41px] py-[53px] text-center">
+    <div className="flex-1 min-h-0 bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center px-[41px] py-[53px] text-center">
       <div className="size-[96px] rounded-full bg-[#f4f5fc] flex items-center justify-center">
         <FileLock2 className="size-10 text-[#9ea8c6]" strokeWidth={1.75} />
       </div>
@@ -15,7 +15,7 @@ export function LockedGroupPlaceholder() {
         Milestones page, then return here to submit your topics.
       </p>
       <Link
-        href="/milestones"
+        href="/milestone"
         className="flex items-center justify-center h-[40px] px-[20px] rounded-[10px] text-[13px] font-semibold text-white shadow-[0px_4px_7px_rgba(112,125,255,0.32)] hover:opacity-95 transition-opacity"
         style={{
           backgroundImage: 'linear-gradient(165deg, #707dff 0%, #5565ff 100%)',

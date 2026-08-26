@@ -59,9 +59,10 @@ Pages use layouts defined in `templates/`:
 |---|---|---|
 | `Default` | Header + main + Footer | Public pages (home, etc.) |
 | `Blank` | Main only | Auth pages (login, signup, password reset) |
-| `Dashboard` | Aside + HeaderDashboard + main + Footer | All `/dashboard/*` routes |
+| `Main` | Aside + HeaderDashboard + main | Protected pages under `/admin`, `/faculty`, `/student`, `/account` role roots |
+| `Welcome` | Aside + main | Guest flow (`/guest`) |
 
-Route protection is done per-page using `getServerSession()` — there is no middleware.
+Route protection is centralized in `proxy.ts` (Next.js 16 proxy): role-root isolation + faculty sub-role checks from JWT flags. Layouts only wrap templates. Server actions additionally DB-check authorization on every call.
 
 ### Authentication model
 

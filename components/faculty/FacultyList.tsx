@@ -43,7 +43,7 @@ interface RawMember {
   activityStatus: 'active' | string
   isAdviser: boolean
   isCoordinator: boolean
-  adviseeCount: number
+  groupCount: number
   sectionsManaged: number
 }
 
@@ -126,7 +126,7 @@ export function FacultyList() {
           break
         }
         case 'workload':
-          cmp = a.adviseeCount - b.adviseeCount
+          cmp = a.groupCount - b.groupCount
           break
         case 'coordinator':
           cmp = a.sectionsManaged - b.sectionsManaged
@@ -143,7 +143,7 @@ export function FacultyList() {
         email: m.email,
         avatarGradient: gradients[m.id % gradients.length],
         activityStatus: m.activityStatus,
-        workload: { current: m.adviseeCount, max: ADVISER_CAP },
+        workload: { current: m.groupCount, max: ADVISER_CAP },
         isCoordinator: m.isCoordinator,
         sectionsManaged: m.sectionsManaged,
       }))

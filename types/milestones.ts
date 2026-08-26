@@ -20,6 +20,10 @@ export interface JourneyRow {
   header: 'CAPSTONE 1' | 'CAPSTONE 2'
   state: JourneyState
   sublabel?: string
+  /** Overrides the generic status text in tooltips (e.g., 'Selected'). */
+  stateLabel?: string
+  /** Extra tooltip line, e.g., '2 of 3 topics approved'. */
+  tooltipDetail?: string
 }
 
 export const JOURNEY_ROWS: ReadonlyArray<Omit<JourneyRow, 'state' | 'sublabel'>> =
@@ -138,6 +142,18 @@ export interface TopicSubmissionItem {
   reviewNote: string | null
   reviewedAt: string | null
   submittedBy: string | null
+  selectedAt?: string | null
+}
+
+export interface TopicSelectionPayload {
+  group: {
+    id: number
+    groupName: string
+    sectionId: number
+  } | null
+  journey: JourneyRow[]
+  topics: TopicSubmissionItem[]
+  confirmedTopicId: number | null
 }
 
 export interface TopicSubmissionPayload {
@@ -153,4 +169,97 @@ export interface TopicSubmissionPayload {
   cap: number
   hasApproved: boolean
   canSubmit: boolean
+}
+
+export type ChapterKey =
+  | 'CHAPTER_1'
+  | 'CHAPTER_2'
+  | 'CHAPTER_3'
+  | 'CHAPTER_4'
+  | 'CHAPTER_5'
+
+export const SLUG_TO_CHAPTER: Record<string, ChapterKey> = {
+  'chapter-1': 'CHAPTER_1',
+  'chapter-2': 'CHAPTER_2',
+  'chapter-3': 'CHAPTER_3',
+  'chapter-4': 'CHAPTER_4',
+  'chapter-5': 'CHAPTER_5',
+}
+
+export const CHAPTER_LABELS: Record<ChapterKey, string> = {
+  CHAPTER_1: 'Chapter 1',
+  CHAPTER_2: 'Chapter 2',
+  CHAPTER_3: 'Chapter 3',
+  CHAPTER_4: 'Chapter 4',
+  CHAPTER_5: 'Chapter 5',
+}
+
+export const CHAPTER_PHASE: Record<ChapterKey, 'CAPSTONE 1' | 'CAPSTONE 2'> = {
+  CHAPTER_1: 'CAPSTONE 1',
+  CHAPTER_2: 'CAPSTONE 1',
+  CHAPTER_3: 'CAPSTONE 1',
+  CHAPTER_4: 'CAPSTONE 2',
+  CHAPTER_5: 'CAPSTONE 2',
+}
+
+export type ChapterViewState =
+  | 'DEFAULT'
+  | 'IN_REVIEW'
+  | 'NEEDS_REVISION'
+  | 'APPROVED'
+
+export type SubmissionViewStatus =
+  | 'IN_REVIEW'
+  | 'NEEDS_REVISION'
+  | 'APPROVED'
+  | 'SUPERSEDED'
+
+/** Submission metadata for the adviser document workspace. */
+export interface SubmissionMeta {
+  id: number
+  groupName: string
+  chapter: string
+  phase: 'CAPSTONE 1' | 'CAPSTONE 2'
+  submittedBy: string
+  dateSubmitted: string
+  fileName: string
+  blobUrl: string
+  mimeType: string
+  size: number
+  status: SubmissionViewStatus
+  reviewedBy?: string | null
+  reviewedAt?: string | null
+  reviewNote?: string | null
+}
+
+export interface ChapterVersionItem {
+  id: number
+  version: number
+  fileName: string
+  blobUrl: string
+  mimeType: string
+  size: number
+  status: SubmissionViewStatus
+  submittedBy: string
+  submittedAt: string
+  reviewedAt: string | null
+  reviewNote: string | null
+  isCurrent: boolean
+  commentCount: number
+}
+
+export interface ChapterSubmissionPayload {
+  chapter: {
+    key: ChapterKey
+    label: string
+    phase: 'CAPSTONE 1' | 'CAPSTONE 2'
+  }
+  open: boolean
+  milestoneId: number | null
+  current: ChapterVersionItem | null
+  history: ChapterVersionItem[]
+  state: ChapterViewState
+  canSubmit: boolean
+  requiresCapstone: boolean
+  journey: JourneyRow[]
 }

@@ -100,6 +100,26 @@ export async function requireAdviser(): Promise<Session | null> {
   return adviser ? session : null
 }
 
+// Guards a server action for any faculty user (role FACULTY) or an admin.
+// Admins pass because they can reach the shared /faculty workspace pages.
+export async function requireFaculty(): Promise<Session | null> {
+  const session = await getSession()
+  if (!session?.user?.id) return null
+  const role = (session.user.role as string) ?? ''
+  if (ADMIN_ROLES.includes(role)) return session
+  if (session.user.isFaculty) return session
+  return null
+}
+
+// Guards a server action for guests — signed in users whose role is still
+// GUEST (i.e. they have not joined a section or the faculty yet).
+export async function requireGuest(): Promise<Session | null> {
+  const session = await getSession()
+  if (!session?.user?.id) return null
+  if ((session.user.role as string) !== 'GUEST') return null
+  return session
+}
+
 // Guards a server action for users with a student record.
 export async function requireStudent(): Promise<Session | null> {
   const session = await requireUser()

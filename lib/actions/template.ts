@@ -42,7 +42,11 @@ export async function getTemplates(search?: string) {
       }),
       rawCreatedAt: t.createdAt.toISOString(),
       uploadedBy: t.uploadedBy.name,
-      size: `${(t.size / (1024 * 1024)).toFixed(1)} MB`,
+      // Below 1 MB show KB; 1 MB and above show MB.
+      size:
+        t.size < 1024 * 1024
+          ? `${Math.round(t.size / 1024)} KB`
+          : `${(t.size / (1024 * 1024)).toFixed(1)} MB`,
       rawSize: t.size,
       fileUrl: t.blobUrl,
     }))

@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useRef, useTransition } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
 import { PasswordToggle } from '@/components/ui/PasswordToggle'
 import { useAuthFormValidity } from '@/components/forms/useAuthFormValidity'
-import { isValidEmail } from '@/lib/helper'
+import { isValidEmail, roleHome } from '@/lib/helper'
 
 export default function FormLogin({ className }: { className?: string }) {
   // Refs
@@ -16,6 +16,7 @@ export default function FormLogin({ className }: { className?: string }) {
   // Hooks
   const [pending, startTransition] = useTransition()
   const { isFormValid, checkFormValidity } = useAuthFormValidity(formRef)
+  const { update } = useSession()
 
   // State
   const [state, setState] = useState({
@@ -77,9 +78,14 @@ export default function FormLogin({ className }: { className?: string }) {
             },
           })
 
+          // Refresh the session so the role is available, then land on the
+          // role's home route.
+          const refreshed = await update()
+          const role = (refreshed?.user?.role as string) ?? 'GUEST'
+
           // Wait 1 second before redirecting
           setTimeout(() => {
-            window.location.href = '/dashboard'
+            window.location.href = roleHome(role)
           }, 1000)
         } else {
           setState({

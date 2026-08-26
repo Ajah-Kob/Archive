@@ -60,7 +60,7 @@ export function SectionsGroup({
     })
   }
 
-  const hasActive = sections.some((s) => pathname === `/${s.id}`)
+  const hasActive = sections.some((s) => pathname === `/faculty/my-section/${s.id}`)
   const expanded = hasActive || !collapsed
 
   return (
@@ -130,10 +130,10 @@ export function SectionsGroup({
             sections.map((s) => (
               <Link
                 key={s.id}
-                href={`/${s.id}?tab=students`}
-                aria-current={pathname === `/${s.id}` ? 'page' : undefined}
+                href={`/faculty/my-section/${s.id}?tab=students`}
+                aria-current={pathname === `/faculty/my-section/${s.id}` ? 'page' : undefined}
                 className={`flex items-center h-8 rounded-[8px] pl-[10px] pr-[10px] text-[13px] whitespace-nowrap truncate transition-colors ${
-                  pathname === `/${s.id}`
+                  pathname === `/faculty/my-section/${s.id}`
                     ? 'font-bold text-[#707dff] bg-[rgba(112,125,255,0.1)]'
                     : 'font-medium text-[#5a6382] hover:bg-[rgba(112,125,255,0.05)] hover:text-[#707dff]'
                 }`}

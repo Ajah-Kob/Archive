@@ -3,12 +3,14 @@
 import { useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { TriangleAlert } from 'lucide-react'
+import { ContextBar } from '@/components/globals/ContextBar'
 
 export type SectionTabKey = 'students' | 'progress' | 'topics'
 
 interface SectionTabsProps {
   activeTab: SectionTabKey
   pendingTopics: number
+  actions?: ReactNode
   studentsPanel: ReactNode
   progressPanel: ReactNode
   topicsPanel: ReactNode
@@ -23,6 +25,7 @@ const TABS: { key: SectionTabKey; label: string }[] = [
 export function SectionTabs({
   activeTab,
   pendingTopics,
+  actions,
   studentsPanel,
   progressPanel,
   topicsPanel,
@@ -44,7 +47,7 @@ export function SectionTabs({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-1 px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0">
+      <ContextBar actions={actions}>
         {TABS.map((t) => {
           const isActive = tab === t.key
           return (
@@ -71,7 +74,7 @@ export function SectionTabs({
             </button>
           )
         })}
-      </div>
+      </ContextBar>
 
       <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
         {panels[tab]}

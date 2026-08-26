@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { Plus_Jakarta_Sans, Sora } from 'next/font/google'
 import HydrationZustand from '@/templates/hydrationZustand'
+import { RouteTracker } from '@/components/globals/RouteTracker'
 import { Providers } from './providers'
 import { Toaster } from 'sonner'
 import './globals.css'
@@ -16,9 +18,9 @@ const sora = Sora({
 })
 
 export const metadata: Metadata = {
-  title: 'NEXT.js CRUD template with Zustand and NextAuth',
+  title: 'Archive',
   description:
-    'A template for building a CRUD application using NEXT.js, Zustand for state management, and NextAuth for authentication.',
+    'A capstone management system that unifies submission, review, and milestone tracking for the BSIS program.',
 }
 
 export default function RootLayout({
@@ -33,6 +35,10 @@ export default function RootLayout({
       >
         <Providers>
           <HydrationZustand>{children}</HydrationZustand>
+          {/* Suspense: usePathname() must not block static prerendering. */}
+          <Suspense fallback={null}>
+            <RouteTracker />
+          </Suspense>
           <Toaster
             richColors
             position="top-center"

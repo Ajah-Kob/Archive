@@ -4,6 +4,23 @@ export function isValidEmail(email: string): boolean {
   return emailRegex.test(email)
 }
 
+// Returns the role-root home route for a given role, falling back to /guest.
+// Used by the login flow, the proxy, and the Join flow to land users on their
+// own role's home page after auth changes.
+export function roleHome(role?: string | null): string {
+  switch (role) {
+    case 'SUPERADMIN':
+    case 'ADMIN':
+      return '/admin'
+    case 'FACULTY':
+      return '/faculty'
+    case 'STUDENT':
+      return '/student'
+    default:
+      return '/guest'
+  }
+}
+
 // Extracts initials from a full name (e.g. "Dr. Maria Santos" → "MS")
 export function getInitials(name: string): string {
   return name

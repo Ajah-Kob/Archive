@@ -76,4 +76,36 @@
   height: 30px;
 }
 
+/* Prevent native image drag inside the EmbedPDF document viewer. EmbedPDF
+   renders PDF pages as <img> elements; browsers treat images as draggable,
+   so mousedown+mouse moves start an HTML5 drag that (a) shows a drag ghost
+   with a no-drop cursor and (b) fires pointercancel, which breaks the
+   annotation tools (highlight selection never commits). */
+.epdf-viewer-area img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
+}
+
+/* Hover effect on annotations — a soft indigo outline appears when the
+   pointer is over an annotation's hit area. */
+.epdf-viewer-area [data-no-interaction]:hover {
+  outline: 1.5px solid rgba(112, 125, 255, 0.55);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Read-only annotation viewing (finalized evaluations): annotations render
+   but ignore all pointer interaction — no select, drag, or edit. Scoping to
+   the annotation wrappers ([data-no-interaction]) keeps page scroll and zoom
+   fully functional. Also disables the hover outline above. */
+.epdf-viewer-area.read-only [data-no-interaction] {
+  pointer-events: none;
+}
+.epdf-viewer-area.read-only [data-no-interaction]:hover {
+  outline: none;
+}
+
 

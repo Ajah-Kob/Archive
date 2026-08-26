@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
+import { revalidateTag } from 'next/cache'
 import { requireStudent, requireUser, unauthorized } from '@/lib/actions/guard'
 import { ADVISER_CAP } from '@/config/constants'
 import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
@@ -28,16 +28,13 @@ function revalidateAdviserCaches() {
 // ───────────────────────────── Reads ─────────────────────────────
 
 // The full student workspace: section, group (members / adviser / invites)
-// and the derived journey rows. Keyed by userId so 'use cache' stays per-user.
+// and the derived journey rows. Read uncached so topic status and the
+// journey always reflect the persisted state on every load.
 export async function getMyWorkspace(userId: number): Promise<{
   success: boolean
   message: string
   payload: WorkspaceData | null
 }> {
-  'use cache'
-  cacheTag(`workspace-${userId}`)
-  cacheLife('max')
-
   const student = await prisma.student.findFirst({
     where: { userId, deletedAt: null },
     include: {
@@ -93,7 +90,7 @@ export async function getMyWorkspace(userId: number): Promise<{
             include: {
               submissions: {
                 where: { deletedAt: null },
-                select: { status: true },
+                select: { status: true, deletedAt: true },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
               },
@@ -134,7 +131,6 @@ export async function getMyWorkspace(userId: number): Promise<{
   }
 
   const group = student.group
-  cacheTag(`journey-${group.id}`)
 
   const isLeader = group.leaderStudentId === student.id
   const members = group.students.map((s) => ({
@@ -151,15 +147,11 @@ export async function getMyWorkspace(userId: number): Promise<{
 
   if (group.adviser) {
     const adviserRecord = group.adviser
-    const [groupCount, capstoneCount] = await prisma.$transaction([
-      prisma.group.count({
-        where: { adviserId: adviserRecord.id, deletedAt: null },
-      }),
-      prisma.capstone.count({
-        where: { adviserId: adviserRecord.id, deletedAt: null },
-      }),
-    ])
-    const workload = groupCount + capstoneCount
+    // Workload = distinct groups currently advised. Capstone.adviserId is a
+    // denormalized snapshot — never sum it on top of Group.adviserId.
+    const workload = await prisma.group.count({
+      where: { adviserId: adviserRecord.id, deletedAt: null },
+    })
     adviser = {
       state: 'assigned',
       canManage: isLeader,
@@ -343,7 +335,6 @@ export async function getAvailableAdvisers(): Promise<{
       adviser: {
         include: {
           groups: { where: { deletedAt: null }, select: { id: true } },
-          capstones: { where: { deletedAt: null }, select: { id: true } },
         },
       },
     },
@@ -351,8 +342,7 @@ export async function getAvailableAdvisers(): Promise<{
   })
 
   const payload: AdviserOption[] = faculty.map((f) => {
-    const workload =
-      (f.adviser?.groups.length ?? 0) + (f.adviser?.capstones.length ?? 0)
+    const workload = f.adviser?.groups.length ?? 0
     return {
       id: f.id,
       userId: f.userId,

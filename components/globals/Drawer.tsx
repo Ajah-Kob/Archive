@@ -49,10 +49,10 @@ export default function Drawer() {
         {isAdmin && (
           <nav className="p-2 flex flex-col gap-1">
             <Link
-              href="/dashboard/users"
+              href="/admin/users"
               onClick={toggle}
               className={`flex items-center gap-3 px-3 py-2 rounded animated hover:bg-tertiary ${
-                pathname === '/dashboard/users' ? 'bg-tertiary font-medium' : ''
+                pathname === '/admin/users' ? 'bg-tertiary font-medium' : ''
               }`}
             >
               <Users size={24} />

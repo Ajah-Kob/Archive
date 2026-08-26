@@ -102,7 +102,7 @@ export default function DrawerProfile() {
             {(session?.user?.role === 'SUPERADMIN' ||
               session?.user?.role === 'ADMIN') && (
               <Link
-                href="/dashboard"
+                href="/admin"
                 className={menuLinkClass}
                 onClick={() => setIsOpen(false)}
               >
@@ -112,7 +112,7 @@ export default function DrawerProfile() {
             )}
 
             <Link
-              href="/dashboard/user/profile"
+              href="/account/profile"
               className={menuLinkClass}
               onClick={() => setIsOpen(false)}
             >
@@ -121,7 +121,7 @@ export default function DrawerProfile() {
             </Link>
 
             <Link
-              href="/dashboard/user/security"
+              href="/account/security"
               className={menuLinkClass}
               onClick={() => setIsOpen(false)}
             >

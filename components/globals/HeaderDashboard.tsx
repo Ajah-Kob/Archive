@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import NotificationPanel from '@/components/notifications/NotificationPanel'
 import DrawerProfile from '@/components/globals/DrawerProfile'
+import HeaderBreadcrumb from '@/components/globals/HeaderBreadcrumb'
 import ButtonDrawer from '@/components/ui/ButtonDrawer'
 
 export default async function HeaderDashboard() {
@@ -14,6 +15,7 @@ export default async function HeaderDashboard() {
         >
           ARCHIVE
         </Link>
+        <HeaderBreadcrumb />
       </div>
 
       <div className="flex-1" />

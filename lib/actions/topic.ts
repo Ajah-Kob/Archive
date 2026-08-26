@@ -1,11 +1,12 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
+import { revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
 import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
 import { TOPIC_CAP } from '@/types/milestones'
 import type {
+  TopicSelectionPayload,
   TopicSubmissionItem,
   TopicSubmissionPayload,
   TopicSubmissionStatus,
@@ -13,18 +14,25 @@ import type {
 
 // Revalidates every cache that surfaces a group's topics: each member's
 // workspace, the journey, and the coordinator's section views (topic queue).
-function revalidateGroupTopics(group: {
-  id: number
-  sectionId: number
-  students: { userId: number }[]
-}) {
+// Pass `{ expireNow: true }` to force-expire the tags (revalidateTag with
+// { expire: 0 }) instead of stale-while-revalidate, so the acting user's next
+// load reflects the change immediately.
+function revalidateGroupTopics(
+  group: {
+    id: number
+    sectionId: number
+    students: { userId: number }[]
+  },
+  opts?: { expireNow?: boolean },
+) {
+  const config = opts?.expireNow ? ({ expire: 0 } as const) : 'max'
   for (const student of group.students) {
-    revalidateTag(`workspace-${student.userId}`, 'max')
+    revalidateTag(`workspace-${student.userId}`, config)
   }
-  revalidateTag(`journey-${group.id}`, 'max')
-  revalidateTag(`my-section-${group.sectionId}`, 'max')
-  revalidateTag('my-sections', 'max')
-  revalidateTag('sections', 'max')
+  revalidateTag(`journey-${group.id}`, config)
+  revalidateTag(`my-section-${group.sectionId}`, config)
+  revalidateTag('my-sections', config)
+  revalidateTag('sections', config)
 }
 
 // The authenticated student plus their live group (with active members), or
@@ -36,7 +44,11 @@ async function getStudentGroup() {
     where: { userId: +session.user.id, deletedAt: null },
     include: {
       group: {
-        include: {
+        select: {
+          id: true,
+          groupName: true,
+          sectionId: true,
+          adviserId: true,
           students: {
             where: { deletedAt: null },
             select: { userId: true },
@@ -58,6 +70,7 @@ function toItem(
     updatedAt: Date
     reviewNote: string | null
     reviewedAt: Date | null
+    selectedAt: Date | null
     uploadedBy: { user: { name: string } } | null
   },
   index: number,
@@ -75,20 +88,17 @@ function toItem(
     reviewNote: topic.reviewNote,
     reviewedAt: topic.reviewedAt ? topic.reviewedAt.toISOString() : null,
     submittedBy: topic.uploadedBy?.user.name ?? null,
+    selectedAt: topic.selectedAt ? topic.selectedAt.toISOString() : null,
   }
 }
 
 // ───────────────────────────── Read ─────────────────────────────
 
-// All data for the Topic Submission workspace, keyed per user so 'use cache'
-// stays isolated. Derives version numbers from topicGroupKey chains.
-export async function getTopicSubmissionData(
-  userId: number,
-): Promise<{ success: boolean; message: string; payload: TopicSubmissionPayload | null }> {
-  'use cache'
-  cacheTag(`workspace-${userId}`)
-  cacheLife('max')
-
+// Shared loader for both the Topic Submission and Topic Selection workspaces.
+// Returns the authenticated student's section availability, group, and the
+// revision-chain items (topics + history) derived from topicGroupKey, plus the
+// confirmed capstone topic id. Null when the user has no student record.
+async function loadTopicWorkspace(userId: number) {
   const student = await prisma.student.findFirst({
     where: { userId, deletedAt: null },
     include: {
@@ -117,7 +127,7 @@ export async function getTopicSubmissionData(
             include: {
               submissions: {
                 where: { deletedAt: null },
-                select: { status: true },
+                select: { status: true, deletedAt: true },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
               },
@@ -129,9 +139,7 @@ export async function getTopicSubmissionData(
     },
   })
 
-  if (!student) {
-    return { success: false, message: 'Not authorized', payload: null }
-  }
+  if (!student) return null
 
   const availability = resolveSectionAvailability(
     !!student.section.capstone2OpenedAt,
@@ -140,20 +148,7 @@ export async function getTopicSubmissionData(
 
   const group = student.group
   if (!group) {
-    return {
-      success: true,
-      message: '',
-      payload: {
-        group: null,
-        journey: buildJourneyRows(null, availability),
-        topics: [],
-        history: [],
-        count: 0,
-        cap: TOPIC_CAP,
-        hasApproved: false,
-        canSubmit: false,
-      },
-    }
+    return { availability, group: null, topics: [], history: [], capstoneTopicId: null }
   }
 
   // Group every topic into its revision chain (topicGroupKey). Legacy rows
@@ -189,21 +184,62 @@ export async function getTopicSubmissionData(
   topics.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   history.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
+  return {
+    availability,
+    group,
+    topics,
+    history,
+    capstoneTopicId: group.capstone?.topicId ?? null,
+  }
+}
+
+function buildJourneySource(
+  group: NonNullable<Awaited<ReturnType<typeof loadTopicWorkspace>>['group']>,
+) {
+  return {
+    topics: group.topics.map((t) => ({ status: t.status, deletedAt: t.deletedAt })),
+    capstone: group.capstone,
+    milestones: group.milestones.map((m) => ({
+      chapter: m.chapter,
+      submissions: m.submissions,
+    })),
+    capstoneArchive: group.capstoneArchive,
+  }
+}
+
+// All data for the Topic Submission workspace. Read uncached so topic
+// status, versions, and the journey reflect the persisted state immediately.
+export async function getTopicSubmissionData(
+  userId: number,
+): Promise<{ success: boolean; message: string; payload: TopicSubmissionPayload | null }> {
+  const loaded = await loadTopicWorkspace(userId)
+  if (!loaded) {
+    return { success: false, message: 'Not authorized', payload: null }
+  }
+
+  const { availability, group, topics, history, capstoneTopicId } = loaded
+
+  if (!group) {
+    return {
+      success: true,
+      message: '',
+      payload: {
+        group: null,
+        journey: buildJourneyRows(null, availability),
+        topics: [],
+        history: [],
+        count: 0,
+        cap: TOPIC_CAP,
+        hasApproved: false,
+        canSubmit: false,
+      },
+    }
+  }
+
   const count = topics.length
   const hasApproved = topics.some((t) => t.status === 'APPROVED')
 
-  const journey = buildJourneyRows(
-    {
-      topics: group.topics.map((t) => ({ status: t.status, deletedAt: t.deletedAt })),
-      capstone: group.capstone,
-      milestones: group.milestones.map((m) => ({
-        chapter: m.chapter,
-        submissions: m.submissions,
-      })),
-      capstoneArchive: group.capstoneArchive,
-    },
-    availability,
-  )
+  const journey = buildJourneyRows(buildJourneySource(group), availability)
 
   return {
     success: true,
@@ -221,6 +257,50 @@ export async function getTopicSubmissionData(
       cap: TOPIC_CAP,
       hasApproved,
       canSubmit: !hasApproved && count < TOPIC_CAP,
+    },
+  }
+}
+
+// All data for the Topic Selection workspace. Returns the active submitted
+// topics (with their pending selection state via selectedAt) plus the
+// confirmed final topic id (Capstone.topicId) once it has been confirmed.
+export async function getTopicSelectionData(
+  userId: number,
+): Promise<{ success: boolean; message: string; payload: TopicSelectionPayload | null }> {
+  const loaded = await loadTopicWorkspace(userId)
+  if (!loaded) {
+    return { success: false, message: 'Not authorized', payload: null }
+  }
+
+  const { availability, group, topics, capstoneTopicId } = loaded
+
+  if (!group) {
+    return {
+      success: true,
+      message: '',
+      payload: {
+        group: null,
+        journey: buildJourneyRows(null, availability),
+        topics: [],
+        confirmedTopicId: null,
+      },
+    }
+  }
+
+  const journey = buildJourneyRows(buildJourneySource(group), availability)
+
+  return {
+    success: true,
+    message: '',
+    payload: {
+      group: {
+        id: group.id,
+        groupName: group.groupName,
+        sectionId: group.sectionId,
+      },
+      journey,
+      topics,
+      confirmedTopicId: capstoneTopicId,
     },
   }
 }
@@ -277,7 +357,7 @@ export async function submitTopic(_prevState: any, formData: FormData) {
     },
   })
 
-  revalidateGroupTopics(group)
+  revalidateGroupTopics(group, { expireNow: true })
   return { success: true, message: 'Topic submitted for review.' }
 }
 
@@ -346,6 +426,108 @@ export async function resubmitTopic(
     }),
   ])
 
-  revalidateGroupTopics(group)
+  revalidateGroupTopics(group, { expireNow: true })
   return { success: true, message: 'Topic resubmitted for review.' }
+}
+
+// Marks an approved topic as the group's pending final topic selection.
+// Only approved topics can be selected, only one at a time, and only before
+// the selection has been confirmed (a Capstone row exists).
+export async function setSelectedTopic(topicId: number) {
+  const student = await getStudentGroup()
+  if (!student?.group) return unauthorized
+
+  const group = student.group
+
+  const topic = await prisma.topic.findFirst({
+    where: {
+      id: topicId,
+      groupId: group.id,
+      deletedAt: null,
+      status: 'APPROVED',
+    },
+    select: { id: true, selectedAt: true },
+  })
+  if (!topic) {
+    return { success: false, message: 'Only approved topics can be selected.' }
+  }
+
+  const capstone = await prisma.capstone.findUnique({
+    where: { groupId: group.id },
+    select: { id: true },
+  })
+  if (capstone) {
+    return {
+      success: false,
+      message: 'The capstone topic has already been confirmed and cannot be changed.',
+    }
+  }
+
+  if (topic.selectedAt) {
+    await prisma.topic.update({
+      where: { id: topicId },
+      data: { selectedAt: null },
+    })
+    revalidateGroupTopics(group, { expireNow: true })
+    return { success: true, message: 'Topic unselected.' }
+  }
+
+  await prisma.$transaction([
+    prisma.topic.updateMany({
+      where: { groupId: group.id, deletedAt: null, NOT: { id: topicId } },
+      data: { selectedAt: null },
+    }),
+    prisma.topic.update({
+      where: { id: topicId },
+      data: { selectedAt: new Date() },
+    }),
+  ])
+
+  revalidateGroupTopics(group, { expireNow: true })
+  return { success: true, message: 'Topic selected.' }
+}
+
+// Confirms the pending selection as the group's final capstone topic by
+// creating the Capstone row. Once confirmed, the selection is final.
+export async function confirmTopicSelection(topicId: number) {
+  const student = await getStudentGroup()
+  if (!student?.group) return unauthorized
+
+  const group = student.group
+
+  const topic = await prisma.topic.findFirst({
+    where: {
+      id: topicId,
+      groupId: group.id,
+      deletedAt: null,
+      status: 'APPROVED',
+      selectedAt: { not: null },
+    },
+    select: { id: true },
+  })
+  if (!topic) {
+    return { success: false, message: 'Select an approved topic before confirming.' }
+  }
+
+  const capstone = await prisma.capstone.findUnique({
+    where: { groupId: group.id },
+    select: { id: true },
+  })
+  if (capstone) {
+    return {
+      success: false,
+      message: 'The capstone topic has already been confirmed and cannot be changed.',
+    }
+  }
+
+  await prisma.capstone.create({
+    data: {
+      groupId: group.id,
+      topicId,
+      adviserId: group.adviserId ?? null,
+    },
+  })
+
+  revalidateGroupTopics(group, { expireNow: true })
+  return { success: true, message: 'Topic confirmed as your final capstone topic.' }
 }

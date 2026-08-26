@@ -39,8 +39,10 @@ model User {
   templates            Template[]
   capstoneArchives     CapstoneArchive[]
   milestoneSubmissions MilestoneSubmission[]
-  invitationsSent      Invitation[]          @relation("InvitationSender")
-  topicReviews         Topic[]               @relation("TopicReviewer")
+  submissionAnnotations SubmissionAnnotation[]
+  invitationsSent              Invitation[]          @relation("InvitationSender")
+  topicReviews                 Topic[]               @relation("TopicReviewer")
+  milestoneSubmissionsReviewed MilestoneSubmission[] @relation("MilestoneSubmissionReviewer")
 
   @@index([email, deletedAt])
 }
@@ -268,6 +270,7 @@ model Topic {
   reviewedById Int?
   reviewedBy   User?       @relation("TopicReviewer", fields: [reviewedById], references: [id])
   reviewedAt   DateTime?
+  selectedAt   DateTime?
   capstone     Capstone?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -325,6 +328,7 @@ model Milestone {
   updatedAt   DateTime              @updatedAt
   deletedAt   DateTime?
 
+  @@unique([groupId, chapter])
   @@index([groupId])
   @@index([capstoneId])
   @@index([deletedAt])
@@ -336,23 +340,54 @@ enum SubmissionStatus {
   APPROVED
 }
 
+enum AnnotationStatus {
+  DRAFT      // auto-saved, adviser-only
+  COMMITTED  // visible to the group once verdict is submitted
+}
+
 model MilestoneSubmission {
-  id          Int              @id @default(autoincrement())
-  milestoneId Int
-  milestone   Milestone        @relation(fields: [milestoneId], references: [id])
-  submittedBy Int
-  user        User             @relation(fields: [submittedBy], references: [id])
-  fileName    String
-  blobUrl     String
-  mimeType    String
-  size        Int
-  status      SubmissionStatus @default(PENDING)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  deletedAt   DateTime?
+  id           Int              @id @default(autoincrement())
+  milestoneId  Int
+  milestone    Milestone        @relation(fields: [milestoneId], references: [id])
+  submittedBy  Int
+  user         User             @relation(fields: [submittedBy], references: [id])
+  fileName     String
+  blobUrl      String
+  mimeType     String
+  size         Int
+  status       SubmissionStatus @default(PENDING)
+  reviewedAt   DateTime?
+  reviewNote   String?
+  reviewedById Int?
+  reviewedBy   User?            @relation("MilestoneSubmissionReviewer", fields: [reviewedById], references: [id])
+  annotations  SubmissionAnnotation[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
 
   @@index([milestoneId])
   @@index([submittedBy])
+  @@index([deletedAt])
+}
+
+// Adviser/panelist in-PDF annotations on a submission. One row per
+// (submission, author); `data` holds the serialized AnnotationTransferItem[]
+// JSON export (stamp ArrayBuffers base64-encoded). DRAFT rows are private to
+// the author; COMMITTED rows are visible to the group once a verdict is
+// submitted.
+model SubmissionAnnotation {
+  id           Int                @id @default(autoincrement())
+  submissionId Int
+  submission   MilestoneSubmission @relation(fields: [submissionId], references: [id])
+  authorId     Int
+  author       User               @relation(fields: [authorId], references: [id])
+  data         Json
+  status       AnnotationStatus   @default(DRAFT)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+
+  @@unique([submissionId, authorId])
   @@index([deletedAt])
 }
 

@@ -1,7 +1,6 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { Users } from 'lucide-react'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { ActivityStatus } from '@/components/ui/ActivityStatus'
 
@@ -44,8 +43,7 @@ export function StudentDataRow({ data, renderActions }: StudentDataRowProps) {
 
       <div className="min-w-0 pr-4">
         {data.group ? (
-          <span className="inline-flex items-center gap-2 px-[10px] py-[4px] bg-[#f4f6ff] border border-[#e5e8ff] rounded-full font-sans font-semibold text-[11px] leading-[16.5px] text-[#707dff] whitespace-nowrap">
-            <Users className="size-[11px]" />
+          <span className="block truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3d4566]">
             {data.group.name}
           </span>
         ) : (

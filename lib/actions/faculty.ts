@@ -8,7 +8,8 @@ import {
   unstable_cacheTag as cacheTag,
   unstable_cacheLife as cacheLife,
 } from 'next/cache'
-import { revalidatePath, revalidateTag } from 'next/cache'
+import { revalidateTag } from 'next/cache'
+import { revalidateFeature } from '@/lib/actions/revalidate'
 
 // A faculty member is considered "active now" if they signed in within this window.
 const ACTIVE_NOW_MS = 5 * 60 * 1000
@@ -74,10 +75,7 @@ export async function getFacultyMembers() {
       adviser: {
         include: {
           _count: {
-            select: {
-              capstones: { where: { deletedAt: null } },
-              groups: { where: { deletedAt: null } },
-            },
+            select: { groups: { where: { deletedAt: null } } },
           },
         },
       },
@@ -98,9 +96,9 @@ export async function getFacultyMembers() {
       activityStatus: activityStatusFor(f.user.loggedInAt),
       isAdviser,
       isCoordinator,
-      adviseeCount: isAdviser
-        ? f.adviser._count.capstones + f.adviser._count.groups
-        : 0,
+      // Workload = distinct groups currently advised. Capstone.adviserId is a
+      // denormalized snapshot — never sum it on top of Group.adviserId.
+      groupCount: isAdviser ? f.adviser._count.groups : 0,
       sectionsManaged: isCoordinator ? f.coordinator._count.section : 0,
     }
   })
@@ -134,20 +132,15 @@ export async function getFacultyMemberDetail(facultyId: number) {
       },
       adviser: {
         include: {
-          capstones: {
+          groups: {
             where: { deletedAt: null },
             include: {
-              group: {
-                include: {
-                  students: {
-                    where: { deletedAt: null },
-                    include: { section: true },
-                  },
-                },
+              students: {
+                where: { deletedAt: null },
+                include: { section: true },
               },
             },
           },
-          groups: { where: { deletedAt: null }, select: { id: true } },
         },
       },
     },
@@ -159,18 +152,20 @@ export async function getFacultyMemberDetail(facultyId: number) {
 
   const isAdviser = !!faculty.adviser && faculty.adviser.deletedAt === null
   const isCoordinator = !!faculty.coordinator && faculty.coordinator.deletedAt === null
-  const capstones = isAdviser ? faculty.adviser.capstones : []
+  const advisedGroups = isAdviser ? faculty.adviser.groups : []
 
   const roles: string[] = []
   if (isAdviser) roles.push('Adviser')
   if (isCoordinator) roles.push('Coordinator')
 
-  const groups = capstones.map((capstone) => {
-    const liveStudents = capstone.group.students
+  // List every advised group (not just those with a confirmed capstone) so
+  // this list matches the workload count in the faculty table.
+  const groups = advisedGroups.map((group) => {
+    const liveStudents = group.students
     const section = liveStudents[0]?.section
     return {
-      id: capstone.group.id,
-      name: capstone.group.groupName,
+      id: group.id,
+      name: group.groupName,
       sectionLabel: section ? section.section : 'No section',
       memberCount: liveStudents.length,
     }
@@ -187,8 +182,7 @@ export async function getFacultyMemberDetail(facultyId: number) {
       loggedInAt: faculty.user.loggedInAt,
       activityStatus: activityStatusFor(faculty.user.loggedInAt),
       roles,
-      adviseeCount:
-        capstones.length + (faculty.adviser?.groups.length ?? 0),
+      groupCount: advisedGroups.length,
       sectionsManaged: isCoordinator ? faculty.coordinator._count.section : 0,
       groups,
     },
@@ -219,20 +213,16 @@ export async function removeFaculty(facultyId: number) {
     where: { facultyId, deletedAt: null },
     include: {
       _count: {
-        select: {
-          capstones: { where: { deletedAt: null } },
-          groups: { where: { deletedAt: null } },
-        },
+        select: { groups: { where: { deletedAt: null } } },
       },
     },
   })
 
-  const adviseeCount =
-    (adviser?._count.capstones ?? 0) + (adviser?._count.groups ?? 0)
-  if (adviseeCount > 0) {
+  const groupCount = adviser?._count.groups ?? 0
+  if (groupCount > 0) {
     return {
       success: false,
-      message: `Cannot remove faculty with ${adviseeCount} advisee group(s). Reassign the groups first.`,
+      message: `Cannot remove faculty with ${groupCount} advisee group(s). Reassign the groups first.`,
     }
   }
 
@@ -275,8 +265,8 @@ export async function removeFaculty(facultyId: number) {
 
   revalidateTag('faculty', 'max')
   revalidateTag('coordinators', 'max')
-  revalidatePath('/faculty')
-  revalidatePath('/sections')
+  revalidateFeature('faculty-list')
+  revalidateFeature('sections')
 
   return { success: true, message: 'Faculty removed.' }
 }
@@ -315,7 +305,7 @@ export async function joinFaculty(formData: FormData) {
 
   revalidateTag('users', 'max')
   revalidateTag('faculty', 'max')
-  revalidatePath('/faculty')
+  revalidateFeature('faculty-list')
 
   return { success: true, message: 'Faculty registration successful.' }
 }
@@ -360,7 +350,7 @@ export async function toggleProgramChair(id: number) {
     })
 
     revalidateTag('users', 'max')
-    revalidatePath('/dashboard/users')
+    revalidateFeature('users')
 
     return {
       success: true,

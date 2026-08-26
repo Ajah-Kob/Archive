@@ -8,7 +8,7 @@ Read this before making any changes. This is the canonical reference for AI agen
 
 - **Soft-delete is mandatory.** Every `User` query needs `where: { deletedAt: null }`.
 - **next-auth v4 only.** Do NOT use v5/Auth.js APIs.
-- **No middleware.ts.** Each dashboard page calls `getServerSession()` itself.
+- **Route protection lives in `proxy.ts`** (Next.js 16 proxy). Layouts only wrap templates — they do NOT guard. Server actions still DB-check authorization themselves.
 - **Prisma 7 with Neon adapter.** Always use the singleton at `@/lib/prisma.ts`.
 - **Two caching mechanisms** — do not confuse them:
   - `'use cache'` (persistent, tag-based) for list/detail reads
@@ -30,16 +30,16 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 **Feature areas**
 
 - **Role-based access** — `GUEST`, `STUDENT`, `FACULTY`, `ADMIN`, `SUPERADMIN`. Faculty hold adviser/coordinator records; Program Chair is a flag on `Faculty`, not a role.
-- **Join by invitation code** — guests join as student or faculty via a code (`/join-archive`).
-- **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`).
-- **Sections** — coordinators own sections, students enroll; monitored via `/sections` and `/sections/[slug]`.
-- **Templates** — capstone document templates (upload/remove) at `/templates`.
-- **Repository** — capstone repository at `/repository`.
+- **Join by invitation code** — guests join as student or faculty via a code (`/guest/join-archive`).
+- **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`); the workload-monitoring list lives at `/faculty/faculty-list`.
+- **Sections** — coordinators own sections, students enroll; the overview is the admin/program-chair view (duplicated at `/admin/sections` and `/faculty/sections`), and the coordinator's own section workspace lives at `/faculty/my-section/[sectionId]`.
+- **Templates** — capstone document templates (upload/remove), duplicated at `/admin/templates` and `/faculty/templates`.
+- **Repository** — capstone repository at `/repository` (shared by any role).
 - **Notifications** — in-app notification panel in the aside footer.
-- **Admin** — user management at `/dashboard/users`; soft-delete.
+- **Admin** — user management at `/admin/users`; soft-delete.
+- **Account** — profile/security shared by all roles at `/account/profile` and `/account/security`.
 
-**Planned (aside nav placeholders, no pages yet):** Milestones, Defense,
-Calendar.
+**Planned (aside nav placeholders, no pages yet):** Defense, Calendar.
 
 **Workflow docs:** the complete capstone lifecycle — coordinator assignment → section management → group management → adviser assignment → Capstone 1 (topic, ch. 1–3, adviser review, proposal defense) → Capstone 2 (ch. 4–5, final defense) → progress monitoring — is documented in `docs/workflow/`. Start at `docs/workflow/00-overview.md`; each numbered file (`01-…`–`10-…`) details one business process.
 
@@ -51,21 +51,23 @@ Calendar.
 
 ## Tech Stack (exact versions)
 
-| Layer          | Package                     | Version                       |
-| -------------- | --------------------------- | ----------------------------- |
-| Framework      | `next`                      | 16.2.4                        |
-| React          | `react` / `react-dom`       | 19.2.x                        |
-| Auth           | `next-auth`                 | 4.24.x                        |
-| ORM            | `prisma` / `@prisma/client` | 7.x                           |
-| DB driver      | `@neondatabase/serverless`  | 1.x                           |
-| Prisma adapter | `@prisma/adapter-neon`      | 7.x                           |
-| File storage   | `@vercel/blob`              | 2.x                           |
-| State          | `zustand`                   | 5.x                           |
-| Email          | `nodemailer`                | 7.x                           |
-| Toasts         | `sonner`                    | 2.x                           |
-| Icons          | `lucide-react`              | 1.x                           |
-| CSS            | `tailwindcss`               | 4.x (PostCSS, no config file) |
-| TypeScript     | `typescript`                | 6.x                           |
+| Layer          | Package                                | Version                       |
+|————————————————|————————————————————————————————————————|———————————————————————————————|
+| Framework      | `next`                                 | 16.2.4                        |
+| React          | `react` / `react-dom`                  | 19.2.x                        |
+| Auth           | `next-auth`                            | 4.24.x                        |
+| ORM            | `prisma` / `@prisma/client`            | 7.x                           |
+| DB driver      | `@neondatabase/serverless`             | 1.x                           |
+| Prisma adapter | `@prisma/adapter-neon`                 | 7.x                           |
+| File storage   | `@vercel/blob`                         | 2.x                           |
+| State          | `zustand`                              | 5.x                           |
+| Email          | `nodemailer`                           | 7.x                           |
+| Toasts         | `sonner`                               | 2.x                           |
+| Icons          | `lucide-react`                         | 1.x                           |
+| PDF viewing    | `@embedpdf/react-pdf-viewer`           | 2.15.x                        |
+| PDF engine     | `@embedpdf/core` / `@embedpdf/engines` | 2.15.x                        |
+| CSS            | `tailwindcss`                          | 4.x (PostCSS, no config file) |
+| TypeScript     | `typescript`                           | 6.x                           |
 
 **TypeScript strict mode is OFF** — `"strict": false` in tsconfig.
 
@@ -313,27 +315,50 @@ Wrap components reading Zustand state in `<HydrationZustand>` (from `templates/h
 
 ## Routing & Templates
 
-| Route                                                      | Protection                  | Template    | Notes                                 |
-| ---------------------------------------------------------- | --------------------------- | ----------- | ------------------------------------- |
-| `/`                                                        | Public                      | `Default`   |                                       |
-| `/login`, `/signup`, `/forgot-password`, `/reset-password` | Public (redirect if authed) | `Blank`     |                                       |
-| `/dashboard/*`                                             | Auth required               | `Dashboard` | Each page checks `getServerSession()` |
+Routes are organized under role roots. `proxy.ts` is the single authority for
+route protection (role isolation + sub-role checks from JWT flags). Layouts
+only wrap templates — they do NOT guard.
 
-**No middleware.ts exists.** Do not create one. Route protection is per-page.
+| Route                                        | Protection (in `proxy.ts`)                     | Template             | Notes                                            |
+| -------------------------------------------- | ---------------------------------------------- | -------------------- | ------------------------------------------------ |
+| `/`                                          | Public                                         | `Default`            | Public landing                                   |
+| `/login`, `/signup`, `/forgot-password`, `/reset-password` | Public (redirect if authed via `proxy.ts`)     | `Blank`              | Auth pages                                       |
+| `/admin`, `/admin/users`, `/admin/sections`, `/admin/templates` | role `SUPERADMIN`/`ADMIN`                       | `Main`               | Admin only                                       |
+| `/faculty`, `/faculty/faculty-list`, `/faculty/sections`, `/faculty/templates` | admin or role `FACULTY` + sub-role flags | `Main` (full-bleed) | Workload monitoring, sections, templates         |
+| `/faculty/evaluation`                        | `isAdviser` (advisers only)                    | `Main` (full-bleed)  | Adviser evaluation                               |
+| `/faculty/my-section/[sectionId]`            | `isCoordinator`                                | `Main` (full-bleed)  | Coordinator section workspace                    |
+| `/student`, `/student/milestone`, `/student/milestone/[milestone]` | role `STUDENT`                  | `Main` (full-bleed)  | Student capstone journey                         |
+| `/guest`, `/guest/join-archive`              | role `GUEST`                                   | `Welcome`            | Guest join-by-invite-code flow                   |
+| `/account/profile`, `/account/security`      | any signed-in user                             | `Main`               | Shared profile/security                          |
+| `/repository`                                | none (any role)                                | `Main`               | Shared capstone repository                       |
+
+`proxy.ts` (Next.js 16 proxy, not `middleware.ts`) reads the JWT via
+`getToken()`, enforces role-root isolation, checks faculty sub-role flags
+(`isProgramChair`, `isCoordinator`, `isAdviser`) for the shared faculty routes,
+and redirects authed users away from `/login` via `roleHome(role)` in
+`lib/helper.tsx`. Role/sub-role changes reflect in the token within ~60s (the
+client session `refetchInterval`) — server actions compensate with instant
+DB-backed guards.
 
 ### Pattern: adding a new protected page
 
 ```typescript
-// app/dashboard/something/page.tsx
+// 1) The page does NOT guard. It only needs the session for data.
+// app/admin/something/page.tsx
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import { redirect } from 'next/navigation'
 
 export default async function SomethingPage() {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) redirect('/login')
-
   // fetch data, render
+}
+```
+
+```typescript
+// 2) Register the route in proxy.ts so only authorized roles reach it.
+// proxy.ts
+if (startsWithPath(pathname, '/admin') && !isAdmin(token.role)) {
+  return NextResponse.redirect(new URL(roleHome(token.role), req.url))
 }
 ```
 
@@ -463,6 +488,7 @@ Two Vercel skill sets govern how we write React components. Full rules live in `
 5. **Session update requires `update()` call on client** after `updateMe` — JWT is not auto-refreshed.
 6. **`react cache()` vs `'use cache'`:** `getMe()` uses `react cache()` (request-level). List/detail queries use `'use cache'` (persistent, tag-based). Do not confuse.
 7. **Prisma singleton** at `@/lib/prisma.ts` — never instantiate `PrismaClient` directly in components or actions.
-8. **No middleware.ts** — no global route guard. Each dashboard page must call `getServerSession()`.
+8. **No middleware.ts** — no global route guard in layouts. All route protection (role roots + sub-roles) lives in `proxy.ts`; layouts only wrap templates.
 9. **Password rounds:** 12 in all server actions, 10 in seed.
 10. **Server action responses** are plain objects — never throw. Pattern: `{ success, message, payload? }`.
+11. **EmbedPDF viewers are client-only.** Render `<PDFViewer>` (drop-in) or the headless `<EmbedPDF>` provider from `'use client'` components (Canvas/WASM). See `.agents/skills/embedpdf/SKILL.md`.

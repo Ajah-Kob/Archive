@@ -5,7 +5,7 @@
 // (coordinator progress) import. 'use server' files can only export async
 // functions, so this logic lives outside of lib/actions/.
 
-import type { JourneyRow } from '@/types/milestones'
+import { TOPIC_CAP, type JourneyRow } from '@/types/milestones'
 
 const CHAPTER_SLUG: Record<string, string> = {
   CHAPTER_1: 'chapter-1',
@@ -28,7 +28,7 @@ export type JourneySource = {
   capstone: { topicId: number } | null
   milestones: {
     chapter: string
-    submissions: { status: string }[]
+    submissions: { status: string; deletedAt: Date | null }[]
   }[]
   capstoneArchive: { deletedAt: Date | null } | null
 }
@@ -91,12 +91,14 @@ export function buildJourneyRows(
 
   const topics = group.topics.filter((t) => !t.deletedAt)
   const approved = topics.filter((t) => t.status === 'APPROVED')
-  const needsRevision = topics.filter((t) => t.status === 'NEED_REVISION')
-  const pending = topics.filter((t) => t.status === 'PENDING')
 
   const rows: JourneyRow[] = []
 
-  // Topic Submission — gated by availability, otherwise derived from Topic rows.
+  // Topic Submission — gated by availability. The node only turns APPROVED
+  // once ALL topic slots are approved (TOPIC_CAP); any unapproved slot keeps
+  // it in the default state. Hover shows the running approved count.
+  const topicsApproved = approved.length
+  const topicDetail = `${topicsApproved} of ${TOPIC_CAP} topics approved`
   const topicSubmission: JourneyRow = {
     slug: 'topic-submission',
     label: 'Topic Submission',
@@ -104,38 +106,34 @@ export function buildJourneyRows(
     state: 'LOCKED',
   }
   if (isOpen('TOPIC_SUBMISSION')) {
-    if (approved.length > 0) {
-      // Submissions lock once any topic is approved.
+    if (topicsApproved >= TOPIC_CAP) {
       topicSubmission.state = 'APPROVED'
-      topicSubmission.sublabel = `${approved.length} Approved`
-    } else if (needsRevision.length > 0) {
-      topicSubmission.state = 'NEEDS_REVISION'
-      topicSubmission.sublabel = `${needsRevision.length} ${
-        needsRevision.length === 1 ? 'needs' : 'need'
-      } revision`
-    } else if (pending.length > 0) {
-      topicSubmission.state = 'SUBMITTED'
-      topicSubmission.sublabel = `${pending.length} Submitted`
+      topicSubmission.sublabel = 'All topics approved'
     } else {
-      // The group exists but has no topics yet — the step is available.
       topicSubmission.state = 'DEFAULT'
     }
+    topicSubmission.tooltipDetail = topicDetail
   }
   rows.push(topicSubmission)
 
-  // Topic Selection — unlocked by the coordinator and an approved topic;
-  // green once selected.
+  // Topic Selection — gated by the coordinator's availability. Green check
+  // labeled "Selected" (not "Approved") once a topic has been confirmed via
+  // the capstone link; hover carries the same approved-topics count.
   const topicSelection: JourneyRow = {
     slug: 'topic-selection',
     label: 'Topic Selection',
     header: 'CAPSTONE 1',
-    state: 'DEFAULT',
+    state: 'LOCKED',
   }
-  if (!isOpen('TOPIC_SELECTION') || approved.length === 0) {
-    topicSelection.state = 'LOCKED'
-  } else if (group.capstone?.topicId) {
-    topicSelection.state = 'APPROVED'
-    topicSelection.sublabel = 'Topic Selected'
+  if (isOpen('TOPIC_SELECTION')) {
+    if (group.capstone?.topicId) {
+      topicSelection.state = 'APPROVED'
+      topicSelection.sublabel = 'Selected'
+      topicSelection.stateLabel = 'Selected'
+    } else {
+      topicSelection.state = 'DEFAULT'
+    }
+    topicSelection.tooltipDetail = topicDetail
   }
   rows.push(topicSelection)
 
@@ -157,7 +155,9 @@ export function buildJourneyRows(
     }
     if (isOpen(chapter)) {
       if (milestone) {
-        const latest = milestone.submissions[0]
+        // The CURRENT live submission decides the row state — never a
+        // soft-deleted (superseded) one, regardless of query ordering.
+        const latest = milestone.submissions.find((s) => !s.deletedAt) ?? null
         if (!latest) {
           row.state = 'DEFAULT'
         } else if (latest.status === 'APPROVED') {
@@ -165,10 +165,10 @@ export function buildJourneyRows(
           row.sublabel = 'Approved'
         } else if (latest.status === 'NEED_REVISION') {
           row.state = 'NEEDS_REVISION'
-          row.sublabel = 'Needs Revision'
+          row.sublabel = 'Need Revision'
         } else {
           row.state = 'SUBMITTED'
-          row.sublabel = 'Submitted'
+          row.sublabel = 'In Review'
         }
       } else {
         // The coordinator opened the milestone but the group hasn't started —

@@ -92,6 +92,9 @@ export async function proxy(req: NextRequest) {
     } else if (startsWithPath(pathname, '/faculty/coordinators')) {
       if (!hasCoordinatorAccess(token))
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
+    } else if (startsWithPath(pathname, '/faculty/defense-scheduling')) {
+      if (!hasCoordinatorAccess(token))
+        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     }
   }
 

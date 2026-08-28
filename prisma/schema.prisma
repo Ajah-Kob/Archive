@@ -43,6 +43,8 @@ model User {
   invitationsSent              Invitation[]          @relation("InvitationSender")
   topicReviews                 Topic[]               @relation("TopicReviewer")
   milestoneSubmissionsReviewed MilestoneSubmission[] @relation("MilestoneSubmissionReviewer")
+  defenseSchedules             DefenseSchedule[]     @relation("DefenseCreatedBy")
+  defensePanelists             DefensePanelist[]
 
   @@index([email, deletedAt])
 }
@@ -240,6 +242,7 @@ model Group {
   milestones      Milestone[]
   capstoneArchive CapstoneArchive?
   invitations     Invitation[]
+  defenseSchedules DefenseSchedule[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   deletedAt       DateTime?
@@ -429,4 +432,60 @@ model Template {
 
   @@index([deletedAt])
   @@index([uploadedById])
+}
+
+// ───────────────────────────── Defense Scheduling ─────────────────────────────
+
+enum DefenseType {
+  PROPOSAL
+  FINAL
+}
+
+enum DefenseVerdict {
+  PENDING
+  APPROVED
+  MINOR_REVISION
+  MAJOR_REVISION
+  REJECTED
+}
+
+enum PanelistRole {
+  CHAIR
+  PANEL_MEMBER
+}
+
+model DefenseSchedule {
+  id         Int              @id @default(autoincrement())
+  groupId    Int
+  group      Group            @relation(fields: [groupId], references: [id])
+  type       DefenseType
+  date       DateTime
+  startTime  String
+  endTime    String
+  venue      String
+  verdict    DefenseVerdict   @default(PENDING)
+  createdBy  Int
+  createdByUser User          @relation("DefenseCreatedBy", fields: [createdBy], references: [id])
+  panelists  DefensePanelist[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  deletedAt  DateTime?
+
+  @@index([deletedAt])
+  @@index([groupId])
+}
+
+model DefensePanelist {
+  id                Int             @id @default(autoincrement())
+  defenseScheduleId Int
+  defenseSchedule   DefenseSchedule @relation(fields: [defenseScheduleId], references: [id])
+  userId            Int
+  user              User            @relation(fields: [userId], references: [id])
+  role              PanelistRole
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  @@index([defenseScheduleId])
+  @@index([deletedAt])
 }

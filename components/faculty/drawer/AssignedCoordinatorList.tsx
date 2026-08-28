@@ -93,7 +93,7 @@ export function AssignedCoordinatorList({
                   <ActionMenu
                     items={[
                       {
-                        label: 'Remove Coordinator',
+                        label: 'Remove',
                         onClick: () => setRemoving(coordinator),
                         variant: 'danger',
                       },

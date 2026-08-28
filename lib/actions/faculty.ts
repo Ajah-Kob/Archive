@@ -5,8 +5,8 @@ import { getSession, requireAdmin, requireAdminOrProgramChair, unauthorized } fr
 import { validateFacultyCode } from '@/lib/actions/join-code'
 import { timeAgo } from '@/lib/helper'
 import {
-  unstable_cacheTag as cacheTag,
-  unstable_cacheLife as cacheLife,
+  cacheTag,
+  cacheLife,
 } from 'next/cache'
 import { revalidateTag } from 'next/cache'
 import { revalidateFeature } from '@/lib/actions/revalidate'
@@ -265,7 +265,7 @@ export async function removeFaculty(facultyId: number) {
 
   revalidateTag('faculty', 'max')
   revalidateTag('coordinators', 'max')
-  revalidateFeature('faculty-list')
+  revalidateFeature('faculties')
   revalidateFeature('sections')
 
   return { success: true, message: 'Faculty removed.' }
@@ -305,7 +305,7 @@ export async function joinFaculty(formData: FormData) {
 
   revalidateTag('users', 'max')
   revalidateTag('faculty', 'max')
-  revalidateFeature('faculty-list')
+  revalidateFeature('faculties')
 
   return { success: true, message: 'Faculty registration successful.' }
 }

@@ -10,9 +10,9 @@ export default async function FacultyHomePage() {
   if (session.user.isAdviser)
     links.push({ label: 'Evaluation', href: '/faculty/evaluation', icon: ClipboardCheck })
   if (session.user.isCoordinator || session.user.isProgramChair)
-    links.push({ label: 'Faculty list', href: '/faculty/faculty-list', icon: Users })
+    links.push({ label: 'Faculties', href: '/faculty/faculties', icon: Users })
   if (session.user.isProgramChair)
-    links.push({ label: 'Sections', href: '/faculty/sections', icon: Layers })
+    links.push({ label: 'Coordinators', href: '/faculty/coordinators', icon: Layers })
   if (session.user.isCoordinator || session.user.isProgramChair)
     links.push({ label: 'Templates', href: '/faculty/templates', icon: FileText })
 

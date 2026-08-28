@@ -1,6 +1,7 @@
 'use client'
 
-import { AlertCircle, FolderOpen, ChevronUp, ChevronDown, Search } from 'lucide-react'
+import { AlertCircle, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react'
+import { SearchBar } from '@/components/ui/SearchBar'
 import { FileIcon } from '@/components/ui/FileIcon'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ActionMenu, type ActionItem } from '@/components/ui/ActionMenu'
@@ -27,7 +28,7 @@ interface TemplateTableProps {
   sortDir?: 'asc' | 'desc'
   onSort?: (field: string) => void
   searchTerm?: string
-  onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onSearchChange?: (value: string) => void
   resultCount?: number
 }
 
@@ -133,16 +134,13 @@ export default function TemplateTable({
       <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
         {/* Toolbar strip — lives inside the card, above the column headers */}
         <div className="flex items-center gap-2.5 pb-[15px] pt-[14px] px-5 border-b border-[#f0f2fa] shrink-0">
-          <div className="relative flex-[0_0_320px] max-w-[320px] min-w-[180px]">
-            <Search className="absolute left-[12.5px] top-1/2 -translate-y-1/2 size-[10px] text-[#8a93b4]" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={onSearchChange}
-              placeholder="Search templates…"
-              className="w-full h-[37.5px] pl-[33px] pr-[13px] py-[9px] bg-[#f4f5fc] border border-[#dddff0] rounded-[9px] font-sans font-medium text-[13px] text-[rgba(16,19,58,0.5)] placeholder:text-[rgba(16,19,58,0.5)] outline-none"
-            />
-          </div>
+          <SearchBar
+            value={searchTerm ?? ''}
+            onChange={onSearchChange ?? (() => {})}
+            placeholder="Search templates…"
+            ariaLabel="Search templates"
+            className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+          />
           {resultCount !== undefined && (
             <span className="ml-auto text-[12px] font-medium text-[#9ea8c6] whitespace-nowrap">
               {resultCount} result{resultCount !== 1 ? 's' : ''}

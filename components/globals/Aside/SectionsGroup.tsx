@@ -64,7 +64,7 @@ export function SectionsGroup({
   const expanded = hasActive || !collapsed
 
   return (
-    <div className="mt-2">
+    <div>
       <div className="flex items-center gap-1">
         <button
           type="button"

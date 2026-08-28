@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ChevronDown,
   ChevronUp,
   ClipboardCheck,
   FileText,
-  Search,
 } from 'lucide-react'
+import { SearchBar } from '@/components/ui/SearchBar'
+import { Filter, type FilterOption } from '@/components/ui/Filter'
 import type { EvaluationItem } from '@/lib/actions/evaluation'
 import { SubmissionDetailsDrawer } from './SubmissionDetailsDrawer'
 
@@ -33,10 +34,7 @@ const CHAPTER_OPTIONS = [
   'Chapter 5',
 ] as const
 
-const STATUS_FILTER_OPTIONS: ReadonlyArray<{
-  value: StatusFilter
-  label: string
-}> = [
+const STATUS_FILTER_OPTIONS: ReadonlyArray<FilterOption> = [
   { value: 'all', label: 'All Status' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'NEED_REVISION', label: 'Need Revision' },
@@ -98,83 +96,6 @@ function SortHeader({
         <ChevronUp size={12} className="opacity-50" />
       )}
     </button>
-  )
-}
-
-interface FilterOption {
-  value: string
-  label: string
-}
-
-/**
- * Self-contained dropdown filter (trigger + menu + click-outside close).
- * Clones the pill-dropdown markup previously inlined for the team filter so
- * the toolbar can host several filters without duplicated state wiring.
- */
-function FilterDropdown({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-}: {
-  value: string
-  options: ReadonlyArray<FilterOption>
-  onChange: (value: string) => void
-  ariaLabel: string
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const selectedLabel =
-    options.find((o) => o.value === value)?.label ?? options[0]?.label ?? ''
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        onClick={() => setOpen(!open)}
-        className="flex gap-[7px] items-center h-[37.5px] px-[14px] py-[9px] bg-[#f4f5fc] border border-[#dddff0] rounded-[9px] font-sans font-semibold text-[13px] text-[#5a6382]"
-      >
-        {selectedLabel}
-        <ChevronDown className="size-[13px]" />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full z-10 pt-1">
-          <div className="bg-white border border-[#eceef8] rounded-[10px] w-[168px] py-1 shadow-[0_8px_24px_rgba(112,125,255,0.14),0_2px_6px_rgba(0,0,0,0.06)]">
-            {options.map((option, index) => (
-              <div key={option.value}>
-                {index > 0 && index === 1 && (
-                  <div className="mx-[10px] h-px bg-[#f0f2fa]" />
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(option.value)
-                    setOpen(false)
-                  }}
-                  className={`w-full text-left px-[14px] py-[9px] font-sans font-semibold text-[13px] hover:bg-[#fafbff] transition-colors ${
-                    value === option.value ? 'text-[#707dff]' : 'text-[#3d4566]'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -300,30 +221,27 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
     <>
       <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
         <div className="flex items-center gap-2.5 px-5 py-[12px] border-b border-[#f0f2fa] shrink-0">
-          <div className="relative flex-[0_0_320px] max-w-[320px] min-w-[180px]">
-            <Search className="absolute left-[12.5px] top-1/2 -translate-y-1/2 size-[10px] text-[#8a93b4]" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search teams, chapters…"
-              className="w-full h-[37.5px] pl-[33px] pr-[13px] py-[9px] bg-[#f4f5fc] border border-[#dddff0] rounded-[9px] font-sans font-medium text-[13px] text-[rgba(16,19,58,0.5)] placeholder:text-[rgba(16,19,58,0.5)] outline-none"
-            />
-          </div>
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search teams, chapters…"
+            ariaLabel="Search teams and chapters"
+            className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+          />
 
-          <FilterDropdown
+          <Filter
             value={teamFilter}
             options={teamOptions}
             onChange={setTeamFilter}
             ariaLabel="Filter by team"
           />
-          <FilterDropdown
+          <Filter
             value={chapterFilter}
             options={chapterOptions}
             onChange={setChapterFilter}
             ariaLabel="Filter by chapter"
           />
-          <FilterDropdown
+          <Filter
             value={statusFilter}
             options={STATUS_FILTER_OPTIONS}
             onChange={(v) => setStatusFilter(v as StatusFilter)}

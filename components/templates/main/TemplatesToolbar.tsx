@@ -1,10 +1,10 @@
 'use client'
 
-import SearchBar from '@/components/ui/Searchbar'
+import { SearchBar } from '@/components/ui/SearchBar'
 
 interface TemplatesToolbarProps {
   searchTerm: string
-  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onSearchChange: (value: string) => void
   resultCount?: number
 }
 

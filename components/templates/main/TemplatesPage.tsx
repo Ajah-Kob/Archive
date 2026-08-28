@@ -145,7 +145,7 @@ export default function TemplatesPage({
             sortDir={sortDir}
             onSort={handleSort}
             searchTerm={searchTerm}
-            onSearchChange={(e) => setSearchTerm(e.target.value)}
+            onSearchChange={(value) => setSearchTerm(value)}
             resultCount={templates.length}
             getRowActions={(item) => [
               { label: 'View', onClick: () => handleViewFile(item) },

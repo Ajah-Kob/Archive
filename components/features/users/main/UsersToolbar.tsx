@@ -1,7 +1,7 @@
 'use client'
 
 import { Filter } from 'lucide-react'
-import SearchBar from '@/components/ui/Searchbar'
+import { SearchBar } from '@/components/ui/SearchBar'
 
 const ROLES = ['SUPERADMIN', 'ADMIN', 'FACULTY', 'STUDENT', 'GUEST']
 const PER_PAGE_OPTIONS = [10, 25, 50]
@@ -28,10 +28,10 @@ export default function UsersToolbar({
       <div className="flex-1 w-full">
         <SearchBar
           value={filters.searchTerm}
-          onChange={(e) =>
+          onChange={(value) =>
             onFilterChange((prev) => ({
               ...prev,
-              searchTerm: e.target.value,
+              searchTerm: value,
             }))
           }
           placeholder="Search users..."

@@ -1,8 +1,8 @@
 'use server'
 
 import {
-  unstable_cacheTag as cacheTag,
-  unstable_cacheLife as cacheLife,
+  cacheTag,
+  cacheLife,
 } from 'next/cache'
 import { revalidateTag } from 'next/cache'
 import { put, del } from '@vercel/blob'

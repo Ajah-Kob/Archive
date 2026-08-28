@@ -5,8 +5,8 @@ import { getSession, requireAdmin, requireAdminOrProgramChair, unauthorized } fr
 import { validateFacultyCode } from '@/lib/actions/join-code'
 import { timeAgo } from '@/lib/helper'
 import {
-  unstable_cacheTag as cacheTag,
-  unstable_cacheLife as cacheLife,
+  cacheTag,
+  cacheLife,
 } from 'next/cache'
 import { revalidateTag } from 'next/cache'
 import { revalidateFeature } from '@/lib/actions/revalidate'

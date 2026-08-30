@@ -1,4 +1,3 @@
-◇ injected env (8) from .env.local // tip: ⌘ override existing { override: true }
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 

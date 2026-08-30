@@ -45,6 +45,8 @@ model User {
   milestoneSubmissionsReviewed MilestoneSubmission[] @relation("MilestoneSubmissionReviewer")
   defenseSchedules             DefenseSchedule[]     @relation("DefenseCreatedBy")
   defensePanelists             DefensePanelist[]
+  defenseResubmissions         DefenseResubmission[] @relation("DefenseResubmissionSubmitter")
+  defenseResubmissionReviews   DefenseResubmissionReview[]
 
   @@index([email, deletedAt])
 }
@@ -467,6 +469,7 @@ model DefenseSchedule {
   createdBy  Int
   createdByUser User          @relation("DefenseCreatedBy", fields: [createdBy], references: [id])
   panelists  DefensePanelist[]
+  resubmissions DefenseResubmission[]
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
   deletedAt  DateTime?
@@ -488,4 +491,50 @@ model DefensePanelist {
 
   @@index([defenseScheduleId])
   @@index([deletedAt])
+}
+
+// A revised manuscript submitted by a group after a defense resulted in a
+// revision verdict (MINOR_REVISION / MAJOR_REVISION). One row per resubmission;
+// per-panelist review state lives in DefenseResubmissionReview so each panelist
+// only sees resubmissions they still need to evaluate (their personal queue).
+model DefenseResubmission {
+  id          Int                       @id @default(autoincrement())
+  scheduleId  Int
+  schedule    DefenseSchedule           @relation(fields: [scheduleId], references: [id])
+  submittedBy Int
+  user        User                      @relation("DefenseResubmissionSubmitter", fields: [submittedBy], references: [id])
+  fileName    String
+  blobUrl     String
+  mimeType    String
+  size        Int
+  reviews     DefenseResubmissionReview[]
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([scheduleId])
+  @@index([deletedAt])
+}
+
+// Per-panelist review state for a resubmission. A panelist's Resubmissions tab
+// lists the PENDING reviews — i.e. resubmissions they still need to evaluate.
+model DefenseResubmissionReview {
+  id             Int                       @id @default(autoincrement())
+  resubmissionId Int
+  resubmission   DefenseResubmission       @relation(fields: [resubmissionId], references: [id])
+  panelistId     Int
+  panelist       User                      @relation(fields: [panelistId], references: [id])
+  status         DefenseResubmissionStatus @default(PENDING)
+  reviewedAt     DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([resubmissionId, panelistId])
+  @@index([deletedAt])
+}
+
+enum DefenseResubmissionStatus {
+  PENDING
+  APPROVED
 }

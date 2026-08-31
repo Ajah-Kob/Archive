@@ -71,10 +71,10 @@ async function main() {
   await seedDefenseResubmissions(passwordHash)
 }
 
-// Seeds a minimal defense-resubmission chain so the faculty Resubmissions tab
+// Seeds a minimal defense-submission chain so the faculty Resubmissions tab
 // has real data to display: two panelists, a section, a group, a defense
-// schedule with a revision verdict, and a resubmission with per-panelist
-// reviews. Idempotent — safe to run repeatedly.
+// schedule with a revision verdict, and a resubmission (DefenseSubmission)
+// with per-panelist reviews. Idempotent — safe to run repeatedly.
 async function seedDefenseResubmissions(passwordHash: string) {
   // 1. Ensure two faculty panelists exist.
   const panelistDefs = [
@@ -163,13 +163,15 @@ async function seedDefenseResubmissions(passwordHash: string) {
   }
 
   // 6. Ensure a resubmission exists with a PENDING review for each panelist.
-  const existingResubmission = await prisma.defenseResubmission.findFirst({
+  const existingResubmission = await prisma.defenseSubmission.findFirst({
     where: { scheduleId: schedule.id, deletedAt: null },
   })
   if (!existingResubmission) {
-    const resubmission = await prisma.defenseResubmission.create({
+    const resubmission = await prisma.defenseSubmission.create({
       data: {
         scheduleId: schedule.id,
+        isInitial: false,
+        version: 2,
         submittedBy: coordinatorUser.id,
         fileName: 'Proposal_Manuscript_v2.pdf',
         blobUrl: 'https://example.com/proposal-v2.pdf',
@@ -183,7 +185,7 @@ async function seedDefenseResubmissions(passwordHash: string) {
         },
       },
     })
-    console.log('✅ Seeded defense resubmission:', resubmission.id)
+    console.log('✅ Seeded defense submission:', resubmission.id)
   }
 }
 

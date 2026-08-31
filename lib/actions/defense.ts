@@ -83,6 +83,7 @@ function parsePanelists(
 export interface DefensePanelistPayload {
   userId: number
   name: string
+  email: string
   image: string | null
   role: PanelistRole
 }
@@ -128,7 +129,7 @@ async function getDefenseSchedulesData() {
       },
       panelists: {
         where: { deletedAt: null },
-        include: { user: { select: { id: true, name: true, image: true } } },
+        include: { user: { select: { id: true, name: true, email: true, image: true } } },
         orderBy: { role: 'asc' },
       },
       createdByUser: { select: { id: true, name: true } },
@@ -154,6 +155,7 @@ async function getDefenseSchedulesData() {
       panelists: s.panelists.map((p) => ({
         userId: p.userId,
         name: p.user.name,
+        email: p.user.email,
         image: p.user.image,
         role: p.role,
       })),
@@ -218,7 +220,7 @@ async function getMyDefenseSchedulesData(
       },
       panelists: {
         where: { deletedAt: null },
-        include: { user: { select: { id: true, name: true, image: true } } },
+        include: { user: { select: { id: true, name: true, email: true, image: true } } },
         orderBy: { role: 'asc' },
       },
       createdByUser: { select: { id: true, name: true } },
@@ -244,6 +246,7 @@ async function getMyDefenseSchedulesData(
       panelists: s.panelists.map((p) => ({
         userId: p.userId,
         name: p.user.name,
+        email: p.user.email,
         image: p.user.image,
         role: p.role,
       })),
@@ -809,7 +812,7 @@ async function getDefenseSessionData(
       },
       panelists: {
         where: { deletedAt: null },
-        include: { user: { select: { id: true, name: true, image: true } } },
+        include: { user: { select: { id: true, name: true, email: true, image: true } } },
         orderBy: { role: 'asc' },
       },
       createdByUser: { select: { id: true, name: true } },
@@ -845,6 +848,7 @@ async function getDefenseSessionData(
     panelists: schedule.panelists.map((p) => ({
       userId: p.userId,
       name: p.user.name,
+      email: p.user.email,
       image: p.user.image,
       role: p.role,
     })),

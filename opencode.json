@@ -20,6 +20,11 @@
       "enabled": true
     }
   },
-  "plugin": ["@mohak34/opencode-notifier@latest"],
+  "plugin": [
+    "@mohak34/opencode-notifier@latest",
+    "opencode-wakatime@latest",
+    "opencode-throughput@latest",
+    "opencode-usage-monitor@latest"
+  ],
   "lsp": true
 }

@@ -40,8 +40,10 @@ const JOURNEY_ROWS_EMPTY: JourneyRow[] = [
   { slug: 'chapter-1', label: 'Chapter 1', header: 'CAPSTONE 1', state: 'LOCKED' },
   { slug: 'chapter-2', label: 'Chapter 2', header: 'CAPSTONE 1', state: 'LOCKED' },
   { slug: 'chapter-3', label: 'Chapter 3', header: 'CAPSTONE 1', state: 'LOCKED' },
+  { slug: 'proposal-defense', label: 'Proposal Defense', header: 'CAPSTONE 1', state: 'LOCKED' },
   { slug: 'chapter-4', label: 'Chapter 4', header: 'CAPSTONE 2', state: 'LOCKED' },
   { slug: 'chapter-5', label: 'Chapter 5', header: 'CAPSTONE 2', state: 'LOCKED' },
+  { slug: 'final-defense', label: 'Final Defense', header: 'CAPSTONE 2', state: 'LOCKED' },
   { slug: 'archiving', label: 'Archiving', header: 'CAPSTONE 2', state: 'LOCKED' },
 ]
 
@@ -58,7 +60,14 @@ export function resolveSectionAvailability(
   rows: SectionAvailabilityRow[],
 ): Record<string, boolean> {
   const explicit = new Map(rows.map((r) => [r.key, r.openedAt != null]))
-  const keys = ['TOPIC_SUBMISSION', 'TOPIC_SELECTION', ...CHAPTER_KEYS, 'ARCHIVING']
+  const keys = [
+    'TOPIC_SUBMISSION',
+    'TOPIC_SELECTION',
+    ...CHAPTER_KEYS,
+    'PROPOSAL_DEFENSE',
+    'FINAL_DEFENSE',
+    'ARCHIVING',
+  ]
   const out: Record<string, boolean> = {}
   for (const key of keys) {
     if (explicit.has(key)) {
@@ -177,6 +186,36 @@ export function buildJourneyRows(
       }
     }
     rows.push(row)
+
+    // Insert the defense step after its preceding chapter. Proposal Defense
+    // follows Chapter 3 (end of Capstone 1); Final Defense follows Chapter 5
+    // (end of Capstone 2). The step is gated by the coordinator's availability
+    // (see resolveSectionAvailability): locked stays locked, open surfaces as
+    // an available step. Defense state derivation (verdict / review status) is
+    // wired separately — see lib/actions/student-defense.ts.
+    if (chapter === 'CHAPTER_3') {
+      const defense: JourneyRow = {
+        slug: 'proposal-defense',
+        label: 'Proposal Defense',
+        header: 'CAPSTONE 1',
+        state: 'LOCKED',
+      }
+      if (isOpen('PROPOSAL_DEFENSE')) {
+        defense.state = 'DEFAULT'
+      }
+      rows.push(defense)
+    } else if (chapter === 'CHAPTER_5') {
+      const defense: JourneyRow = {
+        slug: 'final-defense',
+        label: 'Final Defense',
+        header: 'CAPSTONE 2',
+        state: 'LOCKED',
+      }
+      if (isOpen('FINAL_DEFENSE')) {
+        defense.state = 'DEFAULT'
+      }
+      rows.push(defense)
+    }
   }
 
   // Archiving — gated by availability, green once archived.

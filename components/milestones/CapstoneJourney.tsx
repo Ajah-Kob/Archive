@@ -30,7 +30,7 @@ function RowIcon({
     )
   }
 
-  if (state === 'DEFAULT') {
+  if (state === 'DEFAULT' || state === 'NO_VERDICT') {
     return (
       <div className="bg-[#f0f2fa] border border-[#e8ebf8] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
         <span className="size-[7px] rounded-full bg-[#c4cadf]" />
@@ -38,7 +38,7 @@ function RowIcon({
     )
   }
 
-  if (state === 'NEEDS_REVISION') {
+  if (state === 'NEEDS_REVISION' || state === 'REJECTED') {
     return (
       <div className="bg-[#fef2f2] border border-[rgba(239,68,68,0.3)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
         <TriangleAlert className="size-[12px] text-[#ef4444]" strokeWidth={2.25} />
@@ -46,10 +46,18 @@ function RowIcon({
     )
   }
 
-  if (state === 'SUBMITTED') {
+  if (state === 'SUBMITTED' || state === 'MINOR_REVISION') {
     return (
       <div className="bg-[rgba(234,179,8,0.08)] border border-[rgba(234,179,8,0.25)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
         <Clock className="size-[12px] text-[#eab308]" strokeWidth={2.25} />
+      </div>
+    )
+  }
+
+  if (state === 'MAJOR_REVISION') {
+    return (
+      <div className="bg-[rgba(249,115,22,0.08)] border border-[rgba(249,115,22,0.25)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
+        <TriangleAlert className="size-[12px] text-[#f97316]" strokeWidth={2.25} />
       </div>
     )
   }
@@ -75,6 +83,10 @@ function MilestoneRow({ row, isActive }: MilestoneRowProps) {
     SUBMITTED: 'text-[#eab308]',
     DEFAULT: 'text-transparent',
     LOCKED: 'text-transparent',
+    NO_VERDICT: 'text-transparent',
+    MINOR_REVISION: 'text-[#eab308]',
+    MAJOR_REVISION: 'text-[#f97316]',
+    REJECTED: 'text-[#ef4444]',
   }
 
   const baseClasses =

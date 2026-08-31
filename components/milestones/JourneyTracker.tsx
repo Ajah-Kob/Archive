@@ -10,6 +10,10 @@ const STATUS_LABEL: Record<JourneyRow['state'], string> = {
   SUBMITTED: 'Awaiting review',
   DEFAULT: 'In progress',
   LOCKED: 'Locked',
+  NO_VERDICT: 'No verdict',
+  MINOR_REVISION: 'Minor revisions',
+  MAJOR_REVISION: 'Major revisions',
+  REJECTED: 'Rejected',
 }
 
 const SIZES = {

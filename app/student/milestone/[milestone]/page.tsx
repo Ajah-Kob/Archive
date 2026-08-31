@@ -5,9 +5,10 @@ import { getServerSession } from 'next-auth'
 import { notFound } from 'next/navigation'
 import { authOptions } from '@/lib/authOptions'
 import { ComingSoon } from '@/components/workspace/ComingSoon'
-import { getGroupContext, getMyWorkspace } from '@/lib/actions/groups'
+import { getMyWorkspace } from '@/lib/actions/groups'
 import { getChapterData } from '@/lib/actions/chapter'
 import { getTopicSelectionData, getTopicSubmissionData } from '@/lib/actions/topic'
+import { getDefenseSessionData } from '@/lib/actions/student-defense'
 import { GroupContext } from '@/components/milestones/GroupContext'
 import { CapstoneJourney } from '@/components/milestones/CapstoneJourney'
 import { JOURNEY_ROWS, SLUG_TO_CHAPTER, WORKSPACE_SLUGS } from '@/types/milestones'
@@ -16,6 +17,9 @@ import { TopicSelectionView } from '@/components/milestones/topic-selection/Topi
 import { TopicSubmissionView } from '@/components/milestones/topic-submission/TopicSubmissionView'
 import { ChapterSubmissionView } from '@/components/milestones/chapter/ChapterSubmissionView'
 import { LockedChapterPlaceholder } from '@/components/milestones/chapter/LockedChapterPlaceholder'
+import { DefenseMilestonePage } from '@/components/milestones/defense/DefenseMilestonePage'
+
+const DEFENSE_SLUGS = ['proposal-defense', 'final-defense']
 
 export const metadata: Metadata = {
   title: 'Milestones',
@@ -34,7 +38,13 @@ export default async function MilestoneDetailPage({
 
   const userId = +session.user.id
   const chapter = SLUG_TO_CHAPTER[milestone]
-  const [workspaceRes, topicRes, chapterRes] = await Promise.all([
+  const isDefense = DEFENSE_SLUGS.includes(milestone as string)
+  const defenseTypeForFetch = isDefense
+    ? milestone === 'final-defense'
+      ? ('FINAL' as const)
+      : ('PROPOSAL' as const)
+    : null
+  const [workspaceRes, topicRes, chapterRes, defenseRes] = await Promise.all([
     getMyWorkspace(userId),
     milestone === 'topic-submission'
       ? getTopicSubmissionData(userId)
@@ -42,14 +52,13 @@ export default async function MilestoneDetailPage({
         ? getTopicSelectionData(userId)
         : Promise.resolve(null),
     chapter ? getChapterData(chapter) : Promise.resolve(null),
+    isDefense && defenseTypeForFetch
+      ? getDefenseSessionData(defenseTypeForFetch)
+      : Promise.resolve(null),
   ])
 
   const workspace = workspaceRes.success && workspaceRes.payload ? workspaceRes.payload : null
   if (!workspace?.group) notFound()
-
-  const group = await getGroupContext(workspace.group.id)
-  const groupPayload = group.success && group.payload ? group.payload : null
-  if (!groupPayload) notFound()
 
   if (milestone === 'topic-submission') {
     const data = topicRes?.success && topicRes.payload ? topicRes.payload : null
@@ -60,7 +69,7 @@ export default async function MilestoneDetailPage({
         <CapstoneJourney journey={data.journey} activeSlug="topic-submission" />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <GroupContext group={groupPayload} />
+          <GroupContext />
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
             {data.group ? (
               <TopicSubmissionView data={data} />
@@ -82,7 +91,7 @@ export default async function MilestoneDetailPage({
         <CapstoneJourney journey={data.journey} activeSlug="topic-selection" />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <GroupContext group={groupPayload} />
+          <GroupContext />
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
             {data.group ? (
               <TopicSelectionView data={data} />
@@ -104,7 +113,7 @@ export default async function MilestoneDetailPage({
         <CapstoneJourney journey={data.journey} activeSlug={milestone} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <GroupContext group={groupPayload} />
+          <GroupContext />
 
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
             {data.open ? (
@@ -118,6 +127,21 @@ export default async function MilestoneDetailPage({
     )
   }
 
+  if (isDefense) {
+    const data = defenseRes?.success && defenseRes.payload ? defenseRes.payload : null
+    const defenseType = milestone === 'final-defense' ? 'FINAL' : 'PROPOSAL'
+
+    return (
+      <section className="h-full flex min-h-0">
+        <CapstoneJourney journey={workspace.journey} activeSlug={milestone} />
+
+        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          <DefenseMilestonePage data={data} defenseType={defenseType} />
+        </div>
+      </section>
+    )
+  }
+
   const row = JOURNEY_ROWS.find((r) => r.slug === milestone)
 
   return (
@@ -125,7 +149,7 @@ export default async function MilestoneDetailPage({
       <CapstoneJourney journey={workspace.journey} activeSlug={milestone} />
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <GroupContext group={groupPayload} />
+        <GroupContext />
 
         <div className="flex-1 min-h-0 p-8 flex flex-col gap-3">
           <div className="flex items-center justify-between">

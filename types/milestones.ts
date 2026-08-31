@@ -13,6 +13,10 @@ export type JourneyState =
   | 'SUBMITTED'
   | 'NEEDS_REVISION'
   | 'APPROVED'
+  | 'NO_VERDICT'
+  | 'MINOR_REVISION'
+  | 'MAJOR_REVISION'
+  | 'REJECTED'
 
 export interface JourneyRow {
   slug: string
@@ -33,8 +37,10 @@ export const JOURNEY_ROWS: ReadonlyArray<Omit<JourneyRow, 'state' | 'sublabel'>>
     { slug: 'chapter-1', label: 'Chapter 1', header: 'CAPSTONE 1' },
     { slug: 'chapter-2', label: 'Chapter 2', header: 'CAPSTONE 1' },
     { slug: 'chapter-3', label: 'Chapter 3', header: 'CAPSTONE 1' },
+    { slug: 'proposal-defense', label: 'Proposal Defense', header: 'CAPSTONE 1' },
     { slug: 'chapter-4', label: 'Chapter 4', header: 'CAPSTONE 2' },
     { slug: 'chapter-5', label: 'Chapter 5', header: 'CAPSTONE 2' },
+    { slug: 'final-defense', label: 'Final Defense', header: 'CAPSTONE 2' },
     { slug: 'archiving', label: 'Archiving', header: 'CAPSTONE 2' },
   ]
 

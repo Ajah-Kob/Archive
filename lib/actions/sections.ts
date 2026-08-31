@@ -800,8 +800,10 @@ const MILESTONE_DEFS: ReadonlyArray<{
   { key: 'CHAPTER_1', label: 'Chapter 1', phase: 'CAPSTONE 1' },
   { key: 'CHAPTER_2', label: 'Chapter 2', phase: 'CAPSTONE 1' },
   { key: 'CHAPTER_3', label: 'Chapter 3', phase: 'CAPSTONE 1' },
+  { key: 'PROPOSAL_DEFENSE', label: 'Proposal Defense', phase: 'CAPSTONE 1' },
   { key: 'CHAPTER_4', label: 'Chapter 4', phase: 'CAPSTONE 2' },
   { key: 'CHAPTER_5', label: 'Chapter 5', phase: 'CAPSTONE 2' },
+  { key: 'FINAL_DEFENSE', label: 'Final Defense', phase: 'CAPSTONE 2' },
   { key: 'ARCHIVING', label: 'Archiving', phase: 'CAPSTONE 2' },
 ]
 

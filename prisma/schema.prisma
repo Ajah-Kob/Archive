@@ -173,6 +173,7 @@ model Section {
   coordinatorId Int
   coordinator   Coordinator @relation(fields: [coordinatorId], references: [id])
   section       String
+  headerColor   String?
   students      Student[]
   groups        Group[]
   createdAt     DateTime    @default(now())

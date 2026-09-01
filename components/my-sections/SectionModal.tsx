@@ -10,8 +10,11 @@ import {
   updateSection,
   type MySectionCardData,
 } from '@/lib/actions/sections'
+import { SECTION_HEADER_PALETTE } from '@/lib/sectionHeader'
 
-type SectionRef = Pick<MySectionCardData, 'id' | 'name'>
+type SectionRef = Pick<MySectionCardData, 'id' | 'name'> & {
+  headerColor?: string | null
+}
 
 interface SectionModalProps {
   mode: 'create' | 'edit'
@@ -20,16 +23,22 @@ interface SectionModalProps {
   onSuccess: () => void
 }
 
-export function SectionModal({ mode, section, onClose, onSuccess }: SectionModalProps) {
+export function SectionModal({
+  mode,
+  section,
+  onClose,
+  onSuccess,
+}: SectionModalProps) {
   const action = mode === 'edit' ? updateSection : createSection
   const [state, formAction, isPending] = useActionState(action, null)
   const [name, setName] = useState(section?.name ?? '')
+  const [headerColor, setHeaderColor] = useState<string | null>(
+    section?.headerColor ?? null,
+  )
 
   const trimmed = name.trim()
   const canSubmit =
-    trimmed.length >= 3 &&
-    trimmed.length <= 60 &&
-    name === trimmed
+    trimmed.length >= 3 && trimmed.length <= 60 && name === trimmed
 
   useEffect(() => {
     if (state && state.success) {
@@ -71,8 +80,9 @@ export function SectionModal({ mode, section, onClose, onSuccess }: SectionModal
           {mode === 'edit' && section && (
             <input type="hidden" name="sectionId" value={section.id} />
           )}
+          <input type="hidden" name="headerColor" value={headerColor ?? ''} />
 
-          <div className="flex flex-col items-start pt-[22px] px-[22px]">
+          <div className="flex flex-col items-start pt-[22px] px-[22px] gap-[18px]">
             <div className="flex flex-col items-start w-full">
               <label className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
                 Section Name
@@ -90,8 +100,42 @@ export function SectionModal({ mode, section, onClose, onSuccess }: SectionModal
               </div>
             </div>
 
+            <div className="flex flex-col items-start w-full">
+              <label className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
+                Header Color
+              </label>
+              <div className="flex items-center gap-[10px] pt-[10px] flex-wrap">
+                {SECTION_HEADER_PALETTE.map((c) => {
+                  const isDefault = c.key === 'default'
+                  const active = isDefault
+                    ? headerColor === null
+                    : headerColor === c.key
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => setHeaderColor(isDefault ? null : c.key)}
+                      disabled={active}
+                      aria-label={c.label}
+                      title={c.label}
+                      className={`size-[32px] rounded-full border-2 border-[#5a6382] flex items-center justify-center transition-all ${
+                        active
+                          ? 'ring-2 ring-[rgba(112,125,255,0.22)] ring-offset-2 ring-offset-white opacity-100 cursor-not-allowed'
+                          : 'border-none shadow-[0_1px_4px_rgba(0,0,0,0.12)] hover:scale-90 cursor-pointer'
+                      }`}
+                      style={{ backgroundColor: c.dot }}
+                    >
+                      {active && (
+                        <span className="size-[8px] rounded-full bg-white shadow-[0_0_2px_rgba(0,0,0,0.2)]" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {state && !state.success && (
-              <p className="w-full pt-[10px] font-sans font-medium text-[12.5px] leading-[19px] text-[#ef4444]">
+              <p className="w-full font-sans font-medium text-[12.5px] leading-[19px] text-[#ef4444]">
                 {state.message}
               </p>
             )}

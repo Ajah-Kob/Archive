@@ -388,6 +388,8 @@ export interface MySectionCardData {
   dateCreated: string
   pendingTopics: number
   capstone2OpenedAt: string | null
+  previewAvatars: { initials: string; gradient: string }[]
+  headerColor: string | null
 }
 
 const JOIN_CODE_TTL_MS = 3 * 24 * 60 * 60 * 1000
@@ -408,8 +410,11 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
   const sections = await prisma.section.findMany({
     where: { coordinatorId, deletedAt: null },
     include: {
-      students: { where: { deletedAt: null }, select: { id: true } },
-      _count: { select: { groups: true } },
+      students: {
+        where: { deletedAt: null },
+        select: { id: true, user: { select: { name: true } } },
+        orderBy: { user: { name: 'asc' } },
+      },
       joinCode: true,
       groups: {
         where: { deletedAt: null },
@@ -432,7 +437,7 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
         id: s.id,
         name: s.section,
         students: s.students.length,
-        groups: s._count.groups,
+        groups: s.groups.length,
         hasJoinCode: !!validCode,
         joinCode: validCode?.code ?? null,
         joinCodeExpiresAt: validCode?.expiresAt.toISOString() ?? null,
@@ -443,6 +448,11 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
         }),
         pendingTopics: s.groups.reduce((n, g) => n + g.topics.length, 0),
         capstone2OpenedAt: s.capstone2OpenedAt?.toISOString() ?? null,
+        previewAvatars: s.students.slice(0, 3).map((st) => ({
+          initials: getInitials(st.user.name),
+          gradient: getGradient(st.id),
+        })),
+        headerColor: (s as any).headerColor ?? null,
       }
     },
   )
@@ -630,6 +640,7 @@ async function getCoordinatorSectionData(sectionId: number) {
       studentsCount: students.length,
       groupsCount: section._count.groups,
       capstone2OpenedAt: section.capstone2OpenedAt?.toISOString() ?? null,
+      headerColor: (section as any).headerColor ?? null,
     },
     students,
     groups,
@@ -945,6 +956,13 @@ function validateSectionName(raw: string): string | null {
   return name
 }
 
+function parseHeaderColor(raw: unknown): string | null | { error: string } {
+  const v = typeof raw === 'string' ? raw.trim() : ''
+  if (!v || v === 'default') return null
+  if (['0', '1', '2', '3', '4'].includes(v)) return v
+  return { error: 'Invalid color selected.' }
+}
+
 export async function createSection(_prevState: any, formData: FormData) {
   const coordinator = await requireCoordinatorRow()
   if (!coordinator) {
@@ -955,6 +973,12 @@ export async function createSection(_prevState: any, formData: FormData) {
   if (typeof name !== 'string') {
     return { success: false, message: name }
   }
+
+  const headerColorRaw = parseHeaderColor(formData.get('headerColor'))
+  if (headerColorRaw && typeof headerColorRaw === 'object' && 'error' in headerColorRaw) {
+    return { success: false, message: headerColorRaw.error }
+  }
+  const headerColor = headerColorRaw as string | null
 
   const existing = await prisma.section.findFirst({
     where: {
@@ -987,6 +1011,7 @@ export async function createSection(_prevState: any, formData: FormData) {
         data: {
           coordinatorId: coordinator.id,
           joinCodeId: joinCode.id,
+          headerColor,
           deletedAt: null,
         },
       })
@@ -998,6 +1023,7 @@ export async function createSection(_prevState: any, formData: FormData) {
         data: {
           coordinatorId: coordinator.id,
           section: name,
+          headerColor,
           joinCodeId: joinCode.id,
         },
       })
@@ -1027,6 +1053,12 @@ export async function updateSection(_prevState: any, formData: FormData) {
     return { success: false, message: name }
   }
 
+  const headerColorRaw = parseHeaderColor(formData.get('headerColor'))
+  if (headerColorRaw && typeof headerColorRaw === 'object' && 'error' in headerColorRaw) {
+    return { success: false, message: headerColorRaw.error }
+  }
+  const headerColor = headerColorRaw as string | null
+
   try {
     const current = await prisma.section.findFirst({
       where: { id: sectionId, coordinatorId: coordinator.id, deletedAt: null },
@@ -1035,8 +1067,22 @@ export async function updateSection(_prevState: any, formData: FormData) {
       return { success: false, message: 'Section not found.' }
     }
 
-    if (current.section === name) {
+    const nameChanged = current.section !== name
+    const currentColor = (current as any).headerColor ?? null
+    const colorChanged = currentColor !== headerColor
+
+    if (!nameChanged && !colorChanged) {
       return { success: true, message: 'No changes to save.' }
+    }
+
+    // Color-only change (name stays same)
+    if (!nameChanged && colorChanged) {
+      await prisma.section.update({
+        where: { id: current.id },
+        data: { headerColor },
+      })
+      revalidateCoordinatorCache(sectionId)
+      return { success: true, message: 'Section updated.' }
     }
 
     const target = await prisma.section.findFirst({
@@ -1068,6 +1114,8 @@ export async function updateSection(_prevState: any, formData: FormData) {
           data: {
             coordinatorId: coordinator.id,
             joinCodeId: current.joinCodeId,
+            headerColor,
+            section: name,
             deletedAt: null,
           },
         }),
@@ -1087,7 +1135,7 @@ export async function updateSection(_prevState: any, formData: FormData) {
     } else {
       await prisma.section.update({
         where: { id: current.id },
-        data: { section: name },
+        data: { section: name, headerColor },
       })
     }
 

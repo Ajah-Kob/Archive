@@ -16,6 +16,7 @@ interface SectionContextProps {
     name: string
     hasJoinCode: boolean
     joinCode: string | null
+    headerColor?: string | null
   }
 }
 
@@ -75,7 +76,7 @@ export function SectionContext({ section }: SectionContextProps) {
   function handleRemoveSuccess() {
     setRemoveOpen(false)
     bump()
-    router.push('/faculty')
+    router.push('/faculty/my-sections')
   }
 
   return (

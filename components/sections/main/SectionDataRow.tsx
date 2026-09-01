@@ -68,7 +68,7 @@ export function SectionDataRow({ data }: SectionDataRowProps) {
           items={[
             {
               label: 'View Details',
-              onClick: () => router.push(`/faculty/my-section/${data.id}`),
+              onClick: () => router.push(`/faculty/my-sections/${data.id}`),
             },
           ]}
         />

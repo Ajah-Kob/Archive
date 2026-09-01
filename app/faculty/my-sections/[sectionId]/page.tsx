@@ -41,6 +41,7 @@ export default async function MySectionPage({
                 name: section.name,
                 hasJoinCode: section.hasJoinCode,
                 joinCode: section.joinCode,
+                headerColor: (section as any).headerColor ?? null,
               }}
             />
           }

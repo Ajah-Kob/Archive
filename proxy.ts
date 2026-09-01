@@ -73,6 +73,13 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     }
 
+    // Legacy singular route — consolidate to plural /my-sections
+    if (startsWithPath(pathname, '/faculty/my-section')) {
+      const url = req.nextUrl.clone()
+      url.pathname = pathname.replace('/faculty/my-section', '/faculty/my-sections')
+      return NextResponse.redirect(url)
+    }
+
     // Faculty sub-role routes (only reachable by admins/faculty, see above).
     if (startsWithPath(pathname, '/faculty/faculties')) {
       if (!hasCoordinatorAccess(token))
@@ -86,7 +93,7 @@ export async function proxy(req: NextRequest) {
     } else if (startsWithPath(pathname, '/faculty/evaluation')) {
       if (token.isAdviser !== true)
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/my-section')) {
+    } else if (startsWithPath(pathname, '/faculty/my-sections')) {
       if (token.isCoordinator !== true)
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     } else if (startsWithPath(pathname, '/faculty/coordinators')) {

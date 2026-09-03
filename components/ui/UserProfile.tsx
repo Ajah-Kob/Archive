@@ -4,29 +4,49 @@ interface UserProfileProps {
   email: string
   gradient?: string
   badge?: string
+  /** Override avatar tile size — panelist checklist uses 35px (Figma 1470:5094). Defaults to 32px (size-8) for backward compat. */
+  avatarClassName?: string
 }
 
-export function UserProfile({ initials, name, email, gradient, badge }: UserProfileProps) {
+export const PANELIST_AVATAR_GRADIENT =
+  'linear-gradient(135deg, #1e3a8a 0%, #2d52b8 100%)'
+
+export function UserProfile({
+  initials,
+  name,
+  email,
+  gradient,
+  badge,
+  avatarClassName,
+}: UserProfileProps) {
   return (
-    <div className="flex gap-2.5 items-center">
+    <div className="flex gap-2.5 items-center min-w-0">
       <div
-        className="flex justify-center items-center size-8 rounded-full shrink-0 drop-shadow-[0_2px_2px_rgba(0,0,0,0.14)]"
-        style={{ backgroundImage: gradient || 'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)' }}
+        className={`flex text-center justify-center items-center rounded-full shrink-0 drop-shadow-[0_2px_2px_rgba(0,0,0,0.14)] ${avatarClassName ?? 'size-8'}`}
+        style={{
+          backgroundImage:
+            gradient ||
+            'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)',
+        }}
       >
-        <span className="font-heading font-bold text-[11.5px] text-white tracking-[0.3456px]">
+        <span className="relative font-heading text-[11.5px] font-bold leading-none text-white">
           {initials}
         </span>
       </div>
-      <div className="flex flex-col">
-        <div className="flex items-center gap-[6px]">
-          <p className="font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">{name}</p>
+      <div className="flex flex-col min-w-0">
+        <div className="flex items-center gap-[6px] min-w-0">
+          <p className="font-sans font-bold text-[13px] leading-none text-[#1e2145] truncate">
+            {name}
+          </p>
           {badge && (
-            <span className="inline-flex items-center px-[6px] py-[1px] rounded-full bg-[#f4f6ff] border border-[#e5e8ff] font-sans font-bold text-[10px] leading-[15px] text-[#707dff]">
+            <span className="inline-flex items-center px-[6px] py-[1px] rounded-full bg-[#f4f6ff] border border-[#e5e8ff] font-sans font-bold text-[10px] leading-none text-[#707dff] shrink-0">
               {badge}
             </span>
           )}
         </div>
-        <p className="font-sans font-medium text-[11.5px] leading-[17.25px] text-[#8a93b4]">{email}</p>
+        <p className="font-sans font-medium text-[11.5px] leading-[17.25px] text-[#8a93b4] truncate">
+          {email}
+        </p>
       </div>
     </div>
   )

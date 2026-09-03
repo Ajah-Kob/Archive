@@ -28,6 +28,38 @@ const DEFENSE_VERDICTS: DefenseVerdict[] = [
 ]
 const PANELIST_ROLES: PanelistRole[] = ['CHAIR', 'PANEL_MEMBER']
 
+// ───────────────────────────── Panelist session helpers (pure) ─────────────
+
+/**
+ * Panelist feedback is counts only, gated by verdict !== PENDING, without
+ * exposing private annotation content. When the document workspace ships, this
+ * will aggregate DefenseSubmissionAnnotation counts per panelist (comments +
+ * distinct pages). Until then it is backend-ready null so the UI can rely on
+ * the Figma gate (PENDING -> "No feedback...").
+ */
+function resolvePanelistFeedback(
+  verdict: DefenseVerdict,
+): { comments: number; pages: number } | null {
+  if (verdict === 'PENDING') return null
+  // Workspace not yet built — no annotation counts available yet; counts only
+  // when it ships, never the private `content` field.
+  return null
+}
+
+function toPanelistPayload(
+  p: { userId: number; name: string; email: string; image: string | null; role: PanelistRole },
+  verdict: DefenseVerdict,
+): DefensePanelistPayload {
+  return {
+    userId: p.userId,
+    name: p.name,
+    email: p.email,
+    image: p.image,
+    role: p.role,
+    feedback: resolvePanelistFeedback(verdict),
+  }
+}
+
 interface PanelistInput {
   userId: number
   role: PanelistRole
@@ -86,6 +118,12 @@ export interface DefensePanelistPayload {
   email: string
   image: string | null
   role: PanelistRole
+  /**
+   * Per-panelist feedback completion — counts only, never private content.
+   * Optional and backend-ready: null when the document workspace has not yet
+   * shipped; gated by verdict !== PENDING in the UI (deriveFeedbackText).
+   */
+  feedback?: { comments: number; pages: number } | null
 }
 
 export interface DefenseSchedulePayload {
@@ -152,13 +190,12 @@ async function getDefenseSchedulesData() {
       verdict: s.verdict,
       createdById: s.createdBy,
       createdByName: s.createdByUser.name,
-      panelists: s.panelists.map((p) => ({
-        userId: p.userId,
-        name: p.user.name,
-        email: p.user.email,
-        image: p.user.image,
-        role: p.role,
-      })),
+      panelists: s.panelists.map((p) =>
+        toPanelistPayload(
+          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
+          s.verdict,
+        ),
+      ),
     }),
   )
 }
@@ -243,13 +280,12 @@ async function getMyDefenseSchedulesData(
       verdict: s.verdict,
       createdById: s.createdBy,
       createdByName: s.createdByUser.name,
-      panelists: s.panelists.map((p) => ({
-        userId: p.userId,
-        name: p.user.name,
-        email: p.user.email,
-        image: p.user.image,
-        role: p.role,
-      })),
+      panelists: s.panelists.map((p) =>
+        toPanelistPayload(
+          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
+          s.verdict,
+        ),
+      ),
       myRole:
         s.panelists.find((p) => p.userId === userId)?.role ?? 'PANEL_MEMBER',
     }),
@@ -845,13 +881,15 @@ async function getDefenseSessionData(
     verdict: schedule.verdict,
     createdById: schedule.createdBy,
     createdByName: schedule.createdByUser.name,
-    panelists: schedule.panelists.map((p) => ({
-      userId: p.userId,
-      name: p.user.name,
-      email: p.user.email,
-      image: p.user.image,
-      role: p.role,
-    })),
+    // Panelist feedback completion: counts only, gated by verdict !== PENDING,
+    // without exposing private annotation content. Backend-ready null until the
+    // document workspace ships (then per-panelist {comments, pages} counts).
+    panelists: schedule.panelists.map((p) =>
+      toPanelistPayload(
+        { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
+        schedule.verdict,
+      ),
+    ),
     myRole:
       schedule.panelists.find((p) => p.userId === userId)?.role ?? 'PANEL_MEMBER',
     resubmissions: schedule.resubmissions.map((r, index) => ({

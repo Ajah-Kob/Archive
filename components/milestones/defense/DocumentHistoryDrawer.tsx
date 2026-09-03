@@ -208,7 +208,7 @@ function ResubmissionRow({
 /** Empty state when there are no resubmissions yet. */
 function EmptySubmissionHistory() {
   return (
-    <div className="flex flex-col items-center justify-center gap-[10px] rounded-[12px] border border-[#eceef8] bg-[#fafbff] px-[20px] py-[28px] text-center">
+    <div className="flex flex-col h-full items-center justify-center gap-[10px] rounded-[12px] border border-[#eceef8] bg-[#fafbff] px-[20px] py-[28px] text-center">
       <div className="flex size-[40px] items-center justify-center rounded-[20px] bg-[#f4f5fc]">
         <Clock className="size-[18px] text-[#707dff]" strokeWidth={2} />
       </div>

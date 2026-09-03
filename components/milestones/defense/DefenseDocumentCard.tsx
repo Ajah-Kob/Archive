@@ -40,9 +40,7 @@ export interface DefenseDocumentInfo {
 
 /** Actions required from the parent page / server actions. */
 export interface DefenseUploadActions {
-  requestUploadToken: (
-    fileName: string,
-  ) => Promise<{
+  requestUploadToken: (fileName: string) => Promise<{
     success: boolean
     message: string
     payload?: { pathname: string; token: string } | null
@@ -179,13 +177,12 @@ function Frame({ children }: { children: React.ReactNode }) {
 /** Card header with "Defense Document" label. */
 function Header() {
   return (
-    <div className="flex items-center gap-[8px] px-[16px] pt-[12px] pb-[13px] border-b border-[#f0f2fa]">
-      <div className="flex size-[26px] items-center justify-center rounded-[7px] bg-[rgba(112,125,255,0.05)] shrink-0">
-        <FileText className="size-[12px] text-[#707dff]" strokeWidth={2} />
+    <div className="border-[#f0f2fa] border-b w-full shrink-0">
+      <div className="flex items-center px-[18px] pt-[15px] pb-[16px] w-full">
+        <p className="font-['Sora',sans-serif] font-bold text-[12.5px] leading-[normal] tracking-[-0.125px] text-[#1e3a8a]">
+          Defense Details
+        </p>
       </div>
-      <p className="font-sora text-[12px] font-bold text-[#1e3a8a] tracking-[-0.12px]">
-        Defense Document
-      </p>
     </div>
   )
 }
@@ -457,12 +454,7 @@ function UploadZone({ mode }: { mode?: 'initial' | 'resubmit' }) {
 
   // Opens the confirmation modal instead of submitting directly.
   const handleSubmit = () => {
-    if (
-      !draft ||
-      draft.status !== 'ready' ||
-      !draft.blobUrl ||
-      submitting
-    ) {
+    if (!draft || draft.status !== 'ready' || !draft.blobUrl || submitting) {
       return
     }
     setConfirmOpen(true)
@@ -470,12 +462,7 @@ function UploadZone({ mode }: { mode?: 'initial' | 'resubmit' }) {
 
   // Runs the actual submission once the user confirms in the modal.
   const confirmSubmit = async () => {
-    if (
-      !draft ||
-      draft.status !== 'ready' ||
-      !draft.blobUrl ||
-      submitting
-    ) {
+    if (!draft || draft.status !== 'ready' || !draft.blobUrl || submitting) {
       return
     }
     setSubmitting(true)
@@ -631,7 +618,10 @@ function UploadZone({ mode }: { mode?: 'initial' | 'resubmit' }) {
             }`}
           >
             <div className="flex size-[48px] items-center justify-center rounded-[24px] bg-[#eef0fb]">
-              <UploadCloud className="size-[20px] text-[#707dff]" strokeWidth={1.75} />
+              <UploadCloud
+                className="size-[20px] text-[#707dff]"
+                strokeWidth={1.75}
+              />
             </div>
             <p className="pt-[14px] font-sora text-[14px] font-bold text-[#1e3a8a]">
               Drag and drop your document here
@@ -723,7 +713,8 @@ export function DefenseDocumentCard({
   actions,
 }: DefenseDocumentCardProps) {
   const showUpload = initial == null || (canResubmit && resubmission == null)
-  const showResubmitUpload = canResubmit && initial != null && resubmission == null
+  const showResubmitUpload =
+    canResubmit && initial != null && resubmission == null
 
   return (
     <DefenseDocumentCardContext.Provider
@@ -756,11 +747,14 @@ export function DefenseDocumentCard({
                   versionLabel={`v${resubmission.version ?? 2}`}
                   connectorDashed={resubmissionStatus === 'IN_REVIEW'}
                 />
-              )}            </div>
+              )}{' '}
+            </div>
           )}
 
           {/* Upload zone: shown when no document exists or resubmission needed */}
-          {showUpload && <UploadZone mode={showResubmitUpload ? 'resubmit' : 'initial'} />}
+          {showUpload && (
+            <UploadZone mode={showResubmitUpload ? 'resubmit' : 'initial'} />
+          )}
 
           {/* Empty state — no document and upload not possible */}
           {!initial && !showUpload && (

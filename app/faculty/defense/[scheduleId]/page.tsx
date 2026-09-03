@@ -1,7 +1,10 @@
 import { notFound } from 'next/navigation'
 import { PageLabel } from '@/components/globals/PageLabel'
-import { DefenseSessionView } from '@/components/defense/DefenseSessionView'
+import { DefenseSessionShell } from '@/components/defense/DefenseSessionShell'
 import { getDefenseSession } from '@/lib/actions/defense'
+
+// Page wires ContextBar (via DefenseSessionShell/DefenseSessionContextBar) +
+// DocumentHistoryDrawer — same drawer component as Defense Milestones, back to /defense
 
 export default async function DefenseSessionPage({
   params,
@@ -18,8 +21,8 @@ export default async function DefenseSessionPage({
     <section className="min-h-full flex flex-col">
       <PageLabel label="Defense Session" />
 
-      <div className="flex-1 p-[30px] flex flex-col min-h-0">
-        <DefenseSessionView session={payload} />
+      <div className="flex-1 flex flex-col min-h-0">
+        <DefenseSessionShell session={payload} backHref="/faculty/defense" />
       </div>
     </section>
   )

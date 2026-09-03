@@ -11,7 +11,6 @@ import {
   History,
   MapPin,
   Shield,
-  User,
 } from 'lucide-react'
 import type { DefenseType, DefenseVerdict } from '@prisma/client'
 import type { DefenseSessionPayload } from '@/lib/actions/defense'
@@ -248,6 +247,8 @@ function ReviewStatus({ status }: { status: 'PENDING' | 'APPROVED' }) {
 
 interface DefenseSessionViewProps {
   session: DefenseSessionPayload
+  /** When true, the inner back button is hidden (the ContextBar owns it). */
+  hideBack?: boolean
 }
 
 /**
@@ -255,7 +256,10 @@ interface DefenseSessionViewProps {
  * the latest submitted document, and the full submission history. The Chair
  * verdict submission and the annotation workspace are built in later increments.
  */
-export function DefenseSessionView({ session }: DefenseSessionViewProps) {
+export function DefenseSessionView({
+  session,
+  hideBack = false,
+}: DefenseSessionViewProps) {
   const router = useRouter()
 
   const chair = session.panelists.find((p) => p.role === 'CHAIR')
@@ -291,16 +295,18 @@ export function DefenseSessionView({ session }: DefenseSessionViewProps) {
 
   return (
     <div className="flex flex-col gap-[16px]">
-      {/* Back + title */}
+      {/* Title row — back button lives in DefenseSessionContextBar when hideBack */}
       <div className="flex items-center gap-[12px]">
-        <button
-          type="button"
-          onClick={() => router.push('/faculty/defense')}
-          aria-label="Back to defense"
-          className="bg-white border border-[#eceef8] rounded-[14px] size-[32px] flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
-        >
-          <ArrowLeft className="size-[15px] text-[#8a93b4]" />
-        </button>
+        {!hideBack && (
+          <button
+            type="button"
+            onClick={() => router.push('/faculty/defense')}
+            aria-label="Back to defense"
+            className="bg-white border border-[#eceef8] rounded-[14px] size-[32px] flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
+          >
+            <ArrowLeft className="size-[15px] text-[#8a93b4]" />
+          </button>
+        )}
         <div className="flex items-center gap-[12px] min-w-0">
           <DefenseTypeBadge type={session.type} />
           <div className="min-w-0">

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Clock, Eye, X } from 'lucide-react'
+import { Clock, Eye, FileSearch, X } from 'lucide-react'
 import {
   CircleHistoryState,
   StatusPill,
@@ -24,6 +24,12 @@ interface DocumentHistoryDrawerProps {
   initial: DocumentHistoryItem | null
   /** All resubmissions, oldest first (chronological). */
   resubmissions: DocumentHistoryItem[]
+  /** Defense schedule id for faculty workspace links (e.g. /faculty/defense/[scheduleId]/[submissionId]). */
+  scheduleId?: number
+  /** Milestone slug for student workspace links (e.g. proposal-defense). */
+  milestoneSlug?: string
+  /** Independent button logic — panelist: Review when pending, student: View when pending (opposite). */
+  variant?: 'panelist' | 'student'
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,11 +48,34 @@ function formatDate(iso: string) {
   })
 }
 
-/** Muted "reviewed" line shown for verdict/reviewed states. */
-function ReviewedLine() {
+/** Muted "reviewed" line shown for verdict/reviewed states — now wired to real counts/date. */
+function ReviewedLine({ comments, pages, reviewedAt }: { comments?: number | null; pages?: number | null; reviewedAt?: string | null }) {
+  const hasCounts = typeof comments === 'number' && typeof pages === 'number' && comments > 0
+  const dateLabel = reviewedAt ? formatDate(reviewedAt) : null
+  if (hasCounts && dateLabel) {
+    return (
+      <p className="py-[3px] font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
+        {comments} comments on {pages} pages · Reviewed {dateLabel}.
+      </p>
+    )
+  }
+  if (hasCounts) {
+    return (
+      <p className="py-[3px] font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
+        {comments} comments on {pages} pages.
+      </p>
+    )
+  }
+  if (dateLabel) {
+    return (
+      <p className="py-[3px] font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
+        Reviewed {dateLabel}.
+      </p>
+    )
+  }
   return (
     <p className="py-[3px] font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
-      4 comments on 3 pages · Reviewed May 31, 2026.
+      Reviewed.
     </p>
   )
 }
@@ -68,11 +97,24 @@ function GhostButton({
   icon,
   children,
   className,
+  href,
 }: {
   icon?: React.ReactNode
   children: React.ReactNode
   className?: string
+  href?: string
 }) {
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={`flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 ${className ?? ''}`}
+      >
+        {icon}
+        {children}
+      </a>
+    )
+  }
   return (
     <button
       type="button"
@@ -97,12 +139,30 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 /**
  * Initial Defense Document row (Figma 1448-7043).
- * Shows the verdict status via the circle + pill; No Verdict shows an amber
- * "wait for schedule" line and a Replace action.
+ * Independent: panelist = Review when pending, student = View when pending (opposite after verdict).
  */
-function InitialDocumentRow({ item }: { item: DocumentHistoryItem }) {
+function InitialDocumentRow({
+  item,
+  scheduleId,
+  milestoneSlug,
+  variant = 'panelist',
+}: {
+  item: DocumentHistoryItem
+  scheduleId?: number
+  milestoneSlug?: string
+  variant?: 'panelist' | 'student'
+}) {
   const { info, status } = item
   const isNoVerdict = status === 'PENDING'
+  // Student history: always View grey (per request) — panelist: Review when pending
+  const isPanelist = variant === 'panelist'
+  const showReview = isPanelist ? status === 'PENDING' || status === 'IN_REVIEW' : false
+  const href =
+    info.id && scheduleId
+      ? `/faculty/defense/${scheduleId}/${info.id}`
+      : info.id && milestoneSlug
+        ? `/student/milestone/${milestoneSlug}/${info.id}`
+        : undefined
 
   return (
     <div className="flex items-center gap-[14px]">
@@ -126,13 +186,26 @@ function InitialDocumentRow({ item }: { item: DocumentHistoryItem }) {
             Wait for your defense schedule and verdict
           </AmberStatusLine>
         ) : (
-          <ReviewedLine />
+          <ReviewedLine
+            comments={(info as unknown as { comments?: number | null }).comments ?? null}
+            pages={(info as unknown as { pages?: number | null }).pages ?? null}
+            reviewedAt={(info as unknown as { reviewedAt?: string | null }).reviewedAt ?? null}
+          />
         )}
       </div>
 
       <div className="flex shrink-0 items-center gap-[5px]">
-        <GhostButton icon={<Eye className="size-[11px]" />}>View</GhostButton>
-        {isNoVerdict && <GhostButton>Replace</GhostButton>}
+        {showReview ? (
+          <a
+            href={href ?? info.blobUrl ?? '#'}
+            className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] transition-all shrink-0"
+          >
+            <FileSearch className="size-[13px]" strokeWidth={2} />
+            Review Document
+          </a>
+        ) : (
+          <GhostButton icon={<Eye className="size-[11px]" />} href={href}>View</GhostButton>
+        )}
       </div>
     </div>
   )
@@ -142,18 +215,32 @@ function InitialDocumentRow({ item }: { item: DocumentHistoryItem }) {
 
 /**
  * Resubmission history row (Figma 1448-7162).
- * Shows the review-derived status via the circle + pill; In Review shows an
- * amber "waiting for panelist approvals" line.
+ * Independent: panelist = Review when IN_REVIEW, student = View when IN_REVIEW (opposite after verdict).
  */
 function ResubmissionRow({
   item,
   isLast,
+  scheduleId,
+  milestoneSlug,
+  variant = 'panelist',
 }: {
   item: DocumentHistoryItem
   isLast: boolean
+  scheduleId?: number
+  milestoneSlug?: string
+  variant?: 'panelist' | 'student'
 }) {
   const { info, status } = item
-  const isInReview = status === 'IN_REVIEW'
+  const isInReview = (status as string) === 'IN_REVIEW' || (status as string) === 'FOR_REVIEW'
+  // Student history: always View grey (per request) — panelist: Review when IN_REVIEW
+  const isPanelist = variant === 'panelist'
+  const showReview = isPanelist ? isInReview : false
+  const href =
+    info.id && scheduleId
+      ? `/faculty/defense/${scheduleId}/${info.id}`
+      : info.id && milestoneSlug
+        ? `/student/milestone/${milestoneSlug}/${info.id}`
+        : undefined
 
   return (
     <div className="flex items-start gap-[14px]">
@@ -187,17 +274,28 @@ function ResubmissionRow({
         {isInReview ? (
           <AmberStatusLine>Waiting for panelist approvals</AmberStatusLine>
         ) : (
-          <ReviewedLine />
+          <ReviewedLine
+            comments={(info as unknown as { comments?: number | null }).comments ?? null}
+            pages={(info as unknown as { pages?: number | null }).pages ?? null}
+            reviewedAt={(info as unknown as { reviewedAt?: string | null }).reviewedAt ?? null}
+          />
         )}
       </div>
 
       <div className="w-[74px] shrink-0">
-        <GhostButton
-          icon={<Eye className="size-[11px]" />}
-          className="w-full justify-center"
-        >
-          View
-        </GhostButton>
+        {showReview ? (
+          <a
+            href={href ?? info.blobUrl ?? '#'}
+            className="flex items-center justify-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] transition-all w-full"
+          >
+            <FileSearch className="size-[13px]" strokeWidth={2} />
+            Review
+          </a>
+        ) : (
+          <GhostButton icon={<Eye className="size-[11px]" />} className="w-full justify-center" href={href}>
+            View
+          </GhostButton>
+        )}
       </div>
     </div>
   )
@@ -238,7 +336,10 @@ export function DocumentHistoryDrawer({
   onClose,
   initial,
   resubmissions,
-}: DocumentHistoryDrawerProps) {
+  scheduleId,
+  milestoneSlug,
+  variant = 'panelist',
+}: DocumentHistoryDrawerProps & { variant?: 'panelist' | 'student' }) {
   // Escape closes; body scroll locks while the drawer is open (matches the
   // existing faculty/evaluation drawers).
   useEffect(() => {
@@ -294,7 +395,7 @@ export function DocumentHistoryDrawer({
           <div className="flex flex-col gap-[10px] px-[25px] pb-[22px]">
             <SectionHeading>Initial Defense Document</SectionHeading>
             {initial ? (
-              <InitialDocumentRow item={initial} />
+              <InitialDocumentRow item={initial} scheduleId={scheduleId} milestoneSlug={milestoneSlug} variant={variant} />
             ) : (
               <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
                 No initial document has been submitted yet.
@@ -314,6 +415,9 @@ export function DocumentHistoryDrawer({
                     key={item.info.blobUrl}
                     item={item}
                     isLast={index === resubmissions.length - 1}
+                    scheduleId={scheduleId}
+                    milestoneSlug={milestoneSlug}
+                    variant={variant}
                   />
                 ))}
               </div>

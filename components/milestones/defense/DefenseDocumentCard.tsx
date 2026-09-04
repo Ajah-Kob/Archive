@@ -4,6 +4,7 @@ import { createContext, use, useRef, useState } from 'react'
 import {
   Clock,
   Eye,
+  FileSearch,
   FileText,
   Loader2,
   TriangleAlert,
@@ -29,6 +30,7 @@ export type InitialDocumentStatus =
 export type ResubmissionStatus = 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
 
 export interface DefenseDocumentInfo {
+  id?: number
   fileName: string
   size: number
   submittedAt: string
@@ -70,6 +72,7 @@ interface DefenseDocumentCardContextValue {
   canResubmit: boolean
   onSubmitted: () => void
   actions: DefenseUploadActions
+  milestoneSlug?: string
 }
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -180,7 +183,7 @@ function Header() {
     <div className="border-[#f0f2fa] border-b w-full shrink-0">
       <div className="flex items-center px-[18px] pt-[15px] pb-[16px] w-full">
         <p className="font-['Sora',sans-serif] font-bold text-[12.5px] leading-[normal] tracking-[-0.125px] text-[#1e3a8a]">
-          Defense Details
+          Defense Document
         </p>
       </div>
     </div>
@@ -214,11 +217,24 @@ function GhostButton({
   icon,
   children,
   onClick,
+  href,
 }: {
   icon?: React.ReactNode
   children: React.ReactNode
   onClick?: () => void
+  href?: string
 }) {
+  if (href) {
+    return (
+      <a
+        href={href}
+        className="flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
+      >
+        {icon}
+        {children}
+      </a>
+    )
+  }
   return (
     <button
       type="button"
@@ -279,11 +295,20 @@ function DocumentRow({
   connectorDashed?: boolean
   showReplace?: boolean
 }) {
-  const { actions, onSubmitted } = useDefenseDocumentCard()
+  const { actions, onSubmitted, milestoneSlug } =
+    useDefenseDocumentCard() as DefenseDocumentCardContextValue & {
+      milestoneSlug?: string
+    }
   const [replaceOpen, setReplaceOpen] = useState(false)
 
-  const isNoVerdict = status === 'PENDING'
-  const isInReview = status === 'IN_REVIEW'
+  const normalizedStatus = (status ?? '').toUpperCase().replace(/\s+/g, '_')
+  const isNoVerdict = normalizedStatus === 'PENDING'
+  const isInReview = normalizedStatus === 'IN_REVIEW'
+
+  const workspaceHref =
+    document.id && milestoneSlug
+      ? `/student/milestone/${milestoneSlug}/${document.id}`
+      : undefined
 
   const meta = versionLabel
     ? `${versionLabel} · ${formatDate(document.submittedAt)} · Submitted by ${document.submittedByName}`
@@ -293,7 +318,7 @@ function DocumentRow({
     <div className="flex gap-[14px] items-start">
       {/* Timeline rail: status circle + optional connector line */}
       <div className="flex flex-col items-center self-stretch shrink-0 pt-[2px]">
-        <CircleHistoryState state={status} />
+        <CircleHistoryState state={normalizedStatus} />
         {showConnector && (
           <span
             className={`w-[2px] flex-1 min-h-[24px] ${
@@ -313,7 +338,7 @@ function DocumentRow({
             <h4 className="font-sora font-bold text-[13px] leading-[normal] text-[#1e3a8a] truncate">
               {document.fileName}
             </h4>
-            {!isNoVerdict && <StatusPill state={status} />}
+            {!isNoVerdict && <StatusPill state={normalizedStatus} />}
           </div>
 
           {/* Meta line */}
@@ -321,20 +346,72 @@ function DocumentRow({
             {meta}
           </p>
 
-          {/* Status line */}
+          {/* Annotation counts when verdict submitted */}
+          {!isNoVerdict &&
+            !isInReview &&
+            (
+              document as unknown as {
+                comments?: number | null
+                pages?: number | null
+                reviewedAt?: string | null
+              }
+            ).comments != null && (
+              <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
+                {(document as unknown as { comments?: number | null }).comments}{' '}
+                comments on{' '}
+                {(document as unknown as { pages?: number | null }).pages} pages
+                {(document as unknown as { reviewedAt?: string | null })
+                  .reviewedAt
+                  ? ` · Reviewed ${formatDate((document as unknown as { reviewedAt?: string | null }).reviewedAt!)}`
+                  : ''}
+              </p>
+            )}
+          {!isNoVerdict &&
+            !isInReview &&
+            (document as unknown as { comments?: number | null }).comments ==
+              null &&
+            (document as unknown as { reviewedAt?: string | null })
+              .reviewedAt && (
+              <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
+                Reviewed{' '}
+                {formatDate(
+                  (document as unknown as { reviewedAt?: string | null })
+                    .reviewedAt!,
+                )}
+              </p>
+            )}
+
+          {/* Status line — annotation counts live above; this amber line is the pending footer */}
           {isNoVerdict && (
             <StatusLine tone="amber">
               Wait for your defense schedule and verdict
             </StatusLine>
           )}
           {isInReview && (
-            <StatusLine tone="amber">Waiting for panelist approvals</StatusLine>
+            <StatusLine tone="amber">Waiting for approval</StatusLine>
           )}
         </div>
 
-        {/* Actions */}
+        {/* Actions: independent — student: View grey when pending/in review, Review Document (primary) after verdict submitted */}
         <div className="flex items-start gap-[10px] shrink-0">
-          <GhostButton icon={<Eye className="size-[11px]" />}>View</GhostButton>
+          {isNoVerdict || isInReview ? (
+            <GhostButton
+              icon={<Eye className="size-[11px]" />}
+              href={workspaceHref ?? document.blobUrl}
+            >
+              View
+            </GhostButton>
+          ) : (
+            <a
+              href={workspaceHref ?? document.blobUrl}
+              aria-label={`Review ${document.fileName} in document workspace`}
+              title="Open in document workspace to review feedback"
+              className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] hover:shadow-[0_4px_12px_rgba(112,125,255,0.32)] transition-all focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-2 outline-none shrink-0"
+            >
+              <FileSearch className="size-[13px]" strokeWidth={2} />
+              Review Document
+            </a>
+          )}
           {showReplace && (
             <GhostButton onClick={() => setReplaceOpen(true)}>
               Replace
@@ -656,12 +733,6 @@ function UploadZone({ mode }: { mode?: 'initial' | 'resubmit' }) {
               </p>
             </div>
           )}
-
-          {isResubmitting && initial && (
-            <p className="font-sans font-medium text-[11px] text-[#9ea8c6]">
-              Current version: {initial.fileName}
-            </p>
-          )}
         </>
       )}
 
@@ -690,6 +761,7 @@ interface DefenseDocumentCardProps {
   canResubmit: boolean
   onSubmitted: () => void
   actions: DefenseUploadActions
+  milestoneSlug?: string
 }
 
 /**
@@ -711,8 +783,29 @@ export function DefenseDocumentCard({
   canResubmit,
   onSubmitted,
   actions,
+  milestoneSlug,
 }: DefenseDocumentCardProps) {
-  const showUpload = initial == null || (canResubmit && resubmission == null)
+  const normalizedInitialStatus = (initialStatus ?? '').toUpperCase().replace(/\s+/g, '_')
+  const normalizedResubStatus = (resubmissionStatus ?? '').toUpperCase().replace(/\s+/g, '_')
+  const isVerdictSubmitted =
+    normalizedInitialStatus !== '' && normalizedInitialStatus !== 'PENDING'
+  const resubmissionNeedsRevision = normalizedResubStatus === 'REJECTED'
+  // Timeline is visible only while waiting for verdict / waiting for resubmission review.
+  // When any verdict is submitted (APPROVED/MINOR/MAJOR/REJECTED) the submitted document
+  // must not sit above the dropzone — show only the idle/upload state. Same when a
+  // resubmission needs revision (REJECTED): hide the rejected row and show the resubmit zone.
+  const showInitialRow = initial != null && normalizedInitialStatus === 'PENDING'
+  const showResubmissionRow =
+    resubmission != null &&
+    normalizedResubStatus !== '' &&
+    !resubmissionNeedsRevision
+  const showTimeline = showInitialRow || showResubmissionRow
+  const showUpload =
+    initial == null ||
+    (isVerdictSubmitted && canResubmit && resubmission == null) ||
+    resubmissionNeedsRevision ||
+    // APPROVED/REJECTED reset to idle (no timeline, just the empty/upload placeholder behaviour)
+    (isVerdictSubmitted && !canResubmit && resubmission == null)
   const showResubmitUpload =
     canResubmit && initial != null && resubmission == null
 
@@ -726,32 +819,35 @@ export function DefenseDocumentCard({
         canResubmit,
         onSubmitted,
         actions,
+        milestoneSlug,
       }}
     >
       <Frame>
         <Header />
         <div className="p-[14px] flex flex-col gap-[14px]">
-          {/* Timeline of submitted documents */}
-          {initial && initialStatus && (
+          {/* Timeline — only while waiting (PENDING / IN_REVIEW). Hidden when any verdict is submitted or resubmission needs revision — only the idle/upload zone shows. */}
+          {showTimeline && (
             <div className="flex flex-col">
-              <DocumentRow
-                document={initial}
-                status={initialStatus}
-                showConnector={resubmission != null}
-                showReplace={initialStatus === 'PENDING'}
-              />
-              {resubmission && resubmissionStatus && (
+              {showInitialRow && (
                 <DocumentRow
-                  document={resubmission}
-                  status={resubmissionStatus}
-                  versionLabel={`v${resubmission.version ?? 2}`}
+                  document={initial!}
+                  status={initialStatus!}
+                  showConnector={showResubmissionRow}
+                  showReplace={normalizedInitialStatus === 'PENDING'}
+                />
+              )}
+              {showResubmissionRow && (
+                <DocumentRow
+                  document={resubmission!}
+                  status={resubmissionStatus!}
+                  versionLabel={`v${resubmission!.version ?? 2}`}
                   connectorDashed={resubmissionStatus === 'IN_REVIEW'}
                 />
-              )}{' '}
+              )}
             </div>
           )}
 
-          {/* Upload zone: shown when no document exists or resubmission needed */}
+          {/* Upload zone: shown when no document exists, resubmission needed, or verdict submitted (reset to idle) */}
           {showUpload && (
             <UploadZone mode={showResubmitUpload ? 'resubmit' : 'initial'} />
           )}

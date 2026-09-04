@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { ClipboardCheck, FileText } from 'lucide-react'
-import type { DefenseResubmissionPayload } from '@/lib/actions/defense'
+import type { DefenseQueuePayload } from '@/lib/actions/defense'
 
 // Grid template for the resubmissions table — mirrors the Document Review
 // table's proportions (Group is widest, action column hugs its button).
@@ -47,7 +47,7 @@ function formatSize(bytes: number) {
 function VerdictBadge({
   verdict,
 }: {
-  verdict: DefenseResubmissionPayload['previousVerdict']
+  verdict: DefenseQueuePayload['previousVerdict']
 }) {
   return (
     <span
@@ -59,7 +59,7 @@ function VerdictBadge({
 }
 
 interface ResubmissionsTableProps {
-  items: DefenseResubmissionPayload[]
+  items: DefenseQueuePayload[]
 }
 
 /**

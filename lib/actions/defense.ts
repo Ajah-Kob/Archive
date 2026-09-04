@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/authOptions'
 import {
   requireCoordinatorAccess,
   requireAdminOrProgramChair,
+  requirePanelist,
   unauthorized,
 } from '@/lib/actions/guard'
 import { getFacultyMembers } from '@/lib/actions/faculty'
@@ -15,7 +16,7 @@ import type {
   DefenseType,
   DefenseVerdict,
   PanelistRole,
-  DefenseResubmissionStatus,
+  DefenseReviewStatus,
 } from '@prisma/client'
 
 const DEFENSE_TYPES: DefenseType[] = ['PROPOSAL', 'FINAL']
@@ -30,25 +31,33 @@ const PANELIST_ROLES: PanelistRole[] = ['CHAIR', 'PANEL_MEMBER']
 
 // ───────────────────────────── Panelist session helpers (pure) ─────────────
 
-/**
- * Panelist feedback is counts only, gated by verdict !== PENDING, without
- * exposing private annotation content. When the document workspace ships, this
- * will aggregate DefenseSubmissionAnnotation counts per panelist (comments +
- * distinct pages). Until then it is backend-ready null so the UI can rely on
- * the Figma gate (PENDING -> "No feedback...").
- */
-function resolvePanelistFeedback(
-  verdict: DefenseVerdict,
-): { comments: number; pages: number } | null {
-  if (verdict === 'PENDING') return null
-  // Workspace not yet built — no annotation counts available yet; counts only
-  // when it ships, never the private `content` field.
-  return null
+type PanelistFeedback = { comments: number; pages: number; hasCommitted?: boolean; hasDraft?: boolean } | null
+
+function resolvePanelistFeedbackFromAnnotations(
+  rows: Array<{ status: string; data: unknown }>,
+): PanelistFeedback {
+  if (!rows || rows.length === 0) return null
+  const committed = rows.find((r) => r.status === 'COMMITTED')
+  const draft = rows.find((r) => r.status === 'DRAFT')
+  const source = committed ?? draft ?? null
+  if (!source) return null
+  const items = Array.isArray(source.data) ? (source.data as unknown[]) : []
+  const comments = items.length
+  const pages = new Set(
+    items.map((it) => (it as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex).filter((v) => typeof v === 'number'),
+  ).size
+  return {
+    comments,
+    pages: pages || (comments > 0 ? 1 : 0),
+    hasCommitted: committed != null && items.length > 0,
+    hasDraft: draft != null && items.length > 0 && !committed,
+  }
 }
 
 function toPanelistPayload(
   p: { userId: number; name: string; email: string; image: string | null; role: PanelistRole },
   verdict: DefenseVerdict,
+  annotationRows: Array<{ status: string; data: unknown }> = [],
 ): DefensePanelistPayload {
   return {
     userId: p.userId,
@@ -56,8 +65,27 @@ function toPanelistPayload(
     email: p.email,
     image: p.image,
     role: p.role,
-    feedback: resolvePanelistFeedback(verdict),
+    feedback: resolvePanelistFeedbackFromAnnotations(annotationRows),
   }
+}
+
+function mapGroupMembers(
+  students: Array<{
+    id: number
+    user: { id: number; name: string; email: string; image: string | null }
+  }>,
+  leaderStudentId: number | null | undefined,
+): DefenseMemberPayload[] {
+  const mapped = students.map((s) => ({
+    userId: s.user.id,
+    name: s.user.name,
+    email: s.user.email,
+    image: s.user.image,
+    isLeader: leaderStudentId != null && s.id === leaderStudentId,
+  }))
+  const leader = mapped.filter((m) => m.isLeader)
+  const rest = mapped.filter((m) => !m.isLeader)
+  return [...leader, ...rest]
 }
 
 interface PanelistInput {
@@ -118,12 +146,15 @@ export interface DefensePanelistPayload {
   email: string
   image: string | null
   role: PanelistRole
-  /**
-   * Per-panelist feedback completion — counts only, never private content.
-   * Optional and backend-ready: null when the document workspace has not yet
-   * shipped; gated by verdict !== PENDING in the UI (deriveFeedbackText).
-   */
-  feedback?: { comments: number; pages: number } | null
+  feedback?: { comments: number; pages: number; hasCommitted?: boolean; hasDraft?: boolean } | null
+}
+
+export interface DefenseMemberPayload {
+  userId: number
+  name: string
+  email: string
+  image: string | null
+  isLeader: boolean
 }
 
 export interface DefenseSchedulePayload {
@@ -138,9 +169,12 @@ export interface DefenseSchedulePayload {
   endTime: string
   venue: string
   verdict: DefenseVerdict
+  verdictSubmittedAt?: string | null
   createdById: number
   createdByName: string
   panelists: DefensePanelistPayload[]
+  members: DefenseMemberPayload[]
+  annotationStats?: { comments: number; pages: number } | null
 }
 
 async function getDefenseSchedulesData() {
@@ -154,6 +188,7 @@ async function getDefenseSchedulesData() {
       group: {
         include: {
           section: { select: { id: true, section: true } },
+          leaderStudent: { select: { id: true } },
           adviser: {
             include: {
               faculty: {
@@ -162,6 +197,11 @@ async function getDefenseSchedulesData() {
                 },
               },
             },
+          },
+          students: {
+            where: { deletedAt: null },
+            include: { user: { select: { id: true, name: true, email: true, image: true } } },
+            orderBy: { id: 'asc' },
           },
         },
       },
@@ -195,6 +235,13 @@ async function getDefenseSchedulesData() {
           { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
           s.verdict,
         ),
+      ),
+      members: mapGroupMembers(
+        s.group.students as unknown as Array<{
+          id: number
+          user: { id: number; name: string; email: string; image: string | null }
+        }>,
+        s.group.leaderStudentId,
       ),
     }),
   )
@@ -244,6 +291,7 @@ async function getMyDefenseSchedulesData(
       group: {
         include: {
           section: { select: { id: true, section: true } },
+          leaderStudent: { select: { id: true } },
           adviser: {
             include: {
               faculty: {
@@ -252,6 +300,11 @@ async function getMyDefenseSchedulesData(
                 },
               },
             },
+          },
+          students: {
+            where: { deletedAt: null },
+            include: { user: { select: { id: true, name: true, email: true, image: true } } },
+            orderBy: { id: 'asc' },
           },
         },
       },
@@ -286,6 +339,13 @@ async function getMyDefenseSchedulesData(
           s.verdict,
         ),
       ),
+      members: mapGroupMembers(
+        s.group.students as unknown as Array<{
+          id: number
+          user: { id: number; name: string; email: string; image: string | null }
+        }>,
+        s.group.leaderStudentId,
+      ),
       myRole:
         s.panelists.find((p) => p.userId === userId)?.role ?? 'PANEL_MEMBER',
     }),
@@ -313,10 +373,12 @@ export async function getMyDefenseSchedules() {
 
 // ───────────────────────────── Resubmissions tab ────────────────────────────
 
-export interface DefenseResubmissionPayload {
+export interface DefenseQueuePayload {
   /** The review row id — the unit the panelist acts on. */
   id: number
   resubmissionId: number
+  /** Alias for resubmissionId — the unified DefenseSubmission id. */
+  submissionId: number
   scheduleId: number
   groupId: number
   groupName: string
@@ -331,39 +393,80 @@ export interface DefenseResubmissionPayload {
   blobUrl: string
   mimeType: string
   size: number
+  version: number
+  isInitial: boolean
 }
 
-// The current user's personal revision-evaluation queue: resubmissions where
+// The current user's personal revision-evaluation queue: submissions where
 // they are an assigned panelist AND still need to review the new version
-// (status PENDING). Reuses the 'defense' cache tag so any schedule/resubmission
-// mutation busts this read too.
+// (status PENDING). Unified model — queries DefenseSubmissionReview.
+// Reuses the 'defense' cache tag so any schedule/submission mutation busts
+// this read too.
+function toQueuePayload(
+  r: {
+    id: number
+    submissionId: number
+    createdAt: Date
+    submission: {
+      scheduleId: number
+      fileName: string
+      blobUrl: string
+      mimeType: string
+      size: number
+      version: number
+      isInitial: boolean
+      createdAt: Date
+      schedule: {
+        groupId: number
+        verdict: string
+        date: Date
+        group: { groupName: string; section: { section: string } }
+      }
+    }
+  },
+): DefenseQueuePayload {
+  return {
+    id: r.id,
+    resubmissionId: r.submissionId,
+    submissionId: r.submissionId,
+    scheduleId: r.submission.scheduleId,
+    groupId: r.submission.schedule.groupId,
+    groupName: r.submission.schedule.group.groupName,
+    sectionName: r.submission.schedule.group.section.section,
+    previousVerdict:
+      r.submission.schedule.verdict === 'MAJOR_REVISION'
+        ? 'MAJOR_REVISION'
+        : 'MINOR_REVISION',
+    defenseDate: r.submission.schedule.date.toISOString(),
+    dateSubmitted: r.submission.createdAt.toISOString(),
+    fileName: r.submission.fileName,
+    blobUrl: r.submission.blobUrl,
+    mimeType: r.submission.mimeType,
+    size: r.submission.size,
+    version: r.submission.version,
+    isInitial: r.submission.isInitial,
+  }
+}
+
 async function getMyDefenseResubmissionsData(
   userId: number,
-): Promise<DefenseResubmissionPayload[]> {
+): Promise<DefenseQueuePayload[]> {
   'use cache'
   cacheTag('defense')
   cacheLife('max')
-
-  const reviews = await prisma.defenseResubmissionReview.findMany({
+  const reviews = await prisma.defenseSubmissionReview.findMany({
     where: {
       panelistId: userId,
       status: 'PENDING',
       deletedAt: null,
-      resubmission: {
-        deletedAt: null,
-        schedule: { deletedAt: null },
-      },
+      submission: { deletedAt: null, schedule: { deletedAt: null } },
     },
     include: {
-      resubmission: {
+      submission: {
         include: {
           schedule: {
             include: {
-              group: {
-                include: {
-                  section: { select: { section: true } },
-                },
-              },
+              group: { include: { section: { select: { section: true } } } },
             },
           },
         },
@@ -371,27 +474,7 @@ async function getMyDefenseResubmissionsData(
     },
     orderBy: { createdAt: 'desc' },
   })
-
-  return reviews.map(
-    (r): DefenseResubmissionPayload => ({
-      id: r.id,
-      resubmissionId: r.resubmissionId,
-      scheduleId: r.resubmission.scheduleId,
-      groupId: r.resubmission.schedule.groupId,
-      groupName: r.resubmission.schedule.group.groupName,
-      sectionName: r.resubmission.schedule.group.section.section,
-      previousVerdict:
-        r.resubmission.schedule.verdict === 'MAJOR_REVISION'
-          ? 'MAJOR_REVISION'
-          : 'MINOR_REVISION',
-      defenseDate: r.resubmission.schedule.date.toISOString(),
-      dateSubmitted: r.resubmission.createdAt.toISOString(),
-      fileName: r.resubmission.fileName,
-      blobUrl: r.resubmission.blobUrl,
-      mimeType: r.resubmission.mimeType,
-      size: r.resubmission.size,
-    }),
-  )
+  return reviews.map(toQueuePayload)
 }
 
 export async function getMyDefenseResubmissions() {
@@ -790,11 +873,201 @@ export async function deleteDefenseSchedule(id: number) {
   }
 }
 
+// ───────────────────────────── Chair verdict (awaiting-chair callout) ───────────
+
+const CHAIR_VERDICTS: DefenseVerdict[] = ['APPROVED', 'MINOR_REVISION', 'MAJOR_REVISION', 'REJECTED']
+
+function isChairVerdict(value: string): value is DefenseVerdict {
+  return (CHAIR_VERDICTS as string[]).includes(value)
+}
+
+/**
+ * Panel Chair submits the final defense verdict.
+ * - Authenticates via requirePanelist (any panelist may reach this action)
+ * - Authorizes only the CHAIR for the given schedule (DefensePanelist role === CHAIR)
+ * - Validates verdict is one of APPROVED / MINOR_REVISION / MAJOR_REVISION / REJECTED
+ * - Allows submit only when current verdict is PENDING (no overwrite)
+ * Returns { success, message, payload } — never throws.
+ */
+export async function submitPanelistVerdict(scheduleId: number, verdict: string) {
+  const session = await requirePanelist()
+  if (!session) return unauthorized
+
+  if (!Number.isInteger(scheduleId)) {
+    return { success: false, message: 'Invalid defense schedule.', payload: null }
+  }
+
+  if (!isChairVerdict(verdict)) {
+    return { success: false, message: 'Invalid verdict.', payload: null }
+  }
+
+  try {
+    const chairRow = await prisma.defensePanelist.findFirst({
+      where: { defenseScheduleId: scheduleId, userId: +session.user.id, role: 'CHAIR', deletedAt: null },
+      select: { id: true },
+    })
+    if (!chairRow) {
+      return { success: false, message: 'Only the Panel Chair can submit the verdict.', payload: null }
+    }
+
+    const schedule = await prisma.defenseSchedule.findFirst({
+      where: { id: scheduleId, deletedAt: null },
+      select: { id: true, verdict: true },
+    })
+    if (!schedule) {
+      return { success: false, message: 'Defense schedule not found.', payload: null }
+    }
+    if (schedule.verdict !== 'PENDING') {
+      return { success: false, message: 'Verdict already submitted.', payload: null }
+    }
+
+    const now = new Date()
+    const updated = await prisma.defenseSchedule.update({
+      where: { id: scheduleId },
+      data: { verdict: verdict as DefenseVerdict, verdictSubmittedAt: now },
+    })
+
+    revalidateTag('defense', 'max')
+    revalidateFeature('defense')
+
+    return { success: true, message: 'Verdict submitted successfully.', payload: updated }
+  } catch (error) {
+    return { success: false, message: 'Failed to submit verdict.', payload: null }
+  }
+}
+
+/**
+ * FormData variant for useActionState compatibility.
+ * Expects formData with scheduleId and verdict.
+ */
+export async function submitPanelistVerdictAction(_prevState: any, formData: FormData) {
+  const scheduleId = parseInt(formData.get('scheduleId')?.toString() ?? '', 10)
+  const verdict = formData.get('verdict')?.toString() ?? ''
+  return submitPanelistVerdict(scheduleId, verdict)
+}
+
+// ───────────────────────────── Resubmission review (approve / request revision) ───
+
+/**
+ * Panelist reviews a resubmitted defense document (isInitial === false).
+ * - Authenticates via requirePanelist (any panelist on the schedule)
+ * - Authorizes that the submission is a resubmission and the panelist has a PENDING review row
+ * - Enforces read-only: a panelist who already APPROVED the initial version cannot re-review future resubmissions (carry-forward)
+ * - On success updates DefenseSubmissionReview to APPROVED or REJECTED and commits annotations (if provided)
+ * Returns { success, message } — never throws.
+ */
+export async function reviewDefenseResubmission(
+  submissionId: number,
+  decision: 'APPROVED' | 'REJECTED' | 'NEED_REVISION',
+  annotationData: unknown = null,
+) {
+  const session = await requirePanelist()
+  if (!session) return unauthorized
+
+  const panelistId = +session.user.id
+  const normalizedDecision = decision === 'NEED_REVISION' ? 'REJECTED' : decision
+  if (normalizedDecision !== 'APPROVED' && normalizedDecision !== 'REJECTED') {
+    return { success: false, message: 'Invalid decision.' }
+  }
+
+  if (!Number.isInteger(submissionId)) {
+    return { success: false, message: 'Invalid submission.' }
+  }
+
+  try {
+    const submission = await prisma.defenseSubmission.findFirst({
+      where: { id: submissionId, deletedAt: null },
+      select: {
+        id: true,
+        isInitial: true,
+        scheduleId: true,
+        schedule: { select: { verdict: true } },
+      },
+    })
+    if (!submission) {
+      return { success: false, message: 'Submission not found.' }
+    }
+    if (submission.isInitial) {
+      return { success: false, message: 'Only resubmitted documents can be reviewed this way.' }
+    }
+
+    // Verify the caller is a panelist on this schedule
+    const panelistRow = await prisma.defensePanelist.findFirst({
+      where: { defenseScheduleId: submission.scheduleId, userId: panelistId, deletedAt: null },
+      select: { id: true },
+    })
+    if (!panelistRow) {
+      return { success: false, message: 'You are not a panelist on this defense.' }
+    }
+
+    // Enforce read-only for panelists who already approved the initial version (carry-forward)
+    const initialSubmission = await prisma.defenseSubmission.findFirst({
+      where: { scheduleId: submission.scheduleId, isInitial: true, deletedAt: null },
+      select: { id: true },
+    })
+    if (initialSubmission) {
+      const initialReview = await prisma.defenseSubmissionReview.findFirst({
+        where: { submissionId: initialSubmission.id, panelistId, deletedAt: null },
+        select: { status: true },
+      })
+      const { isPanelistReadOnly } = await import('@/lib/defense/session-helpers')
+      if (initialReview && isPanelistReadOnly(initialReview.status as DefenseReviewStatus)) {
+        return { success: false, message: 'You have already approved the initial document and cannot review resubmissions.' }
+      }
+    }
+
+    const review = await prisma.defenseSubmissionReview.findFirst({
+      where: { submissionId, panelistId, deletedAt: null },
+      select: { id: true, status: true },
+    })
+    if (!review) {
+      return { success: false, message: 'Review assignment not found.' }
+    }
+    if (review.status !== 'PENDING') {
+      return { success: false, message: 'This document has already been reviewed.' }
+    }
+
+    const now = new Date()
+    await prisma.$transaction(async (tx) => {
+      await tx.defenseSubmissionReview.update({
+        where: { id: review.id },
+        data: { status: normalizedDecision as DefenseReviewStatus, reviewedAt: now },
+      })
+      if (annotationData != null) {
+        await (tx as unknown as { defenseSubmissionAnnotation: { upsert: (args: unknown) => Promise<unknown> } }).defenseSubmissionAnnotation.upsert({
+          where: { submissionId_authorId: { submissionId, authorId: panelistId } },
+          create: {
+            submissionId,
+            authorId: panelistId,
+            data: annotationData as never,
+            status: 'COMMITTED',
+          },
+          update: {
+            data: annotationData as never,
+            status: 'COMMITTED',
+          },
+        } as never)
+      }
+    })
+
+    revalidateTag('defense', 'max')
+    revalidateFeature('defense')
+
+    return {
+      success: true,
+      message: normalizedDecision === 'APPROVED' ? 'Resubmission approved.' : 'Revision requested for resubmission.',
+    }
+  } catch (error) {
+    console.error('[reviewDefenseResubmission | Error]:', error)
+    return { success: false, message: 'Failed to review the resubmission.' }
+  }
+}
+
 // ───────────────────────────── Defense session workspace ─────────────────────
 
-export interface DefenseSessionResubmissionPayload {
+export interface DefenseSessionSubmissionPayload {
   id: number
-  /** Version ordinal — 1 is the initial document, 2+ are resubmissions. */
+  /** Version ordinal — mirrors DefenseSubmission.version (1 is initial, 2+ are resubmissions). */
   version: number
   fileName: string
   blobUrl: string
@@ -802,25 +1075,31 @@ export interface DefenseSessionResubmissionPayload {
   size: number
   /** When this version was submitted. */
   dateSubmitted: string
+  isInitial: boolean
+  annotationStats?: { comments: number; pages: number } | null
   /** Per-panelist review state for this version. */
   reviews: {
     panelistId: number
     name: string
-    status: DefenseResubmissionStatus
+    status: DefenseReviewStatus
   }[]
 }
 
 export interface DefenseSessionPayload extends MyDefenseSchedulePayload {
   /** The current user's role on this schedule's panel (CHAIR / PANEL_MEMBER). */
   myRole: PanelistRole
-  /** Submission history — initial document first, then resubmissions. */
-  resubmissions: DefenseSessionResubmissionPayload[]
+  /** Submission history — initial document first, then resubmissions (filtered from unified DefenseSubmission). */
+  resubmissions: DefenseSessionSubmissionPayload[]
+  /** Full submission history including initial (isInitial=true, v1) + resubmissions — used by panelist Initial card. */
+  submissions: DefenseSessionSubmissionPayload[]
 }
 
 // A single defense session for the workspace page. Returns the schedule with
 // its group, section, panel, and full submission history (initial document +
-// every resubmission with per-panelist review state). Reuses the 'defense'
-// cache tag so any schedule/resubmission mutation busts this read too.
+// every resubmission with per-panelist review state). Unified model — reads
+// DefenseSubmission (filtered to resubmissions for the `resubmissions` field).
+// Reuses the 'defense' cache tag so any schedule/submission mutation busts
+// this read too.
 async function getDefenseSessionData(
   scheduleId: number,
   userId: number,
@@ -835,6 +1114,7 @@ async function getDefenseSessionData(
       group: {
         include: {
           section: { select: { id: true, section: true } },
+          leaderStudent: { select: { id: true } },
           adviser: {
             include: {
               faculty: {
@@ -844,6 +1124,11 @@ async function getDefenseSessionData(
               },
             },
           },
+          students: {
+            where: { deletedAt: null },
+            include: { user: { select: { id: true, name: true, email: true, image: true } } },
+            orderBy: { id: 'asc' },
+          },
         },
       },
       panelists: {
@@ -852,15 +1137,19 @@ async function getDefenseSessionData(
         orderBy: { role: 'asc' },
       },
       createdByUser: { select: { id: true, name: true } },
-      resubmissions: {
+      submissions: {
         where: { deletedAt: null },
         include: {
           reviews: {
             where: { deletedAt: null },
             include: { panelist: { select: { id: true, name: true } } },
           },
+          annotations: {
+            where: { deletedAt: null },
+            select: { authorId: true, status: true, data: true },
+          },
         },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { version: 'asc' },
       },
     },
   })
@@ -879,34 +1168,114 @@ async function getDefenseSessionData(
     endTime: schedule.endTime,
     venue: schedule.venue,
     verdict: schedule.verdict,
+    verdictSubmittedAt: (schedule as unknown as { verdictSubmittedAt?: Date | null }).verdictSubmittedAt?.toISOString() ?? null,
     createdById: schedule.createdBy,
     createdByName: schedule.createdByUser.name,
-    // Panelist feedback completion: counts only, gated by verdict !== PENDING,
-    // without exposing private annotation content. Backend-ready null until the
-    // document workspace ships (then per-panelist {comments, pages} counts).
-    panelists: schedule.panelists.map((p) =>
-      toPanelistPayload(
-        { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
-        schedule.verdict,
-      ),
+    annotationStats: (() => {
+      // Feedback indicator is for the initial defense document — never reset on resubmission.
+      const initial = (schedule.submissions.find((s) => (s as unknown as { isInitial: boolean }).isInitial) ?? schedule.submissions[0]) as unknown as { annotations?: Array<{ data: unknown }> } | undefined
+      if (!initial?.annotations || initial.annotations.length === 0) return null
+      const allItems = initial.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
+      if (allItems.length === 0) return null
+      const pages = new Set(
+        allItems
+          .map((it) => (it as unknown as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+          .filter((v): v is number => typeof v === 'number'),
+      ).size
+      return { comments: allItems.length, pages: pages || 1 }
+    })(),
+    // Panelist feedback completion: derived from initial defense submission annotations — not reset when a resubmission (v2+) is created.
+    panelists: (() => {
+      const initial = (schedule.submissions.find((s) => (s as unknown as { isInitial: boolean }).isInitial) ?? schedule.submissions[0]) as unknown as { annotations?: Array<{ authorId: number; status: string; data: unknown }> } | undefined
+      const byAuthor = new Map<number, Array<{ status: string; data: unknown }>>()
+      if (initial?.annotations) {
+        for (const a of initial.annotations) {
+          const arr = byAuthor.get(a.authorId) ?? []
+          arr.push({ status: a.status, data: a.data })
+          byAuthor.set(a.authorId, arr)
+        }
+      }
+      return schedule.panelists.map((p) =>
+        toPanelistPayload(
+          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
+          schedule.verdict,
+          byAuthor.get(p.userId) ?? [],
+        ),
+      )
+    })(),
+    members: mapGroupMembers(
+      schedule.group.students as unknown as Array<{
+        id: number
+        user: { id: number; name: string; email: string; image: string | null }
+      }>,
+      schedule.group.leaderStudentId,
     ),
     myRole:
       schedule.panelists.find((p) => p.userId === userId)?.role ?? 'PANEL_MEMBER',
-    resubmissions: schedule.resubmissions.map((r, index) => ({
-      id: r.id,
-      // The initial document is version 1; each resubmission increments it.
-      version: index + 2,
-      fileName: r.fileName,
-      blobUrl: r.blobUrl,
-      mimeType: r.mimeType,
-      size: r.size,
-      dateSubmitted: r.createdAt.toISOString(),
-      reviews: r.reviews.map((review) => ({
-        panelistId: review.panelistId,
-        name: review.panelist.name,
-        status: review.status,
-      })),
-    })),
+    submissions: schedule.submissions.map((r) => {
+      const rWithAnn = r as unknown as { annotations?: Array<{ data: unknown }> }
+      let annStats: { comments: number; pages: number } | null = null
+      if (rWithAnn.annotations && rWithAnn.annotations.length > 0) {
+        const allItems = rWithAnn.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
+        if (allItems.length > 0) {
+          const pages = new Set(
+            allItems
+              .map((it) => (it as unknown as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+              .filter((v): v is number => typeof v === 'number'),
+          ).size
+          annStats = { comments: allItems.length, pages: pages || 1 }
+        }
+      }
+      return {
+        id: r.id,
+        version: r.version,
+        fileName: r.fileName,
+        blobUrl: r.blobUrl,
+        mimeType: r.mimeType,
+        size: r.size,
+        dateSubmitted: r.createdAt.toISOString(),
+        isInitial: r.isInitial,
+        annotationStats: annStats,
+        reviews: r.reviews.map((review) => ({
+          panelistId: review.panelistId,
+          name: review.panelist.name,
+          status: review.status,
+        })),
+      }
+    }),
+    resubmissions: schedule.submissions
+      .filter((s) => !s.isInitial)
+      .map((r) => {
+        const rWithAnn = r as unknown as { annotations?: Array<{ data: unknown }> }
+        let annStats: { comments: number; pages: number } | null = null
+        if (rWithAnn.annotations && rWithAnn.annotations.length > 0) {
+          const allItems = rWithAnn.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
+          if (allItems.length > 0) {
+            const pages = new Set(
+              allItems
+                .map((it) => (it as unknown as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+                .filter((v): v is number => typeof v === 'number'),
+            ).size
+            annStats = { comments: allItems.length, pages: pages || 1 }
+          }
+        }
+        return {
+          id: r.id,
+          version: r.version,
+          fileName: r.fileName,
+          blobUrl: r.blobUrl,
+          mimeType: r.mimeType,
+          size: r.size,
+          dateSubmitted: r.createdAt.toISOString(),
+          isInitial: r.isInitial,
+          annotationStats: annStats,
+          reviews: r.reviews.map((review) => ({
+            panelistId: review.panelistId,
+            name: review.panelist.name,
+            status: review.status,
+          })),
+        }
+      }),
   }
 }
 

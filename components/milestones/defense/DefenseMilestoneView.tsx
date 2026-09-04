@@ -18,7 +18,7 @@ import {
   type ResubmissionStatus,
 } from './DefenseDocumentCard'
 import { DefenseDocumentSkeleton } from './DefenseDocumentSkeleton'
-import { DefenseDetailsCard } from './DefenseDetailsCard'
+import { MilestoneDefenseDetailsCard } from './MilestoneDefenseDetailsCard'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -41,16 +41,24 @@ function deriveVerdictState(
 function getInitialDoc(
   data: StudentDefenseSessionPayload,
 ): { info: DefenseDocumentInfo; status: InitialDocumentStatus } | null {
-  const sub = data.submissions.find((s) => s.isInitial)
+  const sub = data.submissions.find((s) => s.isInitial) as unknown as
+    | (typeof data.submissions[number] & { annotationStats?: { comments: number; pages: number } | null })
+    | undefined
   if (!sub) return null
+  const reviewedAt = (data as unknown as { verdictSubmittedAt?: string | null }).verdictSubmittedAt ?? null
   return {
     info: {
+      id: sub.id,
       fileName: sub.fileName,
       size: sub.size,
       submittedAt: sub.dateSubmitted,
       blobUrl: sub.blobUrl,
       submittedByName: sub.submittedByName,
-    },
+      version: sub.version,
+      comments: (sub as unknown as { annotationStats?: { comments: number; pages: number } | null }).annotationStats?.comments ?? null,
+      pages: (sub as unknown as { annotationStats?: { comments: number; pages: number } | null }).annotationStats?.pages ?? null,
+      reviewedAt,
+    } as unknown as DefenseDocumentInfo,
     status: sub.status as InitialDocumentStatus,
   }
 }
@@ -59,26 +67,32 @@ function getInitialDoc(
 function getResubmissionDoc(
   data: StudentDefenseSessionPayload,
 ): { info: DefenseDocumentInfo; status: ResubmissionStatus } | null {
-  const sub = data.submissions
+  const sub = (data.submissions
     .filter((s) => !s.isInitial)
-    .sort((a, b) => b.version - a.version)[0]
+    .sort((a, b) => b.version - a.version)[0] as unknown as
+    | (typeof data.submissions[number] & { annotationStats?: { comments: number; pages: number } | null })
+    | undefined)
   if (!sub) return null
   return {
     info: {
+      id: sub.id,
       fileName: sub.fileName,
       size: sub.size,
       submittedAt: sub.dateSubmitted,
       blobUrl: sub.blobUrl,
       submittedByName: sub.submittedByName,
       version: sub.version,
-    },
+      comments: (sub as unknown as { annotationStats?: { comments: number; pages: number } | null }).annotationStats?.comments ?? null,
+      pages: (sub as unknown as { annotationStats?: { comments: number; pages: number } | null }).annotationStats?.pages ?? null,
+      reviewedAt: (sub as unknown as { reviewedAt?: string | null }).reviewedAt ?? null,
+    } as unknown as DefenseDocumentInfo,
     status: sub.status as ResubmissionStatus,
   }
 }
 
 /**
  * Maps StudentDefenseSessionPayload → DefenseSchedulePayload for the
- * DefenseDetailsCard. The card only uses date/startTime/endTime/venue/panelists
+ * MilestoneDefenseDetailsCard. The card only uses date/startTime/endTime/venue/panelists
  * so the added createdById/createdByName are unused placeholders.
  */
 function toSchedulePayload(
@@ -99,6 +113,7 @@ function toSchedulePayload(
     createdById: 0,
     createdByName: '',
     panelists: data.panelists,
+    members: data.members ?? [],
   }
 }
 
@@ -153,6 +168,8 @@ export function DefenseMilestoneView({
     (data.verdict === 'MINOR_REVISION' || data.verdict === 'MAJOR_REVISION') &&
     resubmitDoc === null
 
+  const milestoneSlug = data.type === 'FINAL' ? 'final-defense' : 'proposal-defense'
+
   const actions: DefenseUploadActions = {
     requestUploadToken: uploadDefenseToken,
     submitDocument: (d) =>
@@ -163,9 +180,16 @@ export function DefenseMilestoneView({
       replaceDefenseDocument({ ...d, mimeType: 'application/pdf' }),
   }
 
+  const reviewedAt = (data as unknown as { verdictSubmittedAt?: string | null }).verdictSubmittedAt ?? null
+  const annotationStats = (data as unknown as { annotationStats?: { comments: number; pages: number } | null }).annotationStats ?? null
+  // Review feedback → latest document workspace (resubmission if exists, else initial)
+  const reviewDocumentId = resubmitDoc?.info.id ?? initialDoc?.info.id ?? null
+  const reviewWorkspaceHref =
+    reviewDocumentId != null ? `/student/milestone/${milestoneSlug}/${reviewDocumentId}` : undefined
+
   return (
     <>
-      <VerdictCallout state={verdictState} />
+      <VerdictCallout state={verdictState} reviewedAt={reviewedAt} comments={annotationStats?.comments ?? null} pages={annotationStats?.pages ?? null} workspaceHref={reviewWorkspaceHref} />
       {refreshing ? (
         <DefenseDocumentSkeleton />
       ) : (
@@ -177,9 +201,10 @@ export function DefenseMilestoneView({
           canResubmit={canResubmit}
           onSubmitted={handleSubmitted}
           actions={actions}
+          milestoneSlug={milestoneSlug}
         />
       )}
-      <DefenseDetailsCard schedule={toSchedulePayload(data)} />
+      <MilestoneDefenseDetailsCard schedule={toSchedulePayload(data)} />
     </>
   )
 }

@@ -247,6 +247,16 @@ export function ReplaceDocumentModal({
             onChange={handleFileSelect}
           />
 
+          {/* Replaced with indicator — always between old and new */}
+          <div className="flex items-center justify-center gap-[8px] py-[2px]">
+            <div className="h-px flex-1 bg-[#e8ebf8]" />
+            <div className="flex items-center gap-[6px] px-[10px] py-[4px] rounded-full bg-[#f4f6ff] border border-[#e5e8ff]">
+              <RefreshCw className="size-[12px] text-[#707dff]" strokeWidth={2} />
+              <span className="font-sans font-bold text-[11px] leading-[16.5px] text-[#707dff]">Replaced with</span>
+            </div>
+            <div className="h-px flex-1 bg-[#e8ebf8]" />
+          </div>
+
           {draft ? (
             /* Uploaded (draft) state */
             <div className="flex flex-col gap-[10px]">

@@ -11,6 +11,7 @@ import {
   type DocumentHistoryItem,
 } from './DocumentHistoryDrawer'
 import type {
+  DefenseDocumentInfo,
   InitialDocumentStatus,
   ResubmissionStatus,
 } from './DefenseDocumentCard'
@@ -39,30 +40,49 @@ export function DefenseMilestonePage({
     .filter((s) => !s.isInitial)
     .sort((a, b) => a.version - b.version)
 
+  const getAnnStats = (sub: unknown) => {
+    const s = sub as unknown as { annotationStats?: { comments: number; pages: number } | null }
+    return s.annotationStats ?? null
+  }
+  const milestoneSlug = defenseType === 'FINAL' ? 'final-defense' : 'proposal-defense'
+  const verdictAt = (data as unknown as { verdictSubmittedAt?: string | null })?.verdictSubmittedAt ?? null
+
   const initialItem: DocumentHistoryItem | null = initialSub
     ? {
         info: {
+          id: (initialSub as unknown as { id: number }).id,
           fileName: initialSub.fileName,
           size: initialSub.size,
           submittedAt: initialSub.dateSubmitted,
           blobUrl: initialSub.blobUrl,
           submittedByName: initialSub.submittedByName,
-        },
+          version: (initialSub as unknown as { version: number }).version,
+          comments: getAnnStats(initialSub)?.comments ?? null,
+          pages: getAnnStats(initialSub)?.pages ?? null,
+          reviewedAt: getAnnStats(initialSub) ? verdictAt : null,
+        } as unknown as DefenseDocumentInfo,
         status: initialSub.status as InitialDocumentStatus,
       }
     : null
 
-  const resubmissionItems: DocumentHistoryItem[] = resubmissions.map((s) => ({
-    info: {
-      fileName: s.fileName,
-      size: s.size,
-      submittedAt: s.dateSubmitted,
-      blobUrl: s.blobUrl,
-      submittedByName: s.submittedByName,
-      version: s.version,
-    },
-    status: s.status as ResubmissionStatus,
-  }))
+  const resubmissionItems: DocumentHistoryItem[] = resubmissions.map((s) => {
+    const sWithStats = s as unknown as { annotationStats?: { comments: number; pages: number } | null; id: number; version: number }
+    return {
+      info: {
+        id: sWithStats.id,
+        fileName: s.fileName,
+        size: s.size,
+        submittedAt: s.dateSubmitted,
+        blobUrl: s.blobUrl,
+        submittedByName: s.submittedByName,
+        version: sWithStats.version,
+        comments: sWithStats.annotationStats?.comments ?? null,
+        pages: sWithStats.annotationStats?.pages ?? null,
+        reviewedAt: sWithStats.annotationStats ? verdictAt ?? s.dateSubmitted : null,
+      } as unknown as DefenseDocumentInfo,
+      status: s.status as ResubmissionStatus,
+    }
+  })
 
   return (
     <>
@@ -83,6 +103,8 @@ export function DefenseMilestonePage({
         onClose={() => setHistoryOpen(false)}
         initial={initialItem}
         resubmissions={resubmissionItems}
+        milestoneSlug={milestoneSlug}
+        variant="student"
       />
     </>
   )

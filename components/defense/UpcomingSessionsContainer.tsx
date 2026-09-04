@@ -4,6 +4,9 @@ import type { MyDefenseSchedulePayload } from '@/lib/actions/defense'
 
 interface UpcomingSessionsContainerProps {
   schedules: MyDefenseSchedulePayload[]
+  title?: string
+  emptyTitle?: string
+  emptyDescription?: string
 }
 
 /**
@@ -13,6 +16,9 @@ interface UpcomingSessionsContainerProps {
  */
 export function UpcomingSessionsContainer({
   schedules,
+  title = 'Upcoming Sessions',
+  emptyTitle = 'No Upcoming Defenses',
+  emptyDescription = 'Defense sessions where you are part of the panel will appear here once scheduled.',
 }: UpcomingSessionsContainerProps) {
   return (
     <div className="bg-white rounded-[12px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden h-full">
@@ -23,7 +29,7 @@ export function UpcomingSessionsContainer({
             <MessageSquare className="size-[12px] text-[#707dff]" strokeWidth={2} />
           </div>
           <p className="font-heading font-bold text-[12.5px] leading-[18.75px] text-[#1e3a8a] tracking-[-0.125px] whitespace-nowrap">
-            Upcoming Sessions
+            {title}
           </p>
         </div>
       </div>
@@ -38,11 +44,10 @@ export function UpcomingSessionsContainer({
               className="size-[96px] mb-4"
             />
             <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] tracking-[-0.16px] mb-2">
-              No Upcoming Defenses
+              {emptyTitle}
             </h3>
             <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] max-w-sm">
-              Defense sessions where you are part of the panel will appear here
-              once scheduled.
+              {emptyDescription}
             </p>
           </div>
         ) : (

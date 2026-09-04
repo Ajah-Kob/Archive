@@ -3,7 +3,7 @@
 import { head, del } from '@vercel/blob'
 import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client'
 import prisma from '@/lib/prisma'
-import { revalidateTag } from 'next/cache'
+import { cacheTag, cacheLife, revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
 import type {
   DefenseType,
@@ -46,6 +46,7 @@ export interface DefenseSubmissionItem {
   /** Initial submission: DefenseSchedule.verdict. Resubmission: derived from reviews. */
   status: string
   reviews: DefenseSubmissionReviewItem[]
+  annotationStats?: { comments: number; pages: number } | null
 }
 
 export interface DefensePanelistItem {
@@ -54,6 +55,14 @@ export interface DefensePanelistItem {
   email: string
   image: string | null
   role: PanelistRole
+}
+
+export interface StudentDefenseMemberItem {
+  userId: number
+  name: string
+  email: string
+  image: string | null
+  isLeader: boolean
 }
 
 export interface StudentDefenseSessionPayload {
@@ -68,8 +77,11 @@ export interface StudentDefenseSessionPayload {
   endTime: string
   venue: string
   verdict: DefenseVerdict
+  verdictSubmittedAt: string | null
   panelists: DefensePanelistItem[]
+  members: StudentDefenseMemberItem[]
   submissions: DefenseSubmissionItem[]
+  annotationStats?: { comments: number; pages: number } | null
 }
 
 // ───────────────────────────── Helpers ─────────────────────────────
@@ -93,6 +105,25 @@ function deriveResubmissionStatus(
   if (reviews.every((r) => r.status === 'APPROVED')) return 'Approved'
   if (reviews.some((r) => r.status === 'REJECTED')) return 'Rejected'
   return 'In Review'
+}
+
+function mapStudentMembers(
+  students: Array<{
+    id: number
+    user: { id: number; name: string; email: string; image: string | null }
+  }>,
+  leaderStudentId: number | null | undefined,
+): StudentDefenseMemberItem[] {
+  const mapped = students.map((s) => ({
+    userId: s.user.id,
+    name: s.user.name,
+    email: s.user.email,
+    image: s.user.image,
+    isLeader: leaderStudentId != null && s.id === leaderStudentId,
+  }))
+  const leader = mapped.filter((m) => m.isLeader)
+  const rest = mapped.filter((m) => !m.isLeader)
+  return [...leader, ...rest]
 }
 
 // ───────────────────────────── getDefenseSessionData ─────────────────────────────
@@ -133,6 +164,11 @@ async function getStudentDefenseSessionData(
               },
             },
           },
+          students: {
+            where: { deletedAt: null },
+            include: { user: { select: { id: true, name: true, email: true, image: true } } },
+            orderBy: { id: 'asc' },
+          },
         },
       },
       panelists: {
@@ -149,6 +185,10 @@ async function getStudentDefenseSessionData(
             include: {
               panelist: { select: { id: true, name: true, image: true } },
             },
+          },
+          annotations: {
+            where: { deletedAt: null },
+            select: { data: true },
           },
         },
         orderBy: { version: 'asc' },
@@ -170,6 +210,7 @@ async function getStudentDefenseSessionData(
     endTime: schedule.endTime,
     venue: schedule.venue,
     verdict: schedule.verdict,
+    verdictSubmittedAt: (schedule as unknown as { verdictSubmittedAt?: Date | null }).verdictSubmittedAt?.toISOString() ?? null,
     panelists: schedule.panelists.map((p) => ({
       userId: p.userId,
       name: p.user.name,
@@ -177,29 +218,64 @@ async function getStudentDefenseSessionData(
       image: p.user.image,
       role: p.role,
     })),
-    submissions: schedule.submissions.map((s) => ({
-      id: s.id,
-      isInitial: s.isInitial,
-      version: s.version,
-      fileName: s.fileName,
-      blobUrl: s.blobUrl,
-      mimeType: s.mimeType,
-      size: s.size,
-      dateSubmitted: s.createdAt.toISOString(),
-      submittedByName: s.user.name,
-      // Initial submission status = DefenseSchedule.verdict (not from reviews).
-      // Resubmission status = derived from DefenseSubmissionReview rows.
-      status: s.isInitial
-        ? schedule.verdict
-        : deriveResubmissionStatus(s.reviews),
-      reviews: s.reviews.map((r) => ({
-        panelistId: r.panelistId,
-        name: r.panelist.name,
-        image: r.panelist.image,
-        status: r.status,
-        reviewedAt: r.reviewedAt?.toISOString() ?? null,
-      })),
-    })),
+    members: mapStudentMembers(
+      schedule.group.students as unknown as Array<{
+        id: number
+        user: { id: number; name: string; email: string; image: string | null }
+      }>,
+      (schedule.group as unknown as { leaderStudentId: number | null }).leaderStudentId ?? null,
+    ),
+    annotationStats: (() => {
+      const latest = schedule.submissions[schedule.submissions.length - 1] as unknown as { annotations?: Array<{ data: unknown }> } | undefined
+      if (!latest?.annotations || latest.annotations.length === 0) return null
+      const allItems = latest.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
+      if (allItems.length === 0) return null
+      const pages = new Set(
+        allItems
+          .map((it) => (it as unknown as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+          .filter((v): v is number => typeof v === 'number'),
+      ).size
+      return { comments: allItems.length, pages: pages || 1 }
+    })(),
+        submissions: schedule.submissions.map((s) => {
+      const sWithAnn = s as unknown as { annotations?: Array<{ data: unknown }> }
+      let annStats: { comments: number; pages: number } | null = null
+      if (sWithAnn.annotations && sWithAnn.annotations.length > 0) {
+        const allItems = sWithAnn.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
+        if (allItems.length > 0) {
+          const pages = new Set(
+            allItems
+              .map((it) => (it as unknown as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+              .filter((v): v is number => typeof v === 'number'),
+          ).size
+          annStats = { comments: allItems.length, pages: pages || 1 }
+        }
+      }
+      return {
+        id: s.id,
+        isInitial: s.isInitial,
+        version: s.version,
+        fileName: s.fileName,
+        blobUrl: s.blobUrl,
+        mimeType: s.mimeType,
+        size: s.size,
+        dateSubmitted: s.createdAt.toISOString(),
+        submittedByName: s.user.name,
+        annotationStats: annStats,
+        // Initial submission status = DefenseSchedule.verdict (not from reviews).
+        // Resubmission status = derived from DefenseSubmissionReview rows.
+        status: s.isInitial
+          ? schedule.verdict
+          : deriveResubmissionStatus(s.reviews),
+        reviews: s.reviews.map((r) => ({
+          panelistId: r.panelistId,
+          name: r.panelist.name,
+          image: r.panelist.image,
+          status: r.status,
+          reviewedAt: r.reviewedAt?.toISOString() ?? null,
+        })),
+      }
+    }),
   }
 }
 
@@ -614,3 +690,322 @@ export async function uploadDefenseToken(
     }
   }
 }
+
+// ───────────────────────────── Student defense workspace ───────────────
+
+export interface StudentDefenseDetail {
+  id: number
+  scheduleId: number
+  groupId: number
+  groupName: string
+  sectionName: string
+  type: string
+  verdict: string
+  version: number
+  isInitial: boolean
+  fileName: string
+  blobUrl: string
+  mimeType: string
+  size: number
+  dateSubmitted: string
+  submittedBy: string
+  status: string
+  isCurrent: boolean
+  reviewedAt: string | null
+}
+
+// Resolves the calling student's live group, mirrors student-review.ts.
+async function requireStudentGroup() {
+  const session = await requireStudent()
+  if (!session?.user?.id) return null
+  const student = await prisma.student.findFirst({
+    where: { userId: +session.user.id, deletedAt: null },
+    select: {
+      id: true,
+      group: {
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          students: { where: { deletedAt: null }, select: { id: true } },
+        },
+      },
+    },
+  })
+  if (!student?.group) return null
+  const isMember = student.group.students.some((s) => s.id === student.id)
+  if (!isMember) return null
+  return { groupId: student.group.id, userId: +session.user.id }
+}
+
+// Ownership scope for defense submissions: schedule.group must match student's group.
+// Includes soft-deleted versions so history remains viewable, mirrors findGroupSubmission.
+async function findStudentDefenseSubmission(submissionId: number, groupId: number) {
+  return prisma.defenseSubmission.findFirst({
+    where: {
+      id: submissionId,
+      schedule: {
+        deletedAt: null,
+        group: { id: groupId, deletedAt: null },
+      },
+    },
+    select: { id: true, scheduleId: true },
+  })
+}
+
+function deriveDefenseSubmissionStatus(
+  isInitial: boolean,
+  scheduleVerdict: string,
+  reviews: { status: string }[],
+): string {
+  if (isInitial) return scheduleVerdict
+  if (reviews.length === 0) return 'In Review'
+  if (reviews.every((r) => r.status === 'APPROVED')) return 'Approved'
+  if (reviews.some((r) => r.status === 'REJECTED')) return 'Rejected'
+  return 'In Review'
+}
+
+function toStudentDefenseDetailPayload(
+  submission: {
+    id: number
+    scheduleId: number
+    version: number
+    isInitial: boolean
+    fileName: string
+    blobUrl: string
+    mimeType: string
+    size: number
+    createdAt: Date
+    deletedAt: Date | null
+    schedule: {
+      type: string
+      verdict: string
+      groupId: number
+      group: { groupName: string; section: { section: string } }
+    }
+    user: { name: string }
+    reviews: { panelistId: number; status: string; reviewedAt: Date | null }[]
+  },
+): StudentDefenseDetail {
+  const status = deriveDefenseSubmissionStatus(
+    submission.isInitial,
+    submission.schedule.verdict,
+    submission.reviews,
+  )
+  const myReview = submission.reviews[0] ?? null
+  return {
+    id: submission.id,
+    scheduleId: submission.scheduleId,
+    groupId: submission.schedule.groupId,
+    groupName: submission.schedule.group.groupName,
+    sectionName: submission.schedule.group.section.section,
+    type: submission.schedule.type,
+    verdict: submission.schedule.verdict,
+    version: submission.version,
+    isInitial: submission.isInitial,
+    fileName: submission.fileName,
+    blobUrl: submission.blobUrl,
+    mimeType: submission.mimeType,
+    size: submission.size,
+    dateSubmitted: submission.createdAt.toISOString(),
+    submittedBy: submission.user.name,
+    status,
+    isCurrent: submission.deletedAt == null,
+    reviewedAt: myReview?.reviewedAt ? myReview.reviewedAt.toISOString() : null,
+  }
+}
+
+// Cached detail fetch per-student/per-submission. Session check is outside the
+// cached scope so the tag can be keyed by (submissionId, userId) and the cache
+// does not capture dynamic headers/cookies.
+async function getStudentDefenseDetailData(
+  submissionId: number,
+  groupId: number,
+  userId: number,
+): Promise<{ success: boolean; message: string; payload: StudentDefenseDetail | null }> {
+  'use cache'
+  cacheTag(`defense-student-detail-${submissionId}-${userId}`)
+  cacheTag(`defense-submission-${submissionId}-detail`)
+  cacheLife('max')
+
+  try {
+    const submission = await prisma.defenseSubmission.findFirst({
+      where: {
+        id: submissionId,
+        schedule: {
+          deletedAt: null,
+          group: { id: groupId, deletedAt: null },
+        },
+      },
+      include: {
+        schedule: {
+          include: {
+            group: { include: { section: { select: { section: true } } } },
+          },
+        },
+        user: { select: { name: true } },
+        reviews: {
+          where: { deletedAt: null },
+          select: { panelistId: true, status: true, reviewedAt: true },
+        },
+      },
+    })
+    if (!submission) {
+      return { success: false, message: 'Submission not found.', payload: null }
+    }
+    const payload = toStudentDefenseDetailPayload(submission as never)
+    return { success: true, message: '', payload }
+  } catch (error) {
+    console.error('[getStudentDefenseDetail | Error]:', error)
+    return { success: false, message: 'Failed to load submission.', payload: null }
+  }
+}
+
+// Single defense submission detail for the student's own group — any version,
+// current or superseded. Mirrors getStudentVersionDetail / getVersionDetail.
+export async function getStudentDefenseDetail(submissionId: number) {
+  const ctx = await requireStudentGroup()
+  if (!ctx) return { ...unauthorized, payload: null }
+  return getStudentDefenseDetailData(submissionId, ctx.groupId, ctx.userId)
+}
+
+// ───────────────────── Student defense annotations (merged) ───────────────
+
+function ensureVisibleFlag(items: unknown[]): unknown[] {
+  return items.map((item) => {
+    if (!item || typeof item !== 'object') return item
+    const obj = item as Record<string, unknown>
+    if (!('isVisible' in obj)) return { ...obj, isVisible: true }
+    return obj
+  })
+}
+
+async function getStudentDefenseAnnotationsData(
+  submissionId: number,
+  groupId: number,
+  userId: number,
+) {
+  'use cache'
+  cacheTag(`defense-student-annotations-${submissionId}-${userId}`)
+  cacheTag(`defense-submission-${submissionId}-annotations`)
+  cacheLife('max')
+
+  try {
+    const submission = await findStudentDefenseSubmission(submissionId, groupId)
+    if (!submission) {
+      return {
+        success: false,
+        message: 'Submission not found in your group.',
+        payload: null,
+      }
+    }
+
+    const rows = await (prisma as any).defenseSubmissionAnnotation.findMany({
+      where: {
+        submissionId,
+        status: 'COMMITTED',
+        deletedAt: null,
+      },
+      select: { data: true },
+    })
+
+    const merged = rows.flatMap((row: { data: unknown }) =>
+      Array.isArray(row.data) ? (row.data as unknown[]) : [],
+    )
+    const data = ensureVisibleFlag(merged)
+
+    return { success: true, message: '', payload: { data } }
+  } catch (error) {
+    console.error('[getStudentDefenseAnnotations | Error]:', error)
+    return {
+      success: false,
+      message: 'Failed to load annotations.',
+      payload: null,
+    }
+  }
+}
+
+// Student READ of COMMITTED annotations for a submission in their group,
+// merged across all panelist authors. DRAFT rows are never exposed and only
+// COMMITTED rows are flattened. Each annotation carries isVisible (default
+// true) so the student CommentsPanel can render the visibility toggle state.
+export async function getStudentDefenseAnnotations(submissionId: number) {
+  const ctx = await requireStudentGroup()
+  if (!ctx) return { ...unauthorized, payload: null }
+  return getStudentDefenseAnnotationsData(submissionId, ctx.groupId, ctx.userId)
+}
+
+// ───────────────────── Student versions list (defense) ─────────────────────
+
+export interface StudentDefenseVersionItem {
+  id: number
+  version: number
+  isInitial: boolean
+  status: string
+  submittedAt: string
+  isCurrent: boolean
+  fileName: string
+}
+
+async function getStudentDefenseVersionListData(
+  submissionId: number,
+  groupId: number,
+  userId: number,
+) {
+  'use cache'
+  cacheTag(`defense-student-versions-${submissionId}-${userId}`)
+  cacheLife('max')
+
+  try {
+    const submission = await findStudentDefenseSubmission(submissionId, groupId)
+    if (!submission) {
+      return {
+        success: false,
+        message: 'Submission not found in your group.',
+        payload: null,
+      }
+    }
+
+    const scheduleId = submission.scheduleId
+
+    const chain = await prisma.defenseSubmission.findMany({
+      where: { scheduleId },
+      orderBy: { version: 'asc' },
+      select: {
+        id: true,
+        version: true,
+        isInitial: true,
+        fileName: true,
+        createdAt: true,
+        deletedAt: true,
+        schedule: { select: { verdict: true } },
+        reviews: {
+          where: { deletedAt: null },
+          select: { status: true },
+        },
+      },
+    })
+
+    const items: StudentDefenseVersionItem[] = chain.map((row) => ({
+      id: row.id,
+      version: row.version,
+      isInitial: row.isInitial,
+      status: deriveDefenseSubmissionStatus(row.isInitial, row.schedule.verdict, row.reviews),
+      submittedAt: row.createdAt.toISOString(),
+      isCurrent: row.deletedAt == null,
+      fileName: row.fileName,
+    }))
+
+    return { success: true, message: '', payload: items }
+  } catch (error) {
+    console.error('[getStudentDefenseVersionList | Error]:', error)
+    return { success: false, message: 'Failed to load versions.', payload: null }
+  }
+}
+
+export async function getStudentDefenseVersionList(submissionId: number) {
+  const ctx = await requireStudentGroup()
+  if (!ctx) return { ...unauthorized, payload: null }
+  return getStudentDefenseVersionListData(submissionId, ctx.groupId, ctx.userId)
+}
+
+

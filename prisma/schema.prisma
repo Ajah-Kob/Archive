@@ -23,32 +23,31 @@ enum Role {
 }
 
 model User {
-  id                   Int                   @id @default(autoincrement())
-  name                 String
-  email                String                @unique
-  image                String?
-  role                 Role                  @default(GUEST)
-  activatedAt          DateTime?
-  createdAt            DateTime              @default(now())
-  loggedInAt           DateTime?             @default(now())
-  deletedAt            DateTime?
-  password             String?
-  updatedAt            DateTime?             @updatedAt
-  faculty              Faculty?
-  student              Student?
-  templates            Template[]
-  capstoneArchives     CapstoneArchive[]
-  milestoneSubmissions MilestoneSubmission[]
-  submissionAnnotations SubmissionAnnotation[]
-  invitationsSent              Invitation[]          @relation("InvitationSender")
-  topicReviews                 Topic[]               @relation("TopicReviewer")
-  milestoneSubmissionsReviewed MilestoneSubmission[] @relation("MilestoneSubmissionReviewer")
-  defenseSchedules             DefenseSchedule[]     @relation("DefenseCreatedBy")
+  id                           Int                           @id @default(autoincrement())
+  name                         String
+  email                        String                        @unique
+  image                        String?
+  role                         Role                          @default(GUEST)
+  activatedAt                  DateTime?
+  createdAt                    DateTime                      @default(now())
+  loggedInAt                   DateTime?                     @default(now())
+  deletedAt                    DateTime?
+  password                     String?
+  updatedAt                    DateTime?                     @updatedAt
+  faculty                      Faculty?
+  student                      Student?
+  templates                    Template[]
+  capstoneArchives             CapstoneArchive[]
+  milestoneSubmissions         MilestoneSubmission[]
+  submissionAnnotations        SubmissionAnnotation[]
+  defenseSubmissionAnnotations DefenseSubmissionAnnotation[]
+  invitationsSent              Invitation[]                  @relation("InvitationSender")
+  topicReviews                 Topic[]                       @relation("TopicReviewer")
+  milestoneSubmissionsReviewed MilestoneSubmission[]         @relation("MilestoneSubmissionReviewer")
+  defenseSchedules             DefenseSchedule[]             @relation("DefenseCreatedBy")
   defensePanelists             DefensePanelist[]
-  defenseResubmissions         DefenseResubmission[] @relation("DefenseResubmissionSubmitter")
-  defenseResubmissionReviews   DefenseResubmissionReview[]
-  defenseSubmissions            DefenseSubmission[]          @relation("DefenseSubmissionSubmitter")
-  defenseSubmissionReviews      DefenseSubmissionReview[]
+  defenseSubmissions           DefenseSubmission[]           @relation("DefenseSubmissionSubmitter")
+  defenseSubmissionReviews     DefenseSubmissionReview[]
 
   @@index([email, deletedAt])
 }
@@ -167,19 +166,19 @@ model Invitation {
 // ───────────────────────────── Section & Student & Group ─────────────────────────────
 
 model Section {
-  id            Int         @id @default(autoincrement())
-  joinCodeId    Int?        @unique
-  joinCode      JoinCode?   @relation(fields: [joinCodeId], references: [id], onDelete: SetNull)
-  coordinatorId Int
-  coordinator   Coordinator @relation(fields: [coordinatorId], references: [id])
-  section       String
-  headerColor   String?
-  students      Student[]
-  groups        Group[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  deletedAt     DateTime?
-  capstone2OpenedAt DateTime?
+  id                    Int                     @id @default(autoincrement())
+  joinCodeId            Int?                    @unique
+  joinCode              JoinCode?               @relation(fields: [joinCodeId], references: [id], onDelete: SetNull)
+  coordinatorId         Int
+  coordinator           Coordinator             @relation(fields: [coordinatorId], references: [id])
+  section               String
+  headerColor           String?
+  students              Student[]
+  groups                Group[]
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  deletedAt             DateTime?
+  capstone2OpenedAt     DateTime?
   milestoneAvailability MilestoneAvailability[]
 
   @@unique([coordinatorId, section])
@@ -204,13 +203,13 @@ enum MilestoneKey {
 // means it is locked. Missing rows fall back to defaults (see
 // buildMilestoneAvailability in lib/actions/sections.ts).
 model MilestoneAvailability {
-  id        Int         @id @default(autoincrement())
+  id        Int          @id @default(autoincrement())
   sectionId Int
-  section   Section     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  section   Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   key       MilestoneKey
   openedAt  DateTime?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   @@unique([sectionId, key])
   @@index([sectionId])
@@ -235,24 +234,24 @@ model Student {
 }
 
 model Group {
-  id              Int              @id @default(autoincrement())
-  groupName       String
-  sectionId       Int
-  section         Section          @relation(fields: [sectionId], references: [id])
-  leaderStudentId Int?             @unique
-  leaderStudent   Student?         @relation("GroupLeader", fields: [leaderStudentId], references: [id])
-  adviserId       Int?
-  adviser         Adviser?         @relation(fields: [adviserId], references: [id])
-  students        Student[]
-  topics          Topic[]
-  capstone        Capstone?
-  milestones      Milestone[]
-  capstoneArchive CapstoneArchive?
-  invitations     Invitation[]
+  id               Int               @id @default(autoincrement())
+  groupName        String
+  sectionId        Int
+  section          Section           @relation(fields: [sectionId], references: [id])
+  leaderStudentId  Int?              @unique
+  leaderStudent    Student?          @relation("GroupLeader", fields: [leaderStudentId], references: [id])
+  adviserId        Int?
+  adviser          Adviser?          @relation(fields: [adviserId], references: [id])
+  students         Student[]
+  topics           Topic[]
+  capstone         Capstone?
+  milestones       Milestone[]
+  capstoneArchive  CapstoneArchive?
+  invitations      Invitation[]
   defenseSchedules DefenseSchedule[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  deletedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
 
   @@index([sectionId])
   @@index([deletedAt])
@@ -276,15 +275,15 @@ model Topic {
   uploadedById  Int?
   uploadedBy    Student?    @relation(fields: [uploadedById], references: [id])
   status        TopicStatus @default(PENDING)
-  reviewNote   String?
-  reviewedById Int?
-  reviewedBy   User?       @relation("TopicReviewer", fields: [reviewedById], references: [id])
-  reviewedAt   DateTime?
-  selectedAt   DateTime?
-  capstone     Capstone?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  deletedAt    DateTime?
+  reviewNote    String?
+  reviewedById  Int?
+  reviewedBy    User?       @relation("TopicReviewer", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  selectedAt    DateTime?
+  capstone      Capstone?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
 
   @@index([groupId])
   @@index([uploadedById])
@@ -351,28 +350,28 @@ enum SubmissionStatus {
 }
 
 enum AnnotationStatus {
-  DRAFT      // auto-saved, adviser-only
-  COMMITTED  // visible to the group once verdict is submitted
+  DRAFT // auto-saved, adviser-only
+  COMMITTED // visible to the group once verdict is submitted
 }
 
 model MilestoneSubmission {
-  id           Int              @id @default(autoincrement())
+  id           Int                    @id @default(autoincrement())
   milestoneId  Int
-  milestone    Milestone        @relation(fields: [milestoneId], references: [id])
+  milestone    Milestone              @relation(fields: [milestoneId], references: [id])
   submittedBy  Int
-  user         User             @relation(fields: [submittedBy], references: [id])
+  user         User                   @relation(fields: [submittedBy], references: [id])
   fileName     String
   blobUrl      String
   mimeType     String
   size         Int
-  status       SubmissionStatus @default(PENDING)
+  status       SubmissionStatus       @default(PENDING)
   reviewedAt   DateTime?
   reviewNote   String?
   reviewedById Int?
-  reviewedBy   User?            @relation("MilestoneSubmissionReviewer", fields: [reviewedById], references: [id])
+  reviewedBy   User?                  @relation("MilestoneSubmissionReviewer", fields: [reviewedById], references: [id])
   annotations  SubmissionAnnotation[]
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
   deletedAt    DateTime?
 
   @@index([milestoneId])
@@ -386,15 +385,15 @@ model MilestoneSubmission {
 // the author; COMMITTED rows are visible to the group once a verdict is
 // submitted.
 model SubmissionAnnotation {
-  id           Int                @id @default(autoincrement())
+  id           Int                 @id @default(autoincrement())
   submissionId Int
   submission   MilestoneSubmission @relation(fields: [submissionId], references: [id])
   authorId     Int
-  author       User               @relation(fields: [authorId], references: [id])
+  author       User                @relation(fields: [authorId], references: [id])
   data         Json
-  status       AnnotationStatus   @default(DRAFT)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  status       AnnotationStatus    @default(DRAFT)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
   deletedAt    DateTime?
 
   @@unique([submissionId, authorId])
@@ -462,23 +461,23 @@ enum PanelistRole {
 }
 
 model DefenseSchedule {
-  id         Int              @id @default(autoincrement())
-  groupId    Int
-  group      Group            @relation(fields: [groupId], references: [id])
-  type       DefenseType
-  date       DateTime
-  startTime  String
-  endTime    String
-  venue      String
-  verdict    DefenseVerdict   @default(PENDING)
-  createdBy  Int
-  createdByUser User          @relation("DefenseCreatedBy", fields: [createdBy], references: [id])
-  panelists  DefensePanelist[]
-  resubmissions DefenseResubmission[]
-  submissions DefenseSubmission[]
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  deletedAt  DateTime?
+  id                 Int                 @id @default(autoincrement())
+  groupId            Int
+  group              Group               @relation(fields: [groupId], references: [id])
+  type               DefenseType
+  date               DateTime
+  startTime          String
+  endTime            String
+  venue              String
+  verdict            DefenseVerdict      @default(PENDING)
+  verdictSubmittedAt DateTime?
+  createdBy          Int
+  createdByUser      User                @relation("DefenseCreatedBy", fields: [createdBy], references: [id])
+  panelists          DefensePanelist[]
+  submissions        DefenseSubmission[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?
 
   @@index([deletedAt])
   @@index([groupId])
@@ -499,52 +498,6 @@ model DefensePanelist {
   @@index([deletedAt])
 }
 
-// A revised manuscript submitted by a group after a defense resulted in a
-// revision verdict (MINOR_REVISION / MAJOR_REVISION). One row per resubmission;
-// per-panelist review state lives in DefenseResubmissionReview so each panelist
-// only sees resubmissions they still need to evaluate (their personal queue).
-model DefenseResubmission {
-  id          Int                       @id @default(autoincrement())
-  scheduleId  Int
-  schedule    DefenseSchedule           @relation(fields: [scheduleId], references: [id])
-  submittedBy Int
-  user        User                      @relation("DefenseResubmissionSubmitter", fields: [submittedBy], references: [id])
-  fileName    String
-  blobUrl     String
-  mimeType    String
-  size        Int
-  reviews     DefenseResubmissionReview[]
-  createdAt   DateTime                  @default(now())
-  updatedAt   DateTime                  @updatedAt
-  deletedAt   DateTime?
-
-  @@index([scheduleId])
-  @@index([deletedAt])
-}
-
-// Per-panelist review state for a resubmission. A panelist's Resubmissions tab
-// lists the PENDING reviews — i.e. resubmissions they still need to evaluate.
-model DefenseResubmissionReview {
-  id             Int                       @id @default(autoincrement())
-  resubmissionId Int
-  resubmission   DefenseResubmission       @relation(fields: [resubmissionId], references: [id])
-  panelistId     Int
-  panelist       User                      @relation(fields: [panelistId], references: [id])
-  status         DefenseResubmissionStatus @default(PENDING)
-  reviewedAt     DateTime?
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
-  deletedAt      DateTime?
-
-  @@unique([resubmissionId, panelistId])
-  @@index([deletedAt])
-}
-
-enum DefenseResubmissionStatus {
-  PENDING
-  APPROVED
-}
-
 // ───────────────────────────── Defense Submission (unified) ─────────────────────────────
 
 enum DefenseReviewStatus {
@@ -560,22 +513,22 @@ enum DefenseReviewStatus {
 // computed from its DefenseSubmissionReview rows (all APPROVED → Approved,
 // any PENDING → In Review, any REJECTED → Rejected).
 model DefenseSubmission {
-  id                Int                       @id @default(autoincrement())
-  scheduleId        Int
-  schedule          DefenseSchedule           @relation(fields: [scheduleId], references: [id])
-  submittedBy       Int
-  user              User                      @relation("DefenseSubmissionSubmitter", fields: [submittedBy], references: [id])
-  isInitial         Boolean                   @default(false)
-  version           Int                       @default(1)
-  fileName          String
-  blobUrl           String
-  mimeType          String
-  size              Int
-  reviews           DefenseSubmissionReview[]
-  annotations       DefenseSubmissionAnnotation[]
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  deletedAt         DateTime?
+  id          Int                           @id @default(autoincrement())
+  scheduleId  Int
+  schedule    DefenseSchedule               @relation(fields: [scheduleId], references: [id])
+  submittedBy Int
+  user        User                          @relation("DefenseSubmissionSubmitter", fields: [submittedBy], references: [id])
+  isInitial   Boolean                       @default(false)
+  version     Int                           @default(1)
+  fileName    String
+  blobUrl     String
+  mimeType    String
+  size        Int
+  reviews     DefenseSubmissionReview[]
+  annotations DefenseSubmissionAnnotation[]
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+  deletedAt   DateTime?
 
   @@index([scheduleId])
   @@index([deletedAt])
@@ -584,33 +537,39 @@ model DefenseSubmission {
 // Per-panelist review state for a defense submission. A panelist's queue lists
 // the PENDING reviews — i.e. submissions they still need to evaluate.
 model DefenseSubmissionReview {
-  id             Int                @id @default(autoincrement())
-  submissionId   Int
-  submission     DefenseSubmission  @relation(fields: [submissionId], references: [id])
-  panelistId     Int
-  panelist       User               @relation(fields: [panelistId], references: [id])
-  status         DefenseReviewStatus @default(PENDING)
-  reviewedAt     DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  deletedAt      DateTime?
+  id           Int                 @id @default(autoincrement())
+  submissionId Int
+  submission   DefenseSubmission   @relation(fields: [submissionId], references: [id])
+  panelistId   Int
+  panelist     User                @relation(fields: [panelistId], references: [id])
+  status       DefenseReviewStatus @default(PENDING)
+  reviewedAt   DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
 
   @@unique([submissionId, panelistId])
   @@index([deletedAt])
 }
 
-// An annotation/comment attached to a defense submission by a panelist.
-// Named DefenseSubmissionAnnotation to avoid collision with the existing
-// SubmissionAnnotation model used for milestone PDF annotations.
+// Panelist in-PDF annotations on a defense submission. One row per
+// (submission, author); `data` holds the serialized AnnotationTransferItem[]
+// JSON export (stamp ArrayBuffers base64-encoded). DRAFT rows are private to
+// the author; COMMITTED rows are visible to the group. Visibility per
+// annotation is stored inside `data` (item.isVisible), avoiding a separate
+// table — mirrors SubmissionAnnotation (see lib/actions/annotations.ts).
 model DefenseSubmissionAnnotation {
-  id             Int              @id @default(autoincrement())
-  submissionId   Int
-  submission     DefenseSubmission @relation(fields: [submissionId], references: [id])
-  content        String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  deletedAt      DateTime?
+  id           Int               @id @default(autoincrement())
+  submissionId Int
+  submission   DefenseSubmission @relation(fields: [submissionId], references: [id])
+  authorId     Int
+  author       User              @relation(fields: [authorId], references: [id])
+  data         Json
+  status       AnnotationStatus  @default(DRAFT)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  deletedAt    DateTime?
 
-  @@index([submissionId])
+  @@unique([submissionId, authorId])
   @@index([deletedAt])
 }

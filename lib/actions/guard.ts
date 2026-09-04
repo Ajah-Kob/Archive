@@ -131,12 +131,16 @@ export async function requireStudent(): Promise<Session | null> {
   return student ? session : null
 }
 
-// Guards a server action for users with a panelist record.
-// Note: Panelist model does not exist in the schema yet — always returns null.
+// Guards a server action for users with a panelist record (DefensePanelist).
+// Verified via DB so removed panelists lose access without session refresh.
 export async function requirePanelist(): Promise<Session | null> {
   const session = await requireUser()
   if (!session) return null
-  return null
+  const row = await (prisma as any).defensePanelist.findFirst({
+    where: { userId: +session.user.id, deletedAt: null },
+    select: { id: true },
+  })
+  return row ? session : null
 }
 
 // Strips the password hash (and any other secrets) before a user row is sent

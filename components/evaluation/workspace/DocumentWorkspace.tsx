@@ -591,7 +591,7 @@ function WorkspaceLayout({
                   strokeWidth={2.5}
                   aria-hidden="true"
                 />
-                {draftSaveStatus === 'saved' ? 'Draft saved' : 'Saved just now'}
+                {draftSaveStatus === 'saved' ? 'Draft Saved' : 'Draft Saved'}
               </span>
             )}
           </div>

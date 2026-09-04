@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Shield,
   CalendarClock,
+  Flag,
   type LucideIcon,
 } from 'lucide-react'
 import { roleHome } from '@/lib/helper'
@@ -65,6 +66,7 @@ export function NavLinks({
     {
       label: 'CAPSTONE',
       items: [
+        { label: 'Milestones', href: '/student/milestone', icon: Flag, show: isStudent },
         { label: 'My Sections', href: '/faculty/my-sections', icon: Layers, show: isCoordinator },
         { label: 'Document Review', href: '/faculty/evaluation', icon: ClipboardCheck, show: isAdviser },
         { label: 'Defense', href: '/faculty/defense', icon: Shield, show: isFaculty },

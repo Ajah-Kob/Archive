@@ -1,4 +1,4 @@
-import { Eye } from 'lucide-react'
+import { Eye, FileSearch } from 'lucide-react'
 import { CircleHistoryState } from './CircleHistoryState'
 import { StatusPill } from './StatusPill'
 import { GhostButton } from './GhostButton'
@@ -30,13 +30,15 @@ export type InitialDocumentStatus =
   | 'IN_REVIEW'
 
 type LatestDocumentCardInitialProps = {
-  document: LatestDocumentInfo
+  document: LatestDocumentInfo & { comments?: number | null; pages?: number | null; reviewedAt?: string | null }
   status: InitialDocumentStatus | string
   /** When set, renders a vertical connector under the circle (for timeline). */
   showConnector?: boolean
   connectorDashed?: boolean
   /** Optional extra action beside View (e.g. Replace when PENDING). */
   extraAction?: React.ReactNode
+  /** Optional href for annotation workspace; falls back to blobUrl when absent. */
+  workspaceHref?: string
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -76,9 +78,11 @@ export function LatestDocumentCardInitial({
   showConnector,
   connectorDashed,
   extraAction,
+  workspaceHref,
 }: LatestDocumentCardInitialProps) {
   const isNoVerdict = status === 'PENDING'
   const isInReview = status === 'IN_REVIEW'
+  const isReviewPending = status === 'PENDING' || status === 'IN_REVIEW'
 
   const dateRaw = resolveDate(document)
   const dateLabel = dateRaw ? formatDate(dateRaw) : ''
@@ -128,6 +132,21 @@ export function LatestDocumentCardInitial({
             {meta}
           </p>
 
+          {/* Annotation counts when verdict submitted */}
+          {!isNoVerdict && !isInReview && (document as unknown as { comments?: number | null; pages?: number | null; reviewedAt?: string | null }).comments != null && (
+            <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
+              {(document as unknown as { comments?: number | null; pages?: number | null }).comments} comments on {(document as unknown as { pages?: number | null }).pages} pages
+              {(document as unknown as { reviewedAt?: string | null }).reviewedAt
+                ? ` · Reviewed ${formatDate((document as unknown as { reviewedAt?: string | null }).reviewedAt!)}`
+                : ''}
+            </p>
+          )}
+          {!isNoVerdict && !isInReview && (document as unknown as { comments?: number | null }).comments == null && (document as unknown as { reviewedAt?: string | null }).reviewedAt && (
+            <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
+              Reviewed {formatDate((document as unknown as { reviewedAt?: string | null }).reviewedAt!)}
+            </p>
+          )}
+
           {/* Status line per Figma typography 12px medium */}
           {isNoVerdict ? (
             <StatusLine tone="amber">
@@ -139,14 +158,29 @@ export function LatestDocumentCardInitial({
           ) : null}
         </div>
 
-        {/* Actions: View ghost button 32px h bg #f0f2fa border #e0e3f0 */}
+        {/* Actions: independent — panelist: Review Document when pending/in review, View grey after verdict */}
         <div className="flex items-start gap-[10px] shrink-0">
-          <GhostButton
-            href={document.blobUrl}
-            icon={<Eye className="size-[11px]" />}
-          >
-            View
-          </GhostButton>
+          {isReviewPending ? (
+            <a
+              href={workspaceHref ?? document.blobUrl}
+              aria-label={`Review ${document.fileName} in document workspace`}
+              title="Open in document workspace to review"
+              className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] hover:shadow-[0_4px_12px_rgba(112,125,255,0.32)] transition-all focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-2 outline-none shrink-0"
+            >
+              <FileSearch className="size-[13px]" strokeWidth={2} />
+              Review Document
+            </a>
+          ) : (
+            <a
+              href={workspaceHref ?? document.blobUrl}
+              aria-label={`View ${document.fileName}`}
+              title="View document"
+              className="flex items-center gap-[6px] h-[32px] px-[13px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
+            >
+              <Eye className="size-[11px]" strokeWidth={2} />
+              View
+            </a>
+          )}
           {extraAction}
         </div>
       </div>

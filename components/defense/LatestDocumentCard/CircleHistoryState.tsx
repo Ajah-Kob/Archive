@@ -22,7 +22,8 @@ type CircleHistoryStateProps = {
  * PENDING / NO_VERDICT → gray #e0e3f0; per-status colors otherwise.
  */
 export function CircleHistoryState({ state }: CircleHistoryStateProps) {
-  const normalized = state === 'PENDING' ? 'NO_VERDICT' : state
+  const raw = (state ?? '').toUpperCase().replace(/\s+/g, '_')
+  const normalized = raw === 'PENDING' ? 'NO_VERDICT' : raw === 'FOR_REVIEW' ? 'IN_REVIEW' : raw
   return (
     <span
       aria-hidden="true"

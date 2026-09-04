@@ -2,7 +2,7 @@
 // Awaiting split is chair vs non-chair; 4 verdicts reuse student palette.
 // No DB, no side effects — pure metadata + helpers. Keep functions <50 lines.
 
-import { Check, Clock, TriangleAlert } from 'lucide-react'
+import { Check, Clock, ShieldCheck, TriangleAlert } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,8 +45,13 @@ export interface CalloutVariantMeta {
   headlineClass: string
   headline: string
   context: string
-  /** Gradient + shadow for the "Review feedback" button (verdict states only). */
-  button?: { backgroundImage: string; shadow: string }
+  /** Gradient + shadow for callout action button. Verdict states use "Review feedback"; chair awaiting uses "Submit Verdict". */
+  button?: {
+    backgroundImage: string
+    shadow: string
+    label?: string
+    icon?: typeof Clock
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -110,17 +115,22 @@ export const PANELIST_VERDICT_VARIANTS: Record<
     boxClass: 'bg-[rgba(112,125,255,0.07)] border-[rgba(112,125,255,0.2)]',
     iconTileClass: 'bg-[rgba(112,125,255,0.08)] border-[rgba(112,125,255,0.19)]',
     headlineClass: 'text-[#707dff]',
-    headline: 'Awaiting Verdict',
-    context:
-      'You are the Panel Chair — submit the final verdict once all panel feedback is complete.',
+    headline: 'No Defense Verdict yet',
+    context: 'Discuss the verdict with other members and submit your final verdict',
+    button: {
+      backgroundImage: 'linear-gradient(135deg, #707dff 0%, #5565ff 100%)',
+      shadow: 'drop-shadow-[0px_3px_4px_rgba(112,125,255,0.22)]',
+      label: 'Submit Verdict',
+      icon: ShieldCheck,
+    },
   },
   'awaiting-non-chair': {
     Icon: Clock,
     boxClass: 'bg-[rgba(112,125,255,0.07)] border-[rgba(112,125,255,0.2)]',
     iconTileClass: 'bg-[rgba(112,125,255,0.08)] border-[rgba(112,125,255,0.19)]',
     headlineClass: 'text-[#707dff]',
-    headline: 'Awaiting Verdict',
-    context: 'Waiting for the Panel Chair to submit the final verdict.',
+    headline: 'No Defense Verdict yet',
+    context: 'Discuss the verdict with other members and wait for final verdict',
   },
   approved: {
     Icon: Check,
@@ -128,7 +138,7 @@ export const PANELIST_VERDICT_VARIANTS: Record<
     iconTileClass: 'bg-[rgba(22,163,74,0.08)] border-[rgba(22,163,74,0.19)]',
     headlineClass: 'text-[#16a34a]',
     headline: 'Approved',
-    context: '4 comments on 3 pages · Reviewed May 31, 2026.',
+    context: 'The document meets the defense requirements. No further revisions are needed.',
     button: {
       backgroundImage:
         'linear-gradient(103.38deg, rgb(22, 163, 74) 0%, rgb(18, 140, 63) 99.93%)',
@@ -141,7 +151,7 @@ export const PANELIST_VERDICT_VARIANTS: Record<
     iconTileClass: 'bg-[rgba(245,158,11,0.08)] border-[rgba(245,158,11,0.19)]',
     headlineClass: 'text-[#f59e0b]',
     headline: 'Minor Revision',
-    context: '4 comments on 3 pages · Reviewed May 31, 2026.',
+    context: 'Minor changes are required. Check submission history for latest resubmissions',
     button: {
       backgroundImage:
         'linear-gradient(104.12deg, rgb(245, 158, 11) 5.11%, rgb(218, 140, 7) 99.93%)',
@@ -154,7 +164,7 @@ export const PANELIST_VERDICT_VARIANTS: Record<
     iconTileClass: 'bg-[rgba(225,104,29,0.08)] border-[rgba(225,104,29,0.19)]',
     headlineClass: 'text-[#e1681d]',
     headline: 'Major Revision',
-    context: '4 comments on 3 pages · Reviewed May 31, 2026.',
+    context: 'Significant revisions are required. Check submission history for latest resubmissions',
     button: {
       backgroundImage:
         'linear-gradient(103.38deg, rgb(225, 104, 29) 0%, rgb(184, 82, 19) 99.93%)',
@@ -167,7 +177,7 @@ export const PANELIST_VERDICT_VARIANTS: Record<
     iconTileClass: 'bg-[rgba(225,29,72,0.08)] border-[rgba(225,29,72,0.19)]',
     headlineClass: 'text-[#e11d48]',
     headline: 'Rejected',
-    context: '4 comments on 3 pages · Reviewed May 31, 2026.',
+    context: 'Rejected. Check Submission History for the latest resubmission.',
     button: {
       backgroundImage:
         'linear-gradient(115.15deg, rgb(225, 29, 72) 44.98%, rgb(200, 26, 64) 99.87%)',

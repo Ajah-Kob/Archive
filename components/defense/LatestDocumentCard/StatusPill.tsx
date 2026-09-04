@@ -41,8 +41,11 @@ type StatusPillProps = {
  * 7px radius per Figma 1471-6082.
  */
 export function StatusPill({ state }: StatusPillProps) {
-  if (state === 'PENDING' || state === 'NO_VERDICT') return null
-  const meta = PILL_STYLES[state]
+  const normalized = (state ?? '').toUpperCase().replace(/\s+/g, '_')
+  if (normalized === 'PENDING' || normalized === 'NO_VERDICT') return null
+  // FOR_REVIEW and IN_REVIEW share the same yellow "For Review" pill
+  const key = normalized === 'FOR_REVIEW' ? 'IN_REVIEW' : normalized
+  const meta = PILL_STYLES[key]
   if (!meta) return null
   return (
     <span

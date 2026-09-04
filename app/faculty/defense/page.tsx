@@ -6,7 +6,7 @@ import {
 } from '@/lib/actions/defense'
 import type {
   MyDefenseSchedulePayload,
-  DefenseResubmissionPayload,
+  DefenseQueuePayload,
 } from '@/lib/actions/defense'
 
 export default async function FacultyDefensePage() {
@@ -17,7 +17,7 @@ export default async function FacultyDefensePage() {
 
   const schedules: MyDefenseSchedulePayload[] =
     schedulesRes.success && schedulesRes.payload ? schedulesRes.payload : []
-  const resubmissions: DefenseResubmissionPayload[] =
+  const resubmissions: DefenseQueuePayload[] =
     resubmissionsRes.success && resubmissionsRes.payload
       ? resubmissionsRes.payload
       : []

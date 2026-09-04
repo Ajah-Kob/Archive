@@ -5,7 +5,7 @@ type DefenseDetailsHeaderProps = {
 }
 
 export function DefenseDetailsHeader({
-  children = 'Defense Details',
+  children = 'Session Details',
 }: DefenseDetailsHeaderProps) {
   return (
     <div className="border-[#f0f2fa] border-b w-full shrink-0">

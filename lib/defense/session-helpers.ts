@@ -3,7 +3,6 @@
 
 import type {
   DefenseReviewStatus,
-  DefenseResubmissionStatus,
   DefenseVerdict,
   PanelistRole,
 } from '@prisma/client'
@@ -70,27 +69,22 @@ export const deriveVerdictCalloutStateForPanelist = deriveVerdictCalloutState
 // ── Feedback text (Figma 1470-5094) ──────────────────────────────────────────
 
 /**
- * Derives the center feedback text for a panelist row.
- * Gate: PENDING never exposes feedback, even when a feedback object is present.
- * Otherwise: feedback ? "X comments on Y pages" : "No feedback and verdict yet".
- *
- * Counts only — never the private annotation content.
+ * Derives the center feedback text for a panelist row (panelist → panelist view).
+ * - Has COMMITTED annotations → "✓ Finished reviewing" (counts if available)
+ * - Has DRAFT (auto-save) but not COMMITTED → "Draft — not submitted" (so peers know it's not final)
+ * - No row yet → "Pending review"
+ * verDict param kept for compat but no longer gates PENDING alone.
  */
 export function deriveFeedbackText(
   verdict: DefenseVerdict,
-  feedback: { comments: number; pages: number } | null | undefined,
+  feedback: { comments: number; pages: number; hasCommitted?: boolean; hasDraft?: boolean } | null | undefined,
 ): string {
-  if (verdict === 'PENDING') {
-    return 'No feedback and verdict yet'
+  if (feedback && (feedback.hasCommitted || feedback.comments > 0)) {
+    if (feedback.comments > 0) return `✓ Feedback submitted · ${feedback.comments} comments on ${feedback.pages} pages`
+    return '✓ Feedback submitted'
   }
-  if (
-    feedback &&
-    typeof feedback.comments === 'number' &&
-    typeof feedback.pages === 'number'
-  ) {
-    return `${feedback.comments} comments on ${feedback.pages} pages`
-  }
-  return 'No feedback and verdict yet'
+  if (feedback && feedback.hasDraft) return 'Draft — not submitted'
+  return 'No feedback submitted yet'
 }
 
 // ── Approval progress (resubmissions) ────────────────────────────────────────
@@ -102,16 +96,15 @@ export interface ApprovalProgress {
 }
 
 /**
- * Counts how many DefenseSubmissionReview / DefenseResubmissionReview rows are
- * APPROVED without leaking any review content. Returns approvedCount/total
- * and a display label e.g. "1/3".
+ * Counts how many DefenseSubmissionReview rows are APPROVED without leaking any
+ * review content. Returns approvedCount/total and a display label e.g. "1/3".
  *
- * Accepts either DefenseReviewStatus or DefenseResubmissionStatus rows, or any
- * array with a `status: string` field — only `APPROVED` is counted.
+ * Unified model — accepts DefenseReviewStatus rows, or any array with a
+ * `status: string` field — only `APPROVED` is counted.
  */
 export function deriveApprovalProgress(
   reviews: Array<{
-    status: DefenseReviewStatus | DefenseResubmissionStatus | string
+    status: DefenseReviewStatus | string
   }>,
 ): ApprovalProgress {
   const total = reviews.length
@@ -154,3 +147,164 @@ export function resolvePanelistFeedback(
   }
   return null
 }
+
+// ── Resubmission helpers (defense-tabs — pure, no DB) ────────────────────────
+
+export type ResubmissionStatus = 'FOR_REVIEW' | 'NEED_REVISION' | 'APPROVED'
+export type ResubmissionCalloutState = ResubmissionStatus
+
+/**
+ * Derives resubmission status from per-panelist reviews.
+ * - empty -> FOR_REVIEW
+ * - any REJECTED -> NEED_REVISION
+ * - all APPROVED -> APPROVED
+ * - else -> FOR_REVIEW (any PENDING)
+ * Pure, no throws.
+ */
+export function deriveResubmissionStatus(
+  reviews: Array<{ status: DefenseReviewStatus | string }> | null | undefined,
+): ResubmissionStatus {
+  if (!reviews || reviews.length === 0) return 'FOR_REVIEW'
+  const hasRejected = reviews.some((r) => r.status === 'REJECTED')
+  if (hasRejected) return 'NEED_REVISION'
+  const allApproved = reviews.every((r) => r.status === 'APPROVED')
+  if (allApproved) return 'APPROVED'
+  return 'FOR_REVIEW'
+}
+
+/**
+ * Callout variant for the latest resubmission version.
+ * Delegates to deriveResubmissionStatus — same business rule.
+ */
+export function deriveResubmissionCalloutState(
+  reviews: Array<{ status: DefenseReviewStatus | string }> | null | undefined,
+): ResubmissionCalloutState {
+  return deriveResubmissionStatus(reviews)
+}
+
+// Alias for prose variants.
+export const deriveResubmissionCalloutVariant = deriveResubmissionCalloutState
+export const getResubmissionStatus = deriveResubmissionStatus
+
+/**
+ * Whether a panelist is read-only on future resubmission versions.
+ * Business rule: APPROVED panelists cannot re-review future versions.
+ * - status APPROVED + isFutureVersion true (or omitted) -> true
+ * - otherwise -> false
+ * Also accepts a review object as first arg.
+ */
+export function isPanelistReadOnly(
+  statusOrReview: DefenseReviewStatus | string | { status: DefenseReviewStatus | string },
+  isFutureVersionOrContext?: boolean | number | { isFutureVersion?: boolean; currentVersion?: number; latestVersion?: number },
+  latestVersion?: number,
+): boolean {
+  const status =
+    typeof statusOrReview === 'object' && statusOrReview !== null && 'status' in statusOrReview
+      ? (statusOrReview as { status: DefenseReviewStatus | string }).status
+      : (statusOrReview as DefenseReviewStatus | string)
+  if (status !== 'APPROVED') return false
+  if (typeof isFutureVersionOrContext === 'boolean') return isFutureVersionOrContext
+  if (typeof isFutureVersionOrContext === 'object' && isFutureVersionOrContext !== null) {
+    const ctx = isFutureVersionOrContext as { isFutureVersion?: boolean; currentVersion?: number; latestVersion?: number }
+    if (typeof ctx.isFutureVersion === 'boolean') return ctx.isFutureVersion
+    if (typeof ctx.currentVersion === 'number' && typeof ctx.latestVersion === 'number') {
+      return ctx.currentVersion < ctx.latestVersion
+    }
+  }
+  if (typeof isFutureVersionOrContext === 'number' && typeof latestVersion === 'number') {
+    return isFutureVersionOrContext < latestVersion
+  }
+  return true
+}
+
+/**
+ * Whether a review should reset to PENDING on new version creation.
+ * - REJECTED -> true (reset to PENDING)
+ * - APPROVED -> false (carry-forward, stays APPROVED)
+ * - PENDING/other -> false (already pending)
+ * Carry-forward only unresolved.
+ */
+export function shouldResetOnResubmission(
+  statusOrReview: DefenseReviewStatus | string | { status: DefenseReviewStatus | string },
+): boolean {
+  const status =
+    typeof statusOrReview === 'object' && statusOrReview !== null && 'status' in statusOrReview
+      ? (statusOrReview as { status: DefenseReviewStatus | string }).status
+      : (statusOrReview as DefenseReviewStatus | string)
+  return status === 'REJECTED'
+}
+
+// Alias for carry-forward prose.
+export const shouldResetReviewOnResubmission = shouldResetOnResubmission
+
+export interface ApprovalChecklistItem {
+  panelistId: number
+  name?: string
+  status: DefenseReviewStatus | string
+  displayStatus: 'Approved' | 'Need Revision' | 'Pending'
+  comments: number
+  pages: number
+  reviewedAt: string | null
+  isReadOnly: boolean
+}
+
+/**
+ * Builds per-panelist checklist for latest resubmission version.
+ * Maps each review to displayStatus + feedback counts.
+ * Approved -> Approved (read-only), Rejected -> Need Revision, else Pending.
+ * Pure, no throws.
+ */
+export function deriveApprovalChecklist(
+  reviews: Array<{
+    panelistId?: number
+    id?: number
+    panelist_id?: number
+    name?: string
+    panelistName?: string
+    status: DefenseReviewStatus | string
+    feedback?: { comments: number; pages: number } | null
+    comments?: number
+    pages?: number
+    reviewedAt?: string | Date | null
+    reviewed_at?: string | Date | null
+  }> | null | undefined,
+): ApprovalChecklistItem[] {
+  if (!reviews || reviews.length === 0) return []
+  return reviews.map((r) => {
+    const panelistId = r.panelistId ?? r.id ?? (r as { panelist_id?: number }).panelist_id ?? 0
+    const name = r.name ?? r.panelistName ?? undefined
+    const status = r.status
+    const displayStatus =
+      status === 'APPROVED' ? 'Approved' : status === 'REJECTED' ? 'Need Revision' : 'Pending'
+    const fb = r.feedback
+    const comments =
+      fb && typeof fb.comments === 'number'
+        ? fb.comments
+        : typeof r.comments === 'number'
+          ? r.comments
+          : 0
+    const pages =
+      fb && typeof fb.pages === 'number'
+        ? fb.pages
+        : typeof r.pages === 'number'
+          ? r.pages
+          : 0
+    const rawAt = r.reviewedAt ?? r.reviewed_at ?? null
+    const reviewedAt =
+      rawAt instanceof Date ? rawAt.toISOString() : typeof rawAt === 'string' ? rawAt : null
+    return {
+      panelistId,
+      name,
+      status,
+      displayStatus,
+      comments,
+      pages,
+      reviewedAt,
+      isReadOnly: isPanelistReadOnly(status),
+    }
+  })
+}
+
+// Aliases for checklist prose.
+export const getApprovalChecklist = deriveApprovalChecklist
+export const buildApprovalChecklist = deriveApprovalChecklist

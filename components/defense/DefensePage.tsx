@@ -7,7 +7,7 @@ import { UpcomingSessionsContainer } from './UpcomingSessionsContainer'
 import { ResubmissionsTable } from './ResubmissionsTable'
 import type {
   MyDefenseSchedulePayload,
-  DefenseResubmissionPayload,
+  DefenseQueuePayload,
 } from '@/lib/actions/defense'
 
 type TabId = 'upcoming' | 'resubmissions' | 'completed'
@@ -20,7 +20,7 @@ const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
 
 interface DefensePageProps {
   schedules: MyDefenseSchedulePayload[]
-  resubmissions: DefenseResubmissionPayload[]
+  resubmissions: DefenseQueuePayload[]
 }
 
 /**
@@ -37,6 +37,8 @@ export function DefensePage({
 
   // Upcoming = verdict still pending (the defense has not been decided yet).
   const upcoming = schedules.filter((s) => s.verdict === 'PENDING')
+  // Completed = verdict has been submitted (APPROVED, MINOR/MAJOR, REJECTED)
+  const completed = schedules.filter((s) => s.verdict !== 'PENDING')
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -69,17 +71,7 @@ export function DefensePage({
         ) : active === 'resubmissions' ? (
           <ResubmissionsTable items={resubmissions} />
         ) : (
-          <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col items-center justify-center px-10 py-16">
-            <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
-              <Shield className="size-5 text-[#707dff]" strokeWidth={1.75} />
-            </div>
-            <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#1e3a8a] tracking-[-0.16px] mb-2">
-              Completed
-            </h3>
-            <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] text-center max-w-[360px]">
-              Completed defenses will appear here once verdicts are finalized.
-            </p>
-          </div>
+          <UpcomingSessionsContainer schedules={completed} title="Completed Sessions" emptyTitle="No Completed Defenses" emptyDescription="Completed defenses will appear here once verdicts are finalized." />
         )}
       </div>
     </div>

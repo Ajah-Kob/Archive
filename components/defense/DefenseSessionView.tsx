@@ -227,12 +227,23 @@ function PanelistCard({
 
 // ── Document / history pieces ────────────────────────────────────────────────
 
-function ReviewStatus({ status }: { status: 'PENDING' | 'APPROVED' }) {
+function ReviewStatus({
+  status,
+}: {
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+}) {
   if (status === 'APPROVED') {
     return (
       <span className="inline-flex items-center gap-[4px] rounded-full bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.25)] px-[8px] py-[2px] text-[10.5px] font-bold leading-[15.75px] text-[#22c55e] whitespace-nowrap">
         <Check className="size-[10px]" strokeWidth={2.5} />
         Approved
+      </span>
+    )
+  }
+  if (status === 'REJECTED') {
+    return (
+      <span className="inline-flex items-center gap-[4px] rounded-full bg-[rgba(244,63,94,0.08)] border border-[rgba(244,63,94,0.25)] px-[8px] py-[2px] text-[10.5px] font-bold leading-[15.75px] text-[#f43f5e] whitespace-nowrap">
+        Rejected
       </span>
     )
   }

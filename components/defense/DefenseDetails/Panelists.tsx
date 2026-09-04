@@ -1,4 +1,7 @@
+'use client'
+
 import { Crown, User } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import type { DefenseVerdict, PanelistRole } from '@prisma/client'
 import type { DefensePanelistPayload } from '@/lib/actions/defense'
 import { getInitials } from '@/lib/helper'
@@ -7,6 +10,16 @@ import {
   PANELIST_AVATAR_GRADIENT,
 } from '@/components/ui/UserProfile'
 import { deriveFeedbackText as deriveFeedbackTextHelper } from '@/lib/defense/session-helpers'
+
+// ── Me indicator ───────────────────────────────────────────────────────────
+
+function MeBadge() {
+  return (
+    <span className="inline-flex items-center gap-[4px] rounded-full bg-[#eef2ff] border border-[#c7d2fe] px-[7px] py-[2px] font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[10px] leading-[14px] text-[#4f46e5] whitespace-nowrap shrink-0">
+      Me
+    </span>
+  )
+}
 
 // ── Pills ────────────────────────────────────────────────────────────────────
 
@@ -65,12 +78,14 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
     }
   ).feedback
   const centerText = deriveFeedbackText(verdict, feedback)
+  const { data: session } = useSession()
+  const isMe = session?.user?.id != null && String(session.user.id) === String(panelist.userId)
 
   return (
     <div
       className={`bg-white ${border} ${radius} grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)] max-sm:grid-cols-1 max-sm:gap-2 items-center px-[17px] py-[6px] min-h-[61px] gap-2`}
     >
-      {/* Col1: UserProfile avatar 35px gradient #1e3a8a→#2d52b8, name + email, no badge duplication */}
+      {/* Col1: UserProfile avatar 35px gradient #1e3a8a→#2d52b8, name + email + Me */}
       <div className="flex items-center gap-2.5 min-w-0 sm:h-[50px] w-full">
         <UserProfile
           initials={getInitials(panelist.name)}
@@ -79,10 +94,15 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
           gradient={PANELIST_AVATAR_GRADIENT}
           avatarClassName="size-[35px]"
         />
+        {isMe ? <MeBadge /> : null}
       </div>
-      {/* Col2 center: PENDING-gated status only, never private comment content */}
+      {/* Col2 center: panelist→panelist status (Pending vs Finished) */}
       <div className="flex items-center justify-center sm:h-[50px] sm:px-2 min-w-0 w-full">
-        <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#9ea8c6] text-center">
+        <p
+          className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-center ${
+            centerText.startsWith('✓') ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
+          }`}
+        >
           {centerText}
         </p>
       </div>

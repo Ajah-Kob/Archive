@@ -47,20 +47,63 @@ export function DefenseSessionPanelistView({
     ? deriveResubStatus(latestResub.reviews)
     : 'FOR_REVIEW'
 
-  // Initial document placeholder (when no resubmission, initial not in payload → show empty)
-  const initialDoc = null as any
+  const annotationStats =
+    (
+      session as unknown as {
+        annotationStats?: { comments: number; pages: number } | null
+      }
+    ).annotationStats ?? null
+  const reviewedAt =
+    (session as unknown as { verdictSubmittedAt?: string | null })
+      .verdictSubmittedAt ?? null
+
+  const initialSubmission =
+    (
+      session as unknown as {
+        submissions?: Array<{
+          id: number
+          isInitial: boolean
+          fileName: string
+          size: number
+          blobUrl: string
+          dateSubmitted: string
+          version: number
+        }>
+      }
+    ).submissions?.find((s) => s.isInitial) ?? null
+  const initialDoc = initialSubmission
+    ? {
+        fileName: initialSubmission.fileName,
+        size: initialSubmission.size,
+        blobUrl: initialSubmission.blobUrl,
+        submittedAt: initialSubmission.dateSubmitted,
+        submittedByName: session.groupName,
+        version: initialSubmission.version,
+        status: session.verdict,
+        comments: annotationStats?.comments ?? null,
+        pages: annotationStats?.pages ?? null,
+        reviewedAt: reviewedAt ?? null,
+      }
+    : null
+  const hasDocument = !!initialDoc || hasResubmission
 
   return (
     <div className="flex flex-col gap-[16px] w-full mx-auto">
-      <PanelistVerdictCallout state={verdictState as any} isChair={chair} />
-
-      <DefenseDetailsCard schedule={session as any} />
+      <PanelistVerdictCallout
+        state={verdictState as any}
+        isChair={chair}
+        scheduleId={session.id}
+        reviewedAt={reviewedAt}
+        comments={annotationStats?.comments ?? null}
+        pages={annotationStats?.pages ?? null}
+      />
 
       <LatestDocumentCard.Root>
-        <LatestDocumentCard.Header>Defense Document</LatestDocumentCard.Header>
+        <LatestDocumentCard.Header>Latest Document</LatestDocumentCard.Header>
         <LatestDocumentCard.Body>
           {hasResubmission && latestResub ? (
             <LatestDocumentCard.Resubmitted
+              workspaceHref={`/faculty/defense/${session.id}/${latestResub.id}`}
               document={{
                 fileName: latestResub.fileName,
                 size: latestResub.size,
@@ -71,9 +114,9 @@ export function DefenseSessionPanelistView({
                 status: resubStatus,
                 approvedCount,
                 totalPanelists,
-                comments: 4,
-                pages: 3,
-                reviewedAt: latestResub.dateSubmitted,
+                comments: annotationStats?.comments ?? 0,
+                pages: annotationStats?.pages ?? 0,
+                reviewedAt: reviewedAt ?? latestResub.dateSubmitted,
                 previousVersionApproved: session.resubmissions.length > 1,
               }}
             />
@@ -81,6 +124,11 @@ export function DefenseSessionPanelistView({
             <LatestDocumentCard.Initial
               document={initialDoc}
               status={session.verdict as any}
+              workspaceHref={
+                initialSubmission
+                  ? `/faculty/defense/${session.id}/${initialSubmission.id}`
+                  : undefined
+              }
             />
           ) : (
             <div className="py-8 text-center">
@@ -91,6 +139,8 @@ export function DefenseSessionPanelistView({
           )}
         </LatestDocumentCard.Body>
       </LatestDocumentCard.Root>
+
+      <DefenseDetailsCard schedule={session as any} />
     </div>
   )
 }

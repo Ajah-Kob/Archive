@@ -6,6 +6,7 @@ import {
   DefenseDetailsPanelists,
   DefenseDetailsPanelistChecklist,
 } from './Panelists'
+import { DefenseDetailsMembers } from './Members'
 
 export const DefenseDetails = {
   Root: DefenseDetailsRoot,
@@ -16,6 +17,7 @@ export const DefenseDetails = {
   PanelistChecklist: DefenseDetailsPanelistChecklist,
   Panelist: DefenseDetailsPanelistChecklist,
   Checklist: DefenseDetailsPanelistChecklist,
+  Members: DefenseDetailsMembers,
 }
 
 export { DefenseDetailsRoot } from './Root'
@@ -26,3 +28,4 @@ export {
   DefenseDetailsPanelists,
   DefenseDetailsPanelistChecklist,
 } from './Panelists'
+export { DefenseDetailsMembers } from './Members'

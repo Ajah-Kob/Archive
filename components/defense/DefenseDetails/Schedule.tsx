@@ -1,16 +1,22 @@
 import type { ReactNode } from 'react'
-import { Calendar, Clock, MapPin } from 'lucide-react'
+import { Calendar, Clock, MapPin, Shield } from 'lucide-react'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 
 function formatDate(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
+  const weekday = date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    timeZone: 'UTC',
+  })
+  const weekdayLabel = weekday === 'Thu' ? 'Thur' : weekday
+  const rest = date.toLocaleDateString('en-US', {
+    month: 'long',
     day: 'numeric',
     year: 'numeric',
     timeZone: 'UTC',
   })
+  return `${weekdayLabel}, ${rest}`
 }
 
 function formatTime(value: string): string {
@@ -33,97 +39,97 @@ function formatTime(value: string): string {
   return value
 }
 
-function ScheduleIcon({ children }: { children: ReactNode }) {
+function formatTimeRange(startTime: string, endTime: string): string {
+  return `${formatTime(startTime)} – ${formatTime(endTime)}`
+}
+
+function resolveBadgeLabel(type: string | undefined): string {
+  return type === 'FINAL' ? 'Final Defense' : 'Proposal Defense'
+}
+
+function DetailItem({ icon, children }: { icon: ReactNode; children: string }) {
   return (
-    <div className="size-[26px] rounded-[8px] bg-[#f8f9ff] border border-[#eef0ff] flex items-center justify-center shrink-0">
-      {children}
+    <div className="flex gap-[6px] items-center">
+      {icon}
+      <span className="font-['Plus_Jakarta_Sans',sans-serif] font-semibold text-[12.5px] leading-[normal] text-[#4a5280] whitespace-nowrap">
+        {children}
+      </span>
     </div>
   )
 }
 
-function ScheduleLabel({ children }: { children: string }) {
-  return (
-    <span className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[11px] leading-[normal] text-[#9ea8c6]">
-      {children}
-    </span>
-  )
-}
+function DetailsCard({
+  schedule,
+}: {
+  schedule: DefenseSchedulePayload | null
+}) {
+  const groupName = schedule?.groupName ? schedule.groupName : 'TEAM 5: ARCHIVE'
+  const sectionName = schedule?.sectionName ?? 'BSIS 4AG2'
+  const dateText = schedule?.date
+    ? formatDate(schedule.date)
+    : 'Thur, August 30, 2026'
+  const timeText = schedule
+    ? formatTimeRange(schedule.startTime, schedule.endTime)
+    : '2:00 PM – 3:00 PM'
+  const venueText = schedule?.venue ?? 'Room 204'
+  const badgeLabel = resolveBadgeLabel(schedule?.type)
 
-function ScheduleValue({ children }: { children: ReactNode }) {
   return (
-    <span className="font-['Sora',sans-serif] font-semibold text-[11px] leading-[normal] tracking-[-0.125px] text-[#1e3a8a]">
-      {children}
-    </span>
-  )
-}
-
-function DateRow({ schedule }: { schedule: DefenseSchedulePayload }) {
-  return (
-    <div className="h-full border border-[#e8ebf8] border-b-0 rounded-tl-[10px] rounded-tr-[10px] flex flex-col justify-center px-[17px] py-[11px] w-full">
-      <div className="flex gap-[10px] items-center w-full">
-        <ScheduleIcon>
-          <Calendar className="size-[14px] text-[#9ea8c6]" strokeWidth={1.75} />
-        </ScheduleIcon>
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <ScheduleLabel>Date</ScheduleLabel>
-          <ScheduleValue>{formatDate(schedule.date)}</ScheduleValue>
-        </div>
+    <div className="bg-white border border-[#eceef8] rounded-[14px] drop-shadow-[0px_2px_6px_rgba(112,125,255,0.05)] flex items-start px-[16px] py-[8px] w-full flex-col lg:flex-row gap-0">
+      <div className="w-[197px] p-[10px] max-lg:w-full lg:w-[197px] shrink-0 flex flex-col gap-[2px]">
+        <p className="font-['Sora',sans-serif] font-extrabold text-[20px] leading-[normal] tracking-[-0.44px] text-[#10133a] whitespace-nowrap truncate">
+          {groupName}
+        </p>
+        <p className="font-['Plus_Jakarta_Sans',sans-serif] font-semibold text-[12.5px] leading-[normal] text-[#8a93b4]">
+          {sectionName}
+        </p>
       </div>
-    </div>
-  )
-}
 
-function TimeRow({ schedule }: { schedule: DefenseSchedulePayload }) {
-  return (
-    <div className="h-full border-x border-t border-[#e8ebf8] flex flex-col justify-center px-[17px] py-[11px] w-full">
-      <div className="flex gap-[10px] items-center w-full">
-        <ScheduleIcon>
-          <Clock className="size-[14px] text-[#9ea8c6]" strokeWidth={1.75} />
-        </ScheduleIcon>
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <ScheduleLabel>Time</ScheduleLabel>
-          <ScheduleValue>
-            {formatTime(schedule.startTime)} - {formatTime(schedule.endTime)}
-          </ScheduleValue>
-        </div>
+      <div className="flex-1 gap-[15px] h-full items-center p-[10px] flex flex-wrap min-w-0">
+        <DetailItem
+          icon={
+            <Calendar
+              className="size-[11px] text-[#8a93b4] shrink-0"
+              strokeWidth={2}
+            />
+          }
+        >
+          {dateText}
+        </DetailItem>
+        <DetailItem
+          icon={
+            <Clock
+              className="size-[11px] text-[#8a93b4] shrink-0"
+              strokeWidth={2}
+            />
+          }
+        >
+          {timeText}
+        </DetailItem>
+        <DetailItem
+          icon={
+            <MapPin
+              className="size-[11px] text-[#8a93b4] shrink-0"
+              strokeWidth={2}
+            />
+          }
+        >
+          {venueText}
+        </DetailItem>
       </div>
-    </div>
-  )
-}
 
-function VenueRow({ schedule }: { schedule: DefenseSchedulePayload }) {
-  return (
-    <div className="h-full border border-[#e8ebf8] rounded-bl-[10px] rounded-br-[10px] flex flex-col justify-center px-[17px] py-[11px] w-full">
-      <div className="flex gap-[10px] items-center w-full">
-        <ScheduleIcon>
-          <MapPin className="size-[14px] text-[#9ea8c6]" strokeWidth={1.75} />
-        </ScheduleIcon>
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <ScheduleLabel>Venue</ScheduleLabel>
-          <span className="font-['Sora',sans-serif] font-semibold text-[11px] leading-[normal] tracking-[-0.125px] text-[#1e3a8a] truncate">
-            {schedule.venue}
+      <div className="w-full h-full max-lg:w-full lg:w-[162px] shrink-0 flex flex-col items-end justify-center">
+        <div className="inline-flex items-center gap-[6px] px-[11px] py-[5px] rounded-[8px] bg-[rgba(59,130,246,0.07)] border border-[rgba(59,130,246,0.18)]">
+          <Shield
+            className="size-[11px] text-[#3b82f6] shrink-0"
+            strokeWidth={2}
+          />
+          <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[11.5px] leading-[normal] text-[#3b82f6] whitespace-nowrap">
+            {badgeLabel}
           </span>
         </div>
       </div>
     </div>
-  )
-}
-
-function ScheduleCard({ schedule }: { schedule: DefenseSchedulePayload }) {
-  return (
-    <div className="bg-white flex flex-col flex-1 rounded-[12px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] w-full overflow-clip">
-      <DateRow schedule={schedule} />
-      <TimeRow schedule={schedule} />
-      <VenueRow schedule={schedule} />
-    </div>
-  )
-}
-
-function ScheduleEmpty() {
-  return (
-    <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[13px] leading-[21.45px] text-[#8a93b4]">
-      No defense schedule has been set yet.
-    </p>
   )
 }
 
@@ -137,9 +143,9 @@ export function DefenseDetailsSchedule({
   return (
     <div className="flex flex-col gap-[10px] self-stretch min-w-0">
       <p className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[12px] leading-[18px] text-[#9ea8c6]">
-        Schedule
+        Details
       </p>
-      {schedule ? <ScheduleCard schedule={schedule} /> : <ScheduleEmpty />}
+      <DetailsCard schedule={schedule} />
     </div>
   )
 }

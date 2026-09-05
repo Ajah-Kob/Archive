@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { ClipboardCheck, FileText } from 'lucide-react'
+import { ClipboardCheck } from 'lucide-react'
 import type { DefenseQueuePayload } from '@/lib/actions/defense'
 
 // Grid template for the resubmissions table — mirrors the Document Review
@@ -148,16 +148,15 @@ export function ResubmissionsTable({ items }: ResubmissionsTableProps) {
                 <button
                   type="button"
                   onClick={() =>
-                    router.push(`/faculty/defense/${item.scheduleId}`)
+                    router.push(
+                      `/faculty/defense/${item.scheduleId}/resubmission`,
+                    )
                   }
                   title="Evaluate Document"
                   aria-label={`Evaluate ${item.groupName} resubmission`}
                   className="flex items-center gap-[5px] h-[28px] px-[11px] bg-[#707dff] rounded-[7px] font-sans font-semibold text-[11px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-1"
                 >
-                  <ClipboardCheck
-                    className="size-[12px]"
-                    strokeWidth={2.25}
-                  />
+                  <ClipboardCheck className="size-[12px]" strokeWidth={2.25} />
                   Evaluate Document
                 </button>
               </span>

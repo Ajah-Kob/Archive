@@ -6,9 +6,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, History } from 'lucide-react'
-import { ContextBar } from '@/components/globals/ContextBar'
+import { HeaderBar } from '@/components/globals/HeaderBar'
 import {
   DocumentHistoryDrawer,
   type DocumentHistoryItem,
@@ -125,6 +126,8 @@ function deriveResubmissionItems(
       (session as unknown as { verdictSubmittedAt?: string | null })
         .verdictSubmittedAt ?? null
     const hasStats = rWithStats.annotationStats != null
+    const reviews = (r.reviews as unknown as Array<{ status: string }>) ?? []
+    const approved = reviews.filter((rv) => rv.status === 'APPROVED').length
     return {
       info: {
         id: r.id,
@@ -141,6 +144,9 @@ function deriveResubmissionItems(
       status: deriveResubmissionStatus(
         r.reviews as unknown as Array<{ status: string }>,
       ) as unknown as DocumentHistoryItem['status'],
+      reviews,
+      approvedCount: approved,
+      total: reviews.length,
     }
   })
 }
@@ -232,9 +238,6 @@ export function DefenseSessionTabsRoot({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const paramTab = searchParams.get('tab')
-  const initialTab = resolveInitialTab(paramTab, defaultTab)
-  const [activeTab, setActiveTabState] = useState<DefenseSessionTabKey>(initialTab)
   const [historyOpen, setHistoryOpen] = useState(false)
 
   // Resolve drawer props: explicit props win; otherwise derive from session if present.
@@ -249,15 +252,38 @@ export function DefenseSessionTabsRoot({
   const resolvedScheduleId =
     scheduleId !== undefined ? scheduleId : session ? session.id : undefined
 
+  // Active tab derived from pathname segment: /session or /resubmission
+  // Fallback to ?tab= query for bookmark compat, then defaultTab.
+  const activeTab: DefenseSessionTabKey = (() => {
+    if (pathname?.endsWith('/resubmission')) return 'resubmission'
+    if (pathname?.endsWith('/session')) return 'session'
+    // legacy query fallback
+    const q = searchParams.get('tab')
+    const valid = isValidTab(q)
+    if (valid) return valid
+    return defaultTab
+  })()
+
   function selectTab(key: DefenseSessionTabKey) {
-    setActiveTabState(key)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('tab', key)
-    router.replace(`${pathname}?${params.toString()}`)
+    if (!resolvedScheduleId) {
+      // fallback to query for unknown schedule (should not happen)
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('tab', key)
+      router.replace(`${pathname}?${params.toString()}`)
+      return
+    }
+    // New segment routing: /[scheduleId]/session and /[scheduleId]/resubmission
+    router.push(`/faculty/defense/${resolvedScheduleId}/${key}`)
   }
 
   // Normalize "/defense" shorthand to real faculty route for the back button.
   const target = backHref === '/defense' ? '/faculty/defense' : backHref
+
+  // Build hrefs for tab Links (href is segment route, preserves drawer state via client nav)
+  function hrefFor(key: DefenseSessionTabKey): string {
+    if (!resolvedScheduleId) return `${pathname}?tab=${key}`
+    return `/faculty/defense/${resolvedScheduleId}/${key}`
+  }
 
   return (
     <DefenseSessionTabsContext value={{ activeTab, selectTab }}>
@@ -269,7 +295,7 @@ export function DefenseSessionTabsRoot({
           .filter(Boolean)
           .join(' ')}
       >
-        <ContextBar
+        <HeaderBar
           actions={
             <>
               <button
@@ -294,10 +320,13 @@ export function DefenseSessionTabsRoot({
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key
             return (
-              <button
+              <Link
                 key={tab.key}
-                type="button"
-                onClick={() => selectTab(tab.key)}
+                href={hrefFor(tab.key)}
+                onClick={(e) => {
+                  // Keep context in sync for TabPanel consumers that still rely on it (legacy Shell)
+                  // Prevent full reload — Next Link handles it, but we still update legacy state for instant feedback
+                }}
                 className={`relative flex items-center h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
                   isActive
                     ? 'font-bold text-[#707dff]'
@@ -308,10 +337,10 @@ export function DefenseSessionTabsRoot({
                 {isActive && (
                   <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
                 )}
-              </button>
+              </Link>
             )
           })}
-        </ContextBar>
+        </HeaderBar>
         <div className="flex-1 min-h-0 overflow-y-auto p-[30px] flex flex-col overscroll-contain">
           {children}
         </div>

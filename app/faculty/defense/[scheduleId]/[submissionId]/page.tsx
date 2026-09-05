@@ -78,7 +78,7 @@ export default async function DefensePanelistWorkspacePage({
   const draftStatus =
     (annotations?.status as 'DRAFT' | 'COMMITTED' | null) ?? null
 
-  const meta: SubmissionMeta & { scheduleId?: number; isInitial?: boolean } = {
+  const meta: SubmissionMeta & { scheduleId?: number; isInitial?: boolean; version?: number; verdict?: string } = {
     id: detail.id,
     groupName: detail.groupName,
     chapter: chapterLabel,
@@ -95,15 +95,22 @@ export default async function DefensePanelistWorkspacePage({
     reviewNote: null,
     scheduleId: detail.scheduleId,
     isInitial: detail.isInitial,
+    version: detail.version,
+    verdict: (detail as unknown as { verdict?: string }).verdict ?? 'PENDING',
   }
 
   const isCommitted = draftStatus === 'COMMITTED'
   // Resubmitted documents remain editable while IN_REVIEW even though the schedule verdict is already submitted (MINOR/MAJOR).
+  // isCommitted only finalizes the *initial* document (Save annotation flow); resubmissions finalize solely via viewStatus (APPROVED/REJECTED) so a premature COMMITTED+DRAFT mismatch does not hide the Approve/Request Revision buttons.
   const shouldFinalize =
     !detail.isCurrent ||
     viewStatus !== 'IN_REVIEW' ||
-    isCommitted ||
+    (detail.isInitial && isCommitted) ||
     (detail.isInitial && isVerdictSubmitted)
+
+  const backHref = detail.isInitial
+    ? `/faculty/defense/${detail.scheduleId}/session`
+    : `/faculty/defense/${detail.scheduleId}/resubmission`
 
   if (shouldFinalize) {
     return (
@@ -111,7 +118,7 @@ export default async function DefensePanelistWorkspacePage({
         submission={meta}
         initialAnnotations={initialAnnotations as unknown[]}
         isSuperseded={!detail.isCurrent}
-        backHref={`/faculty/defense/${detail.scheduleId}`}
+        backHref={backHref}
         scheduleId={detail.scheduleId}
         draftStatus={draftStatus}
       />
@@ -124,7 +131,7 @@ export default async function DefensePanelistWorkspacePage({
       submission={meta}
       initialAnnotations={initialAnnotations as unknown[]}
       draftStatus={draftStatus}
-      backHref={`/faculty/defense/${detail.scheduleId}`}
+      backHref={backHref}
       scheduleId={detail.scheduleId}
     />
   )

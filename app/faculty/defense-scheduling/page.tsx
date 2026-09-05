@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import { PageLabel } from '@/components/globals/PageLabel'
-import { DefenseSchedulingPage as DefenseSchedulingView } from '@/components/defense/DefenseSchedulingPage'
+import { DefenseSchedulingPage as DefenseSchedulingView } from '@/components/defense-scheduling/DefenseSchedulingPage'
 import {
   getDefenseSchedules,
   getDefenseWizardOptions,
@@ -29,20 +29,10 @@ export default async function DefenseSchedulingPage() {
     facultyRes.success && facultyRes.payload ? facultyRes.payload : []
 
   return (
-    <section className="min-h-full flex flex-col pt-[30px] px-[30px] pb-[30px]">
+    <section className="min-h-full flex flex-col">
       <PageLabel label="Defense Scheduling" />
 
-      <div className="flex flex-col">
-        <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
-          Defense Scheduling
-        </h1>
-        <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] mt-1">
-          Create and manage capstone defense schedules — proposal and final
-          defenses — with venue, time, and a chair-and-members panel.
-        </p>
-      </div>
-
-      <div className="flex-1 pb-[30px] mt-3 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0">
         <DefenseSchedulingView
           schedules={schedules}
           sections={sections}

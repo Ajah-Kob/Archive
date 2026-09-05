@@ -2,17 +2,18 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { DefenseTable } from '@/components/defense/DefenseTable'
-import { DefenseDetailsDrawer } from '@/components/defense/DefenseDetailsDrawer'
-import { CreateDefenseWizard } from '@/components/defense/CreateDefenseWizard'
+import { Plus } from 'lucide-react'
+import { HeaderBar } from '@/components/globals/HeaderBar'
+import { SearchBar } from '@/components/ui/SearchBar'
+import { Filter, type FilterOption } from '@/components/ui/Filter'
+import { DefenseTable } from '@/components/defense-scheduling/DefenseTable'
+import { DefenseDetailsDrawer } from '@/components/defense-scheduling/DefenseDetailsDrawer'
+import { CreateDefenseWizard } from '@/components/defense-scheduling/CreateDefenseWizard'
 import {
   ConfirmDeleteModal,
   type DefenseScheduleSummary,
-} from '@/components/defense/ConfirmDeleteModal'
-import {
-  createDefenseSchedule,
-  updateDefenseSchedule,
-} from '@/lib/actions/defense'
+} from '@/components/defense-scheduling/ConfirmDeleteModal'
+import { createDefenseSchedule } from '@/lib/actions/defense'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 import type {
   DefenseWizardGroup,
@@ -61,8 +62,6 @@ export function DefenseSchedulingPage({
   const [selectedSchedule, setSelectedSchedule] =
     useState<DefenseSchedulePayload | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [editingSchedule, setEditingSchedule] =
-    useState<DefenseSchedulePayload | null>(null)
   const [deletingSchedule, setDeletingSchedule] =
     useState<DefenseScheduleSummary | null>(null)
 
@@ -114,23 +113,15 @@ export function DefenseSchedulingPage({
   ])
 
   function openCreateWizard() {
-    setEditingSchedule(null)
     setWizardOpen(true)
   }
 
   function closeWizard() {
     setWizardOpen(false)
-    setEditingSchedule(null)
   }
 
   function handleView(schedule: DefenseSchedulePayload) {
     setSelectedSchedule(schedule)
-  }
-
-  function handleEdit(schedule: DefenseSchedulePayload) {
-    setSelectedSchedule(null)
-    setEditingSchedule(schedule)
-    setWizardOpen(true)
   }
 
   function handleDelete(schedule: DefenseSchedulePayload) {
@@ -142,39 +133,107 @@ export function DefenseSchedulingPage({
     })
   }
 
-  // The wizard stays action-agnostic: create when no schedule is being
-  // edited, update otherwise (the action reads scheduleId from the form).
   async function handleWizardSubmit(_prevState: any, formData: FormData) {
-    const result = editingSchedule
-      ? await updateDefenseSchedule(_prevState, formData)
-      : await createDefenseSchedule(_prevState, formData)
+    const result = await createDefenseSchedule(_prevState, formData)
     if (result.success) router.refresh()
     return result
   }
 
   const hasAnySchedules = schedules.length > 0
 
+  const TYPE_OPTIONS: ReadonlyArray<FilterOption> = [
+    { value: '', label: 'All Types' },
+    { value: 'PROPOSAL', label: 'Proposal Defense' },
+    { value: 'FINAL', label: 'Final Defense' },
+  ]
+
+  const STATUS_OPTIONS: ReadonlyArray<FilterOption> = [
+    { value: '', label: 'All Status' },
+    { value: 'PENDING', label: 'No Verdict' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'MINOR_REVISION', label: 'Minor Revisions' },
+    { value: 'MAJOR_REVISION', label: 'Major Revisions' },
+    { value: 'REJECTED', label: 'Rejected' },
+  ]
+
+  const sectionOptions: FilterOption[] = [
+    { value: '', label: 'All Sections' },
+    ...sections.map((s) => ({ value: String(s.id), label: s.name })),
+  ]
+
   return (
     <>
-      <div className="flex-1 flex flex-col min-h-0">
+      <HeaderBar
+        actions={
+          <button
+            type="button"
+            onClick={openCreateWizard}
+            className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+          >
+            <Plus className="size-4" strokeWidth={2} />
+            <span className="whitespace-nowrap">New Defense Schedule</span>
+          </button>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={mySchedules}
+            onClick={() => setMySchedules(!mySchedules)}
+            className="flex items-center gap-2 h-[37.5px] px-[13px] bg-white border border-[#e8ebf8] rounded-lg hover:border-[rgba(112,125,255,0.6)] transition-colors shrink-0"
+          >
+            <span className="font-sans font-semibold text-[13px] text-[#5a6382] whitespace-nowrap">
+              All
+            </span>
+            <span
+              className={`relative w-[32px] h-[18px] rounded-full transition-colors ${
+                mySchedules ? 'bg-[#707dff]' : 'bg-[#dddff0]'
+              }`}
+            >
+              <span
+                className={`absolute top-[2.5px] left-[2.5px] size-[13px] bg-white rounded-full shadow-sm transition-transform ${
+                  mySchedules ? 'translate-x-[14px]' : ''
+                }`}
+              />
+            </span>
+          </button>
+
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search schedules..."
+            ariaLabel="Search defense schedules"
+            className="flex-1 min-w-[200px] max-w-[320px]"
+          />
+
+          <Filter
+            value={typeFilter}
+            options={TYPE_OPTIONS}
+            onChange={setTypeFilter}
+            ariaLabel="Filter by defense type"
+          />
+          <Filter
+            value={statusFilter}
+            options={STATUS_OPTIONS}
+            onChange={setStatusFilter}
+            ariaLabel="Filter by status"
+          />
+          <Filter
+            value={sectionFilter}
+            options={sectionOptions}
+            onChange={setSectionFilter}
+            ariaLabel="Filter by section"
+          />
+        </div>
+      </HeaderBar>
+
+      <div className="flex-1 flex flex-col min-h-0 px-8 pt-[16px] pb-[30px]">
         <DefenseTable
           schedules={filtered}
           currentUserId={currentUserId}
           onView={handleView}
-          onEdit={handleEdit}
           onDelete={handleDelete}
-          search={search}
-          onSearchChange={setSearch}
-          typeFilter={typeFilter}
-          onTypeFilterChange={setTypeFilter}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          sectionFilter={sectionFilter}
-          onSectionFilterChange={setSectionFilter}
-          mySchedules={mySchedules}
-          onMySchedulesChange={setMySchedules}
-          sections={sections}
-          onNew={openCreateWizard}
           hasAnySchedules={hasAnySchedules}
         />
       </div>
@@ -183,7 +242,6 @@ export function DefenseSchedulingPage({
         schedule={selectedSchedule}
         currentUserId={currentUserId}
         onClose={() => setSelectedSchedule(null)}
-        onEdit={handleEdit}
         onDelete={handleDelete}
       />
 
@@ -194,7 +252,7 @@ export function DefenseSchedulingPage({
         groups={groups}
         faculty={faculty}
         existingScheduleDates={existingScheduleDates}
-        editingSchedule={editingSchedule}
+        editingSchedule={null}
         onSubmit={handleWizardSubmit}
       />
 

@@ -6,7 +6,6 @@ import {
   Clock,
   Crown,
   MapPin,
-  Pencil,
   Trash2,
   X,
 } from 'lucide-react'
@@ -23,7 +22,6 @@ interface DefenseDetailsDrawerProps {
   /** Session user id — determines whether footer actions are shown. */
   currentUserId: number
   onClose: () => void
-  onEdit: (schedule: DefenseSchedulePayload) => void
   onDelete: (schedule: DefenseSchedulePayload) => void
 }
 
@@ -31,7 +29,6 @@ interface DefenseDetailsContextValue {
   schedule: DefenseSchedulePayload | null
   isOwner: boolean
   onClose: () => void
-  onEdit: (schedule: DefenseSchedulePayload) => void
   onDelete: (schedule: DefenseSchedulePayload) => void
 }
 
@@ -58,8 +55,8 @@ const TYPE_LABELS: Record<DefenseType, string> = {
   FINAL: 'Final Defense',
 }
 
-// Verdict badge maps verdict → label/colors exactly like the table row
-// (DefenseDataRow) so the drawer badge and the row badge always match.
+// Verdict badge — must match DefenseDataRow and VerdictCallout panelist variants (Figma 1428-12746)
+// PENDING is plain text (not a pill), only 4 verdicts are pills
 const VERDICT_META: Record<DefenseVerdict, { label: string; className: string }> =
   {
     PENDING: {
@@ -69,22 +66,22 @@ const VERDICT_META: Record<DefenseVerdict, { label: string; className: string }>
     APPROVED: {
       label: 'Approved',
       className:
-        'bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.3)] text-[#22c55e]',
+        'bg-[rgba(22,163,74,0.07)] border border-[rgba(22,163,74,0.2)] text-[#16a34a]',
     },
     MINOR_REVISION: {
-      label: 'Minor Revisions',
+      label: 'Minor Revision',
       className:
-        'bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)] text-[#3b82f6]',
+        'bg-[rgba(245,158,11,0.07)] border border-[rgba(245,158,11,0.2)] text-[#f59e0b]',
     },
     MAJOR_REVISION: {
-      label: 'Major Revisions',
+      label: 'Major Revision',
       className:
-        'bg-[rgba(249,115,22,0.08)] border border-[rgba(249,115,22,0.25)] text-[#f97316]',
+        'bg-[rgba(225,104,29,0.07)] border border-[rgba(225,104,29,0.2)] text-[#e1681d]',
     },
     REJECTED: {
       label: 'Rejected',
       className:
-        'bg-[rgba(244,63,94,0.08)] border border-[rgba(244,63,94,0.25)] text-[#f43f5e]',
+        'bg-[rgba(225,29,72,0.07)] border border-[rgba(225,29,72,0.2)] text-[#e11d48]',
     },
   }
 
@@ -119,6 +116,7 @@ function formatDate(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
   return date.toLocaleDateString('en-US', {
+    weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -175,7 +173,7 @@ function VerdictBadge({ verdict }: { verdict: DefenseVerdict }) {
   }
   return (
     <span
-      className={`inline-flex items-center h-[22px] px-[8px] rounded-[7px] font-sans font-semibold text-[10.5px] leading-[15.75px] whitespace-nowrap ${verdictClassName(verdict)}`}
+      className={`inline-flex items-center h-[22px] px-[8px] rounded-[7px] font-sans font-semibold text-[10.5px] leading-[15.75px] whitespace-nowrap border ${verdictClassName(verdict)}`}
     >
       {verdictLabel(verdict)}
     </span>
@@ -197,11 +195,11 @@ function GroupInfoCard() {
   return (
     <div className="flex flex-col gap-[10px] bg-[#fafbff] border border-[#e8ebf8] rounded-xl p-4">
       <div className="flex items-start justify-between gap-[12px]">
-        <div className="min-w-0 flex flex-col gap-[2px]">
-          <p className="truncate font-heading font-bold text-[16px] leading-[24px] text-[#10133a]">
+        <div className="flex flex-col gap-[2px] flex-1 min-w-0 w-auto">
+          <p className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] break-words whitespace-normal">
             {schedule.groupName}
           </p>
-          <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+          <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] break-words whitespace-normal">
             {schedule.sectionName}
           </p>
         </div>
@@ -372,9 +370,9 @@ function DefenseDetailsHeader() {
   )
 }
 
-// Only shown for schedules created by the current user (ownership rule).
+// Only shown for schedules created by the current user (ownership rule) — now delete-only.
 function DefenseDetailsFooter() {
-  const { schedule, isOwner, onEdit, onDelete } = useDefenseDetails()
+  const { schedule, isOwner, onDelete } = useDefenseDetails()
   if (!schedule || !isOwner) return null
 
   return (
@@ -387,14 +385,6 @@ function DefenseDetailsFooter() {
         <Trash2 className="size-4" strokeWidth={2.25} />
         Delete
       </button>
-      <button
-        type="button"
-        onClick={() => onEdit(schedule)}
-        className="flex flex-1 items-center justify-center gap-2 h-10 rounded-[10px] bg-[#707dff] text-[13px] font-bold text-white hover:bg-[#5565ff] transition-colors"
-      >
-        <Pencil className="size-4" strokeWidth={2.25} />
-        Edit Schedule
-      </button>
     </div>
   )
 }
@@ -405,7 +395,6 @@ export function DefenseDetailsDrawer({
   schedule,
   currentUserId,
   onClose,
-  onEdit,
   onDelete,
 }: DefenseDetailsDrawerProps) {
   // Namespace-safe comparison: session ids can arrive as strings while the
@@ -431,7 +420,7 @@ export function DefenseDetailsDrawer({
 
   return (
     <DefenseDetailsContext
-      value={{ schedule, isOwner, onClose, onEdit, onDelete }}
+      value={{ schedule, isOwner, onClose, onDelete }}
     >
       <div
         className={`fixed inset-0 z-40 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] transition-all duration-300 ${

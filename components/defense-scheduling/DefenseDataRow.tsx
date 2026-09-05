@@ -1,6 +1,6 @@
 'use client'
 
-import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { Eye, Trash2 } from 'lucide-react'
 import type { DefenseType, DefenseVerdict } from '@prisma/client'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 
@@ -25,22 +25,22 @@ const VERDICT_META: Record<
   APPROVED: {
     label: 'Approved',
     className:
-      'bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.3)] text-[#22c55e]',
+      'bg-[rgba(22,163,74,0.07)] border border-[rgba(22,163,74,0.2)] text-[#16a34a]',
   },
   MINOR_REVISION: {
-    label: 'Minor Revisions',
+    label: 'Minor Revision',
     className:
-      'bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)] text-[#3b82f6]',
+      'bg-[rgba(245,158,11,0.07)] border border-[rgba(245,158,11,0.2)] text-[#f59e0b]',
   },
   MAJOR_REVISION: {
-    label: 'Major Revisions',
+    label: 'Major Revision',
     className:
-      'bg-[rgba(249,115,22,0.08)] border border-[rgba(249,115,22,0.25)] text-[#f97316]',
+      'bg-[rgba(225,104,29,0.07)] border border-[rgba(225,104,29,0.2)] text-[#e1681d]',
   },
   REJECTED: {
     label: 'Rejected',
     className:
-      'bg-[rgba(244,63,94,0.08)] border border-[rgba(244,63,94,0.25)] text-[#f43f5e]',
+      'bg-[rgba(225,29,72,0.07)] border border-[rgba(225,29,72,0.2)] text-[#e11d48]',
   },
 }
 
@@ -50,6 +50,7 @@ function formatDefenseDate(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
   return date.toLocaleDateString('en-US', {
+    weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -93,7 +94,6 @@ interface DefenseDataRowProps {
   schedule: DefenseSchedulePayload
   currentUserId: number
   onView: (schedule: DefenseSchedulePayload) => void
-  onEdit: (schedule: DefenseSchedulePayload) => void
   onDelete: (schedule: DefenseSchedulePayload) => void
 }
 
@@ -101,7 +101,6 @@ export function DefenseDataRow({
   schedule,
   currentUserId,
   onView,
-  onEdit,
   onDelete,
 }: DefenseDataRowProps) {
   // Namespace-safe comparison: session ids can arrive as strings, payload
@@ -162,7 +161,7 @@ export function DefenseDataRow({
           </span>
         ) : (
           <span
-            className={`inline-flex items-center h-[22px] px-[8px] rounded-[7px] font-sans font-semibold text-[10.5px] leading-[15.75px] whitespace-nowrap ${verdictMeta.className}`}
+            className={`inline-flex items-center h-[22px] px-[8px] rounded-[7px] font-sans font-semibold text-[10.5px] leading-[15.75px] whitespace-nowrap border ${verdictMeta.className}`}
           >
             {verdictMeta.label}
           </span>
@@ -180,26 +179,15 @@ export function DefenseDataRow({
           <Eye className="size-[16px]" strokeWidth={2} />
         </button>
         {isOwner && (
-          <>
-            <button
-              type="button"
-              title="Edit"
-              aria-label={`Edit defense for ${schedule.groupName}`}
-              onClick={() => onEdit(schedule)}
-              className={actionButtonClass}
-            >
-              <Pencil className="size-[16px]" strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              title="Delete"
-              aria-label={`Delete defense for ${schedule.groupName}`}
-              onClick={() => onDelete(schedule)}
-              className={actionButtonClass}
-            >
-              <Trash2 className="size-[16px]" strokeWidth={2} />
-            </button>
-          </>
+          <button
+            type="button"
+            title="Delete"
+            aria-label={`Delete defense for ${schedule.groupName}`}
+            onClick={() => onDelete(schedule)}
+            className={actionButtonClass}
+          >
+            <Trash2 className="size-[16px]" strokeWidth={2} />
+          </button>
         )}
       </div>
     </div>

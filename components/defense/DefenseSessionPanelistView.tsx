@@ -2,7 +2,7 @@
 
 import { DefenseDetailsCard } from '@/components/milestones/defense/DefenseDetailsCard'
 import { PanelistVerdictCallout } from '@/components/milestones/defense/VerdictCallout'
-import { LatestDocumentCard } from '@/components/defense/LatestDocumentCard'
+import { DefenseDocumentCard as LatestDocumentCard } from '@/components/defense/DefenseDocumentCard'
 import {
   deriveVerdictCalloutState,
   isChair,
@@ -99,7 +99,7 @@ export function DefenseSessionPanelistView({
       />
 
       <LatestDocumentCard.Root>
-        <LatestDocumentCard.Header>Latest Document</LatestDocumentCard.Header>
+        <LatestDocumentCard.Header>Defense Document</LatestDocumentCard.Header>
         <LatestDocumentCard.Body>
           {hasResubmission && latestResub ? (
             <LatestDocumentCard.Resubmitted

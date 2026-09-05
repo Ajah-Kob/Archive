@@ -1,8 +1,9 @@
 'use client'
 
+import { useSession } from 'next-auth/react'
 import { DefenseDetailsCard } from '@/components/milestones/defense/DefenseDetailsCard'
 import { PanelistVerdictCallout } from '@/components/milestones/defense/VerdictCallout'
-import { LatestDocumentCard } from '@/components/defense/LatestDocumentCard'
+import { DefenseDocumentCard as LatestDocumentCard } from '@/components/defense/DefenseDocumentCard'
 import {
   deriveVerdictCalloutState,
   isChair,
@@ -93,8 +94,25 @@ function buildInitialDocument(
 export function SessionTabPanel({ session }: SessionTabPanelProps) {
   const chair = isChair(session.myRole)
   const verdictState = deriveVerdictCalloutState(session.verdict, chair)
+  const { data: authSession } = useSession()
+  const currentUserId = authSession?.user?.id != null ? Number(authSession.user.id) : null
 
   const initialSubmission = resolveInitialSubmission(session)
+
+  // Has the current panelist already submitted annotation (COMMITTED) for the initial doc?
+  const hasReviewed = (() => {
+    if (!initialSubmission || currentUserId == null) return false
+    const anns = (initialSubmission as unknown as { annotations?: Array<{ authorId: number; status: string }> })?.annotations
+    if (anns && anns.length > 0) {
+      return anns.some((a) => a.authorId === currentUserId && a.status === 'COMMITTED')
+    }
+    const reviews = (initialSubmission as unknown as { reviews?: Array<{ panelistId: number; status: string }> })?.reviews
+    if (reviews) {
+      const my = reviews.find((r) => r.panelistId === currentUserId)
+      if (my && my.status !== 'PENDING') return true
+    }
+    return false
+  })()
 
   const topLevelStats = (
     session as unknown as {
@@ -149,6 +167,7 @@ export function SessionTabPanel({ session }: SessionTabPanelProps) {
               document={initialDoc}
               status={session.verdict as unknown as string}
               workspaceHref={workspaceHref}
+              hasReviewed={hasReviewed}
             />
           ) : (
             <div className="py-8 text-center">

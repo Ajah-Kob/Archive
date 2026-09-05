@@ -1,7 +1,7 @@
 import { Clock, Eye, FileSearch } from 'lucide-react'
-import { LatestDocumentCardRoot } from './LatestDocumentCard/Root'
-import { LatestDocumentCardHeader } from './LatestDocumentCard/Header'
-import { LatestDocumentCardBody } from './LatestDocumentCard/Body'
+import { LatestDocumentCardRoot } from './DefenseDocumentCard/Root'
+import { LatestDocumentCardHeader } from './DefenseDocumentCard/Header'
+import { LatestDocumentCardBody } from './DefenseDocumentCard/Body'
 import { deriveResubmissionStatus } from '@/lib/defense/session-helpers'
 import type { ResubmissionStatus } from '@/lib/defense/session-helpers'
 
@@ -39,6 +39,10 @@ export type ResubmittedDocumentCardProps = {
   reviewedAt?: string | null
   workspaceHref?: string
   headerTitle?: string
+  /** Whether current panelist has already submitted annotation (COMMITTED) */
+  hasReviewed?: boolean
+  /** Whether current panelist already approved previous document (carry-forward, read-only) */
+  hasApprovedPrevious?: boolean
 }
 
 // ── Pure helpers (<50 lines) ─────────────────────────────────────────────────
@@ -101,6 +105,8 @@ export function ResubmittedDocumentCard({
   reviewedAt,
   workspaceHref,
   headerTitle = 'Resubmitted Document',
+  hasReviewed = false,
+  hasApprovedPrevious = false,
 }: ResubmittedDocumentCardProps) {
   const latest = resolveLatest(document, submissions, resubmissions)
   if (!latest) {
@@ -114,7 +120,9 @@ export function ResubmittedDocumentCard({
     )
   }
   const effectiveReviews = reviews ?? (latest.reviews as Array<{ status: string }> | undefined) ?? []
-  const status: ResubmissionStatus = deriveResubmissionStatus(effectiveReviews)
+  const hasPending = effectiveReviews.some((r) => r.status === 'PENDING')
+  const derivedStatus = deriveResubmissionStatus(effectiveReviews)
+  const status: ResubmissionStatus = hasPending ? 'FOR_REVIEW' : derivedStatus
   const pill = getPillMeta(status)
   const circleClass = getCircleClass(status)
   const total = totalPanelists ?? (effectiveReviews.length > 0 ? effectiveReviews.length : 3)
@@ -125,7 +133,7 @@ export function ResubmittedDocumentCard({
   const reviewed = reviewedAt ?? (latest as ResubmittedDocument).reviewedAt ?? null
   const meta = `v${latest.version} · PDF · ${formatSize(latest.size)} · ${latest.dateSubmitted ? `${formatDate(latest.dateSubmitted)} · ` : ''}Submitted by ${latest.submittedByName}`
   const hasCounts = typeof c === 'number' && typeof p === 'number'
-  const approvedLabel = `${approved}/${total} approve`
+  const approvedLabel = `${approved}/${total}`
   const commentsLabel = hasCounts ? `${c} comments on ${p} pages` : null
   const isForReview = status === 'FOR_REVIEW'
   return (
@@ -144,9 +152,15 @@ export function ResubmittedDocumentCard({
               </div>
               <p className="pt-[4px] font-sans font-medium text-[12px] leading-[18px] text-[#6b7399] truncate w-full">{meta}</p>
               {isForReview ? (
-                <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#f59e0b] flex items-center gap-[5px]">
-                  <Clock className="size-[9px] text-[#f59e0b]" strokeWidth={2.5} /> Waiting for approval
-                </p>
+                hasApprovedPrevious ? (
+                  <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#16a34a]">
+                    ✓ Previous document already approved. No need for review
+                  </p>
+                ) : (
+                  <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#f59e0b] flex items-center gap-[5px]">
+                    <Clock className="size-[9px] text-[#f59e0b]" strokeWidth={2.5} /> Waiting for approval
+                  </p>
+                )
               ) : (
                 <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
                   {approvedLabel}
@@ -155,15 +169,9 @@ export function ResubmittedDocumentCard({
               )}
             </div>
             <div className="flex items-start gap-[10px] shrink-0">
-              {isForReview ? (
-                <a href={workspaceHref ?? latest.blobUrl} aria-label={`Review ${latest.fileName} in document workspace`} title="Open in document workspace to review" className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] hover:shadow-[0_4px_12px_rgba(112,125,255,0.32)] transition-all focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-2 outline-none shrink-0">
-                  <FileSearch className="size-[13px]" strokeWidth={2} /> Review Document
-                </a>
-              ) : (
-                <a href={workspaceHref ?? latest.blobUrl} aria-label={`View ${latest.fileName}`} title="View document" className="flex items-center gap-[6px] h-[32px] px-[13px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0">
-                  <Eye className="size-[11px]" strokeWidth={2} /> View
-                </a>
-              )}
+              <a href={workspaceHref ?? latest.blobUrl} aria-label={`View ${latest.fileName}`} title="View document" className="flex items-center gap-[6px] h-[32px] px-[13px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0">
+                <Eye className="size-[11px]" strokeWidth={2} /> View
+              </a>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { DocumentContent, DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
-import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
+import { Scroller, ScrollPluginPackage, useScroll } from '@embedpdf/plugin-scroll/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import { PagePointerProvider, InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/react'
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
@@ -16,6 +16,7 @@ import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 import { AnnotationLayer, AnnotationPluginPackage, useAnnotation } from '@embedpdf/plugin-annotation/react'
 import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
+import { StatusPill } from '@/components/defense/DefenseDocumentCard/StatusPill'
 import { deserializeAnnotations } from '@/lib/annotations-serializer'
 import type { SubmissionMeta } from '@/types/milestones'
 import { DefenseDocumentWorkspace } from '@/components/defense/workspace/DefenseDocumentWorkspace'
@@ -24,8 +25,8 @@ import { ZoomControl } from '@/components/defense/workspace/ZoomControl'
 import { AnnotationDedupe } from '@/components/defense/workspace/AnnotationDedupe'
 
 export interface DefenseFinalizedWorkspaceViewProps {
-  /** Submission metadata (status is APPROVED / NEEDS_REVISION / IN_REVIEW for defense mapping). */
-  submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean }
+  /** Submission metadata (status is APPROVED / NEEDS_REVISION / IN_REVIEW for defense mapping). Extra version/isInitial/verdict helps robust resubmission detection and verdict pill. */
+  submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean; version?: number; verdict?: string }
   /** Committed annotations (serialized AnnotationTransferItem[] JSON). */
   initialAnnotations: unknown[] | null
   /**
@@ -71,15 +72,25 @@ function AnnotateButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-function ReadOnlyCommentCard({ item }: { item: unknown }) {
+function ReadOnlyCommentCard({
+  item,
+  onClick,
+}: {
+  item: unknown
+  onClick?: () => void
+}) {
   const ann = (item as unknown as { annotation?: Record<string, unknown> }).annotation as
-    | { type?: number; author?: string; contents?: string; pageIndex?: number }
+    | { type?: number; author?: string; contents?: string; pageIndex?: number; id?: string }
     | undefined
   const author = (ann?.author as string)?.trim() || 'Unknown'
   const contents = (ann?.contents as string)?.trim() || ''
   const pageIndex = typeof ann?.pageIndex === 'number' ? ann.pageIndex + 1 : null
   return (
-    <div className="w-full border border-[#eceef8] rounded-[9px] px-[14px] pt-[12px] pb-[12px]">
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left border border-[#eceef8] rounded-[9px] px-[14px] pt-[12px] pb-[12px] hover:bg-[#fafbff] hover:border-[#e5e8ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
+    >
       <div className="flex items-center gap-[8px] min-w-0">
         <span className="flex items-center justify-center size-[26px] rounded-[8px] bg-[#f4f6ff] border border-[#e5e8ff] shrink-0">
           <MessageSquareText className="size-[13px] text-[#707dff]" strokeWidth={2} />
@@ -93,10 +104,72 @@ function ReadOnlyCommentCard({ item }: { item: unknown }) {
         <div className="flex-1" />
         <p className="truncate font-sans font-medium text-[11px] leading-[16.5px] text-[#9ea8c6]">{author}</p>
       </div>
-      <p className="pt-[8px] font-sans font-medium text-[12px] leading-[18px] text-[#5a6382]">
+      <p className="pt-[8px] font-sans font-medium text-[12px] leading-[18px] text-[#5a6382] text-left">
         {contents || 'No text — annotation on page.'}
       </p>
-    </div>
+    </button>
+  )
+}
+
+function ReadOnlyCommentsPanel({
+  documentId,
+  annotations,
+  onClose,
+}: {
+  documentId: string
+  annotations: unknown[]
+  onClose: () => void
+}) {
+  const { provides: annotationProvides } = useAnnotation(documentId)
+  const scroll = useScroll(documentId)
+
+  function handleCommentClick(item: unknown) {
+    const ann = (item as unknown as { annotation?: { pageIndex?: number; id?: string } }).annotation
+    const pageIndex = typeof ann?.pageIndex === 'number' ? ann.pageIndex : 0
+    const id = typeof ann?.id === 'string' ? ann.id : ''
+    if (annotationProvides) {
+      try {
+        annotationProvides.selectAnnotation(pageIndex, id)
+      } catch {}
+    }
+    const scrollProvides = (scroll as unknown as { provides?: { scrollToPage?: (opts: { pageNumber: number; behavior?: string; alignY?: number }) => void } })?.provides
+    if (scrollProvides?.scrollToPage) {
+      try {
+        scrollProvides.scrollToPage({ pageNumber: pageIndex + 1, behavior: 'smooth', alignY: 25 })
+      } catch {}
+    } else {
+      const pageEl = document.querySelector(`[data-page-index="${pageIndex}"]`)
+      if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
+  return (
+    <WorkspacePanel
+      title="Comments"
+      subtitle="Click a comment to jump to its annotation."
+      count={annotations.length}
+      onClose={onClose}
+    >
+      {annotations.length === 0 ? (
+        <div className="flex flex-col items-center justify-center text-center px-[8px] py-[24px]">
+          <div className="size-[40px] rounded-full bg-[#f4f5fc] flex items-center justify-center">
+            <MessageSquareText className="size-[18px] text-[#c4cadf]" strokeWidth={1.75} />
+          </div>
+          <p className="pt-[8px] font-sans font-semibold text-[12.5px] text-[#8a93b4]">No comments yet</p>
+          <p className="pt-[3px] font-sans font-medium text-[11px] text-[#c4cadf] leading-[16.5px]">Annotations you saved will appear here.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-[10px]">
+          {annotations.map((item, idx) => (
+            <ReadOnlyCommentCard
+              key={(item as unknown as { annotation?: { id?: string } }).annotation?.id ?? String(idx)}
+              item={item}
+              onClick={() => handleCommentClick(item)}
+            />
+          ))}
+        </div>
+      )}
+    </WorkspacePanel>
   )
 }
 
@@ -155,15 +228,18 @@ export function DefenseFinalizedWorkspaceView({
   const [showComments, setShowComments] = useState(false)
 
   const annotations = deserializeAnnotations(initialAnnotations ?? [])
+  // Robust resubmission check: isInitial===false is primary, version>1 is fallback for legacy rows missing isInitial.
+  const isResubmission =
+    (submission as unknown as { isInitial?: boolean }).isInitial === false ||
+    (typeof (submission as unknown as { version?: number }).version === 'number' &&
+      (submission as unknown as { version?: number }).version! > 1)
   const resolvedBackHref =
     backHref ??
     (scheduleId
-      ? `/faculty/defense/${scheduleId}`
+      ? `/faculty/defense/${scheduleId}/${isResubmission ? 'resubmission' : 'session'}`
       : submission.scheduleId
-        ? `/faculty/defense/${submission.scheduleId}`
+        ? `/faculty/defense/${submission.scheduleId}/${isResubmission ? 'resubmission' : 'session'}`
         : '/faculty/defense')
-
-  const isResubmission = (submission as unknown as { isInitial?: boolean }).isInitial === false
   // Only the current COMMITTED IN_REVIEW version is re-editable. Superseded
   // (historical) versions and non-IN_REVIEW (APPROVED/NEEDS_REVISION) stay
   // strictly read-only — no Annotate affordance. Resubmissions use Approve/Request Revision flow, not Annotate.
@@ -172,6 +248,9 @@ export function DefenseFinalizedWorkspaceView({
 
   const { engine, isLoading, error } = usePdfiumEngine()
   const annotationAuthor = submission.reviewedBy ?? 'Panelist'
+  // Read-only must fully disable drag/resize/rotate for ALL annotation tools
+  // (pen/ink and freeText were still movable because the plugin defaults are draggable).
+  // We mirror the student-mode overrides here and keep isDraggable false for every tool.
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
@@ -185,6 +264,28 @@ export function DefenseFinalizedWorkspaceView({
       createPluginRegistration(HistoryPluginPackage),
       createPluginRegistration(AnnotationPluginPackage, {
         annotationAuthor,
+        tools: [
+          {
+            id: 'highlight',
+            interaction: { exclusive: false, isDraggable: false, isResizable: false, isRotatable: false },
+          },
+          {
+            id: 'strikeout',
+            interaction: { exclusive: false, isDraggable: false, isResizable: false, isRotatable: false },
+          },
+          {
+            id: 'freeText',
+            interaction: { exclusive: false, isDraggable: false, isResizable: false, isRotatable: false },
+          },
+          {
+            id: 'ink',
+            interaction: { exclusive: false, isDraggable: false, isResizable: false, isRotatable: false },
+          },
+          {
+            id: 'textComment',
+            interaction: { exclusive: false, isDraggable: false, isResizable: false, isRotatable: false },
+          },
+        ],
       }),
     ],
     [submission.blobUrl, annotationAuthor],
@@ -250,7 +351,13 @@ export function DefenseFinalizedWorkspaceView({
                     {submission.chapter}
                   </p>
                 </div>
-                <SubmissionStatusBadge status={submission.status} />
+                {(submission as unknown as { isInitial?: boolean; verdict?: string }).isInitial &&
+                (submission as unknown as { verdict?: string }).verdict &&
+                (submission as unknown as { verdict?: string }).verdict !== 'PENDING' ? (
+                  <StatusPill state={(submission as unknown as { verdict: string }).verdict} />
+                ) : (
+                  <SubmissionStatusBadge status={submission.status} />
+                )}
               </div>
 
               <div className="flex-1" />
@@ -337,29 +444,12 @@ export function DefenseFinalizedWorkspaceView({
                   </DocumentContent>
                 ) : null}
               </div>
-              {showComments && (
-                <WorkspacePanel
-                  title="Comments"
-                  subtitle="Annotations on this document. Click is disabled in read-only."
-                  count={annotations.length}
+              {showComments && activeDocumentId && (
+                <ReadOnlyCommentsPanel
+                  documentId={activeDocumentId}
+                  annotations={annotations}
                   onClose={() => setShowComments(false)}
-                >
-                  {annotations.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center px-[8px] py-[24px]">
-                      <div className="size-[40px] rounded-full bg-[#f4f5fc] flex items-center justify-center">
-                        <MessageSquareText className="size-[18px] text-[#c4cadf]" strokeWidth={1.75} />
-                      </div>
-                      <p className="pt-[8px] font-sans font-semibold text-[12.5px] text-[#8a93b4]">No comments yet</p>
-                      <p className="pt-[3px] font-sans font-medium text-[11px] text-[#c4cadf] leading-[16.5px]">Annotations you saved will appear here.</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-[10px]">
-                      {annotations.map((item, idx) => (
-                        <ReadOnlyCommentCard key={(item as unknown as { annotation?: { id?: string } }).annotation?.id ?? String(idx)} item={item} />
-                      ))}
-                    </div>
-                  )}
-                </WorkspacePanel>
+                />
               )}
             </div>
           </>

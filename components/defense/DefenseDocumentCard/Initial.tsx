@@ -1,4 +1,5 @@
 import { Eye, FileSearch } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { CircleHistoryState } from './CircleHistoryState'
 import { StatusPill } from './StatusPill'
 import { GhostButton } from './GhostButton'
@@ -39,6 +40,8 @@ type LatestDocumentCardInitialProps = {
   extraAction?: React.ReactNode
   /** Optional href for annotation workspace; falls back to blobUrl when absent. */
   workspaceHref?: string
+  /** Whether current panelist has already submitted annotation (COMMITTED) — controls View vs Review styling */
+  hasReviewed?: boolean
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -79,10 +82,12 @@ export function LatestDocumentCardInitial({
   connectorDashed,
   extraAction,
   workspaceHref,
+  hasReviewed = false,
 }: LatestDocumentCardInitialProps) {
   const isNoVerdict = status === 'PENDING'
   const isInReview = status === 'IN_REVIEW'
   const isReviewPending = status === 'PENDING' || status === 'IN_REVIEW'
+  const showReviewAction = isReviewPending && !hasReviewed
 
   const dateRaw = resolveDate(document)
   const dateLabel = dateRaw ? formatDate(dateRaw) : ''
@@ -158,9 +163,9 @@ export function LatestDocumentCardInitial({
           ) : null}
         </div>
 
-        {/* Actions: independent — panelist: Review Document when pending/in review, View grey after verdict */}
+        {/* Actions: Review Document (purple) when pending/in review and not yet reviewed, else View (grey) */}
         <div className="flex items-start gap-[10px] shrink-0">
-          {isReviewPending ? (
+          {showReviewAction ? (
             <a
               href={workspaceHref ?? document.blobUrl}
               aria-label={`Review ${document.fileName} in document workspace`}

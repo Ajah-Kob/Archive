@@ -43,6 +43,7 @@ import type { FreeTextClickBehavior } from '@embedpdf/plugin-annotation'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import { serializeAnnotations } from '@/lib/annotations-serializer'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
+import { StatusPill } from '@/components/defense/DefenseDocumentCard/StatusPill'
 import { AnnotationToolbar } from '@/components/defense/workspace/AnnotationToolbar'
 import type { ToolId } from '@/components/defense/workspace/AnnotationToolbar'
 import { ToolSettingsPanel } from '@/components/defense/workspace/ToolSettingsPanel'
@@ -74,8 +75,8 @@ export interface DefenseDocumentWorkspaceProps {
   mode?: DefenseWorkspaceMode
   /** Public Vercel Blob URL of the submission's document. */
   blobUrl: string
-  /** Submission metadata for the header + detail. Extended with optional scheduleId/isInitial for defense redirect. */
-  submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean }
+  /** Submission metadata for the header + detail. Extended with optional scheduleId/isInitial/version/verdict for defense redirect and resubmission detection. */
+  submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean; version?: number; verdict?: string }
   /** Saved annotation rows (serialized AnnotationTransferItem[]) for this submission. */
   initialAnnotations: unknown[] | null
   /** Persistence status of the saved annotation row, if any. */
@@ -280,7 +281,7 @@ function DefenseWorkspaceLayout({
 }: {
   mode?: DefenseWorkspaceMode
   activeDocumentId: string | null
-  submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean }
+  submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean; version?: number; verdict?: string }
   initialAnnotations: unknown[] | null
   draftStatus: 'DRAFT' | 'COMMITTED' | null
   versions?: StudentVersionListItem[]
@@ -318,7 +319,10 @@ function DefenseWorkspaceLayout({
   const [panel, setPanel] = useState<PanelId | null>(null)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
   const [resubmissionVerdict, setResubmissionVerdict] = useState<ResubmissionVerdictState | null>(null)
-  const isResubmission = (submission as unknown as { isInitial?: boolean }).isInitial === false
+  const isResubmission =
+    (submission as unknown as { isInitial?: boolean }).isInitial === false ||
+    (typeof (submission as unknown as { version?: number }).version === 'number' &&
+      (submission as unknown as { version?: number }).version! > 1)
 
   const [activeTool, setActiveTool] = useState<ToolId | null>(null)
 
@@ -467,7 +471,9 @@ function DefenseWorkspaceLayout({
   const resolvedScheduleId = scheduleId ?? submission.scheduleId ?? null
   const resolvedBackHref =
     backHref ??
-    (resolvedScheduleId ? `/faculty/defense/${resolvedScheduleId}` : '/faculty/defense')
+    (resolvedScheduleId
+      ? `/faculty/defense/${resolvedScheduleId}/${isResubmission ? 'resubmission' : 'session'}`
+      : '/faculty/defense')
 
   return (
     <div className="flex h-full w-full min-h-0 flex-col">
@@ -502,7 +508,13 @@ function DefenseWorkspaceLayout({
               {submission.chapter}
             </p>
           </div>
-          <SubmissionStatusBadge status={submission.status} />
+          {(submission as unknown as { isInitial?: boolean; verdict?: string }).isInitial &&
+          (submission as unknown as { verdict?: string }).verdict &&
+          (submission as unknown as { verdict?: string }).verdict !== 'PENDING' ? (
+            <StatusPill state={(submission as unknown as { verdict: string }).verdict} />
+          ) : (
+            <SubmissionStatusBadge status={submission.status} />
+          )}
         </div>
 
         {!isStudent && (
@@ -756,7 +768,8 @@ function DefenseWorkspaceLayout({
           onClose={() => setSaveState(null)}
           onCommitted={() => {
             if (!resolvedScheduleId) return
-            router.push(`/faculty/defense/${resolvedScheduleId}`)
+            router.refresh()
+            router.push(`/faculty/defense/${resolvedScheduleId}/session`)
           }}
         />
       )}
@@ -770,7 +783,10 @@ function DefenseWorkspaceLayout({
           onClose={() => setResubmissionVerdict(null)}
           onCommitted={() => {
             if (!resolvedScheduleId) return
-            router.push(`/faculty/defense/${resolvedScheduleId}`)
+            router.refresh()
+            router.push(`/faculty/defense/${resolvedScheduleId}/resubmission`)
+            // Ensure the resubmission tab's server data is fresh (revalidated 'defense' tag)
+            setTimeout(() => router.refresh(), 100)
           }}
         />
       )}

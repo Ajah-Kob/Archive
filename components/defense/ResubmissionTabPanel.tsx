@@ -155,6 +155,22 @@ function ResubmissionStatusCallout({
   )
 }
 
+function NoVerdictPlaceholder() {
+  return (
+    <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center p-10 text-center h-full flex-1 min-h-[400px]">
+      <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
+        <Clock className="size-6 text-[#707dff]" strokeWidth={1.75} />
+      </div>
+      <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#1e3a8a] tracking-[-0.16px] mb-2">
+        Defense not completed
+      </h3>
+      <p className="font-sans font-medium text-[13px] leading-[21px] text-[#8a93b4] max-w-[360px]">
+        Defense is not completed or has no verdict yet. Please wait for the verdict.
+      </p>
+    </div>
+  )
+}
+
 // ── Main panel ───────────────────────────────────────────────────────────────
 
 /**
@@ -167,9 +183,18 @@ function ResubmissionStatusCallout({
  * gap-[16px], responsive, pure helpers.
  */
 export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
+  if ((session as unknown as { verdict?: string })?.verdict === 'PENDING') {
+    return (
+      <div className="flex flex-col gap-[16px] w-full mx-auto h-full flex-1 min-h-0">
+        <NoVerdictPlaceholder />
+      </div>
+    )
+  }
   const latest = resolveLatestResubmission(session)
   const reviews = (latest?.reviews as Array<{ panelistId: number; name: string; status: DefenseReviewStatus | string }> | undefined) ?? []
-  const status = deriveResubmissionStatus(reviews as Array<{ status: DefenseReviewStatus | string }>) as ResubmissionStatus
+  const hasPending = reviews.some((r) => r.status === 'PENDING')
+  const derivedStatus = deriveResubmissionStatus(reviews as Array<{ status: DefenseReviewStatus | string }>) as ResubmissionStatus
+  const status = hasPending && latest ? ('FOR_REVIEW' as const) : derivedStatus
   const progress = deriveApprovalProgress(reviews as Array<{ status: DefenseReviewStatus | string }>)
   const approvedCount = progress.approvedCount
   const total = progress.total || session.panelists.length || 3
@@ -180,6 +205,10 @@ export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
       panelistId: r.panelistId,
       name: r.name,
       status: r.status as DefenseReviewStatus | string,
+      feedback: (r as unknown as { feedback?: { comments: number; pages: number } | null }).feedback ?? null,
+      comments: (r as unknown as { comments?: number }).comments,
+      pages: (r as unknown as { pages?: number }).pages,
+      reviewedAt: (r as unknown as { reviewedAt?: string | null }).reviewedAt ?? null,
     })),
   )
 
@@ -201,6 +230,16 @@ export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
   const isCurrentReadOnly = myReview ? isPanelistReadOnly(myReview.status as DefenseReviewStatus) : false
   void isCurrentReadOnly
   void shouldResetOnResubmission
+
+  // Has current panelist already submitted annotation (COMMITTED) for this resubmission?
+  const hasReviewedResub = (() => {
+    if (currentUserId == null || !latest) return false
+    const anns = (latest as unknown as { annotations?: Array<{ authorId: number; status: string }> })?.annotations
+    if (anns && anns.length > 0) {
+      return anns.some((a) => a.authorId === currentUserId && a.status === 'COMMITTED')
+    }
+    return myReview ? myReview.status !== 'PENDING' : false
+  })()
 
   const annotationStats = resolveAnnotationStats(latest)
   const reviewedAt =
@@ -231,6 +270,10 @@ export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
   const checklistReviews = reviews.map((r) => ({
     panelistId: r.panelistId,
     status: r.status as DefenseReviewStatus | string,
+    feedback: (r as unknown as { feedback?: { comments: number; pages: number } | null }).feedback ?? null,
+    comments: (r as unknown as { comments?: number }).comments,
+    pages: (r as unknown as { pages?: number }).pages,
+    reviewedAt: (r as unknown as { reviewedAt?: string | null }).reviewedAt ?? null,
   }))
 
   return (
@@ -256,6 +299,8 @@ export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
         pages={annotationStats?.pages ?? null}
         reviewedAt={reviewedAt}
         workspaceHref={workspaceHref}
+        hasReviewed={hasReviewedResub}
+        hasApprovedPrevious={isCurrentReadOnly}
       />
 
       {latest ? (

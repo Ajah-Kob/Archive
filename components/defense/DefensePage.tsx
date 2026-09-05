@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Shield } from 'lucide-react'
-import { ContextBar } from '@/components/globals/ContextBar'
+import { HeaderBar } from '@/components/globals/HeaderBar'
 import { UpcomingSessionsContainer } from './UpcomingSessionsContainer'
 import { ResubmissionsTable } from './ResubmissionsTable'
 import type {
@@ -29,10 +28,7 @@ interface DefensePageProps {
  * Resubmissions are implemented; Completed renders a placeholder until its
  * workflow is built.
  */
-export function DefensePage({
-  schedules,
-  resubmissions,
-}: DefensePageProps) {
+export function DefensePage({ schedules, resubmissions }: DefensePageProps) {
   const [active, setActive] = useState<TabId>('upcoming')
 
   // Upcoming = verdict still pending (the defense has not been decided yet).
@@ -42,7 +38,7 @@ export function DefensePage({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <ContextBar>
+      <HeaderBar>
         {TABS.map((tab) => {
           const isActive = tab.id === active
           return (
@@ -63,7 +59,7 @@ export function DefensePage({
             </button>
           )
         })}
-      </ContextBar>
+      </HeaderBar>
 
       <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
         {active === 'upcoming' ? (
@@ -71,7 +67,12 @@ export function DefensePage({
         ) : active === 'resubmissions' ? (
           <ResubmissionsTable items={resubmissions} />
         ) : (
-          <UpcomingSessionsContainer schedules={completed} title="Completed Sessions" emptyTitle="No Completed Defenses" emptyDescription="Completed defenses will appear here once verdicts are finalized." />
+          <UpcomingSessionsContainer
+            schedules={completed}
+            title="Completed Sessions"
+            emptyTitle="No Completed Defenses"
+            emptyDescription="Completed defenses will appear here once verdicts are finalized."
+          />
         )}
       </div>
     </div>

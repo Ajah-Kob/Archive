@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { TriangleAlert } from 'lucide-react'
-import { ContextBar } from '@/components/globals/ContextBar'
+import { HeaderBar } from '@/components/globals/HeaderBar'
 
 export type SectionTabKey = 'students' | 'progress' | 'topics'
 
@@ -47,7 +47,7 @@ export function SectionTabs({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <ContextBar actions={actions}>
+      <HeaderBar actions={actions}>
         {TABS.map((t) => {
           const isActive = tab === t.key
           return (
@@ -74,7 +74,7 @@ export function SectionTabs({
             </button>
           )
         })}
-      </ContextBar>
+      </HeaderBar>
 
       <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
         {panels[tab]}

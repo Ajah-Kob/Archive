@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { ContextBar } from '@/components/globals/ContextBar'
+import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { SectionCard } from './SectionCard'
 import { SectionModal } from './SectionModal'
@@ -41,7 +41,7 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <ContextBar
+      <HeaderBar
         actions={
           <button
             type="button"
@@ -67,7 +67,7 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
             clearable
           />
         </div>
-      </ContextBar>
+      </HeaderBar>
 
       <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
         {filtered.length === 0 ? (

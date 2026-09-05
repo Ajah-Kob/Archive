@@ -188,7 +188,7 @@ async function getStudentDefenseSessionData(
           },
           annotations: {
             where: { deletedAt: null },
-            select: { data: true },
+            select: { authorId: true, status: true, data: true },
           },
         },
         orderBy: { version: 'asc' },
@@ -238,7 +238,7 @@ async function getStudentDefenseSessionData(
       return { comments: allItems.length, pages: pages || 1 }
     })(),
         submissions: schedule.submissions.map((s) => {
-      const sWithAnn = s as unknown as { annotations?: Array<{ data: unknown }> }
+      const sWithAnn = s as unknown as { annotations?: Array<{ authorId: number; data: unknown; status: string }> }
       let annStats: { comments: number; pages: number } | null = null
       if (sWithAnn.annotations && sWithAnn.annotations.length > 0) {
         const allItems = sWithAnn.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
@@ -249,6 +249,19 @@ async function getStudentDefenseSessionData(
               .filter((v): v is number => typeof v === 'number'),
           ).size
           annStats = { comments: allItems.length, pages: pages || 1 }
+        }
+      }
+      const annByAuthor = new Map<number, { comments: number; pages: number }>()
+      if (sWithAnn.annotations) {
+        for (const a of sWithAnn.annotations) {
+          const items = Array.isArray(a.data) ? (a.data as unknown[]) : []
+          if (items.length === 0) continue
+          const pages = new Set(
+            items
+              .map((it) => (it as unknown as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+              .filter((v): v is number => typeof v === 'number'),
+          ).size
+          annByAuthor.set(a.authorId, { comments: items.length, pages: pages || 1 })
         }
       }
       return {
@@ -267,13 +280,19 @@ async function getStudentDefenseSessionData(
         status: s.isInitial
           ? schedule.verdict
           : deriveResubmissionStatus(s.reviews),
-        reviews: s.reviews.map((r) => ({
-          panelistId: r.panelistId,
-          name: r.panelist.name,
-          image: r.panelist.image,
-          status: r.status,
-          reviewedAt: r.reviewedAt?.toISOString() ?? null,
-        })),
+        reviews: s.reviews.map((r) => {
+          const fb = annByAuthor.get(r.panelistId) ?? null
+          return {
+            panelistId: r.panelistId,
+            name: r.panelist.name,
+            image: r.panelist.image,
+            status: r.status,
+            reviewedAt: r.reviewedAt?.toISOString() ?? null,
+            feedback: fb,
+            comments: fb?.comments ?? 0,
+            pages: fb?.pages ?? 0,
+          }
+        }),
       }
     }),
   }
@@ -486,11 +505,40 @@ export async function resubmitDefenseDocument(
   // Guard: resubmission is only allowed after a revision verdict.
   if (
     schedule.verdict !== 'MINOR_REVISION' &&
-    schedule.verdict !== 'MAJOR_REVISION'
+    schedule.verdict !== 'MAJOR_REVISION' &&
+    schedule.verdict !== 'REJECTED'
   ) {
     return {
       success: false,
       message: 'Resubmission is only allowed after a revision verdict.',
+    }
+  }
+
+  // B — strict: if a resubmission already exists, allow next upload only when
+  // all panelists have finished reviewing and the result is Need Revision.
+  const existingResubmission = await prisma.defenseSubmission.findFirst({
+    where: { scheduleId: schedule.id, isInitial: false, deletedAt: null },
+    orderBy: { version: 'desc' },
+    select: { id: true },
+  })
+  if (existingResubmission) {
+    const reviews = await prisma.defenseSubmissionReview.findMany({
+      where: { submissionId: existingResubmission.id, deletedAt: null },
+      select: { status: true },
+    })
+    const hasPending = reviews.some((r) => r.status === 'PENDING')
+    if (hasPending) {
+      return {
+        success: false,
+        message: 'All panelists must finish reviewing before you can resubmit.',
+      }
+    }
+    const hasRejected = reviews.some((r) => r.status === 'REJECTED')
+    if (!hasRejected) {
+      return {
+        success: false,
+        message: 'Resubmission is only allowed when a revision is requested.',
+      }
     }
   }
 
@@ -512,6 +560,19 @@ export async function resubmitDefenseDocument(
     select: { userId: true },
   })
 
+  // Carry-forward: APPROVED stays approved, REJECTED resets to PENDING
+  // Build map of previous resubmission reviews if exists (from B-strict guard)
+  let prevReviewStatusByPanelist = new Map<number, string>()
+  if (existingResubmission) {
+    const prevReviews = await prisma.defenseSubmissionReview.findMany({
+      where: { submissionId: existingResubmission.id, deletedAt: null },
+      select: { panelistId: true, status: true },
+    })
+    for (const r of prevReviews) {
+      prevReviewStatusByPanelist.set(r.panelistId, r.status)
+    }
+  }
+
   try {
     const submission = await prisma.$transaction(async (tx) => {
       return tx.defenseSubmission.create({
@@ -525,10 +586,14 @@ export async function resubmitDefenseDocument(
           mimeType: upload.mimeType,
           size: upload.size,
           reviews: {
-            create: panelists.map((p) => ({
-              panelistId: p.userId,
-              status: 'PENDING' as const,
-            })),
+            create: panelists.map((p) => {
+              const prevStatus = prevReviewStatusByPanelist.get(p.userId) as 'PENDING' | 'APPROVED' | 'REJECTED' | undefined
+              // First resubmission: all PENDING. Subsequent: APPROVED carries forward, REJECTED -> PENDING
+              if (!existingResubmission) return { panelistId: p.userId, status: 'PENDING' as const }
+              if (prevStatus === 'APPROVED') return { panelistId: p.userId, status: 'APPROVED' as const }
+              // REJECTED or PENDING or missing -> reset to PENDING for next version
+              return { panelistId: p.userId, status: 'PENDING' as const }
+            }),
           },
         },
       })

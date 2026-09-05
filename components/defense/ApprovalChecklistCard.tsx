@@ -211,18 +211,9 @@ function ChecklistRow({ panelist, isFirst, isLast }: ChecklistRowProps) {
       {/* Col2 center: Approved / Need Revision + feedback counts / Pending */}
       <div className="flex flex-col items-center justify-center sm:h-[50px] sm:px-2 min-w-0 w-full gap-[2px]">
         {display === 'Approved' ? (
-          <div className="flex flex-col items-center gap-[2px]">
-            <span
-              className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-center ${centerColor}`}
-            >
-              Approved
-            </span>
-            {isReadOnly ? (
-              <span className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[11px] leading-[14px] text-[#9ea8c6] text-center">
-                Read-only
-              </span>
-            ) : null}
-          </div>
+          <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-center text-[#16a34a]">
+            ✓ Document is approved. No need to review the future resubmissions.
+          </p>
         ) : display === 'Need Revision' ? (
           <div className="flex flex-col items-center gap-[1px]">
             <span
@@ -250,9 +241,8 @@ function ChecklistRow({ panelist, isFirst, isLast }: ChecklistRowProps) {
         )}
       </div>
 
-      {/* Col3 right: pill Chair amber vs Member indigo; approved also shows badge on wide screens via center, pill stays role */}
+      {/* Col3 right: pill Chair amber vs Member indigo */}
       <div className="flex items-center justify-end sm:h-[50px] shrink-0 w-full sm:w-auto gap-2">
-        {display === 'Approved' ? <ApprovedBadge /> : null}
         <PanelPill role={panelist.role} />
       </div>
     </div>

@@ -1213,7 +1213,7 @@ async function getDefenseSessionData(
     myRole:
       schedule.panelists.find((p) => p.userId === userId)?.role ?? 'PANEL_MEMBER',
     submissions: schedule.submissions.map((r) => {
-      const rWithAnn = r as unknown as { annotations?: Array<{ data: unknown }> }
+      const rWithAnn = r as unknown as { annotations?: Array<{ authorId: number; data: unknown; status: string }> }
       let annStats: { comments: number; pages: number } | null = null
       if (rWithAnn.annotations && rWithAnn.annotations.length > 0) {
         const allItems = rWithAnn.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
@@ -1226,6 +1226,19 @@ async function getDefenseSessionData(
           annStats = { comments: allItems.length, pages: pages || 1 }
         }
       }
+      const annByAuthor = new Map<number, { comments: number; pages: number }>()
+      if (rWithAnn.annotations) {
+        for (const a of rWithAnn.annotations) {
+          const items = Array.isArray(a.data) ? (a.data as unknown[]) : []
+          if (items.length === 0) continue
+          const pages = new Set(
+            items
+              .map((it) => (it as unknown as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+              .filter((v): v is number => typeof v === 'number'),
+          ).size
+          annByAuthor.set(a.authorId, { comments: items.length, pages: pages || 1 })
+        }
+      }
       return {
         id: r.id,
         version: r.version,
@@ -1236,17 +1249,24 @@ async function getDefenseSessionData(
         dateSubmitted: r.createdAt.toISOString(),
         isInitial: r.isInitial,
         annotationStats: annStats,
-        reviews: r.reviews.map((review) => ({
-          panelistId: review.panelistId,
-          name: review.panelist.name,
-          status: review.status,
-        })),
+        reviews: r.reviews.map((review) => {
+          const fb = annByAuthor.get(review.panelistId) ?? null
+          return {
+            panelistId: review.panelistId,
+            name: review.panelist.name,
+            status: review.status,
+            reviewedAt: (review as unknown as { reviewedAt?: Date | null }).reviewedAt?.toISOString() ?? null,
+            feedback: fb,
+            comments: fb?.comments ?? 0,
+            pages: fb?.pages ?? 0,
+          }
+        }),
       }
     }),
     resubmissions: schedule.submissions
       .filter((s) => !s.isInitial)
       .map((r) => {
-        const rWithAnn = r as unknown as { annotations?: Array<{ data: unknown }> }
+        const rWithAnn = r as unknown as { annotations?: Array<{ authorId: number; data: unknown; status: string }> }
         let annStats: { comments: number; pages: number } | null = null
         if (rWithAnn.annotations && rWithAnn.annotations.length > 0) {
           const allItems = rWithAnn.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
@@ -1259,6 +1279,19 @@ async function getDefenseSessionData(
             annStats = { comments: allItems.length, pages: pages || 1 }
           }
         }
+        const annByAuthor = new Map<number, { comments: number; pages: number }>()
+        if (rWithAnn.annotations) {
+          for (const a of rWithAnn.annotations) {
+            const items = Array.isArray(a.data) ? (a.data as unknown[]) : []
+            if (items.length === 0) continue
+            const pages = new Set(
+              items
+                .map((it) => (it as unknown as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+                .filter((v): v is number => typeof v === 'number'),
+            ).size
+            annByAuthor.set(a.authorId, { comments: items.length, pages: pages || 1 })
+          }
+        }
         return {
           id: r.id,
           version: r.version,
@@ -1269,11 +1302,18 @@ async function getDefenseSessionData(
           dateSubmitted: r.createdAt.toISOString(),
           isInitial: r.isInitial,
           annotationStats: annStats,
-          reviews: r.reviews.map((review) => ({
-            panelistId: review.panelistId,
-            name: review.panelist.name,
-            status: review.status,
-          })),
+          reviews: r.reviews.map((review) => {
+            const fb = annByAuthor.get(review.panelistId) ?? null
+            return {
+              panelistId: review.panelistId,
+              name: review.panelist.name,
+              status: review.status,
+              reviewedAt: (review as unknown as { reviewedAt?: Date | null }).reviewedAt?.toISOString() ?? null,
+              feedback: fb,
+              comments: fb?.comments ?? 0,
+              pages: fb?.pages ?? 0,
+            }
+          }),
         }
       }),
   }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { Clock, Eye, FileSearch, X } from 'lucide-react'
 import {
   CircleHistoryState,
@@ -15,6 +16,10 @@ import {
 export interface DocumentHistoryItem {
   info: DefenseDocumentInfo
   status: InitialDocumentStatus | ResubmissionStatus
+  /** Optional per-version reviews for completion count */
+  reviews?: Array<{ status: string }>
+  approvedCount?: number
+  total?: number
 }
 
 interface DocumentHistoryDrawerProps {
@@ -217,6 +222,14 @@ function InitialDocumentRow({
  * Resubmission history row (Figma 1448-7162).
  * Independent: panelist = Review when IN_REVIEW, student = View when IN_REVIEW (opposite after verdict).
  */
+function normalizeResubStatus(status: string): string {
+  const upper = status.toUpperCase().replace(/\s+/g, '_')
+  if (upper === 'FOR_REVIEW' || upper === 'IN_REVIEW' || upper === 'PENDING') return 'IN_REVIEW'
+  if (upper === 'NEED_REVISION' || upper === 'REJECTED') return 'NEED_REVISION'
+  if (upper === 'APPROVED') return 'APPROVED'
+  return upper
+}
+
 function ResubmissionRow({
   item,
   isLast,
@@ -231,10 +244,16 @@ function ResubmissionRow({
   variant?: 'panelist' | 'student'
 }) {
   const { info, status } = item
-  const isInReview = (status as string) === 'IN_REVIEW' || (status as string) === 'FOR_REVIEW'
-  // Student history: always View grey (per request) — panelist: Review when IN_REVIEW
-  const isPanelist = variant === 'panelist'
-  const showReview = isPanelist ? isInReview : false
+  const normalizedStatus = normalizeResubStatus(status as string)
+  const isInReview = normalizedStatus === 'IN_REVIEW'
+  // Panelist: Review only if the current user’s own review for this version is still PENDING.
+  // Done reviewers (APPROVED/REJECTED) see View grey even while overall doc is In Review.
+  const { data: session } = useSession()
+  const currentUserId = session?.user?.id != null ? Number(session.user.id) : null
+  const revs = (item as unknown as { reviews?: Array<{ panelistId?: number; status: string }> }).reviews
+  const myReview = currentUserId != null && revs ? revs.find((r) => r.panelistId === currentUserId) : undefined
+  const isMyPending = myReview ? myReview.status === 'PENDING' : isInReview // fallback to overall In Review if no per-user review found
+  const showReview = variant === 'panelist' ? isInReview && isMyPending : false
   const href =
     info.id && scheduleId
       ? `/faculty/defense/${scheduleId}/${info.id}`
@@ -246,7 +265,7 @@ function ResubmissionRow({
     <div className="flex items-start gap-[14px]">
       {/* Timeline rail: status circle + connector */}
       <div className="flex flex-col items-center self-stretch shrink-0">
-        <CircleHistoryState state={status} />
+        <CircleHistoryState state={normalizedStatus} />
         {!isLast && (
           <span
             className={`w-[2px] flex-1 min-h-[24px] ${
@@ -263,22 +282,37 @@ function ResubmissionRow({
           <p className="truncate font-sora font-bold text-[13px] leading-[normal] text-[#1e3a8a]">
             {info.fileName}
           </p>
-          <StatusPill state={status} />
+          <StatusPill state={normalizedStatus} />
         </div>
 
         <p className="pt-[4px] truncate font-sans font-medium text-[12px] leading-[18px] text-[#6b7399]">
-          v{info.version ?? 2} · {formatDate(info.submittedAt)} · Submitted by{' '}
-          {info.submittedByName}
+          v{info.version ?? 2} · {formatDate(info.submittedAt)} · Submitted by {info.submittedByName}
         </p>
 
         {isInReview ? (
           <AmberStatusLine>Waiting for panelist approvals</AmberStatusLine>
         ) : (
-          <ReviewedLine
-            comments={(info as unknown as { comments?: number | null }).comments ?? null}
-            pages={(info as unknown as { pages?: number | null }).pages ?? null}
-            reviewedAt={(info as unknown as { reviewedAt?: string | null }).reviewedAt ?? null}
-          />
+          (() => {
+            const revs = (item as unknown as { reviews?: Array<{ status: string }>; approvedCount?: number; total?: number }).reviews
+            const ac = (item as unknown as { approvedCount?: number }).approvedCount
+            const tot = (item as unknown as { total?: number }).total
+            let completion: string | null = null
+            if (typeof ac === 'number' && typeof tot === 'number') completion = `${ac}/${tot}`
+            else if (revs && revs.length > 0) {
+              const approved = revs.filter((r) => r.status === 'APPROVED').length
+              completion = `${approved}/${revs.length}`
+            }
+            const comments = (info as unknown as { comments?: number | null }).comments ?? null
+            const pages = (info as unknown as { pages?: number | null }).pages ?? null
+            const reviewedAt = (info as unknown as { reviewedAt?: string | null }).reviewedAt ?? null
+            const hasCounts = typeof comments === 'number' && typeof pages === 'number' && comments > 0
+            const parts: string[] = []
+            if (completion) parts.push(completion)
+            if (hasCounts) parts.push(`${comments} comments on ${pages} pages`)
+            if (reviewedAt) parts.push(`Reviewed ${formatDate(reviewedAt)}`)
+            if (parts.length === 0) return <p className="py-[3px] font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">Reviewed.</p>
+            return <p className="py-[3px] font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">{parts.join(' · ')}</p>
+          })()
         )}
       </div>
 

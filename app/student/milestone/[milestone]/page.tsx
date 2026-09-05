@@ -2,13 +2,12 @@ import Link from 'next/link'
 import { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { getServerSession } from 'next-auth'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { authOptions } from '@/lib/authOptions'
 import { ComingSoon } from '@/components/workspace/ComingSoon'
 import { getMyWorkspace } from '@/lib/actions/groups'
 import { getChapterData } from '@/lib/actions/chapter'
 import { getTopicSelectionData, getTopicSubmissionData } from '@/lib/actions/topic'
-import { getDefenseSessionData } from '@/lib/actions/student-defense'
 import { GroupContext } from '@/components/milestones/GroupContext'
 import { CapstoneJourney } from '@/components/milestones/CapstoneJourney'
 import { JOURNEY_ROWS, SLUG_TO_CHAPTER, WORKSPACE_SLUGS } from '@/types/milestones'
@@ -17,7 +16,6 @@ import { TopicSelectionView } from '@/components/milestones/topic-selection/Topi
 import { TopicSubmissionView } from '@/components/milestones/topic-submission/TopicSubmissionView'
 import { ChapterSubmissionView } from '@/components/milestones/chapter/ChapterSubmissionView'
 import { LockedChapterPlaceholder } from '@/components/milestones/chapter/LockedChapterPlaceholder'
-import { DefenseMilestonePage } from '@/components/milestones/defense/DefenseMilestonePage'
 
 const DEFENSE_SLUGS = ['proposal-defense', 'final-defense']
 
@@ -36,15 +34,13 @@ export default async function MilestoneDetailPage({
   const { milestone } = await params
   if (!WORKSPACE_SLUGS.includes(milestone)) notFound()
 
+  if ((DEFENSE_SLUGS as readonly string[]).includes(milestone)) {
+    redirect(`/student/milestone/${milestone}/defense`)
+  }
+
   const userId = +session.user.id
   const chapter = SLUG_TO_CHAPTER[milestone]
-  const isDefense = DEFENSE_SLUGS.includes(milestone as string)
-  const defenseTypeForFetch = isDefense
-    ? milestone === 'final-defense'
-      ? ('FINAL' as const)
-      : ('PROPOSAL' as const)
-    : null
-  const [workspaceRes, topicRes, chapterRes, defenseRes] = await Promise.all([
+  const [workspaceRes, topicRes, chapterRes] = await Promise.all([
     getMyWorkspace(userId),
     milestone === 'topic-submission'
       ? getTopicSubmissionData(userId)
@@ -52,9 +48,6 @@ export default async function MilestoneDetailPage({
         ? getTopicSelectionData(userId)
         : Promise.resolve(null),
     chapter ? getChapterData(chapter) : Promise.resolve(null),
-    isDefense && defenseTypeForFetch
-      ? getDefenseSessionData(defenseTypeForFetch)
-      : Promise.resolve(null),
   ])
 
   const workspace = workspaceRes.success && workspaceRes.payload ? workspaceRes.payload : null
@@ -127,21 +120,6 @@ export default async function MilestoneDetailPage({
     )
   }
 
-  if (isDefense) {
-    const data = defenseRes?.success && defenseRes.payload ? defenseRes.payload : null
-    const defenseType = milestone === 'final-defense' ? 'FINAL' : 'PROPOSAL'
-
-    return (
-      <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={workspace.journey} activeSlug={milestone} />
-
-        <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <DefenseMilestonePage data={data} defenseType={defenseType} />
-        </div>
-      </section>
-    )
-  }
-
   const row = JOURNEY_ROWS.find((r) => r.slug === milestone)
 
   return (
@@ -164,9 +142,7 @@ export default async function MilestoneDetailPage({
               Back to Milestones
             </Link>
           </div>
-          <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] -mt-1">
-            {row?.header} workspace
-          </p>
+          <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] -mt-1">{row?.header} workspace</p>
 
           <ComingSoon
             title={`${row?.label ?? 'This workspace'} is coming soon`}

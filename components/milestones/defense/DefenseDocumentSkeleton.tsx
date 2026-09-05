@@ -1,7 +1,5 @@
 'use client'
 
-import { FileText } from 'lucide-react'
-
 /**
  * Loading skeleton for the Defense Document Card.
  *
@@ -12,14 +10,10 @@ import { FileText } from 'lucide-react'
 export function DefenseDocumentSkeleton() {
   return (
     <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] overflow-hidden animate-pulse">
-      {/* Header */}
+      {/* Header — skeleton, no solid label */}
       <div className="flex items-center gap-[8px] px-[16px] pt-[12px] pb-[13px] border-b border-[#f0f2fa]">
-        <div className="flex size-[26px] items-center justify-center rounded-[7px] bg-[rgba(112,125,255,0.05)] shrink-0">
-          <FileText className="size-[12px] text-[#707dff]" strokeWidth={2} />
-        </div>
-        <p className="font-sora text-[12px] font-bold text-[#1e3a8a] tracking-[-0.12px]">
-          Defense Document
-        </p>
+        <div className="size-[26px] rounded-[7px] bg-slate-200 shrink-0" />
+        <div className="h-[12px] w-[130px] rounded bg-slate-200" />
       </div>
 
       {/* Body */}

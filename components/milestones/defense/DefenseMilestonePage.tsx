@@ -1,20 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import type { StudentDefenseSessionPayload } from '@/lib/actions/student-defense'
 import type { DefenseType } from '@prisma/client'
-import { GroupContext } from '@/components/milestones/GroupContext'
-import { DefenseMilestoneView } from './DefenseMilestoneView'
-import { DefenseEmptyState } from './DefenseEmptyState'
-import {
-  DocumentHistoryDrawer,
-  type DocumentHistoryItem,
-} from './DocumentHistoryDrawer'
-import type {
-  DefenseDocumentInfo,
-  InitialDocumentStatus,
-  ResubmissionStatus,
-} from './DefenseDocumentCard'
+import { DefenseTabPanel } from './tabs/DefenseTabPanel'
 
 interface DefenseMilestonePageProps {
   data: StudentDefenseSessionPayload | null
@@ -22,90 +10,14 @@ interface DefenseMilestonePageProps {
 }
 
 /**
- * Client wrapper for the defense milestone page.
- *
- * Owns the Document History drawer open state and coordinates the context bar
- * button (rendered via GroupContext) with the drawer. Splits the session
- * payload into the initial document + resubmission history for the drawer.
+ * Client wrapper for the defense milestone — legacy entry point.
+ * Now delegates to DefenseTabPanel (initial-only filtered card +
+ * VerdictCallout + MilestoneDefenseDetailsCard) so behavior stays
+ * consistent with the /defense segment route. Preserves the same
+ * canResubmit rule (MINOR|MAJOR && no resubmission) and carry-forward
+ * semantics via the shared DefenseTabPanel. Drawer remains accessible
+ * via GroupContext inside DefenseTabPanel.
  */
-export function DefenseMilestonePage({
-  data,
-  defenseType,
-}: DefenseMilestonePageProps) {
-  const [historyOpen, setHistoryOpen] = useState(false)
-
-  // Split submissions into initial + resubmissions (oldest first).
-  const initialSub = data?.submissions.find((s) => s.isInitial) ?? null
-  const resubmissions = (data?.submissions ?? [])
-    .filter((s) => !s.isInitial)
-    .sort((a, b) => a.version - b.version)
-
-  const getAnnStats = (sub: unknown) => {
-    const s = sub as unknown as { annotationStats?: { comments: number; pages: number } | null }
-    return s.annotationStats ?? null
-  }
-  const milestoneSlug = defenseType === 'FINAL' ? 'final-defense' : 'proposal-defense'
-  const verdictAt = (data as unknown as { verdictSubmittedAt?: string | null })?.verdictSubmittedAt ?? null
-
-  const initialItem: DocumentHistoryItem | null = initialSub
-    ? {
-        info: {
-          id: (initialSub as unknown as { id: number }).id,
-          fileName: initialSub.fileName,
-          size: initialSub.size,
-          submittedAt: initialSub.dateSubmitted,
-          blobUrl: initialSub.blobUrl,
-          submittedByName: initialSub.submittedByName,
-          version: (initialSub as unknown as { version: number }).version,
-          comments: getAnnStats(initialSub)?.comments ?? null,
-          pages: getAnnStats(initialSub)?.pages ?? null,
-          reviewedAt: getAnnStats(initialSub) ? verdictAt : null,
-        } as unknown as DefenseDocumentInfo,
-        status: initialSub.status as InitialDocumentStatus,
-      }
-    : null
-
-  const resubmissionItems: DocumentHistoryItem[] = resubmissions.map((s) => {
-    const sWithStats = s as unknown as { annotationStats?: { comments: number; pages: number } | null; id: number; version: number }
-    return {
-      info: {
-        id: sWithStats.id,
-        fileName: s.fileName,
-        size: s.size,
-        submittedAt: s.dateSubmitted,
-        blobUrl: s.blobUrl,
-        submittedByName: s.submittedByName,
-        version: sWithStats.version,
-        comments: sWithStats.annotationStats?.comments ?? null,
-        pages: sWithStats.annotationStats?.pages ?? null,
-        reviewedAt: sWithStats.annotationStats ? verdictAt ?? s.dateSubmitted : null,
-      } as unknown as DefenseDocumentInfo,
-      status: s.status as ResubmissionStatus,
-    }
-  })
-
-  return (
-    <>
-      <GroupContext onDocumentHistory={() => setHistoryOpen(true)} />
-
-      <div className="flex-1 min-h-0 px-8 py-[30px] overflow-y-auto">
-        <div className="flex flex-col gap-5">
-          {data ? (
-            <DefenseMilestoneView data={data} />
-          ) : (
-            <DefenseEmptyState type={defenseType} />
-          )}
-        </div>
-      </div>
-
-      <DocumentHistoryDrawer
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        initial={initialItem}
-        resubmissions={resubmissionItems}
-        milestoneSlug={milestoneSlug}
-        variant="student"
-      />
-    </>
-  )
+export function DefenseMilestonePage({ data, defenseType }: DefenseMilestonePageProps) {
+  return <DefenseTabPanel data={data} defenseType={defenseType} />
 }

@@ -153,12 +153,7 @@ export function ReplaceDocumentModal({
   }
 
   const confirmReplace = async () => {
-    if (
-      !draft ||
-      draft.status !== 'ready' ||
-      !draft.blobUrl ||
-      replacing
-    ) {
+    if (!draft || draft.status !== 'ready' || !draft.blobUrl || replacing) {
       return
     }
     setReplacing(true)
@@ -194,7 +189,7 @@ export function ReplaceDocumentModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="replace-document-title"
-        className="w-full max-w-[480px] bg-white border border-[#eceef8] rounded-[16px] shadow-[0_16px_48px_rgba(16,19,58,0.18)]"
+        className="w-full max-w-[600px] bg-white border border-[#eceef8] rounded-[16px] shadow-[0_16px_48px_rgba(16,19,58,0.18)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -226,14 +221,14 @@ export function ReplaceDocumentModal({
           {/* Current document */}
           <div className="flex items-center gap-[11px] px-[14px] py-[12px] rounded-[10px] bg-[#fafbff] border border-[#eceef8]">
             <div className="flex size-[36px] items-center justify-center rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] shrink-0">
-              <FileText className="size-[16px] text-[#707dff]" strokeWidth={1.75} />
+              <FileText
+                className="size-[16px] text-[#707dff]"
+                strokeWidth={1.75}
+              />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-sans font-bold text-[12.5px] leading-[18.75px] text-[#1e3a8a]">
                 {document.fileName}
-              </p>
-              <p className="pt-[2px] font-sans font-medium text-[11px] leading-[16.5px] text-[#9ea8c6]">
-                Current document
               </p>
             </div>
           </div>
@@ -251,8 +246,13 @@ export function ReplaceDocumentModal({
           <div className="flex items-center justify-center gap-[8px] py-[2px]">
             <div className="h-px flex-1 bg-[#e8ebf8]" />
             <div className="flex items-center gap-[6px] px-[10px] py-[4px] rounded-full bg-[#f4f6ff] border border-[#e5e8ff]">
-              <RefreshCw className="size-[12px] text-[#707dff]" strokeWidth={2} />
-              <span className="font-sans font-bold text-[11px] leading-[16.5px] text-[#707dff]">Replaced with</span>
+              <RefreshCw
+                className="size-[12px] text-[#707dff]"
+                strokeWidth={2}
+              />
+              <span className="font-sans font-bold text-[11px] leading-[16.5px] text-[#707dff]">
+                Replaced with
+              </span>
             </div>
             <div className="h-px flex-1 bg-[#e8ebf8]" />
           </div>
@@ -265,7 +265,10 @@ export function ReplaceDocumentModal({
                   {isUploading ? (
                     <Loader2 className="size-[16px] text-[#707dff] animate-spin motion-reduce:animate-none" />
                   ) : (
-                    <FileText className="size-[16px] text-[#707dff]" strokeWidth={1.75} />
+                    <FileText
+                      className="size-[16px] text-[#707dff]"
+                      strokeWidth={1.75}
+                    />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -336,7 +339,10 @@ export function ReplaceDocumentModal({
               }`}
             >
               <div className="flex size-[48px] items-center justify-center rounded-[24px] bg-[#eef0fb]">
-                <UploadCloud className="size-[20px] text-[#707dff]" strokeWidth={1.75} />
+                <UploadCloud
+                  className="size-[20px] text-[#707dff]"
+                  strokeWidth={1.75}
+                />
               </div>
               <p className="pt-[14px] font-sora text-[14px] font-bold text-[#1e3a8a]">
                 Drag and drop your document here
@@ -395,7 +401,8 @@ export function ReplaceDocumentModal({
             }
             className="flex items-center justify-center gap-[6px] h-[36px] px-[16px] rounded-[9px] font-sans font-bold text-[12px] text-white transition-opacity hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 outline-none focus-visible:ring-[rgba(112,125,255,0.4)]"
             style={{
-              backgroundImage: 'linear-gradient(159deg, #707dff 0%, #5565ff 100%)',
+              backgroundImage:
+                'linear-gradient(159deg, #707dff 0%, #5565ff 100%)',
             }}
           >
             {replacing ? (

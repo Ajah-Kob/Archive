@@ -126,6 +126,8 @@ const CIRCLE_STYLES: Record<string, string> = {
   MAJOR_REVISION: 'bg-[#e1681d] border-[#ffd1b4] rounded-[50px]',
   REJECTED: 'bg-[#e11d48] border-[#efd5da] rounded-[25px]',
   IN_REVIEW: 'bg-[#f59e0b] border-[#f2ddba] rounded-[50px]',
+  NEED_REVISION: 'bg-[#e11d48] border-[#efd5da] rounded-[25px]',
+  FOR_REVIEW: 'bg-[#f59e0b] border-[#f2ddba] rounded-[50px]',
 }
 
 /** Status pill (Figma 1448-7141). */
@@ -151,6 +153,16 @@ const PILL_STYLES: Record<string, { label: string; className: string }> = {
       'bg-[rgba(225,29,72,0.07)] border-[rgba(225,29,72,0.2)] text-[#e11d48]',
   },
   IN_REVIEW: {
+    label: 'For Review',
+    className:
+      'bg-[rgba(245,158,11,0.07)] border-[rgba(245,158,11,0.2)] text-[#f59e0b]',
+  },
+  NEED_REVISION: {
+    label: 'Need Revision',
+    className:
+      'bg-[rgba(225,29,72,0.07)] border-[rgba(225,29,72,0.2)] text-[#e11d48]',
+  },
+  FOR_REVIEW: {
     label: 'For Review',
     className:
       'bg-[rgba(245,158,11,0.07)] border-[rgba(245,158,11,0.2)] text-[#f59e0b]',
@@ -287,6 +299,7 @@ function DocumentRow({
   showConnector,
   connectorDashed,
   showReplace,
+  forceView = false,
 }: {
   document: DefenseDocumentInfo
   status: string
@@ -294,6 +307,7 @@ function DocumentRow({
   showConnector?: boolean
   connectorDashed?: boolean
   showReplace?: boolean
+  forceView?: boolean
 }) {
   const { actions, onSubmitted, milestoneSlug } =
     useDefenseDocumentCard() as DefenseDocumentCardContextValue & {
@@ -310,8 +324,9 @@ function DocumentRow({
       ? `/student/milestone/${milestoneSlug}/${document.id}`
       : undefined
 
+  // Defense-tab: v1 badge rendered as pill; meta preserves PDF size even with versionLabel
   const meta = versionLabel
-    ? `${versionLabel} · ${formatDate(document.submittedAt)} · Submitted by ${document.submittedByName}`
+    ? `${versionLabel} · PDF · ${formatSize(document.size)} · ${formatDate(document.submittedAt)} · Submitted by ${document.submittedByName}`
     : `PDF · ${formatSize(document.size)} · ${formatDate(document.submittedAt)} · Submitted by ${document.submittedByName}`
 
   return (
@@ -333,8 +348,8 @@ function DocumentRow({
       {/* Content */}
       <div className="flex-1 min-w-0 flex items-start gap-[12px]">
         <div className="flex-1 min-w-0 flex flex-col items-start">
-          {/* Title + status pill */}
-          <div className="flex items-center gap-[8px] min-w-0">
+          {/* Title + status pill (defense-tab: isInitial only, v1 badge removed per request) */}
+          <div className="flex items-center gap-[8px] min-w-0 flex-wrap">
             <h4 className="font-sora font-bold text-[13px] leading-[normal] text-[#1e3a8a] truncate">
               {document.fileName}
             </h4>
@@ -394,7 +409,7 @@ function DocumentRow({
 
         {/* Actions: independent — student: View grey when pending/in review, Review Document (primary) after verdict submitted */}
         <div className="flex items-start gap-[10px] shrink-0">
-          {isNoVerdict || isInReview ? (
+          {forceView || isNoVerdict || isInReview ? (
             <GhostButton
               icon={<Eye className="size-[11px]" />}
               href={workspaceHref ?? document.blobUrl}
@@ -624,14 +639,6 @@ function UploadZone({ mode }: { mode?: 'initial' | 'resubmit' }) {
               </button>
               <button
                 type="button"
-                onClick={openPicker}
-                disabled={isUploading || submitting}
-                className="flex items-center justify-center px-[12px] py-[8px] rounded-[9px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Replace
-              </button>
-              <button
-                type="button"
                 onClick={handleRemove}
                 disabled={isUploading || submitting}
                 aria-label={`Remove ${draft.file.name}`}
@@ -762,17 +769,24 @@ interface DefenseDocumentCardProps {
   onSubmitted: () => void
   actions: DefenseUploadActions
   milestoneSlug?: string
+  /** When true, forces the document row to show grey View instead of purple Review (student defense tab) */
+  forceView?: boolean
 }
 
 /**
- * Defense Document Card — compound component for the student defense milestone.
+ * Defense Document Card — defense-tab mode (isInitial filter).
  *
- * Displays the initial defense document and any resubmissions in a timeline
- * layout, plus an upload zone for the idle and uploaded (draft) states.
+ * Renders ONLY the initial defense document (isInitial=true) — v1 badge
+ * preserved, resubmitted documents (v2+) hidden with no resubmission
+ * timeline row. Replace action remains only when initial status is PENDING.
+ * Resubmission UI lives in tabs/ResubmittedDocumentCard on the resubmission tab.
+ *
+ * Displays the initial defense document in a timeline row plus an upload
+ * zone for the idle and uploaded (draft) states when no initial exists.
  *
  * **Design refs:** Figma 1413-6563 (idle), 1413-6592 (uploaded),
- * 1413-6628 (submitted), 1448-7043 (initial states), 1448-7162 (resubmitted
- * states), 1448-7141 (status pill), 1448-7156 (circle history state).
+ * 1413-6628 (submitted), 1448-7043 (initial states), 1448-7141 (status pill),
+ * 1448-7156 (circle history state).
  * **Out of scope:** PDF viewer and review link (separate task).
  */
 export function DefenseDocumentCard({
@@ -784,30 +798,17 @@ export function DefenseDocumentCard({
   onSubmitted,
   actions,
   milestoneSlug,
+  forceView = false,
 }: DefenseDocumentCardProps) {
+  // Defense-tab mode: renders only submissions where isInitial=true.
+  // Resubmitted documents (v2+) hidden — no resubmission timeline row, v1 badge preserved.
   const normalizedInitialStatus = (initialStatus ?? '').toUpperCase().replace(/\s+/g, '_')
-  const normalizedResubStatus = (resubmissionStatus ?? '').toUpperCase().replace(/\s+/g, '_')
-  const isVerdictSubmitted =
-    normalizedInitialStatus !== '' && normalizedInitialStatus !== 'PENDING'
-  const resubmissionNeedsRevision = normalizedResubStatus === 'REJECTED'
-  // Timeline is visible only while waiting for verdict / waiting for resubmission review.
-  // When any verdict is submitted (APPROVED/MINOR/MAJOR/REJECTED) the submitted document
-  // must not sit above the dropzone — show only the idle/upload state. Same when a
-  // resubmission needs revision (REJECTED): hide the rejected row and show the resubmit zone.
-  const showInitialRow = initial != null && normalizedInitialStatus === 'PENDING'
-  const showResubmissionRow =
-    resubmission != null &&
-    normalizedResubStatus !== '' &&
-    !resubmissionNeedsRevision
-  const showTimeline = showInitialRow || showResubmissionRow
-  const showUpload =
-    initial == null ||
-    (isVerdictSubmitted && canResubmit && resubmission == null) ||
-    resubmissionNeedsRevision ||
-    // APPROVED/REJECTED reset to idle (no timeline, just the empty/upload placeholder behaviour)
-    (isVerdictSubmitted && !canResubmit && resubmission == null)
-  const showResubmitUpload =
-    canResubmit && initial != null && resubmission == null
+  const isPending = normalizedInitialStatus === 'PENDING'
+  const showInitialRow = initial != null
+  const showTimeline = showInitialRow
+  // Defense tab shows upload only for empty initial (preserve initial upload flow, hide resubmission flow).
+  const showUpload = initial == null
+  const versionLabel = initial ? `v${(initial as DefenseDocumentInfo & { version?: number }).version ?? 1}` : undefined
 
   return (
     <DefenseDocumentCardContext.Provider
@@ -825,34 +826,23 @@ export function DefenseDocumentCard({
       <Frame>
         <Header />
         <div className="p-[14px] flex flex-col gap-[14px]">
-          {/* Timeline — only while waiting (PENDING / IN_REVIEW). Hidden when any verdict is submitted or resubmission needs revision — only the idle/upload zone shows. */}
+          {/* Defense-tab timeline — renders ONLY initial document (isInitial=true). Resubmitted docs (v2+) hidden, v1 badge preserved, Replace only when PENDING. */}
           {showTimeline && (
             <div className="flex flex-col">
-              {showInitialRow && (
-                <DocumentRow
-                  document={initial!}
-                  status={initialStatus!}
-                  showConnector={showResubmissionRow}
-                  showReplace={normalizedInitialStatus === 'PENDING'}
-                />
-              )}
-              {showResubmissionRow && (
-                <DocumentRow
-                  document={resubmission!}
-                  status={resubmissionStatus!}
-                  versionLabel={`v${resubmission!.version ?? 2}`}
-                  connectorDashed={resubmissionStatus === 'IN_REVIEW'}
-                />
-              )}
+              <DocumentRow
+                document={initial!}
+                status={initialStatus!}
+                versionLabel={versionLabel}
+                showReplace={isPending}
+                forceView={forceView}
+              />
             </div>
           )}
 
-          {/* Upload zone: shown when no document exists, resubmission needed, or verdict submitted (reset to idle) */}
-          {showUpload && (
-            <UploadZone mode={showResubmitUpload ? 'resubmit' : 'initial'} />
-          )}
+          {/* Upload zone for initial document only — hidden when initial exists (defense-tab); preserves upload flow for empty state. */}
+          {showUpload && <UploadZone mode="initial" />}
 
-          {/* Empty state — no document and upload not possible */}
+          {/* Empty fallback when no initial and upload not possible (preserves empty state) */}
           {!initial && !showUpload && (
             <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4]">
               No document has been submitted for this defense yet.

@@ -17,6 +17,7 @@ export interface EvaluationItem {
   mimeType: string
   size: number
   status: 'PENDING' | 'NEED_REVISION' | 'APPROVED'
+  version: number
 }
 
 export interface EvaluationVersion {
@@ -59,6 +60,32 @@ async function requireAdviserRow() {
   })
 }
 
+// Builds version map for live submissions — 1-based position within the
+// milestone chain ordered by createdAt asc, including soft-deleted rows.
+// Mirrors getEvaluationVersions derivation: findMany where milestoneId,
+// orderBy createdAt asc, version = index + 1.
+async function getMilestoneVersionMap(
+  milestoneIds: number[],
+): Promise<Map<number, number>> {
+  const chains = await Promise.all(
+    milestoneIds.map((milestoneId) =>
+      prisma.milestoneSubmission.findMany({
+        where: { milestoneId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      }),
+    ),
+  )
+
+  const versionById = new Map<number, number>()
+  chains.forEach((chain) => {
+    chain.forEach((row, index) => {
+      versionById.set(row.id, index + 1)
+    })
+  })
+  return versionById
+}
+
 // Current submissions of the adviser's assigned groups, newest first. A
 // "current" submission is the live (non-soft-deleted) row of a milestone —
 // previous versions are the soft-deleted rows in the same milestone.
@@ -80,6 +107,11 @@ async function getEvaluationsData(adviserId: number): Promise<EvaluationItem[]> 
     orderBy: { createdAt: 'desc' },
   })
 
+  if (submissions.length === 0) return []
+
+  const milestoneIds = [...new Set(submissions.map((s) => s.milestoneId))]
+  const versionById = await getMilestoneVersionMap(milestoneIds)
+
   return submissions.map(
     (s): EvaluationItem => ({
       id: s.id,
@@ -94,6 +126,7 @@ async function getEvaluationsData(adviserId: number): Promise<EvaluationItem[]> 
       mimeType: s.mimeType,
       size: s.size,
       status: s.status,
+      version: versionById.get(s.id) ?? 1,
     }),
   )
 }

@@ -542,7 +542,7 @@ function WorkspaceLayout({
       {/* Header bar: back + context | draft status | tools | zoom | undo/redo | panels + verdict */}
       <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
         <Link
-          href={backHref ?? '/faculty/evaluation'}
+          href={backHref ?? '/faculty/document-review'}
           className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
         >
           <ArrowLeft className="size-[14px]" strokeWidth={2} />
@@ -803,12 +803,12 @@ function WorkspaceLayout({
           annotationData={verdict.data}
           onClose={() => setVerdict(null)}
           // The evaluation is finalized on success — return to the Teams tab
-          // (the default tab of /faculty/evaluation). refresh() first: it
+          // (the default tab of /faculty/document-review). refresh() first: it
           // invalidates the client Router Cache so the list reflects the
           // verdict immediately instead of serving the pre-verdict snapshot.
           onCommitted={() => {
             router.refresh()
-            router.push('/faculty/evaluation')
+            router.push('/faculty/document-review')
           }}
         />
       )}

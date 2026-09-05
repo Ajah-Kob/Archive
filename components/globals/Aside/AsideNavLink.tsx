@@ -28,8 +28,8 @@ type NavSection = {
 }
 
 function isNavActive(pathname: string, href: string) {
-  if (href === '/faculty/my-sections') {
-    return pathname === href || pathname.startsWith('/faculty/my-sections/')
+  if (href === '/faculty/my-sections' || href === '/faculty/document-review') {
+    return pathname === href || pathname.startsWith(`${href}/`)
   }
   return pathname === href
 }
@@ -68,7 +68,7 @@ export function NavLinks({
       items: [
         { label: 'Milestones', href: '/student/milestone', icon: Flag, show: isStudent },
         { label: 'My Sections', href: '/faculty/my-sections', icon: Layers, show: isCoordinator },
-        { label: 'Document Review', href: '/faculty/evaluation', icon: ClipboardCheck, show: isAdviser },
+        { label: 'Document Review', href: '/faculty/document-review', icon: ClipboardCheck, show: isAdviser },
         { label: 'Defense', href: '/faculty/defense', icon: Shield, show: isFaculty },
         { label: 'Defense Scheduling', href: '/faculty/defense-scheduling', icon: CalendarClock, show: isCoordinator },
       ],

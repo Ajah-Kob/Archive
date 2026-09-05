@@ -2,12 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  ChevronDown,
-  ChevronUp,
-  ClipboardCheck,
-  FileText,
-} from 'lucide-react'
+import { ChevronDown, ChevronUp, ClipboardCheck, FileText } from 'lucide-react'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
 import type { EvaluationItem } from '@/lib/actions/evaluation'
@@ -41,20 +36,20 @@ const STATUS_FILTER_OPTIONS: ReadonlyArray<FilterOption> = [
   { value: 'APPROVED', label: 'Approved' },
 ]
 
-/** Pill badge for the Teams table — labels per the evaluation spec. */
+/** Pill badge for the Teams table — colors + labels match SubmissionStatusBadge / StatusCallout. */
 const TEAM_STATUS_STYLES = {
   PENDING:
-    'bg-[rgba(112,125,255,0.07)] border-[rgba(112,125,255,0.2)] text-[#707dff]',
-  NEED_REVISION:
     'bg-[rgba(245,158,11,0.07)] border-[rgba(245,158,11,0.2)] text-[#f59e0b]',
+  NEED_REVISION:
+    'bg-[rgba(225,29,72,0.07)] border-[rgba(225,29,72,0.2)] text-[#e11d48]',
   APPROVED:
     'bg-[rgba(22,163,74,0.07)] border-[rgba(22,163,74,0.2)] text-[#16a34a]',
 } as const
 
 function TeamsStatusBadge({ status }: { status: EvaluationItem['status'] }) {
   const labels = {
-    PENDING: 'Pending',
-    NEED_REVISION: 'Need Revision',
+    PENDING: 'In Review',
+    NEED_REVISION: 'Needs Revision',
     APPROVED: 'Approved',
   } as const
   return (
@@ -292,8 +287,13 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
                   <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
                     {item.groupName}
                   </span>
-                  <span className="block truncate font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
-                    {item.fileName} · {formatSize(item.size)}
+                  <span className="flex items-center gap-[7px] min-w-0">
+                    <span className="bg-[#f4f6ff] border border-[#e5e8ff] rounded-[6px] px-[7px] py-[2px] font-sans font-bold text-[10px] text-[#707dff] shrink-0">
+                      v{item.version}
+                    </span>
+                    <span className="truncate font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
+                      {item.fileName} · {formatSize(item.size)}
+                    </span>
                   </span>
                 </span>
 
@@ -327,7 +327,7 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
                     <button
                       type="button"
                       onClick={() =>
-                        router.push(`/faculty/evaluation/${item.id}`)
+                        router.push(`/faculty/document-review/${item.id}`)
                       }
                       title="Evaluate Document"
                       aria-label={`Evaluate ${item.groupName} ${item.chapter}`}

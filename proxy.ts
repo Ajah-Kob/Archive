@@ -90,7 +90,7 @@ export async function proxy(req: NextRequest) {
     } else if (startsWithPath(pathname, '/faculty/templates')) {
       if (!hasCoordinatorAccess(token))
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/evaluation')) {
+    } else if (startsWithPath(pathname, '/faculty/document-review')) {
       if (token.isAdviser !== true)
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     } else if (startsWithPath(pathname, '/faculty/my-sections')) {

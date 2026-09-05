@@ -8,7 +8,7 @@ export default async function FacultyHomePage() {
 
   const links: { label: string; href: string; icon: typeof Users }[] = []
   if (session.user.isAdviser)
-    links.push({ label: 'Evaluation', href: '/faculty/evaluation', icon: ClipboardCheck })
+    links.push({ label: 'Document Review', href: '/faculty/document-review', icon: ClipboardCheck })
   if (session.user.isCoordinator || session.user.isProgramChair)
     links.push({ label: 'Faculties', href: '/faculty/faculties', icon: Users })
   if (session.user.isProgramChair)

@@ -18,6 +18,8 @@ export interface FinalizedWorkspaceViewProps {
    * the milestone's current submission — the banner wording adapts.
    */
   isSuperseded?: boolean
+  /** Back-link target (defaults to the document-review list). */
+  backHref?: string
 }
 
 function formatDate(iso: string) {
@@ -41,6 +43,7 @@ export function FinalizedWorkspaceView({
   submission,
   initialAnnotations,
   isSuperseded = false,
+  backHref,
 }: FinalizedWorkspaceViewProps) {
   // Decode persisted items (base64 stamp data → ArrayBuffer) before the
   // viewer imports them — same hydration path as useAnnotationDraft.
@@ -50,7 +53,7 @@ export function FinalizedWorkspaceView({
       {/* Header bar: back + context | finalized notice */}
       <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
         <Link
-          href="/faculty/evaluation"
+          href={backHref ?? '/faculty/document-review'}
           className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
         >
           <ArrowLeft className="size-[14px]" strokeWidth={2} />

@@ -84,7 +84,9 @@ export function SubmissionDetailsDrawer({
     <>
       <div
         className={`fixed inset-0 z-40 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] transition-all duration-300 ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          isOpen
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
       />
@@ -143,7 +145,8 @@ export function SubmissionDetailsDrawer({
                     </div>
                     <div className="flex items-center gap-[8px]">
                       <span className="flex items-center justify-center size-[18px] rounded-[5px] bg-[#f4f5fc] text-[8.5px] font-bold text-[#9ea8c6] shrink-0">
-                        {submission.mimeType.split('/')[1]?.toUpperCase() ?? 'FILE'}
+                        {submission.mimeType.split('/')[1]?.toUpperCase() ??
+                          'FILE'}
                       </span>
                       <p className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
                         {formatSize(submission.size)}
@@ -222,7 +225,7 @@ export function SubmissionDetailsDrawer({
                             </p>
                           </div>
                           <a
-                            href={`/faculty/evaluation/${version.id}`}
+                            href={`/faculty/document-review/${version.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Open this version in its own workspace (new tab)"
@@ -234,7 +237,9 @@ export function SubmissionDetailsDrawer({
                           </a>
                         </div>
                         <div className="pt-[5px] flex items-center gap-[8px]">
-                          <SubmissionStatusBadge status={toViewStatus(version)} />
+                          <SubmissionStatusBadge
+                            status={toViewStatus(version)}
+                          />
                           {version.reviewedAt && (
                             <span className="flex items-center gap-[5px] font-sans font-medium text-[11px] text-[#9ea8c6]">
                               <CalendarDays
@@ -265,7 +270,7 @@ export function SubmissionDetailsDrawer({
                     type="button"
                     onClick={() => {
                       onClose()
-                      router.push(`/faculty/evaluation/${submission.id}`)
+                      router.push(`/faculty/document-review/${submission.id}`)
                     }}
                     title={
                       currentVersion.status === 'PENDING'
@@ -279,9 +284,15 @@ export function SubmissionDetailsDrawer({
                     }`}
                   >
                     {currentVersion.status === 'PENDING' ? (
-                      <ClipboardCheck className="size-[16px]" strokeWidth={2.25} />
+                      <ClipboardCheck
+                        className="size-[16px]"
+                        strokeWidth={2.25}
+                      />
                     ) : (
-                      <LayoutPanelLeft className="size-[15px]" strokeWidth={2.25} />
+                      <LayoutPanelLeft
+                        className="size-[15px]"
+                        strokeWidth={2.25}
+                      />
                     )}
                     {currentVersion.status === 'PENDING'
                       ? 'Evaluate Document'

@@ -1,3 +1,4 @@
+import { PageLabel } from '@/components/globals/PageLabel'
 import TemplatesPage from '@/components/templates/main/TemplatesPage'
 
 // Students get read-only access: they can search, view and download
@@ -5,6 +6,7 @@ import TemplatesPage from '@/components/templates/main/TemplatesPage'
 export default function StudentTemplatesPage() {
   return (
     <section className="h-full flex flex-col">
+      <PageLabel label="Templates" />
       <TemplatesPage canUpload={false} canRemove={false} />
     </section>
   )

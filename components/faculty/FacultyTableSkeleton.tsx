@@ -6,34 +6,22 @@ export function FacultyTableSkeleton({ manageMode = true }: { manageMode?: boole
     : 'grid-cols-[2fr_1fr_1fr_150px]'
 
   return (
-    <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] animate-pulse">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2.5 pb-[15px] pt-[14px] px-5 border-b border-[#f0f2fa]">
-        <div className={`h-[37.5px] w-[320px] max-w-[320px] min-w-[180px] rounded-[9px] ${BAR}`} />
-        <div className={`h-[37.5px] w-[148px] rounded-[9px] ${BAR}`} />
-        {manageMode && (
-          <div className="flex-1 flex justify-end gap-[10px]">
-            <div className={`h-[37px] w-[172px] rounded-[9px] ${BAR}`} />
-            <div className={`h-[37.5px] w-[150px] rounded-[9px] ${BAR}`} />
-          </div>
-        )}
-      </div>
-
-      {/* Header Row */}
+    <div className="flex flex-col flex-1 min-h-0 animate-pulse">
+      {/* Header Row — font matches defense scheduling */}
       <div
         className={`grid ${gridCols} items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]`}
       >
-        <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
+        <div className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
           Adviser
         </div>
-        <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
+        <div className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
           Activity
         </div>
-        <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
+        <div className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
           Workload
         </div>
         {manageMode && (
-          <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
+          <div className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
             Coordinator
           </div>
         )}

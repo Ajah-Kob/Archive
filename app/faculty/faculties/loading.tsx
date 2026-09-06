@@ -2,18 +2,11 @@ import { FacultyTableSkeleton } from '@/components/faculty/FacultyTableSkeleton'
 
 export default function FacultyLoading() {
   return (
-    <section className="bg-[#f4f6ff] min-h-full flex flex-col gap-3 pt-[30px] px-[30px]">
-      <div className="flex gap-[6px] items-center h-[18px] animate-pulse">
-        <div className="h-[12px] w-[60px] rounded bg-[#e8ebf8]" />
-        <div className="size-[4px] rounded-full bg-[#e8ebf8]" />
-        <div className="h-[12px] w-[50px] rounded bg-[#e8ebf8]" />
-      </div>
-      <div className="flex flex-col gap-2 animate-pulse">
-        <div className="h-[20px] w-[120px] rounded bg-[#e8ebf8]" />
-        <div className="h-[14px] w-[420px] rounded bg-[#e8ebf8]" />
-      </div>
-      <div className="flex-1 pb-[30px]">
-        <FacultyTableSkeleton />
+    <section className="h-full flex flex-col">
+      <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
+        <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <FacultyTableSkeleton />
+        </div>
       </div>
     </section>
   )

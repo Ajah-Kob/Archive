@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
+import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
 import { FacultyTable, type FacultyMember } from './FacultyTable'
@@ -150,49 +151,50 @@ export function FacultyList() {
   }
 
   return (
-    <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)]">
-      <div className="flex items-center gap-2.5 pb-[15px] pt-[14px] px-5 border-b border-[#f0f2fa]">
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="Search faculty…"
-          ariaLabel="Search faculty"
-          className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
-        />
+    <>
+      <div className="flex flex-col flex-1 min-h-0">
+        <HeaderBar actions={viewerCanManage ? <CopyJoinCode /> : undefined}>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search faculty…"
+              ariaLabel="Search faculty"
+              className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+            />
+            <Filter
+              value={filter}
+              options={filterOptions}
+              onChange={(v) => setFilter(v as FacultyFilter)}
+              ariaLabel="Filter faculty"
+            />
+          </div>
+        </HeaderBar>
 
-        <Filter
-          value={filter}
-          options={filterOptions}
-          onChange={(v) => setFilter(v as FacultyFilter)}
-          ariaLabel="Filter faculty"
-        />
-
-        <div className="flex-1 flex justify-end gap-[10px]">
-          {viewerCanManage && <CopyJoinCode />}
+        <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
+          <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
+            {loading ? (
+              <FacultyTableSkeleton manageMode={session?.user ? viewerCanManage : true} />
+            ) : (
+              <FacultyTable
+                faculty={faculty}
+                emptyMessage={
+                  raw.length === 0
+                    ? 'No faculty have joined yet. Faculty join using the faculty invite code.'
+                    : 'No faculty match your search or filter.'
+                }
+                sortField={sortField}
+                sortDir={sortDir}
+                onSort={handleSort}
+                onViewDetails={(member) => openFacultyDrawer(member.id)}
+                onRemove={setRemoveTarget}
+                manageMode={viewerCanManage}
+                viewerUserId={session?.user?.id ? Number(session.user.id) : null}
+              />
+            )}
+          </div>
         </div>
       </div>
-
-      {loading ? (
-        <FacultyTableSkeleton
-          manageMode={session?.user ? viewerCanManage : true}
-        />
-      ) : (
-        <FacultyTable
-          faculty={faculty}
-          emptyMessage={
-            raw.length === 0
-              ? 'No faculty have joined yet. Faculty join using the faculty invite code.'
-              : 'No faculty match your search or filter.'
-          }
-          sortField={sortField}
-          sortDir={sortDir}
-          onSort={handleSort}
-          onViewDetails={(member) => openFacultyDrawer(member.id)}
-          onRemove={setRemoveTarget}
-          manageMode={viewerCanManage}
-          viewerUserId={session?.user?.id ? Number(session.user.id) : null}
-        />
-      )}
 
       <FacultyProfileDrawer />
       <RemoveFacultyModal
@@ -203,6 +205,6 @@ export function FacultyList() {
         onConfirm={handleRemove}
         onCancel={() => setRemoveTarget(null)}
       />
-    </div>
+    </>
   )
 }

@@ -23,7 +23,7 @@ function SortHeader({
 }) {
   return (
     <div
-      className="flex items-center gap-1 cursor-pointer select-none text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase"
+      className="flex items-center gap-1 cursor-pointer select-none font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase"
       onClick={() => onSort?.(field)}
     >
       {label}

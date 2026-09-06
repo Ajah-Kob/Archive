@@ -11,6 +11,8 @@ import {
   Shield,
   CalendarClock,
   Flag,
+  Users,
+  UserCog,
   type LucideIcon,
 } from 'lucide-react'
 import { roleHome } from '@/lib/helper'
@@ -28,7 +30,12 @@ type NavSection = {
 }
 
 function isNavActive(pathname: string, href: string) {
-  if (href === '/faculty/my-sections' || href === '/faculty/document-review') {
+  if (
+    href === '/faculty/my-sections' ||
+    href === '/faculty/document-review' ||
+    href === '/faculty/faculties' ||
+    href === '/faculty/coordinators'
+  ) {
     return pathname === href || pathname.startsWith(`${href}/`)
   }
   return pathname === href
@@ -57,6 +64,7 @@ export function NavLinks({
       : isStudent
         ? '/student/templates'
         : null
+  const isProgramChair = !!session?.user?.isProgramChair
 
   const sections: NavSection[] = [
     {
@@ -71,6 +79,23 @@ export function NavLinks({
         { label: 'Document Review', href: '/faculty/document-review', icon: ClipboardCheck, show: isAdviser },
         { label: 'Defense', href: '/faculty/defense', icon: Shield, show: isFaculty },
         { label: 'Defense Scheduling', href: '/faculty/defense-scheduling', icon: CalendarClock, show: isCoordinator },
+      ],
+    },
+    {
+      label: 'PROGRAM MANAGEMENT',
+      items: [
+        {
+          label: 'Faculties',
+          href: '/faculty/faculties',
+          icon: Users,
+          show: isAdmin || isCoordinator || isProgramChair,
+        },
+        {
+          label: 'Coordinators',
+          href: '/faculty/coordinators',
+          icon: UserCog,
+          show: isAdmin || isProgramChair,
+        },
       ],
     },
     {

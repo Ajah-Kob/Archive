@@ -144,29 +144,31 @@ export default function TemplatesPage({
               />
             </div>
 
-            <button
-              type="button"
-              role="switch"
-              aria-checked={myUploads}
-              aria-label="Filter my uploads"
-              onClick={() => setMyUploads(!myUploads)}
-              className="flex items-center gap-2 h-[37.5px] px-[13px] bg-white border border-[#e8ebf8] rounded-lg hover:border-[rgba(112,125,255,0.6)] transition-colors shrink-0"
-            >
-              <span className="font-sans font-semibold text-[13px] text-[#5a6382] whitespace-nowrap">
-                My Uploads
-              </span>
-              <span
-                className={`relative w-[32px] h-[18px] rounded-full transition-colors ${
-                  myUploads ? 'bg-[#707dff]' : 'bg-[#dddff0]'
-                }`}
+            {canUpload && (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={myUploads}
+                aria-label="Filter my uploads"
+                onClick={() => setMyUploads(!myUploads)}
+                className="flex items-center gap-2 h-[37.5px] px-[13px] bg-white border border-[#e8ebf8] rounded-lg hover:border-[rgba(112,125,255,0.6)] transition-colors shrink-0"
               >
+                <span className="font-sans font-semibold text-[13px] text-[#5a6382] whitespace-nowrap">
+                  My Uploads
+                </span>
                 <span
-                  className={`absolute top-[2.5px] left-[2.5px] size-[13px] bg-white rounded-full shadow-sm transition-transform ${
-                    myUploads ? 'translate-x-[14px]' : ''
+                  className={`relative w-[32px] h-[18px] rounded-full transition-colors ${
+                    myUploads ? 'bg-[#707dff]' : 'bg-[#dddff0]'
                   }`}
-                />
-              </span>
-            </button>
+                >
+                  <span
+                    className={`absolute top-[2.5px] left-[2.5px] size-[13px] bg-white rounded-full shadow-sm transition-transform ${
+                      myUploads ? 'translate-x-[14px]' : ''
+                    }`}
+                  />
+                </span>
+              </button>
+            )}
           </div>
         </HeaderBar>
 

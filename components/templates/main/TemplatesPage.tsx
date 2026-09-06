@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Plus } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import TemplateTable from '@/components/templates/main/TemplatesTable'
@@ -36,7 +37,9 @@ export default function TemplatesPage({
   const [removeTarget, setRemoveTarget] = useState<TemplateItem | null>(null)
   const [sortField, setSortField] = useState<'name' | 'date' | 'uploadedBy' | 'size'>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [myUploads, setMyUploads] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { data: session } = useSession()
 
   const handleSort = (field: typeof sortField) => {
     setSortDir((prev) => (sortField === field ? (prev === 'asc' ? 'desc' : 'asc') : 'desc'))
@@ -57,6 +60,13 @@ export default function TemplatesPage({
     })
     return sorted
   }, [templates, sortField, sortDir])
+
+  const displayedTemplates = useMemo(() => {
+    if (!myUploads) return sortedTemplates
+    const email = session?.user?.email?.toLowerCase()
+    if (!email) return sortedTemplates
+    return sortedTemplates.filter((t) => t.uploadedByEmail?.toLowerCase() === email)
+  }, [sortedTemplates, myUploads, session?.user?.email])
 
   const fetchTemplates = useCallback(async (search?: string) => {
     setLoading(true)
@@ -123,20 +133,46 @@ export default function TemplatesPage({
             ) : undefined
           }
         >
-          <div className="w-[280px] shrink-0 py-[8px]">
-            <SearchBar
-              value={searchTerm}
-              onChange={setSearchTerm}
-              placeholder="Search templates..."
-              ariaLabel="Search templates"
-              clearable
-            />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={myUploads}
+              aria-label="Filter my uploads"
+              onClick={() => setMyUploads(!myUploads)}
+              className="flex items-center gap-2 h-[37.5px] px-[13px] bg-white border border-[#e8ebf8] rounded-lg hover:border-[rgba(112,125,255,0.6)] transition-colors shrink-0"
+            >
+              <span className="font-sans font-semibold text-[13px] text-[#5a6382] whitespace-nowrap">
+                My Uploads
+              </span>
+              <span
+                className={`relative w-[32px] h-[18px] rounded-full transition-colors ${
+                  myUploads ? 'bg-[#707dff]' : 'bg-[#dddff0]'
+                }`}
+              >
+                <span
+                  className={`absolute top-[2.5px] left-[2.5px] size-[13px] bg-white rounded-full shadow-sm transition-transform ${
+                    myUploads ? 'translate-x-[14px]' : ''
+                  }`}
+                />
+              </span>
+            </button>
+
+            <div className="w-[280px] shrink-0 py-[8px]">
+              <SearchBar
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search templates..."
+                ariaLabel="Search templates"
+                clearable
+              />
+            </div>
           </div>
         </HeaderBar>
 
         <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
           <TemplateTable
-            templates={sortedTemplates}
+            templates={displayedTemplates}
             error={loading ? null : error}
             loading={loading}
             isEmpty={!loading && templates.length === 0 && !searchTerm}

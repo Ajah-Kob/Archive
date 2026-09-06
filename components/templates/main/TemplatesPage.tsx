@@ -134,6 +134,16 @@ export default function TemplatesPage({
           }
         >
           <div className="flex flex-wrap items-center gap-2.5">
+            <div className="w-[280px] shrink-0 py-[8px]">
+              <SearchBar
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search templates..."
+                ariaLabel="Search templates"
+                clearable
+              />
+            </div>
+
             <button
               type="button"
               role="switch"
@@ -157,16 +167,6 @@ export default function TemplatesPage({
                 />
               </span>
             </button>
-
-            <div className="w-[280px] shrink-0 py-[8px]">
-              <SearchBar
-                value={searchTerm}
-                onChange={setSearchTerm}
-                placeholder="Search templates..."
-                ariaLabel="Search templates"
-                clearable
-              />
-            </div>
           </div>
         </HeaderBar>
 

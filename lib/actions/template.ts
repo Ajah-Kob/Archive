@@ -28,7 +28,7 @@ export async function getTemplates(search?: string) {
       where: where as any,
       orderBy: { createdAt: 'desc' },
       include: {
-        uploadedBy: { select: { name: true } },
+        uploadedBy: { select: { name: true, email: true } },
       },
     })
 
@@ -42,6 +42,7 @@ export async function getTemplates(search?: string) {
       }),
       rawCreatedAt: t.createdAt.toISOString(),
       uploadedBy: t.uploadedBy.name,
+      uploadedByEmail: t.uploadedBy.email,
       // Below 1 MB show KB; 1 MB and above show MB.
       size:
         t.size < 1024 * 1024

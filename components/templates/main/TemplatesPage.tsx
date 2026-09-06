@@ -1,7 +1,9 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Upload } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { HeaderBar } from '@/components/globals/HeaderBar'
+import { SearchBar } from '@/components/ui/SearchBar'
 import TemplateTable from '@/components/templates/main/TemplatesTable'
 import UploadTemplateModal from '@/components/templates/modal/UploadTemplateModal'
 import RemoveTemplateModal from '@/components/templates/modal/RemoveTemplateModal'
@@ -13,6 +15,7 @@ export interface TemplateItem {
   dateUploaded: string
   rawCreatedAt: string
   uploadedBy: string
+  uploadedByEmail: string
   size: string
   rawSize: number
   fileUrl: string
@@ -105,37 +108,33 @@ export default function TemplatesPage({
 
   return (
     <>
-      <div className="flex flex-col w-full gap-5 h-full">
-        {/* Headings */}
-        <div className="flex flex-col gap-[12px]">
-          <div className="flex">
-            {/* Heading */}
-            <div className="flex flex-col w-full gap-1">
-              <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
-                Templates
-              </h1>
-              <p className="font-sans font-medium text-[13.5px] text-[#8a93b4]">
-                View and manage coordinators responsible for handling capstone
-                sections.
-              </p>
-            </div>
-
-            {/* Upload Button - Only specific roles can access this button */}
-            {canUpload && (
+      <div className="flex flex-col flex-1 min-h-0">
+        <HeaderBar
+          actions={
+            canUpload ? (
               <button
                 type="button"
                 onClick={() => setIsUploadModalOpen(true)}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-br from-[#707dff] via-[#707dff] to-[#5555ff] bg-[length:200%_200%] bg-[position:0%_0%] hover:bg-[position:100%_100%] text-white rounded-xl text-sm font-semibold transition-all duration-500 shadow-sm hover:shadow-md hover:shadow-indigo-500/20 active:scale-95 shrink-0"
+                className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
               >
-                <Upload size={16} />
-                <span>Upload Template</span>
+                <Plus className="size-4" strokeWidth={2} />
+                <span className="whitespace-nowrap">Upload Template</span>
               </button>
-            )}
+            ) : undefined
+          }
+        >
+          <div className="w-[280px] shrink-0 py-[8px]">
+            <SearchBar
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search templates..."
+              ariaLabel="Search templates"
+              clearable
+            />
           </div>
-        </div>
+        </HeaderBar>
 
-        <div className="flex flex-col gap-[10px] flex-1 min-h-px">
-          {/* Data Table — search bar lives inside the table card, above the headers */}
+        <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
           <TemplateTable
             templates={sortedTemplates}
             error={loading ? null : error}
@@ -144,9 +143,6 @@ export default function TemplatesPage({
             sortField={sortField}
             sortDir={sortDir}
             onSort={handleSort}
-            searchTerm={searchTerm}
-            onSearchChange={(value) => setSearchTerm(value)}
-            resultCount={templates.length}
             getRowActions={(item) => [
               { label: 'View', onClick: () => handleViewFile(item) },
               { label: 'Download', onClick: () => handleDownloadFile(item) },

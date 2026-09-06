@@ -1,8 +1,8 @@
 'use client'
 
 import { AlertCircle, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react'
-import { SearchBar } from '@/components/ui/SearchBar'
 import { FileIcon } from '@/components/ui/FileIcon'
+import { UserProfile } from '@/components/ui/UserProfile'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ActionMenu, type ActionItem } from '@/components/ui/ActionMenu'
 import TableSkeleton from './TableSkeleton'
@@ -13,6 +13,7 @@ export interface TemplateItem {
   dateUploaded: string
   rawCreatedAt: string
   uploadedBy: string
+  uploadedByEmail: string
   size: string
   rawSize: number
   fileUrl: string
@@ -27,26 +28,6 @@ interface TemplateTableProps {
   sortField?: string
   sortDir?: 'asc' | 'desc'
   onSort?: (field: string) => void
-  searchTerm?: string
-  onSearchChange?: (value: string) => void
-  resultCount?: number
-}
-
-function UserAvatar({ name }: { name: string }) {
-  const initial = name.charAt(0).toUpperCase()
-  return (
-    <div
-      className="size-[24px] rounded-[12px] flex items-center justify-center shrink-0"
-      style={{
-        backgroundImage:
-          'linear-gradient(135deg, rgb(112,125,255), rgb(85,101,255))',
-      }}
-    >
-      <span className="text-[9px] font-bold text-white leading-none">
-        {initial}
-      </span>
-    </div>
-  )
 }
 
 function SortHeader({
@@ -64,7 +45,7 @@ function SortHeader({
 }) {
   return (
     <div
-      className="flex items-center gap-1 cursor-pointer select-none text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase"
+      className="flex items-center gap-1 cursor-pointer select-none font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase"
       onClick={() => onSort?.(field)}
     >
       {label}
@@ -83,6 +64,13 @@ function SortHeader({
 
 const GRID_COLS = 'grid-cols-[1fr_1fr_1fr_1fr_80px]'
 
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
 export default function TemplateTable({
   templates,
   error,
@@ -92,9 +80,6 @@ export default function TemplateTable({
   sortField,
   sortDir,
   onSort,
-  searchTerm,
-  onSearchChange,
-  resultCount,
 }: TemplateTableProps) {
   return (
     <>
@@ -131,27 +116,11 @@ export default function TemplateTable({
           display: none;
         }
       `}</style>
-      <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
-        {/* Toolbar strip — lives inside the card, above the column headers */}
-        <div className="flex items-center gap-2.5 pb-[15px] pt-[14px] px-5 border-b border-[#f0f2fa] shrink-0">
-          <SearchBar
-            value={searchTerm ?? ''}
-            onChange={onSearchChange ?? (() => {})}
-            placeholder="Search templates…"
-            ariaLabel="Search templates"
-            className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
-          />
-          {resultCount !== undefined && (
-            <span className="ml-auto text-[12px] font-medium text-[#9ea8c6] whitespace-nowrap">
-              {resultCount} result{resultCount !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-
-        {/* Header row */}
-        <div className="bg-[#f8f9fe] shrink-0 header-grid-gutter">
+      <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
+        {/* Header row — font style matches defense scheduling */}
+        <div className="bg-[#fafbff] shrink-0 header-grid-gutter">
           <div
-            className={`grid ${GRID_COLS} px-[20px] py-[15px] border-b border-[#eceef8] items-center`}
+            className={`grid ${GRID_COLS} px-[20px] h-[39px] border-b border-[#f0f2fa] items-center rounded-t-[14px]`}
           >
             <SortHeader
               field="name"
@@ -220,11 +189,12 @@ export default function TemplateTable({
                 <span className="text-[12.5px] font-medium text-[#6b7399] whitespace-nowrap">
                   {item.dateUploaded}
                 </span>
-                <div className="flex items-center gap-[8px] min-w-0">
-                  <UserAvatar name={item.uploadedBy} />
-                  <span className="text-[12.5px] font-medium text-[#6b7399] truncate">
-                    {item.uploadedBy}
-                  </span>
+                <div className="min-w-0">
+                  <UserProfile
+                    initials={getInitials(item.uploadedBy)}
+                    name={item.uploadedBy}
+                    email={item.uploadedByEmail}
+                  />
                 </div>
                 <span className="text-[12.5px] font-medium text-[#9ea8c6] whitespace-nowrap">
                   {item.size}

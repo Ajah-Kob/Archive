@@ -178,25 +178,25 @@ export default function TemplateTable({
             {templates.map((item) => (
               <div
                 key={item.id}
-                className={`grid ${GRID_COLS} px-[20px] h-[63px] items-center border-b border-[#f0f2fa] hover:bg-slate-50/40 transition-colors`}
+                className={`grid ${GRID_COLS} px-[20px] h-[60px] items-center border-b border-[#f0f2fa] last:border-b-0 hover:bg-slate-50/40 transition-colors`}
               >
-                <div className="flex items-center gap-[12px] min-w-0">
+                <div className="flex items-center gap-[12px] min-w-0 pr-4">
                   <FileIcon filename={item.name} />
-                  <span className="text-[13px] font-semibold text-[#1e2145] truncate">
+                  <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
                     {item.name}
                   </span>
                 </div>
-                <span className="text-[12.5px] font-medium text-[#6b7399] whitespace-nowrap">
+                <span className="whitespace-nowrap font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pr-4">
                   {item.dateUploaded}
                 </span>
-                <div className="min-w-0">
+                <div className="min-w-0 pr-4">
                   <UserProfile
                     initials={getInitials(item.uploadedBy)}
                     name={item.uploadedBy}
                     email={item.uploadedByEmail}
                   />
                 </div>
-                <span className="text-[12.5px] font-medium text-[#9ea8c6] whitespace-nowrap">
+                <span className="whitespace-nowrap font-sans font-medium text-[12.5px] leading-[18.75px] text-[#5a6382] pr-4">
                   {item.size}
                 </span>
                 <div className="flex justify-end">

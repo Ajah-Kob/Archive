@@ -15,7 +15,7 @@ export default function TableSkeleton() {
       {rows.map((_, i) => (
         <div
           key={i}
-          className={`grid ${GRID_COLS} px-[20px] h-[63px] items-center border-b border-[#f0f2fa]`}
+          className={`grid ${GRID_COLS} px-[20px] h-[60px] items-center border-b border-[#f0f2fa] last:border-b-0`}
         >
           <div className="flex items-center gap-[12px]">
             <div className="size-[34px] rounded-[8px] bg-[#e8ebf8]" />

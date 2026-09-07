@@ -54,7 +54,7 @@ export function FooterActions({
         onClick={onPreview}
         disabled={!showPreviewEnabled}
         aria-label="Show capstone preview"
-        className="inline-flex items-center justify-center h-[33px] px-[18px] py-[8px] rounded-[9px] bg-white border border-[#dfe3fb] font-sans font-bold text-[12.5px] leading-none text-[#5a6382] hover:bg-[#f8f9ff] active:bg-[#f4f6ff] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)] focus:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="inline-flex items-center justify-center h-[33px] px-[18px] py-[8px] rounded-[9px] bg-white border border-[#dfe3fb] font-sans font-bold text-[12.5px] leading-none text-[#5a6382] hover:bg-[#f8f9ff] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)] focus:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         Show Preview
       </button>
@@ -72,7 +72,7 @@ export function FooterActions({
             className={`inline-flex items-center justify-center gap-[6px] h-[33px] px-[18px] py-[8px] rounded-[9px] bg-white border font-sans font-bold text-[12.5px] leading-none transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)] focus:ring-offset-1 ${
               saveDraftIsDisabled
                 ? 'opacity-50 cursor-not-allowed text-[#9ea8c6] border-[#e8ebf8] bg-[#f8f9ff]'
-                : 'text-[#5a6382] hover:bg-[#f8f9ff] active:bg-[#f4f6ff] border-[#dfe3fb]'
+                : 'text-[#5a6382] hover:bg-[#f8f9ff] border-[#dfe3fb]'
             }`}
           >
             {isSavingDraft ? (

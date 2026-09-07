@@ -120,17 +120,36 @@ export function AuthorList({
 
   const pickDisabled = readOnly || isAllMembersSelected
 
-  // Preview order while dragging — smoothly shifts list to show drop position
-  const previewAuthors = useMemo(() => {
+  const isDragging = dragIndex != null
+
+  // Display list with placeholder gap while dragging — avoids DOM reorder glitch.
+  // We keep original authors array, filter out dragged item, insert a placeholder at drop position.
+  // The list visually shows a gap where the dragged author will land, other authors smoothly shift via transition.
+  const displayList = useMemo(() => {
+    if (!isDragging || dragOverIndex == null || dragIndex == null || dragIndex === dragOverIndex) {
+      return authors.map((a, i) => ({ kind: 'author' as const, author: a, originalIndex: i }))
+    }
     const from = dragIndex
     const to = dragOverIndex
-    if (from == null || to == null || from === to) return authors
-    if (from < 0 || from >= authors.length) return authors
-    if (to < 0 || to >= authors.length) return authors
-    return arrayMove(authors, from, to)
-  }, [authors, dragIndex, dragOverIndex])
-
-  const isDragging = dragIndex != null
+    if (from < 0 || from >= authors.length || to < 0 || to >= authors.length) {
+      return authors.map((a, i) => ({ kind: 'author' as const, author: a, originalIndex: i }))
+    }
+    const without = authors
+      .map((a, i) => ({ kind: 'author' as const, author: a, originalIndex: i }))
+      .filter((item) => item.originalIndex !== from)
+    let target = to
+    if (from < to) target = to - 1
+    // Map target original index to position in without array
+    // Find where in without the target original index would be
+    const targetPos = without.findIndex((item) => item.originalIndex === to)
+    const insertAt = targetPos !== -1 ? targetPos + (from < to ? 1 : 0) : Math.max(0, Math.min(without.length, target))
+    const placeholder = { kind: 'placeholder' as const, key: `placeholder-${to}` }
+    const arr: (
+      | { kind: 'author'; author: AuthorEntry; originalIndex: number }
+      | { kind: 'placeholder'; key: string }
+    )[] = [...without.slice(0, insertAt), placeholder, ...without.slice(insertAt)]
+    return arr
+  }, [authors, dragIndex, dragOverIndex, isDragging])
 
   const notifyChange = useCallback(
     (next: AuthorEntry[]) => {
@@ -308,9 +327,40 @@ export function AuthorList({
             </p>
           </div>
         ) : (
-          (isDragging && dragOverIndex != null && dragIndex !== dragOverIndex ? previewAuthors : authors).map((author, previewIndex) => {
-            const originalIndex = authors.indexOf(author)
-            const index = originalIndex !== -1 ? originalIndex : previewIndex
+          displayList.map((item) => {
+            if (item.kind === 'placeholder') {
+              return (
+                <div
+                  key={item.key}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDrop={(e) => {
+                    // Drop on placeholder itself should commit to current dragOverIndex
+                    e.preventDefault()
+                    if (dragIndex == null || dragOverIndex == null) return
+                    const from = dragIndex
+                    const to = dragOverIndex
+                    if (from === to) return
+                    const next = arrayMove(authors, from, to)
+                    if (Array.isArray(next) && next.length === authors.length) {
+                      dragIndexRef.current = null
+                      setDragIndex(null)
+                      setDragOverIndex(null)
+                      notifyChange(next)
+                    }
+                  }}
+                  className="h-[54px] rounded-[10px] border-2 border-dashed border-[#c4c8ff] bg-[rgba(112,125,255,0.06)] flex items-center justify-center gap-2 transition-all duration-200 ease-out"
+                >
+                  <span className="size-2 rounded-full bg-[#707dff] animate-pulse" />
+                  <span className="font-sans text-[11px] font-semibold text-[#707dff]">Drop here</span>
+                </div>
+              )
+            }
+            const author = item.author
+            const index = item.originalIndex
+            const visualIndex = displayList.filter((i) => i.kind === 'author').findIndex((i) => i.kind === 'author' && i.author === author)
             const rowError = getAuthorRowError(author)
             const isDuplicateRow = duplicateSet.has(index)
             const hasRowError = Boolean(rowError) || isDuplicateRow
@@ -323,7 +373,7 @@ export function AuthorList({
                 ? `user-${author.userId}`
                 : author.email
                   ? `email-${author.email.trim().toLowerCase()}`
-                  : `custom-${author.firstName}-${author.lastName}-${previewIndex}`
+                  : `custom-${author.firstName}-${author.lastName}-${index}`
             return (
               <div
                 key={stableKey}
@@ -332,7 +382,7 @@ export function AuthorList({
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver(index)}
                 onDrop={handleDrop(index)}
-                className={`bg-[#fafbff] border rounded-[10px] px-[12px] py-[10px] flex gap-[10px] items-center w-full transition-all duration-200 ease-out ${rowBorder} ${isDragOver ? 'ring-2 ring-[rgba(112,125,255,0.18)] bg-white translate-y-[1px] shadow-sm' : ''} ${isDraggedItem ? 'opacity-60 scale-[0.98] shadow-md' : ''} ${readOnly ? 'opacity-90' : ''}`}
+                className={`bg-[#fafbff] border rounded-[10px] px-[12px] py-[10px] flex gap-[10px] items-center w-full transition-all duration-200 ease-out ${rowBorder} ${isDragOver ? 'ring-2 ring-[rgba(112,125,255,0.18)] bg-white shadow-sm' : ''} ${isDraggedItem ? 'opacity-40 scale-[0.98]' : ''} ${readOnly ? 'opacity-90' : ''}`}
               >
                 <div
                   aria-hidden="true"
@@ -343,7 +393,7 @@ export function AuthorList({
                 </div>
 
                 <span className="shrink-0 font-sans font-medium text-[11px] leading-[14px] text-[#9ea8c6] min-w-[56px]">
-                  Author {previewIndex + 1}:
+                  Author {visualIndex + 1}:
                 </span>
 
                 <div className="flex-1 min-w-0 flex flex-wrap lg:flex-nowrap gap-[8px] items-center">
@@ -355,7 +405,7 @@ export function AuthorList({
                     disabled={readOnly}
                     readOnly={readOnly}
                     placeholder="Lastname"
-                    aria-label={`Author ${previewIndex + 1} last name`}
+                    aria-label={`Author ${visualIndex + 1} last name`}
                     className={`flex-1 min-w-[110px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[#9ea8c6] placeholder:font-normal transition-colors ${showRowError && !author.lastName.trim() ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
                   />
                   <input
@@ -366,7 +416,7 @@ export function AuthorList({
                     disabled={readOnly}
                     readOnly={readOnly}
                     placeholder="Firstname"
-                    aria-label={`Author ${previewIndex + 1} first name`}
+                    aria-label={`Author ${visualIndex + 1} first name`}
                     className={`flex-1 min-w-[110px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[#9ea8c6] placeholder:font-normal transition-colors ${showRowError && !author.firstName.trim() ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
                   />
                   <input
@@ -377,7 +427,7 @@ export function AuthorList({
                     disabled={readOnly}
                     readOnly={readOnly}
                     placeholder="Email"
-                    aria-label={`Author ${previewIndex + 1} email`}
+                    aria-label={`Author ${visualIndex + 1} email`}
                     className={`flex-1 min-w-[160px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[rgba(158,168,198,0.7)] placeholder:font-normal transition-colors ${showRowError && (!author.email.trim() || !isValidEmailFormat(author.email)) ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
                   />
 
@@ -387,7 +437,7 @@ export function AuthorList({
                         type="button"
                         onClick={() => moveUp(index)}
                         disabled={readOnly || index === 0}
-                        aria-label={`Move author ${previewIndex + 1} up`}
+                        aria-label={`Move author ${visualIndex + 1} up`}
                         className={`size-[20px] rounded-[6px] border flex items-center justify-center transition-colors ${readOnly || index === 0 ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed' : 'bg-white border-[#e8ebf8] text-[#8a93b4] hover:border-[#707dff] hover:text-[#707dff] active:bg-[#f4f6ff]'}`}
                       >
                         <ChevronUp className="size-[10px]" strokeWidth={2.5} />
@@ -396,7 +446,7 @@ export function AuthorList({
                         type="button"
                         onClick={() => moveDown(index)}
                         disabled={readOnly || index === authors.length - 1}
-                        aria-label={`Move author ${previewIndex + 1} down`}
+                        aria-label={`Move author ${visualIndex + 1} down`}
                         className={`size-[20px] rounded-[6px] border flex items-center justify-center transition-colors ${readOnly || index >= authors.length - 1 ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed' : 'bg-white border-[#e8ebf8] text-[#8a93b4] hover:border-[#707dff] hover:text-[#707dff] active:bg-[#f4f6ff]'}`}
                       >
                         <ChevronDown className="size-[10px]" strokeWidth={2.5} />
@@ -407,7 +457,7 @@ export function AuthorList({
                       type="button"
                       onClick={() => openPickerForRow(index)}
                       disabled={pickDisabled}
-                      aria-label={`Pick student for author ${previewIndex + 1}`}
+                      aria-label={`Pick student for author ${visualIndex + 1}`}
                       title={pickDisabled && !readOnly ? 'All group members already added' : 'Pick from group'}
                       className={`size-[28px] rounded-[9px] border flex items-center justify-center shrink-0 transition-colors ${pickDisabled ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed opacity-60' : 'bg-white border-[#e8ebf8] text-[#707dff] hover:bg-[#f4f6ff] hover:border-[#d4d8f0] active:bg-[#eef0ff] focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.2)]'}`}
                     >
@@ -418,7 +468,7 @@ export function AuthorList({
                       type="button"
                       onClick={() => handleDelete(index)}
                       disabled={readOnly}
-                      aria-label={`Remove author ${previewIndex + 1}`}
+                      aria-label={`Remove author ${visualIndex + 1}`}
                       className={`size-[28px] rounded-[9px] border flex items-center justify-center shrink-0 transition-colors ${readOnly ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed' : 'bg-white border-[#e8ebf8] text-[#e11d48] hover:bg-[#fff1f2] hover:border-[#fecdd3] active:bg-[#ffe4e6] focus:outline-none focus:ring-2 focus:ring-[rgba(225,29,72,0.15)]'}`}
                       title="Remove author"
                     >

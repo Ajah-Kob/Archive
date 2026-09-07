@@ -51,7 +51,7 @@ async function getArchivedCapstonesData(): Promise<RepositoryArchiveRow[]> {
     title: r.title,
     abstract: r.abstract,
     tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
-    authorOrder: Array.isArray(r.authorOrder) ? (r.authorOrder as AuthorEntry[]) : [],
+    authorOrder: Array.isArray(r.authorOrder) ? (r.authorOrder as unknown as AuthorEntry[]) : [],
     blobUrl: r.blobUrl,
     fileName: r.fileName,
     mimeType: r.mimeType,

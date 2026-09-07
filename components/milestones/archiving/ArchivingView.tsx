@@ -78,7 +78,7 @@ export function ArchivingView({ initialStatus, initialData }: ArchivingViewProps
   return (
     <>
       <PageLabel label="Archiving" />
-      <div className="flex flex-1 min-h-0 flex-col gap-[16px] overflow-hidden w-full max-w-[968px] mx-auto">
+      <div className="flex flex-1 min-h-0 flex-col gap-[16px] overflow-hidden w-full">
         <StatusCallout status={status} />
 
         {/* Card is the primary scroll container; outer stack never overflows the page */}

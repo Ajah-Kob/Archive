@@ -241,7 +241,7 @@ export function CapstoneDetailsCard({
   const hasFooterHandlers = Boolean(onPreview || onSaveDraft || onSubmit)
 
   return (
-    <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden w-full max-w-[968px] mx-auto">
+    <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden w-full">
       <Header />
 
       {/* Scrollable form area — preserves outer layout; only this region scrolls. Gap + pb10 per spec */}

@@ -533,6 +533,9 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
         if (documentValue.fileName) formData.set('fileName', documentValue.fileName)
         if (documentValue.mimeType) formData.set('mimeType', documentValue.mimeType)
         if (documentValue.size != null) formData.set('size', String(documentValue.size))
+      } else if ((initialData as any)?.blobUrl) {
+        // File was removed — tell server to clear the persisted document
+        formData.set('clearDocument', 'true')
       }
 
       const res = await saveArchivingDraft(null, formData)

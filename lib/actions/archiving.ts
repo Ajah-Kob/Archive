@@ -644,20 +644,7 @@ export async function saveArchivingDraft(_prevState: any, formData: FormData) {
       size: effectiveSize,
     }
 
-    // Draft lenient: only checks limits for fields that have value; allows partial save.
-    // For authors, "has input" means at least one author has all fields filled.
-    const hasAuthorsWithValues =
-      Array.isArray(toValidate.authorOrder) &&
-      toValidate.authorOrder.some((a: any) => a?.lastName?.trim() && a?.firstName?.trim() && a?.email?.trim() && isValidEmailFormat(a.email.trim()))
-    const hasAnyInput =
-      (toValidate.title ?? '').trim().length > 0 ||
-      (toValidate.abstract ?? '').trim().length > 0 ||
-      (Array.isArray(toValidate.tags) && toValidate.tags.length > 0) ||
-      hasAuthorsWithValues ||
-      Boolean(toValidate.blobUrl && toValidate.blobUrl.trim().length > 0)
-    if (!hasAnyInput) {
-      return { success: false, message: 'Add at least one field to save draft.' }
-    }
+    // Draft lenient: only checks limits for fields that have value; allows partial and even empty save (clearing).
     const validation = validateDraftPayload(toValidate)
     if (validation.valid === false) {
       return { success: false, message: validation.message }

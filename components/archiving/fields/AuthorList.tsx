@@ -72,16 +72,17 @@ export function AuthorList({
   id = 'authors',
 }: AuthorListProps) {
   const rawAuthors = Array.isArray(value) ? value : []
-  // Ensure stable ids for keys — generate for authors without id and keep stable
-  const idMapRef = useRef<Map<string, string>>(new Map())
+  // Stable ids — use WeakMap so id follows author object, not content/index
+  const weakIdMapRef = useRef<WeakMap<AuthorEntry, string>>(new WeakMap())
   const authors: AuthorEntry[] = useMemo(() => {
-    return rawAuthors.map((a, idx) => {
+    return rawAuthors.map((a) => {
       if (a.id) return a
-      const key = `${a.userId ?? 'custom'}-${a.email}-${a.firstName}-${a.lastName}-${idx}`
-      if (!idMapRef.current.has(key)) {
-        idMapRef.current.set(key, generateId())
+      if (weakIdMapRef.current.has(a)) {
+        return { ...a, id: weakIdMapRef.current.get(a)! }
       }
-      return { ...a, id: idMapRef.current.get(key)! }
+      const newId = generateId()
+      weakIdMapRef.current.set(a, newId)
+      return { ...a, id: newId }
     })
   }, [rawAuthors])
 

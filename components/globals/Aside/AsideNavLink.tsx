@@ -99,7 +99,7 @@ export function NavLinks({
           show: isAdmin || isProgramChair,
         },
         {
-          label: 'Archiving Review',
+          label: 'Archiving',
           href: '/faculty/archiving',
           icon: Archive,
           show: isAdmin || isProgramChair,

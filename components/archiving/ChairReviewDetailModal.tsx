@@ -236,43 +236,7 @@ export function ChairReviewDetailModal({
             )}
           </div>
 
-          {/* Authors ordered */}
-          <div>
-            <SectionLabel>Authors (in order)</SectionLabel>
-            {submission.authorOrder.length === 0 ? (
-              <p className="font-sans text-[12.5px] text-[#9ea8c6]">No authors</p>
-            ) : (
-              <div className="border border-[#e8ebf8] rounded-[10px] divide-y divide-[#f0f2fa] overflow-hidden">
-                {submission.authorOrder.map((a, idx) => (
-                  <div key={`${a.email}-${idx}`} className="flex items-center justify-between gap-3 px-4 py-2.5 bg-white">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex items-center justify-center size-[22px] rounded-full bg-[#f4f6ff] border border-[#e5e8ff] font-sans font-bold text-[10px] text-[#707dff] shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#1e2145] truncate">
-                          {a.lastName}, {a.firstName}
-                        </p>
-                        <p className="font-sans text-[11.5px] leading-[16px] text-[#8a93b4] truncate">{a.email}</p>
-                      </div>
-                    </div>
-                    {a.userId != null ? (
-                      <span className="inline-flex items-center h-[20px] px-[7px] rounded-full bg-[rgba(22,163,74,0.07)] border border-[rgba(22,163,74,0.2)] font-sans font-semibold text-[10px] text-[#16a34a] shrink-0">
-                        Linked
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center h-[20px] px-[7px] rounded-full bg-[#f8f9ff] border border-[#e5e8ff] font-sans font-medium text-[10px] text-[#8a93b4] shrink-0">
-                        Custom
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            <p className="font-sans text-[11px] leading-[16px] text-[#9ea8c6] mt-1.5">
-              Order is preserved exactly as submitted — removed group members remain as custom authors.
-            </p>
-          </div>
+
 
           {/* Document */}
           <div>

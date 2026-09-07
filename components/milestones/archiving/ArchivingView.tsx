@@ -38,6 +38,7 @@ export function ArchivingView({
     showPreview,
     showSubmitModal,
     isSubmitDisabled,
+    isSaveDraftDisabled,
     validationForSubmit,
     setTitle,
     setAbstract,
@@ -113,6 +114,7 @@ export function ArchivingView({
           submitDisabledReason={submitDisabledReason}
           isSubmitting={isFooterSubmitting}
           isSavingDraft={isSavingDraft}
+          isSaveDraftDisabled={isSaveDraftDisabled}
         />
       </div>
 

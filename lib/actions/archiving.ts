@@ -331,6 +331,67 @@ function validateArchivingPayload(
   return { valid: true }
 }
 
+// Draft lenient validation — only checks limits for fields that have value; allows partial save.
+// Disabled only when ALL fields empty is handled client-side via hasAnyInput; server also guards empty draft as no-op.
+function validateDraftPayload(
+  data: ReturnType<typeof parseArchivingForm>,
+): { valid: true } | { valid: false; message: string } {
+  const { title, abstract, tags, authorOrder, blobUrl, mimeType } = data
+
+  const trimmedTitle = (title ?? '').trim()
+  if (trimmedTitle.length > 0) {
+    if (countChars(title) > TITLE_MAX_CHARS) {
+      return { valid: false, message: `Research title must be at most ${TITLE_MAX_CHARS} characters (current: ${countChars(title)}).` }
+    }
+    if (countWords(title) > TITLE_MAX_WORDS) {
+      return { valid: false, message: `Research title must be at most ${TITLE_MAX_WORDS} words (current: ${countWords(title)}).` }
+    }
+    if (!isValidTitle(title)) return { valid: false, message: 'Research title is invalid.' }
+  }
+
+  const trimmedAbstract = (abstract ?? '').trim()
+  if (trimmedAbstract.length > 0) {
+    if (countChars(abstract) > ABSTRACT_MAX_CHARS) {
+      return { valid: false, message: `Abstract must be at most ${ABSTRACT_MAX_CHARS} characters (current: ${countChars(abstract)}).` }
+    }
+    if (countSentences(abstract) > ABSTRACT_MAX_SENTENCES) {
+      return { valid: false, message: `Abstract must be at most ${ABSTRACT_MAX_SENTENCES} sentences (current: ${countSentences(abstract)}).` }
+    }
+    if (!isValidAbstract(abstract)) return { valid: false, message: 'Abstract is invalid.' }
+  }
+
+  if (Array.isArray(tags) && tags.length > 0) {
+    if (!isValidTags(tags)) {
+      const hasEmpty = tags.some((t) => !t || t.trim().length === 0)
+      if (hasEmpty) return { valid: false, message: 'Tags cannot be empty.' }
+      const normalized = tags.map((t) => t.trim().toLowerCase())
+      if (new Set(normalized).size !== normalized.length) return { valid: false, message: 'Duplicate tags are not allowed.' }
+      return { valid: false, message: 'Tags are invalid.' }
+    }
+  }
+
+  if (Array.isArray(authorOrder) && authorOrder.length > 0) {
+    if (!isValidAuthors(authorOrder)) {
+      const hasMissing = authorOrder.some((a) => !a.lastName?.trim() || !a.firstName?.trim() || !a.email?.trim())
+      if (hasMissing) return { valid: false, message: 'Each author requires last name, first name, and email.' }
+      const hasBadEmail = authorOrder.some((a) => !isValidEmailFormat(a.email))
+      if (hasBadEmail) return { valid: false, message: 'One or more authors have an invalid email.' }
+      const emails = authorOrder.map((a) => a.email.trim().toLowerCase())
+      if (new Set(emails).size !== emails.length) return { valid: false, message: 'Duplicate authors are not allowed.' }
+      const names = authorOrder.map((a) => `${a.firstName.trim().toLowerCase()}|${a.lastName.trim().toLowerCase()}`)
+      if (new Set(names).size !== names.length) return { valid: false, message: 'Duplicate authors are not allowed.' }
+      return { valid: false, message: 'Authors are invalid.' }
+    }
+  }
+
+  if (blobUrl && blobUrl.trim().length > 0 && mimeType && !isPdfMime(mimeType)) {
+    return { valid: false, message: 'Only PDF files are allowed.' }
+  }
+
+  // All empty is handled via client disabled; server allows empty draft as no-op but we guard below
+  return { valid: true }
+}
+
 // ───────────────────────────── cached readers ─────────────────────────────
 
 // Internal cached fetch for a single group's archiving data.
@@ -574,7 +635,18 @@ export async function saveArchivingDraft(_prevState: any, formData: FormData) {
       size: effectiveSize,
     }
 
-    const validation = validateArchivingPayload(toValidate, { requireBlob: false })
+    // Draft lenient: only checks limits for fields that have value; allows partial save.
+    // All-empty is handled client-side disabled, but guard here too.
+    const hasAnyInput =
+      (toValidate.title ?? '').trim().length > 0 ||
+      (toValidate.abstract ?? '').trim().length > 0 ||
+      (Array.isArray(toValidate.tags) && toValidate.tags.length > 0) ||
+      (Array.isArray(toValidate.authorOrder) && toValidate.authorOrder.length > 0) ||
+      Boolean(toValidate.blobUrl && toValidate.blobUrl.trim().length > 0)
+    if (!hasAnyInput) {
+      return { success: false, message: 'Add at least one field to save draft.' }
+    }
+    const validation = validateDraftPayload(toValidate)
     if (validation.valid === false) {
       return { success: false, message: validation.message }
     }

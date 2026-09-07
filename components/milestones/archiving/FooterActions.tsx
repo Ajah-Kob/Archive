@@ -14,6 +14,7 @@ export interface FooterActionsProps {
   isSubmitDisabled?: boolean
   isSubmitting?: boolean
   isSavingDraft?: boolean
+  isSaveDraftDisabled?: boolean
   submitDisabledReason?: string
   onPreview: () => void
   onSaveDraft: () => void
@@ -26,6 +27,7 @@ export function FooterActions({
   isSubmitDisabled = false,
   isSubmitting = false,
   isSavingDraft = false,
+  isSaveDraftDisabled = false,
   submitDisabledReason,
   onPreview,
   onSaveDraft,
@@ -33,6 +35,7 @@ export function FooterActions({
 }: FooterActionsProps) {
   const showPreviewEnabled = true // always works, even when readOnly
   const submitIsDisabled = isSubmitting || isSubmitDisabled
+  const saveDraftIsDisabled = isSavingDraft || Boolean(isSaveDraftDisabled)
   // When readOnly, hide Save Draft and Submit (show only Preview + locked banner handled by parent)
   const hideSaveAndSubmit = Boolean(isReadOnly)
 
@@ -58,16 +61,18 @@ export function FooterActions({
 
       {!hideSaveAndSubmit ? (
         <>
-          {/* Save as Draft — same style as Show Preview, disabled while saving */}
+          {/* Save as Draft — disabled when all fields empty, enabled when at least one input has value */}
           <button
             type="button"
             onClick={onSaveDraft}
-            disabled={isSavingDraft}
+            disabled={saveDraftIsDisabled}
             aria-label="Save as draft"
-            className={`inline-flex items-center justify-center gap-[6px] h-[33px] px-[18px] py-[8px] rounded-[9px] bg-white border border-[#dfe3fb] font-sans font-bold text-[12.5px] leading-none transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)] focus:ring-offset-1 ${
-              isSavingDraft
-                ? 'opacity-60 cursor-not-allowed text-[#9ea8c6]'
-                : 'text-[#5a6382] hover:bg-[#f8f9ff] active:bg-[#f4f6ff]'
+            title={isSaveDraftDisabled && !isSavingDraft ? 'Add at least one field to save draft' : undefined}
+            aria-disabled={saveDraftIsDisabled}
+            className={`inline-flex items-center justify-center gap-[6px] h-[33px] px-[18px] py-[8px] rounded-[9px] bg-white border font-sans font-bold text-[12.5px] leading-none transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)] focus:ring-offset-1 ${
+              saveDraftIsDisabled
+                ? 'opacity-50 cursor-not-allowed text-[#9ea8c6] border-[#e8ebf8] bg-[#f8f9ff]'
+                : 'text-[#5a6382] hover:bg-[#f8f9ff] active:bg-[#f4f6ff] border-[#dfe3fb]'
             }`}
           >
             {isSavingDraft ? (

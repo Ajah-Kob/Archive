@@ -41,19 +41,16 @@ export function TagChipInput({
   // Normalized set for duplicate blocking (case-insensitive)
   const normalizedSet = new Set(tags.map((t) => t.trim().toLowerCase()))
 
-  const getValidationError = useCallback(
-    (current: string[]): string | null => {
-      // Use validation.ts isValidTags for client+server parity; surface specific message for UX
-      // Empty (required) is NOT shown inline — Submit is disabled when empty.
-      if (!isValidTags(current)) {
-        if (current.length < 1) return null
-        // isValidTags covers empty/duplicate — duplicate is handled as flash, empty as required
-        return 'Tags are invalid.'
-      }
-      return null
-    },
-    [],
-  )
+  const getValidationError = useCallback((current: string[]): string | null => {
+    // Use validation.ts isValidTags for client+server parity; surface specific message for UX
+    // Empty (required) is NOT shown inline — Submit is disabled when empty.
+    if (!isValidTags(current)) {
+      if (current.length < 1) return null
+      // isValidTags covers empty/duplicate — duplicate is handled as flash, empty as required
+      return 'Tags are invalid.'
+    }
+    return null
+  }, [])
 
   // Show external error if provided, otherwise internal required after touched / when duplicate flash not present
   const requiredError = getValidationError(tags)
@@ -69,7 +66,12 @@ export function TagChipInput({
   }
 
   // Pristine empty should not flash required until touched or attempt to add
-  if (!touched && tags.length === 0 && !duplicateFlash && externalError === undefined) {
+  if (
+    !touched &&
+    tags.length === 0 &&
+    !duplicateFlash &&
+    externalError === undefined
+  ) {
     displayError = null
   }
 
@@ -116,12 +118,16 @@ export function TagChipInput({
         setInputValue('')
         setTouched(true)
       }
-    } else if (e.key === ',' ) {
+    } else if (e.key === ',') {
       // Optional: comma also adds — consistent with comma-separated paste
       e.preventDefault()
       const added = tryAddTag(inputValue)
       if (added) setInputValue('')
-    } else if (e.key === 'Backspace' && inputValue.length === 0 && tags.length > 0) {
+    } else if (
+      e.key === 'Backspace' &&
+      inputValue.length === 0 &&
+      tags.length > 0
+    ) {
       // Backspace when empty deletes last
       e.preventDefault()
       const next = tags.slice(0, -1)
@@ -210,7 +216,7 @@ export function TagChipInput({
         />
       </div>
 
-      {/* Inline validation — min1 required + duplicate flash */}
+      {/* Inline validation — duplicate flash only; empty not shown (Submit disabled) */}
       <div className="min-h-[16px]">
         {hasError && displayError ? (
           <p

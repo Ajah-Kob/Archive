@@ -90,7 +90,8 @@ export function AuthorList({
     if (readOnly) return null
     if (!isValidAuthors(authors)) {
       if (authors.length === 0) return null
-      if (hasDuplicateAuthors(authors)) return 'Duplicate authors are not allowed.'
+      if (hasDuplicateAuthors(authors))
+        return 'Duplicate authors are not allowed.'
       // Check each row has required fields when touched or when any field partially filled
       const hasRowError = authors.some((a) => getAuthorRowError(a) !== null)
       if (hasRowError && touched) {
@@ -106,7 +107,9 @@ export function AuthorList({
   // If external error not provided but pristine, hide until touched
   const showOverallError = Boolean(overallError)
   const showMinErrorPristine =
-    !touched && authors.length === 0 && !externalError && !showOverallError ? null : overallError
+    !touched && authors.length === 0 && !externalError && !showOverallError
+      ? null
+      : overallError
 
   // Row duplicate detection for inline highlight (already handled overall but also per row)
   const duplicateSet = (() => {
@@ -121,7 +124,11 @@ export function AuthorList({
         const emailB = (b.email ?? '').trim().toLowerCase()
         const nameA = `${(a.firstName ?? '').trim().toLowerCase()}|${(a.lastName ?? '').trim().toLowerCase()}`
         const nameB = `${(b.firstName ?? '').trim().toLowerCase()}|${(b.lastName ?? '').trim().toLowerCase()}`
-        if ((emailA && emailA === emailB) || (nameA !== '|' && nameA === nameB) || (a.userId != null && a.userId === b.userId)) {
+        if (
+          (emailA && emailA === emailB) ||
+          (nameA !== '|' && nameA === nameB) ||
+          (a.userId != null && a.userId === b.userId)
+        ) {
           dupIndices.add(i)
           dupIndices.add(j)
         }
@@ -130,7 +137,11 @@ export function AuthorList({
     return dupIndices
   })()
 
-  const handleFieldChange = (index: number, field: keyof AuthorEntry, val: string) => {
+  const handleFieldChange = (
+    index: number,
+    field: keyof AuthorEntry,
+    val: string,
+  ) => {
     if (readOnly) return
     const next = [...authors]
     // Preserve userId distinction: keep linked userId even if fields edited manually (snapshot survives group removal)
@@ -268,8 +279,11 @@ export function AuthorList({
             const isDuplicateRow = duplicateSet.has(index)
             const hasRowError = Boolean(rowError) || isDuplicateRow
             // Show row error only after touched or when duplicate
-            const showRowError = !readOnly && ( (touched && hasRowError) || isDuplicateRow)
-            const rowBorder = showRowError ? 'border-[#e11d48]' : 'border-[#e8ebf8]'
+            const showRowError =
+              !readOnly && ((touched && hasRowError) || isDuplicateRow)
+            const rowBorder = showRowError
+              ? 'border-[#e11d48]'
+              : 'border-[#e8ebf8]'
             const isDragOver = dragOverIndex === index && dragIndex !== index
             return (
               <div
@@ -281,22 +295,14 @@ export function AuthorList({
                 onDrop={handleDrop(index)}
                 className={`bg-[#fafbff] border rounded-[10px] px-[12px] py-[10px] flex gap-[10px] items-center w-full transition-colors ${rowBorder} ${isDragOver ? 'ring-2 ring-[rgba(112,125,255,0.18)] bg-white' : ''} ${dragIndex === index ? 'opacity-60' : ''} ${readOnly ? 'opacity-90' : ''}`}
               >
-                {/* Drag handle — 14.6x9.3 6 dots draggable via handle (entire row draggable, handle visual) */}
-                <button
-                  type="button"
-                  draggable={false}
-                  disabled={readOnly}
-                  aria-label={`Drag to reorder author ${index + 1}`}
-                  className={`shrink-0 cursor-grab active:cursor-grabbing touch-manipulation ${readOnly ? 'cursor-not-allowed' : ''}`}
-                  onMouseDown={(e) => {
-                    // Allow drag by row; handle is visual only when using row draggable
-                    // Prevent button from stealing drag
-                    e.preventDefault()
-                  }}
-                  tabIndex={readOnly ? -1 : 0}
+                {/* Drag handle — 14.6x9.3 6 dots — row is draggable, handle is visual grip */}
+                <div
+                  aria-hidden="true"
+                  className={`shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing touch-manipulation select-none ${readOnly ? 'opacity-40 cursor-not-allowed' : 'opacity-60 hover:opacity-100'}`}
+                  style={{ width: 14.6, height: 20 }}
                 >
                   <DragHandle disabled={readOnly} />
-                </button>
+                </div>
 
                 {/* Author N label — 11px medium #9ea8c6 */}
                 <span className="shrink-0 font-sans font-medium text-[11px] leading-[14px] text-[#9ea8c6] min-w-[56px]">
@@ -309,7 +315,9 @@ export function AuthorList({
                   <input
                     type="text"
                     value={author.lastName}
-                    onChange={(e) => handleFieldChange(index, 'lastName', e.target.value)}
+                    onChange={(e) =>
+                      handleFieldChange(index, 'lastName', e.target.value)
+                    }
                     onBlur={() => setTouched(true)}
                     disabled={readOnly}
                     readOnly={readOnly}
@@ -321,7 +329,9 @@ export function AuthorList({
                   <input
                     type="text"
                     value={author.firstName}
-                    onChange={(e) => handleFieldChange(index, 'firstName', e.target.value)}
+                    onChange={(e) =>
+                      handleFieldChange(index, 'firstName', e.target.value)
+                    }
                     onBlur={() => setTouched(true)}
                     disabled={readOnly}
                     readOnly={readOnly}
@@ -333,7 +343,9 @@ export function AuthorList({
                   <input
                     type="email"
                     value={author.email}
-                    onChange={(e) => handleFieldChange(index, 'email', e.target.value)}
+                    onChange={(e) =>
+                      handleFieldChange(index, 'email', e.target.value)
+                    }
                     onBlur={() => setTouched(true)}
                     disabled={readOnly}
                     readOnly={readOnly}
@@ -361,7 +373,10 @@ export function AuthorList({
                         aria-label={`Move author ${index + 1} down`}
                         className={`size-[20px] rounded-[6px] border flex items-center justify-center transition-colors ${readOnly || index >= authors.length - 1 ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed' : 'bg-white border-[#e8ebf8] text-[#8a93b4] hover:border-[#707dff] hover:text-[#707dff] active:bg-[#f4f6ff]'}`}
                       >
-                        <ChevronDown className="size-[10px]" strokeWidth={2.5} />
+                        <ChevronDown
+                          className="size-[10px]"
+                          strokeWidth={2.5}
+                        />
                       </button>
                     </div>
 
@@ -396,35 +411,6 @@ export function AuthorList({
         )}
       </div>
 
-      {/* Overall inline error */}
-      <div className="min-h-[16px]">
-        {showMinErrorPristine ? (
-          <p id={`${id}-error`} role="alert" className="font-sans text-[11px] leading-[16px] text-[#e11d48]">
-            {showMinErrorPristine}
-          </p>
-        ) : authors.some((a) => duplicateSet.has(authors.indexOf(a))) && !readOnly && touched ? (
-          <p id={`${id}-duplicate`} role="alert" className="font-sans text-[11px] leading-[16px] text-[#e11d48]">
-            Duplicate authors are not allowed.
-          </p>
-        ) : (
-          // Per-row errors aggregated — show first row error if any when touched
-          (() => {
-            if (readOnly) return <span aria-hidden="true" className="font-sans text-[11px] leading-[16px] text-transparent select-none">.</span>
-            if (!touched) return <span aria-hidden="true" className="font-sans text-[11px] leading-[16px] text-transparent select-none">.</span>
-            const firstErrIdx = authors.findIndex((a) => getAuthorRowError(a) !== null)
-            if (firstErrIdx >= 0) {
-              const msg = getAuthorRowError(authors[firstErrIdx]!)
-              return (
-                <p role="alert" className="font-sans text-[11px] leading-[16px] text-[#e11d48]">
-                  Author {firstErrIdx + 1}: {msg}
-                </p>
-              )
-            }
-            return <span aria-hidden="true" className="font-sans text-[11px] leading-[16px] text-transparent select-none">.</span>
-          })()
-        )}
-      </div>
-
       {/* Add Another Author — dashed border #d4d8f0 text #707dff 12.5px bold gap7 h38 rounded-10px justify-center */}
       <button
         type="button"
@@ -437,17 +423,14 @@ export function AuthorList({
         Add Another Author
       </button>
 
-      {/* Secondary pick action — global "Pick from group" when list is not empty, for quick append without row target */}
-      {!readOnly && authors.length > 0 && (
-        <button
-          type="button"
-          onClick={() => openPickerForRow(null)}
-          className="w-full h-[36px] rounded-[10px] border border-[#e8ebf8] bg-[#fafbff] flex items-center justify-center gap-[7px] font-sans font-medium text-[12.5px] leading-[18px] text-[#707dff] hover:bg-white hover:border-[#d4d8f0] transition-colors mt-[2px]"
-        >
-          <Users className="size-[14px]" strokeWidth={2} />
-          Pick from group members
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => openPickerForRow(null)}
+        className="w-full h-[36px] rounded-[10px] border border-[#e8ebf8] bg-[#fafbff] flex items-center justify-center gap-[7px] font-sans font-medium text-[12.5px] leading-[18px] text-[#707dff] hover:bg-white hover:border-[#d4d8f0] transition-colors mt-[2px]"
+      >
+        <Users className="size-[14px]" strokeWidth={2} />
+        Pick from group members
+      </button>
 
       {/* AddStudentModal — list current group students only, excludes already added, close on select */}
       <AddStudentModal

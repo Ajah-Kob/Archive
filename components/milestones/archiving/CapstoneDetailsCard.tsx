@@ -6,7 +6,10 @@ import { ResearchTitleInput } from './fields/ResearchTitleInput'
 import { AbstractTextarea } from './fields/AbstractTextarea'
 import { TagChipInput } from './fields/TagChipInput'
 import { AuthorList } from './fields/AuthorList'
-import { UploadDocument, type UploadDocumentValue } from './fields/UploadDocument'
+import {
+  UploadDocument,
+  type UploadDocumentValue,
+} from './fields/UploadDocument'
 import { FooterActions } from './FooterActions'
 import type { AuthorEntry } from '@/lib/archiving/validation'
 import type { ArchivingUiStatus } from '@/lib/actions/archiving'
@@ -51,6 +54,7 @@ interface CapstoneDetailsCardProps {
   submitDisabledReason?: string
   isSubmitting?: boolean
   isSavingDraft?: boolean
+  isSaveDraftDisabled?: boolean
   /** Seed values for uncontrolled mode (e.g., draft recovered from DB) */
   initialTitle?: string | null
   initialAbstract?: string | null
@@ -75,7 +79,10 @@ function Header() {
 function InfoCallout() {
   return (
     <div className="flex items-start gap-[10px] rounded-[10px] border border-[#e0e3f0] bg-[#f8f9ff] px-[14px] py-[10px]">
-      <Info className="size-[16px] text-[#707dff] shrink-0 mt-[1px]" strokeWidth={2} />
+      <Info
+        className="size-[16px] text-[#707dff] shrink-0 mt-[1px]"
+        strokeWidth={2}
+      />
       <p className="font-sans text-[12.5px] leading-[18px] text-[#5a6382]">
         Once submitted, your capstone details cannot be changed.
       </p>
@@ -88,7 +95,10 @@ function LockedBanner({ status }: { status?: ArchivingUiStatus }) {
   if (isArchived) {
     return (
       <div className="flex items-start gap-[10px] rounded-[10px] border border-[rgba(22,163,74,0.2)] bg-[#ecfaf5] px-[14px] py-[10px]">
-        <Info className="size-[16px] text-[#16a34a] shrink-0 mt-[1px]" strokeWidth={2} />
+        <Info
+          className="size-[16px] text-[#16a34a] shrink-0 mt-[1px]"
+          strokeWidth={2}
+        />
         <p className="font-sans text-[12.5px] leading-[18px] text-[#065f46]">
           Submission is locked — awaiting Program Chair approval
         </p>
@@ -97,7 +107,10 @@ function LockedBanner({ status }: { status?: ArchivingUiStatus }) {
   }
   return (
     <div className="flex items-start gap-[10px] rounded-[10px] border border-[#f59e0b] bg-[#fffbeb] px-[14px] py-[10px]">
-      <Info className="size-[16px] text-[#f59e0b] shrink-0 mt-[1px]" strokeWidth={2} />
+      <Info
+        className="size-[16px] text-[#f59e0b] shrink-0 mt-[1px]"
+        strokeWidth={2}
+      />
       <p className="font-sans text-[12.5px] leading-[18px] text-[#92400e]">
         Submission is locked — awaiting Program Chair approval
       </p>
@@ -130,6 +143,7 @@ export function CapstoneDetailsCard({
   submitDisabledReason,
   isSubmitting,
   isSavingDraft,
+  isSaveDraftDisabled,
   initialTitle,
   initialAbstract,
   initialTags,
@@ -150,9 +164,10 @@ export function CapstoneDetailsCard({
   const [internalAuthors, setInternalAuthors] = useState<AuthorEntry[]>(
     controlledAuthors ?? initialAuthors ?? [],
   )
-  const [internalDocument, setInternalDocument] = useState<UploadDocumentValue | null>(
-    controlledDocument ?? initialDocument ?? null,
-  )
+  const [internalDocument, setInternalDocument] =
+    useState<UploadDocumentValue | null>(
+      controlledDocument ?? initialDocument ?? null,
+    )
 
   const isTitleControlled = controlledTitle !== undefined
   const isAbstractControlled = controlledAbstract !== undefined
@@ -160,11 +175,21 @@ export function CapstoneDetailsCard({
   const isAuthorsControlled = controlledAuthors !== undefined
   const isDocumentControlled = controlledDocument !== undefined
 
-  const effectiveTitle = isTitleControlled ? (controlledTitle as string) : internalTitle
-  const effectiveAbstract = isAbstractControlled ? (controlledAbstract as string) : internalAbstract
-  const effectiveTags = isTagsControlled ? (controlledTags as string[]) : internalTags
-  const effectiveAuthors = isAuthorsControlled ? (controlledAuthors as AuthorEntry[]) : internalAuthors
-  const effectiveDocument = isDocumentControlled ? (controlledDocument as UploadDocumentValue | null) : internalDocument
+  const effectiveTitle = isTitleControlled
+    ? (controlledTitle as string)
+    : internalTitle
+  const effectiveAbstract = isAbstractControlled
+    ? (controlledAbstract as string)
+    : internalAbstract
+  const effectiveTags = isTagsControlled
+    ? (controlledTags as string[])
+    : internalTags
+  const effectiveAuthors = isAuthorsControlled
+    ? (controlledAuthors as AuthorEntry[])
+    : internalAuthors
+  const effectiveDocument = isDocumentControlled
+    ? (controlledDocument as UploadDocumentValue | null)
+    : internalDocument
 
   const handleTitleChange = useCallback(
     (next: string) => {
@@ -236,7 +261,8 @@ export function CapstoneDetailsCard({
   )
 
   // Merge documentError (legacy) with fieldErrors.document for inline display
-  const effectiveDocumentError = documentError ?? fieldErrors?.document ?? undefined
+  const effectiveDocumentError =
+    documentError ?? fieldErrors?.document ?? undefined
 
   const hasFooterHandlers = Boolean(onPreview || onSaveDraft || onSubmit)
 
@@ -245,7 +271,7 @@ export function CapstoneDetailsCard({
       <Header />
 
       {/* Scrollable form area — preserves outer layout; only this region scrolls. Gap + pb10 per spec */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-[30px] py-[20px] flex flex-col gap-[12px]">
+      <div className="flex-1 min-h-0 overflow-y-auto px-[30px] py-[20px] flex flex-col">
         {/* Research Title — controlled, pure validation via validation.ts, pb10 inside field */}
         <ResearchTitleInput
           value={effectiveTitle}
@@ -263,7 +289,12 @@ export function CapstoneDetailsCard({
         />
 
         {/* Tags — chip input wrap flex-wrap gap5 min-h37.5, Enter adds, X removes, blocks duplicate */}
-        <TagChipInput value={effectiveTags} onChange={handleTagsChange} readOnly={isReadOnly} error={fieldErrors?.tags ?? undefined} />
+        <TagChipInput
+          value={effectiveTags}
+          onChange={handleTagsChange}
+          readOnly={isReadOnly}
+          error={fieldErrors?.tags ?? undefined}
+        />
 
         {/* Authors — ordered draggable rows, 3 inputs + handle + delete + pick-student, order persisted JSON */}
         <AuthorList
@@ -298,6 +329,7 @@ export function CapstoneDetailsCard({
           submitDisabledReason={submitDisabledReason}
           isSubmitting={isSubmitting}
           isSavingDraft={isSavingDraft}
+          isSaveDraftDisabled={isSaveDraftDisabled}
           onPreview={onPreview ?? (() => {})}
           onSaveDraft={onSaveDraft ?? (() => {})}
           onSubmit={onSubmit ?? (() => {})}
@@ -316,7 +348,9 @@ export function CapstoneDetailsCard({
             type="button"
             disabled={isReadOnly}
             className={`h-[36px] px-[16px] rounded-[9px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[13px] transition-colors ${
-              isReadOnly ? 'text-[#9ea8c6] opacity-60 cursor-not-allowed' : 'text-[#5a6382] hover:bg-[#f8f9ff]'
+              isReadOnly
+                ? 'text-[#9ea8c6] opacity-60 cursor-not-allowed'
+                : 'text-[#5a6382] hover:bg-[#f8f9ff]'
             }`}
           >
             Save as Draft

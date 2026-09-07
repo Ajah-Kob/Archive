@@ -158,6 +158,100 @@ function getFirstInvalid(
   return { valid: true, message: '', field: null, fieldId: null }
 }
 
+function getFirstInvalidForDraft(
+  title: string,
+  abstract: string,
+  tags: string[],
+  authors: AuthorEntry[],
+  doc: UploadDocumentValue | null,
+): ValidationResult {
+  const trimmedTitle = (title ?? '').trim()
+  if (trimmedTitle.length > 0) {
+    if (countChars(title) > TITLE_MAX_CHARS) {
+      return {
+        valid: false,
+        message: `Research title must be at most ${TITLE_MAX_CHARS} characters (current: ${countChars(title)}).`,
+        field: 'title',
+        fieldId: 'research-title',
+      }
+    }
+    if (countWords(title) > TITLE_MAX_WORDS) {
+      return {
+        valid: false,
+        message: `Research title must be at most ${TITLE_MAX_WORDS} words (current: ${countWords(title)}).`,
+        field: 'title',
+        fieldId: 'research-title',
+      }
+    }
+    if (!isValidTitle(title)) {
+      return { valid: false, message: 'Research title is invalid.', field: 'title', fieldId: 'research-title' }
+    }
+  }
+
+  const trimmedAbstract = (abstract ?? '').trim()
+  if (trimmedAbstract.length > 0) {
+    if (countChars(abstract) > ABSTRACT_MAX_CHARS) {
+      return {
+        valid: false,
+        message: `Abstract must be at most ${ABSTRACT_MAX_CHARS} characters (current: ${countChars(abstract)}).`,
+        field: 'abstract',
+        fieldId: 'abstract',
+      }
+    }
+    if (countSentences(abstract) > ABSTRACT_MAX_SENTENCES) {
+      return {
+        valid: false,
+        message: `Abstract must be at most ${ABSTRACT_MAX_SENTENCES} sentences (current: ${countSentences(abstract)}).`,
+        field: 'abstract',
+        fieldId: 'abstract',
+      }
+    }
+    if (!isValidAbstract(abstract)) {
+      return { valid: false, message: 'Abstract is invalid.', field: 'abstract', fieldId: 'abstract' }
+    }
+  }
+
+  if (Array.isArray(tags) && tags.length > 0) {
+    if (!isValidTags(tags)) {
+      const hasEmpty = tags.some((t) => !t || t.trim().length === 0)
+      if (hasEmpty) return { valid: false, message: 'Tags cannot be empty.', field: 'tags', fieldId: 'tags' }
+      const normalized = tags.map((t) => t.trim().toLowerCase())
+      const dup = new Set(normalized).size !== normalized.length
+      if (dup) return { valid: false, message: 'Duplicate tags are not allowed.', field: 'tags', fieldId: 'tags' }
+      return { valid: false, message: 'Tags are invalid.', field: 'tags', fieldId: 'tags' }
+    }
+  }
+
+  if (Array.isArray(authors) && authors.length > 0) {
+    if (!isValidAuthors(authors)) {
+      const hasMissing = authors.some((a) => !a.lastName?.trim() || !a.firstName?.trim() || !a.email?.trim())
+      if (hasMissing) {
+        return { valid: false, message: 'Each author requires last name, first name, and email.', field: 'authors', fieldId: 'authors' }
+      }
+      const hasBadEmail = authors.some((a) => !isValidEmailFormat(a.email))
+      if (hasBadEmail) {
+        return { valid: false, message: 'One or more authors have an invalid email.', field: 'authors', fieldId: 'authors' }
+      }
+      const emails = authors.map((a) => a.email.trim().toLowerCase())
+      if (new Set(emails).size !== emails.length) {
+        return { valid: false, message: 'Duplicate authors are not allowed.', field: 'authors', fieldId: 'authors' }
+      }
+      const names = authors.map((a) => `${a.firstName.trim().toLowerCase()}|${a.lastName.trim().toLowerCase()}`)
+      if (new Set(names).size !== names.length) {
+        return { valid: false, message: 'Duplicate authors are not allowed.', field: 'authors', fieldId: 'authors' }
+      }
+      return { valid: false, message: 'Authors are invalid.', field: 'authors', fieldId: 'authors' }
+    }
+  }
+
+  const hasBlob = Boolean(doc?.blobUrl && doc?.fileName)
+  if (hasBlob && doc?.mimeType && !isPdfMime(doc.mimeType)) {
+    return { valid: false, message: 'Only PDF files are allowed.', field: 'document', fieldId: 'upload-document' }
+  }
+
+  return { valid: true, message: '', field: null, fieldId: null }
+}
+
 function focusFirstInvalid(fieldId: string | null, field: keyof FieldErrors | null) {
   if (!fieldId) return
   // Defer to next tick so DOM is ready and error state rendered
@@ -277,12 +371,22 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
   )
   const isSubmitDisabled = !validationForSubmit.valid || isReadOnly
 
-  // Validation for draft — per spec "validates same as submit (do NOT bypass)" — require same fields including document
-  // We keep requireBlob true so draft also shows failed toast when incomplete (strict). This satisfies spec's edge: Ctrl+S while invalid → failed toast + reason
+  // Save Draft — lenient: disabled only when ALL fields empty, enabled when at least one input has value.
+  // Validation for draft only checks limits for fields that have value (allows partial save), not required.
+  const hasAnyInput = useMemo(() => {
+    const hasTitle = (title ?? '').trim().length > 0
+    const hasAbstract = (abstract ?? '').trim().length > 0
+    const hasTags = Array.isArray(tags) && tags.length > 0
+    const hasAuthors = Array.isArray(authors) && authors.length > 0
+    const hasDoc = Boolean(documentValue?.blobUrl && documentValue?.fileName)
+    return hasTitle || hasAbstract || hasTags || hasAuthors || hasDoc
+  }, [title, abstract, tags, authors, documentValue])
+
   const validationForDraft = useMemo(
-    () => getFirstInvalid(title, abstract, tags, authors, documentValue, true),
+    () => getFirstInvalidForDraft(title, abstract, tags, authors, documentValue),
     [title, abstract, tags, authors, documentValue],
   )
+  const isSaveDraftDisabled = !hasAnyInput || isReadOnly || isSavingDraft
 
   // Clear field error for a specific field when user edits (so error disappears on fix)
   const clearFieldError = useCallback((field: keyof FieldErrors) => {
@@ -345,13 +449,14 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     return msg.includes('is required') || msg.includes('At least one')
   }, [])
 
-  // ── Save Draft handler ──
+  // ── Save Draft handler — lenient: allows partial, disabled only when all empty; fail does NOT clear inputs ──
   const handleSaveDraft = useCallback(async () => {
     if (isReadOnly) {
       toast.error('Submission is locked — awaiting Program Chair approval.')
       return
     }
     if (isSavingDraft) return
+    if (!hasAnyInput) return
 
     const result = validationForDraft
     if (!result.valid) {
@@ -435,7 +540,7 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     } finally {
       setIsSavingDraft(false)
     }
-  }, [isReadOnly, isSavingDraft, validationForDraft, title, abstract, tags, authors, documentValue, router, isEmptyRequiredMessage])
+  }, [isReadOnly, isSavingDraft, validationForDraft, title, abstract, tags, authors, documentValue, router, isEmptyRequiredMessage, hasAnyInput])
 
   // ── Submit click handler — validates then opens confirmation modal (2 tabs) ──
   const handleSubmitClick = useCallback(() => {
@@ -504,6 +609,8 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     showPreview,
     showSubmitModal,
     isSubmitDisabled,
+    isSaveDraftDisabled,
+    hasAnyInput,
     validationForSubmit,
     validationForDraft,
     // setters / handlers

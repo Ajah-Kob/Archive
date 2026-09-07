@@ -3,7 +3,10 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageLabel } from '@/components/globals/PageLabel'
-import type { ArchivingPayload, ArchivingUiStatus } from '@/lib/actions/archiving'
+import type {
+  ArchivingPayload,
+  ArchivingUiStatus,
+} from '@/lib/actions/archiving'
 import { StatusCallout } from './StatusCallout'
 import { CapstoneDetailsCard } from './CapstoneDetailsCard'
 import { CapstonePreviewModal } from './CapstonePreviewModal'
@@ -15,7 +18,10 @@ interface ArchivingViewProps {
   initialData: ArchivingPayload | null
 }
 
-export function ArchivingView({ initialStatus, initialData }: ArchivingViewProps) {
+export function ArchivingView({
+  initialStatus,
+  initialData,
+}: ArchivingViewProps) {
   const router = useRouter()
 
   const {
@@ -68,7 +74,9 @@ export function ArchivingView({ initialStatus, initialData }: ArchivingViewProps
   }, [router])
 
   // Derive submit disabled reason for tooltip — mirrors server validation message
-  const submitDisabledReason = !validationForSubmit.valid ? validationForSubmit.message : undefined
+  const submitDisabledReason = !validationForSubmit.valid
+    ? validationForSubmit.message
+    : undefined
 
   // Footer submit is considered submitting while modal is open to prevent double-open,
   // and while actual submit is in flight (hook's isSubmitting). This satisfies

@@ -5,11 +5,12 @@ export default function ArchivingReviewLoading() {
   return (
     <section className="h-full flex flex-col">
       <PageLabel label="Archiving Review" />
+      {/* HeaderBar skeleton — matches SearchBar 320px + Filter */}
+      <div className="flex flex-wrap items-center gap-2.5 px-8 bg-[#eef2ff] border-b border-[#dfe3fb] h-[56px] shrink-0 animate-pulse">
+        <div className="h-[37.5px] w-[320px] max-w-[320px] min-w-[180px] rounded-lg bg-[#dfe3fb]" />
+        <div className="h-[37.5px] w-[140px] rounded-lg bg-[#dfe3fb]" />
+      </div>
       <div className="flex-1 flex flex-col min-h-0 px-8 py-6">
-        <div className="mb-4 shrink-0 animate-pulse">
-          <div className="h-[18px] w-[160px] rounded bg-[#e8ebf8]" />
-          <div className="h-[13px] w-[420px] max-w-full rounded bg-[#e8ebf8]/60 mt-2" />
-        </div>
         <ChairReviewSkeleton />
       </div>
     </section>

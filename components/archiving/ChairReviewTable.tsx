@@ -61,12 +61,28 @@ const approveButtonClass =
 
 interface ChairReviewTableProps {
   submissions: ArchivingReviewItem[]
+  hasAnySubmissions?: boolean
   onView: (item: ArchivingReviewItem) => void
   onApprove?: (item: ArchivingReviewItem) => void
 }
 
-// ── Empty state (hoisted, matches defense EmptyState styling) ─────────────────
-function EmptyState() {
+// ── Empty states ─────────────────
+function EmptyState({ hasAny }: { hasAny: boolean }) {
+  if (hasAny) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center px-10 py-16 text-center">
+        <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
+          <Archive className="size-5 text-[#707dff]" strokeWidth={1.75} />
+        </div>
+        <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] tracking-[-0.16px] mb-2">
+          No matching submissions
+        </h3>
+        <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] max-w-sm">
+          No submissions match your search or filter. Try adjusting your search or clear the filter.
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-10 py-16 text-center">
       <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
@@ -82,7 +98,7 @@ function EmptyState() {
   )
 }
 
-export function ChairReviewTable({ submissions, onView, onApprove }: ChairReviewTableProps) {
+export function ChairReviewTable({ submissions, hasAnySubmissions = false, onView, onApprove }: ChairReviewTableProps) {
   return (
     <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="overflow-x-auto flex-1 min-h-0">
@@ -102,7 +118,7 @@ export function ChairReviewTable({ submissions, onView, onApprove }: ChairReview
           </div>
 
           {submissions.length === 0 ? (
-            <EmptyState />
+            <EmptyState hasAny={hasAnySubmissions} />
           ) : (
             submissions.map((item) => (
               <div

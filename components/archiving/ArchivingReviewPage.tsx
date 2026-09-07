@@ -1,7 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { HeaderBar } from '@/components/globals/HeaderBar'
+import { SearchBar } from '@/components/ui/SearchBar'
+import { Filter, type FilterOption } from '@/components/ui/Filter'
 import type { ArchivingReviewItem } from '@/lib/actions/archiving'
 import { ChairReviewTable } from './ChairReviewTable'
 import { ChairReviewDetailModal } from './ChairReviewDetailModal'
@@ -10,23 +13,46 @@ interface ArchivingReviewPageProps {
   submissions: ArchivingReviewItem[]
 }
 
+const STATUS_OPTIONS: FilterOption[] = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'IN_REVIEW', label: 'In Review' },
+  { value: 'ARCHIVED', label: 'Archived' },
+]
+
 /**
  * Client orchestrator for /faculty/archiving.
- * Owns selected submission state and wires the table + detail modal together.
- * Mirrors DefenseSchedulingPage pattern: server page fetches, client handles
- * view/approve interactions and router.refresh() after mutations so the server
- * props stay DERIVED from DB (refresh preserves state, removed members stay).
+ * Owns HeaderBar search/filter state and wires table + detail modal together.
+ * Mirrors DefenseSchedulingPage pattern: HeaderBar with SearchBar + Filter,
+ * table card below with defense-style header/rows, empty states for filtered vs total.
  */
 export function ArchivingReviewPage({ submissions }: ArchivingReviewPageProps) {
   const router = useRouter()
   const [selected, setSelected] = useState<ArchivingReviewItem | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return submissions.filter((s) => {
+      if (statusFilter !== 'all' && s.status !== statusFilter) return false
+      if (!term) return true
+      const authors = (s.authorOrder ?? []).map((a) => `${a.firstName} ${a.lastName} ${a.email}`).join(' ').toLowerCase()
+      return (
+        s.groupName.toLowerCase().includes(term) ||
+        (s.sectionName ?? '').toLowerCase().includes(term) ||
+        s.title.toLowerCase().includes(term) ||
+        authors.includes(term)
+      )
+    })
+  }, [submissions, search, statusFilter])
+
+  const hasAny = submissions.length > 0
 
   function handleView(item: ArchivingReviewItem) {
     setSelected(item)
   }
 
   function handleApproveFromTable(item: ArchivingReviewItem) {
-    // Open detail modal with approve focus — user confirms there
     setSelected(item)
   }
 
@@ -35,17 +61,34 @@ export function ArchivingReviewPage({ submissions }: ArchivingReviewPageProps) {
   }
 
   function handleApproved() {
-    // After approveArchiving succeeds, the modal already calls router.refresh()
-    // We also ensure local selection is cleared; next server render will show ARCHIVED badge.
     setSelected(null)
     router.refresh()
   }
 
   return (
     <>
-      <div className="flex-1 flex flex-col min-h-0">
+      <HeaderBar>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search group, section, title, authors…"
+            ariaLabel="Search archiving submissions"
+            className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+          />
+          <Filter
+            value={statusFilter}
+            options={STATUS_OPTIONS}
+            onChange={setStatusFilter}
+            ariaLabel="Filter by status"
+          />
+        </div>
+      </HeaderBar>
+
+      <div className="flex-1 flex flex-col min-h-0 px-8 py-6">
         <ChairReviewTable
-          submissions={submissions}
+          submissions={filtered}
+          hasAnySubmissions={hasAny}
           onView={handleView}
           onApprove={handleApproveFromTable}
         />
@@ -60,6 +103,5 @@ export function ArchivingReviewPage({ submissions }: ArchivingReviewPageProps) {
   )
 }
 
-// Re-export table/modal for direct imports (spec compatibility)
 export { ChairReviewTable } from './ChairReviewTable'
 export { ChairReviewDetailModal } from './ChairReviewDetailModal'

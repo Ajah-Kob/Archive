@@ -57,6 +57,7 @@ export function UploadDocument({
 }: UploadDocumentProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [pendingFile, setPendingFile] = useState<{ name: string; size: number } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [internalError, setInternalError] = useState<string | null>(null)
 
@@ -102,6 +103,7 @@ export function UploadDocument({
       }
 
       setIsUploading(true)
+      setPendingFile({ name: file.name, size: file.size })
       setInternalError(null)
       try {
         const formData = new FormData()
@@ -144,6 +146,7 @@ export function UploadDocument({
         toast.error(msg)
       } finally {
         setIsUploading(false)
+        setPendingFile(null)
       }
     },
     [onChange, submittedByName],
@@ -243,15 +246,44 @@ export function UploadDocument({
         tabIndex={-1}
       />
 
-      {!hasValue ? (
+      {isUploading && pendingFile ? (
+        // ───────── Uploading — show file but button loading ─────────
+        // Displays file name/size immediately while Blob upload is in progress; button shows spinner
+        <div
+          className={`flex gap-[10px] h-[64px] px-[12px] py-[10px] items-start w-full rounded-[9px] border transition-colors ${uploadedBorder} ${uploadedBg} ${hasError ? 'bg-[#fff1f2]' : ''}`}
+        >
+          <div className="size-[36px] rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] flex items-center justify-center shrink-0">
+            <FileIcon className="size-[16px] text-[#707dff]" strokeWidth={2} />
+          </div>
+
+          <div className="flex-1 min-w-0 flex flex-col gap-[2px] justify-center py-[1px]">
+            <p className="font-sans font-bold text-[12.5px] leading-[16px] text-[#1e3a8a] truncate" title={pendingFile.name}>
+              {pendingFile.name}
+            </p>
+            <p className="font-sans font-medium text-[12px] leading-[16px] text-[#6b7399] truncate">
+              PDF · {formatFileSize(pendingFile.size)} · Uploading…
+            </p>
+          </div>
+
+          <div className="flex items-center gap-[8px] shrink-0 self-center">
+            <button
+              type="button"
+              disabled
+              aria-label="Uploading document"
+              className="inline-flex items-center gap-[6px] h-[28px] px-[12px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-medium text-[12px] leading-none text-[#707dff] opacity-80 cursor-wait"
+            >
+              <Loader2 className="size-[12px] animate-spin" style={{ animationDuration: '1000ms' } as React.CSSProperties} />
+              Uploading…
+            </button>
+          </div>
+        </div>
+      ) : !hasValue ? (
         // ───────── Idle state ─────────
-        // bg #fafbff border #e8ebf8 rounded-10px flex-col items-center px13 py21 gap5
-        // dragOver bg #eef2ff border #707dff
         <div
           role="button"
-          tabIndex={readOnly || isUploading ? -1 : 0}
+          tabIndex={readOnly ? -1 : 0}
           aria-label="Upload final document"
-          aria-disabled={readOnly || isUploading}
+          aria-disabled={readOnly}
           onClick={handleContainerClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -263,34 +295,23 @@ export function UploadDocument({
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`flex flex-col items-center px-[13px] py-[21px] gap-[5px] rounded-[10px] border w-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.18)] focus-visible:border-[#707dff] ${idleBorder} ${idleBg} ${readOnly || isUploading ? '' : 'cursor-pointer hover:border-[#d4d8f0]'} ${hasError ? 'border-[#e11d48]' : ''}`}
+          className={`flex flex-col items-center px-[13px] py-[21px] gap-[5px] rounded-[10px] border w-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.18)] focus-visible:border-[#707dff] ${idleBorder} ${idleBg} ${readOnly ? '' : 'cursor-pointer hover:border-[#d4d8f0]'} ${hasError ? 'border-[#e11d48]' : ''}`}
         >
-          {/* icon 48px bg #eef0fb rounded-24 centered */}
           <div className="size-[48px] rounded-[24px] bg-[#eef0fb] flex items-center justify-center shrink-0">
-            {isUploading ? (
-              <Loader2
-                className="size-[20px] text-[#707dff] animate-spin"
-                style={{ animationDuration: '1000ms', animationTimingFunction: 'linear' } as React.CSSProperties}
-                aria-label="Uploading"
-              />
-            ) : (
-              <Upload className="size-[20px] text-[#707dff]" strokeWidth={2} />
-            )}
+            <Upload className="size-[20px] text-[#707dff]" strokeWidth={2} />
           </div>
 
-          {/* title Sora 14px bold #1e3a8a "Drag and drop your document here" */}
           <p className="font-heading font-bold text-[14px] leading-[18px] text-[#1e3a8a] text-center">
-            {isUploading ? 'Uploading your document…' : 'Drag and drop your document here'}
+            Drag and drop your document here
           </p>
 
-          {!isUploading && !readOnly && (
+          {!readOnly && (
             <>
               <p className="font-sans font-medium text-[12.5px] leading-[16px] text-[#8a93b4]">or</p>
-              {/* Browse Files gradient #707dff 164deg shadow */}
               <button
                 type="button"
                 onClick={handleBrowseClick}
-                disabled={readOnly || isUploading}
+                disabled={readOnly}
                 className="h-[36px] px-[18px] rounded-[9px] font-heading font-semibold text-[13px] leading-none text-white shadow-[0px_4px_7px_rgba(112,125,255,0.32)] bg-gradient-to-r from-[#707dff] to-[#5565ff] border border-[rgba(112,125,255,0.2)] hover:opacity-95 active:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.3)]"
               >
                 Browse Files
@@ -298,60 +319,36 @@ export function UploadDocument({
             </>
           )}
 
-          {isUploading && (
-            <div className="flex items-center gap-[8px] pt-[2px]">
-              <Loader2
-                className="size-[16px] text-[#707dff] animate-spin"
-                style={{ animationDuration: '1000ms', animationTimingFunction: 'linear' } as React.CSSProperties}
-              />
-              <span className="font-sans font-medium text-[12.5px] leading-[18px] text-[#707dff]">Uploading…</span>
-            </div>
-          )}
-
-          {readOnly && !isUploading && (
+          {readOnly && (
             <p className="font-sans text-[12px] leading-[16px] text-[#9ea8c6] pt-[2px]">Upload locked — submission in review.</p>
           )}
 
-          {/* hint 11px #bbc0d8 "Only PDF file format is accepted" */}
           <p className="font-sans text-[11px] leading-[14px] text-[#bbc0d8] text-center pt-[2px]">Only PDF file format is accepted</p>
         </div>
       ) : (
         // ───────── Uploaded state ─────────
-        // bg #fafbff border #e8ebf8 rounded-9px flex gap10 h64 px12 py10 items-start
         <div
           className={`flex gap-[10px] h-[64px] px-[12px] py-[10px] items-start w-full rounded-[9px] border transition-colors ${uploadedBorder} ${uploadedBg} ${hasError ? 'bg-[#fff1f2]' : ''}`}
         >
-          {/* icon 36px bg rgba(112,125,255,0.07) border rgba(112,125,255,0.14) File icon 16px */}
           <div className="size-[36px] rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] flex items-center justify-center shrink-0">
-            {isUploading ? (
-              <Loader2
-                className="size-[16px] text-[#707dff] animate-spin"
-                style={{ animationDuration: '1000ms', animationTimingFunction: 'linear' } as React.CSSProperties}
-              />
-            ) : (
-              <FileIcon className="size-[16px] text-[#707dff]" strokeWidth={2} />
-            )}
+            <FileIcon className="size-[16px] text-[#707dff]" strokeWidth={2} />
           </div>
 
           <div className="flex-1 min-w-0 flex flex-col gap-[2px] justify-center py-[1px]">
-            {/* file name 12.5px bold #1e3a8a truncate */}
             <p className="font-sans font-bold text-[12.5px] leading-[16px] text-[#1e3a8a] truncate" title={fileName}>
               {fileName}
             </p>
-            {/* meta 12px medium #6b7399 "PDF · 3.7 MB · May 30, 2026 · Submitted by Name" */}
             <p className="font-sans font-medium text-[12px] leading-[16px] text-[#6b7399] truncate">
               PDF · {sizeLabel} · {dateLabel} · Submitted by {submitter}
             </p>
           </div>
 
-          {/* Actions — Replace + Remove (hidden when readOnly) */}
           {!readOnly ? (
             <div className="flex items-center gap-[8px] shrink-0 self-center">
               <button
                 type="button"
                 onClick={handleBrowseClick}
-                disabled={isUploading}
-                className="hidden sm:inline-flex h-[28px] px-[10px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-medium text-[12px] leading-none text-[#707dff] hover:bg-[#f8f9ff] hover:border-[#d4d8f0] transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)]"
+                className="hidden sm:inline-flex h-[28px] px-[10px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-medium text-[12px] leading-none text-[#707dff] hover:bg-[#f8f9ff] hover:border-[#d4d8f0] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)]"
                 aria-label="Replace document"
               >
                 Replace
@@ -359,9 +356,8 @@ export function UploadDocument({
               <button
                 type="button"
                 onClick={handleRemove}
-                disabled={isUploading}
                 aria-label="Remove document"
-                className="inline-flex items-center gap-[4px] font-sans font-semibold text-[12px] leading-none text-[#ef4444] hover:text-[#dc2626] active:text-[#b91c1c] transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[rgba(239,68,68,0.15)] rounded-[6px] px-[6px] py-[6px]"
+                className="inline-flex items-center gap-[4px] font-sans font-semibold text-[12px] leading-none text-[#ef4444] hover:text-[#dc2626] active:text-[#b91c1c] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(239,68,68,0.15)] rounded-[6px] px-[6px] py-[6px]"
               >
                 <X className="size-[7px] text-[#ef4444]" strokeWidth={2.5} />
                 Remove

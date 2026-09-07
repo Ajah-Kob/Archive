@@ -30,6 +30,8 @@ export interface AuthorEntry {
   firstName: string
   email: string
   userId: number | null
+  /** Stable UI key — not displayed, persisted in JSON for reorder stability. Optional for back-compat with old drafts. */
+  id?: string
 }
 
 // ───────────────────────────── primitive counters (pure) ─────────────────────────────

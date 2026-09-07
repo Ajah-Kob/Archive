@@ -105,6 +105,7 @@ export function authorFromMember(member: {
 }): AuthorEntry {
   const { firstName, lastName } = splitName(member.name ?? '')
   return {
+    id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     userId: member.userId,
     firstName,
     lastName,

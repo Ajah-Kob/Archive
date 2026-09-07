@@ -22,8 +22,14 @@ interface AuthorListProps {
   id?: string
 }
 
+function generateId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 function createEmptyAuthor(): AuthorEntry {
-  return { lastName: '', firstName: '', email: '', userId: null }
+  return { id: generateId(), lastName: '', firstName: '', email: '', userId: null }
 }
 
 function getAuthorRowError(author: AuthorEntry): string | null {
@@ -65,7 +71,20 @@ export function AuthorList({
   onReorder,
   id = 'authors',
 }: AuthorListProps) {
-  const authors = Array.isArray(value) ? value : []
+  const rawAuthors = Array.isArray(value) ? value : []
+  // Ensure stable ids for keys — generate for authors without id and keep stable
+  const idMapRef = useRef<Map<string, string>>(new Map())
+  const authors: AuthorEntry[] = useMemo(() => {
+    return rawAuthors.map((a, idx) => {
+      if (a.id) return a
+      const key = `${a.userId ?? 'custom'}-${a.email}-${a.firstName}-${a.lastName}-${idx}`
+      if (!idMapRef.current.has(key)) {
+        idMapRef.current.set(key, generateId())
+      }
+      return { ...a, id: idMapRef.current.get(key)! }
+    })
+  }, [rawAuthors])
+
   const { data: session } = useSession()
   const [touched, setTouched] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -75,6 +94,9 @@ export function AuthorList({
   const [showPicker, setShowPicker] = useState(false)
   const pickerTargetIndexRef = useRef<number | null>(null)
   const [groupMembers, setGroupMembers] = useState<{ userId: number; name: string; email: string }[]>([])
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const [pendingNewIndex, setPendingNewIndex] = useState<number | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const userId = session?.user?.id ? Number(session.user.id) : NaN
@@ -99,6 +121,39 @@ export function AuthorList({
     }
   }, [session?.user?.id, authors.length])
 
+  // Click outside to remove empty pending card (issue 2)
+  useEffect(() => {
+    if (pendingNewIndex == null || readOnly) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!containerRef.current) return
+      // If click is inside container (any author card or inputs), don't remove
+      if (containerRef.current.contains(target)) return
+      // Also ignore clicks on modal
+      const modal = document.querySelector('[role="dialog"]')
+      if (modal && modal.contains(target)) return
+      const idx = pendingNewIndex
+      if (idx == null || idx < 0 || idx >= authors.length) {
+        setPendingNewIndex(null)
+        return
+      }
+      const author = authors[idx]
+      if (!author) {
+        setPendingNewIndex(null)
+        return
+      }
+      const isEmpty = !author.lastName?.trim() && !author.firstName?.trim() && !author.email?.trim()
+      if (isEmpty) {
+        const next = authors.filter((_, i) => i !== idx)
+        onChange(next)
+        if (onReorder) onReorder(next)
+      }
+      setPendingNewIndex(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [pendingNewIndex, authors, onChange, onReorder, readOnly])
+
   const isAllMembersSelected = (() => {
     if (groupMembers.length === 0) return false
     return groupMembers.every((m) =>
@@ -117,6 +172,11 @@ export function AuthorList({
   })()
 
   const pickDisabled = readOnly || isAllMembersSelected
+
+  const canAddAnother = useMemo(() => {
+    if (authors.length === 0) return true
+    return authors.every((a) => a.lastName.trim() && a.firstName.trim() && a.email.trim() && isValidEmailFormat(a.email))
+  }, [authors])
 
   const isDragging = dragIndex != null
 
@@ -180,7 +240,8 @@ export function AuthorList({
   const handleFieldChange = (index: number, field: keyof AuthorEntry, val: string) => {
     if (readOnly) return
     const next = [...authors]
-    next[index] = { ...next[index], [field]: val } as AuthorEntry
+    const current = next[index] as AuthorEntry
+    next[index] = { ...current, [field]: val } as AuthorEntry
     notifyChange(next)
   }
 
@@ -189,13 +250,19 @@ export function AuthorList({
     const next = authors.filter((_, i) => i !== index)
     notifyChange(next)
     setTouched(true)
+    setActiveIndex(null)
+    if (pendingNewIndex === index) setPendingNewIndex(null)
+    else if (pendingNewIndex != null && pendingNewIndex > index) setPendingNewIndex((p) => (p != null ? p - 1 : null))
   }
 
   const handleAdd = () => {
     if (readOnly) return
+    if (!canAddAnother) return
     const next = [...authors, createEmptyAuthor()]
     notifyChange(next)
     setTouched(true)
+    setPendingNewIndex(next.length - 1)
+    setActiveIndex(next.length - 1)
   }
 
   const handlePickStudentSelect = (picked: AuthorEntry) => {
@@ -207,20 +274,23 @@ export function AuthorList({
     const targetIdx = pickerTargetIndexRef.current
     if (targetIdx != null && targetIdx >= 0 && targetIdx < authors.length) {
       const next = [...authors]
-      next[targetIdx] = picked
+      next[targetIdx] = { ...picked, id: picked.id ?? generateId() } as AuthorEntry
       notifyChange(next)
     } else {
-      notifyChange([...authors, picked])
+      const withId = { ...picked, id: picked.id ?? generateId() } as AuthorEntry
+      notifyChange([...authors, withId])
     }
     setTouched(true)
     setShowPicker(false)
     pickerTargetIndexRef.current = null
+    setPendingNewIndex(null)
   }
 
   const openPickerForRow = (rowIndex: number | null) => {
     if (pickDisabled) return
     pickerTargetIndexRef.current = rowIndex
     setShowPicker(true)
+    if (rowIndex != null) setActiveIndex(rowIndex)
   }
 
   const handleDragStart = (index: number) => (e: React.DragEvent) => {
@@ -230,6 +300,7 @@ export function AuthorList({
     }
     dragIndexRef.current = index
     setDragIndex(index)
+    setActiveIndex(index)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(index))
   }
@@ -252,7 +323,6 @@ export function AuthorList({
     const from = dragIndexRef.current ?? dragIndex
     if (from == null) return
     if (overIndex === dragOverIndex) return
-    // Throttle + use dragEnter (fires once per enter) to prevent glitch from reordered DOM triggering continuous dragOver
     const now = Date.now()
     if (now - lastDragOverRef.current < 120) return
     lastDragOverRef.current = now
@@ -278,24 +348,26 @@ export function AuthorList({
     const next = arrayMove(authors, from, dropIndex)
     if (!Array.isArray(next) || next.length !== authors.length) return
     notifyChange(next)
+    setActiveIndex(dropIndex)
   }
 
   const moveUp = (index: number) => {
     if (readOnly || index <= 0) return
     const next = arrayMove(authors, index, index - 1)
     notifyChange(next)
+    setActiveIndex(index - 1)
   }
   const moveDown = (index: number) => {
     if (readOnly || index >= authors.length - 1) return
     const next = arrayMove(authors, index, index + 1)
     notifyChange(next)
+    setActiveIndex(index + 1)
   }
 
-  // While dragging, show preview order with smooth shift; dragged item is semi-transparent
   const listToRender = isDragging && dragOverIndex != null && dragIndex !== dragOverIndex ? previewAuthors : authors
 
   return (
-    <div className="flex flex-col gap-[6px] w-full pb-[10px]">
+    <div ref={containerRef} className="flex flex-col gap-[6px] w-full pb-[10px]">
       <label className="font-sans font-bold text-[12.5px] leading-[18px] text-[#3a4170]">
         Authors <span className="text-[#ef4444]">*</span>
       </label>
@@ -306,12 +378,10 @@ export function AuthorList({
       <div
         className="flex flex-col gap-[10px] w-full"
         onDragOver={(e) => {
-          // Allow drop on container gap (edge) — keep current preview, don't change dragOverIndex
           e.preventDefault()
           if (isDragging) e.dataTransfer.dropEffect = 'move'
         }}
         onDrop={(e) => {
-          // Drop on container gap (edge) — commit current preview if any
           e.preventDefault()
           if (!isDragging || dragIndex == null || dragOverIndex == null) return
           const from = dragIndex
@@ -328,6 +398,7 @@ export function AuthorList({
             setDragIndex(null)
             setDragOverIndex(null)
             notifyChange(next)
+            setActiveIndex(to)
           }
         }}
       >
@@ -339,7 +410,6 @@ export function AuthorList({
           </div>
         ) : (
           listToRender.map((author, displayIndex) => {
-            // Find original index for handlers and validation
             const originalIndex = authors.indexOf(author)
             const index = originalIndex !== -1 ? originalIndex : displayIndex
             const visualIndex = displayIndex
@@ -347,15 +417,11 @@ export function AuthorList({
             const isDuplicateRow = duplicateSet.has(index)
             const hasRowError = Boolean(rowError) || isDuplicateRow
             const showRowError = !readOnly && ((touched && hasRowError) || isDuplicateRow)
-            const rowBorder = showRowError ? 'border-[#e11d48]' : 'border-[#e8ebf8]'
+            const rowBorder = showRowError ? 'border-[#e11d48]' : activeIndex === index ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.15)] bg-white' : 'border-[#e8ebf8]'
             const isDraggedItem = isDragging && author === authors[dragIndex ?? -1]
             const isDragOver = isDragging && dragOverIndex === index && !isDraggedItem
-            const stableKey =
-              author.userId != null
-                ? `user-${author.userId}`
-                : author.email
-                  ? `email-${author.email.trim().toLowerCase()}`
-                  : `custom-${author.firstName}-${author.lastName}-${index}`
+            const stableKey = author.id ?? `author-${index}`
+            const isActive = activeIndex === index
             return (
               <div
                 key={stableKey}
@@ -365,7 +431,10 @@ export function AuthorList({
                 onDragOver={handleDragOver(index)}
                 onDragEnter={handleDragEnter(index)}
                 onDrop={handleDrop(index)}
-                className={`bg-[#fafbff] border rounded-[10px] px-[12px] py-[10px] flex gap-[10px] items-center w-full transition-all duration-200 ease-out ${rowBorder} ${isDragOver ? 'ring-2 ring-[rgba(112,125,255,0.18)] bg-white shadow-sm' : ''} ${isDraggedItem ? 'opacity-60 scale-[0.98] shadow-md' : ''} ${readOnly ? 'opacity-90' : ''}`}
+                onClick={() => !readOnly && setActiveIndex(index)}
+                onFocusCapture={() => !readOnly && setActiveIndex(index)}
+                tabIndex={-1}
+                className={`bg-[#fafbff] border rounded-[10px] px-[12px] py-[10px] flex gap-[10px] items-center w-full transition-all duration-200 ease-out cursor-pointer ${rowBorder} ${isDragOver ? 'ring-2 ring-[rgba(112,125,255,0.18)] bg-white shadow-sm' : ''} ${isDraggedItem ? 'opacity-60 scale-[0.98] shadow-md' : ''} ${isActive ? 'bg-white shadow-sm' : ''} ${readOnly ? 'opacity-90 cursor-default' : ''}`}
               >
                 <div
                   aria-hidden="true"
@@ -384,6 +453,7 @@ export function AuthorList({
                     type="text"
                     value={author.lastName}
                     onChange={(e) => handleFieldChange(index, 'lastName', e.target.value)}
+                    onFocus={() => setActiveIndex(index)}
                     onBlur={() => setTouched(true)}
                     disabled={readOnly}
                     readOnly={readOnly}
@@ -418,7 +488,10 @@ export function AuthorList({
                     <div className="hidden sm:flex flex-col gap-[2px]">
                       <button
                         type="button"
-                        onClick={() => moveUp(index)}
+                        onClick={() => {
+                          moveUp(index)
+                          setActiveIndex(Math.max(0, index - 1))
+                        }}
                         disabled={readOnly || index === 0}
                         aria-label={`Move author ${visualIndex + 1} up`}
                         className={`size-[20px] rounded-[6px] border flex items-center justify-center transition-colors ${readOnly || index === 0 ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed' : 'bg-white border-[#e8ebf8] text-[#8a93b4] hover:border-[#707dff] hover:text-[#707dff] active:bg-[#f4f6ff]'}`}
@@ -427,7 +500,10 @@ export function AuthorList({
                       </button>
                       <button
                         type="button"
-                        onClick={() => moveDown(index)}
+                        onClick={() => {
+                          moveDown(index)
+                          setActiveIndex(Math.min(authors.length - 1, index + 1))
+                        }}
                         disabled={readOnly || index === authors.length - 1}
                         aria-label={`Move author ${visualIndex + 1} down`}
                         className={`size-[20px] rounded-[6px] border flex items-center justify-center transition-colors ${readOnly || index >= authors.length - 1 ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed' : 'bg-white border-[#e8ebf8] text-[#8a93b4] hover:border-[#707dff] hover:text-[#707dff] active:bg-[#f4f6ff]'}`}
@@ -442,6 +518,7 @@ export function AuthorList({
                       disabled={pickDisabled}
                       aria-label={`Pick student for author ${visualIndex + 1}`}
                       title={pickDisabled && !readOnly ? 'All group members already added' : 'Pick from group'}
+                      onFocus={() => setActiveIndex(index)}
                       className={`size-[28px] rounded-[9px] border flex items-center justify-center shrink-0 transition-colors ${pickDisabled ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed opacity-60' : 'bg-white border-[#e8ebf8] text-[#707dff] hover:bg-[#f4f6ff] hover:border-[#d4d8f0] active:bg-[#eef0ff] focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.2)]'}`}
                     >
                       <Users className="size-[14px]" strokeWidth={2} />
@@ -452,6 +529,7 @@ export function AuthorList({
                       onClick={() => handleDelete(index)}
                       disabled={readOnly}
                       aria-label={`Remove author ${visualIndex + 1}`}
+                      onFocus={() => setActiveIndex(index)}
                       className={`size-[28px] rounded-[9px] border flex items-center justify-center shrink-0 transition-colors ${readOnly ? 'bg-[#fafbff] border-[#e8ebf8] text-[#cbd0e6] cursor-not-allowed' : 'bg-white border-[#e8ebf8] text-[#e11d48] hover:bg-[#fff1f2] hover:border-[#fecdd3] active:bg-[#ffe4e6] focus:outline-none focus:ring-2 focus:ring-[rgba(225,29,72,0.15)]'}`}
                       title="Remove author"
                     >
@@ -476,9 +554,10 @@ export function AuthorList({
       <button
         type="button"
         onClick={handleAdd}
-        disabled={readOnly}
+        disabled={readOnly || !canAddAnother}
+        title={!canAddAnother && !readOnly ? 'Fill current author before adding another' : undefined}
         aria-label="Add another author"
-        className={`w-full h-[38px] rounded-[10px] border border-dashed flex items-center justify-center gap-[7px] font-sans font-bold text-[12.5px] leading-[18px] transition-colors ${readOnly ? 'border-[#e8ebf8] text-[#9ea8c6] bg-[#fafbff] cursor-not-allowed' : 'border-[#d4d8f0] text-[#707dff] bg-white hover:bg-[#f8f9ff] hover:border-[#707dff] active:bg-[#f4f6ff] focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)]'}`}
+        className={`w-full h-[38px] rounded-[10px] border border-dashed flex items-center justify-center gap-[7px] font-sans font-bold text-[12.5px] leading-[18px] transition-colors ${readOnly || !canAddAnother ? 'border-[#e8ebf8] text-[#9ea8c6] bg-[#fafbff] cursor-not-allowed opacity-60' : 'border-[#d4d8f0] text-[#707dff] bg-white hover:bg-[#f8f9ff] hover:border-[#707dff] active:bg-[#f4f6ff] focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)]'}`}
       >
         <Plus className="size-[14px]" strokeWidth={2.5} />
         Add Another Author

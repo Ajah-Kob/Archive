@@ -372,12 +372,13 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
   const isSubmitDisabled = !validationForSubmit.valid || isReadOnly
 
   // Save Draft — lenient: disabled only when ALL fields empty, enabled when at least one input has value.
-  // Validation for draft only checks limits for fields that have value (allows partial save), not required.
+  // For authors, "has input" means at least one author has ALL fields filled (last, first, email valid).
+  // Empty author cards (all fields empty) do not count as input.
   const hasAnyInput = useMemo(() => {
     const hasTitle = (title ?? '').trim().length > 0
     const hasAbstract = (abstract ?? '').trim().length > 0
     const hasTags = Array.isArray(tags) && tags.length > 0
-    const hasAuthors = Array.isArray(authors) && authors.length > 0
+    const hasAuthors = Array.isArray(authors) && authors.some((a) => a.lastName?.trim() && a.firstName?.trim() && a.email?.trim() && isValidEmailFormat(a.email.trim()))
     const hasDoc = Boolean(documentValue?.blobUrl && documentValue?.fileName)
     return hasTitle || hasAbstract || hasTags || hasAuthors || hasDoc
   }, [title, abstract, tags, authors, documentValue])

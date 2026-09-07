@@ -203,11 +203,7 @@ export function AuthorList({
     if (!isValidAuthors(authors)) {
       if (authors.length === 0) return null
       if (hasDuplicateAuthors(authors)) return 'Duplicate authors are not allowed.'
-      const hasRowError = authors.some((a) => getAuthorRowError(a) !== null)
-      if (hasRowError && touched) {
-        return null
-      }
-      if (touched) return 'Authors are invalid.'
+      // Row-level errors are shown per-row; generic "Authors are invalid." is suppressed per request.
     }
     return null
   })()

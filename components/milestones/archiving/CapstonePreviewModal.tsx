@@ -13,7 +13,11 @@ import type { UploadDocumentValue } from './fields/UploadDocument'
 
 /** Returns initials for a firstName: "John" → "J.", "John Michael" → "J.M." */
 export function formatAuthorInitials(firstName: string): string {
-  const parts = (firstName ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 2)
+  const parts = (firstName ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
   if (parts.length === 0) return ''
   return parts.map((p) => `${p[0]!.toUpperCase()}.`).join('')
 }
@@ -85,18 +89,26 @@ export function CapstonePreviewCard({
   publishedDate,
   inline = false,
 }: CapstonePreviewCardProps) {
-  const displayTitle = (title ?? '').trim().length > 0 ? title.trim() : 'Untitled Capstone'
+  const displayTitle =
+    (title ?? '').trim().length > 0 ? title.trim() : 'Untitled Capstone'
   const displayAbstract =
-    (abstract ?? '').trim().length > 0 ? abstract.trim() : 'No overview provided yet.'
+    (abstract ?? '').trim().length > 0
+      ? abstract.trim()
+      : 'No overview provided yet.'
   const authorLine = formatAuthorsForPreview(authors)
   const publishedLabel = formatPublishedLabel(publishedDate)
   const hasAuthors = authorLine.length > 0
-  const safeTags = Array.isArray(tags) ? tags.filter((t) => typeof t === 'string' && t.trim().length > 0) : []
+  const safeTags = Array.isArray(tags)
+    ? tags.filter((t) => typeof t === 'string' && t.trim().length > 0)
+    : []
 
   const cardInner = (
     <>
       {/* Left accent bar — 5px #707dff, full height, rounded left when card has rounded-12 */}
-      <div className="w-[5px] bg-[#707dff] shrink-0 self-stretch rounded-l-[12px]" aria-hidden="true" />
+      <div
+        className="w-[5px] bg-[#707dff] shrink-0 self-stretch rounded-l-[12px]"
+        aria-hidden="true"
+      />
 
       {/* Content — p20 flex-col gap12 per figma */}
       <div className="flex-1 min-w-0 p-[20px] flex flex-col gap-[12px]">
@@ -116,23 +128,6 @@ export function CapstonePreviewCard({
           {displayAbstract}
         </p>
 
-        {/* Document hint — when a file is attached, show muted row matching UploadDocument spec */}
-        {document?.fileName ? (
-          <div className="flex items-center gap-[8px] rounded-[8px] bg-[#fafbff] border border-[#eceef8] px-[10px] py-[8px]">
-            <div className="size-[28px] rounded-[7px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] flex items-center justify-center shrink-0">
-              <FileText className="size-[14px] text-[#707dff]" strokeWidth={1.75} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-sans font-semibold text-[12px] leading-[16px] text-[#1e2145] truncate" title={document.fileName}>
-                {document.fileName}
-              </p>
-              <p className="font-sans font-medium text-[11px] leading-[14px] text-[#8a93b4] truncate">
-                PDF · {formatFileSizeLabel(document.size)} · {document.blobUrl ? 'Ready for submission' : ''}
-              </p>
-            </div>
-          </div>
-        ) : null}
-
         {/* Tags — wrap flex-wrap gap5 h auto pills bg #f4f6ff border #e5e8ff h23 px9 py2 text 11px semibold #707dff rounded-full */}
         {safeTags.length > 0 ? (
           <div className="flex flex-wrap gap-[5px] w-full">
@@ -146,7 +141,9 @@ export function CapstonePreviewCard({
             ))}
           </div>
         ) : (
-          <p className="font-sans text-[11px] leading-[16px] text-[#bbc0d8]">No tags added yet.</p>
+          <p className="font-sans text-[11px] leading-[16px] text-[#bbc0d8]">
+            No tags added yet.
+          </p>
         )}
 
         {/* Footer — border-t #f0f2fa pt12 flex justify-end gap10 with Favorite/Details/Open buttons */}
@@ -175,7 +172,10 @@ export function CapstonePreviewCard({
             aria-label="Open document"
             className="inline-flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[9px] bg-white border border-[#dfe3fb] font-sans font-bold text-[12.5px] leading-none text-[#5a6382] hover:bg-[#f8f9ff] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]"
           >
-            <ExternalLink className="size-[12px] text-[#5a6382]" strokeWidth={2} />
+            <ExternalLink
+              className="size-[12px] text-[#5a6382]"
+              strokeWidth={2}
+            />
             Open
           </button>
         </div>
@@ -238,7 +238,8 @@ export function CapstonePreviewModal({
   useEffect(() => {
     if (!isOpen || !mounted) return
 
-    const previouslyFocused = globalThis.document.activeElement as HTMLElement | null
+    const previouslyFocused = globalThis.document
+      .activeElement as HTMLElement | null
     const t = setTimeout(() => closeBtnRef.current?.focus(), 0)
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -312,7 +313,7 @@ export function CapstonePreviewModal({
         {/* Hidden heading for aria */}
         <h2 id="capstone-preview-title" className="sr-only">
           Capstone Preview
-        </h2>
+        </h2> 
         <p id="capstone-preview-desc" className="sr-only">
           Preview of how your capstone will appear in the Repository.
         </p>

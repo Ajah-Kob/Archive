@@ -315,7 +315,7 @@ export function CapstoneDetailsCard({
           submittedAt={submittedAt}
         />
 
-        <InfoCallout />
+        {!isReadOnly && <InfoCallout />}
 
         {isReadOnly && <LockedBanner status={status} />}
       </div>

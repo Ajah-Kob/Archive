@@ -331,21 +331,59 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
   const [showPreview, setShowPreview] = useState(false)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
 
-  // Sync when server payload changes (draft recoverable, refresh preserves, chair approves while open)
+  // Derived readOnly — per PROMPT 6
+  const isReadOnly = status === 'IN_REVIEW' || status === 'CAPSTONE_ARCHIVED'
+
+  // hasChanges — computed early so sync guards can use it
+  const hasChangesEarly = useMemo(() => {
+    const norm = (s: string | null | undefined) => (s ?? '').trim()
+    const initialTitle = norm(initialData?.title)
+    const initialAbstract = norm(initialData?.abstract)
+    const currentTitle = norm(title)
+    const currentAbstract = norm(abstract)
+    if (currentTitle !== initialTitle) return true
+    if (currentAbstract !== initialAbstract) return true
+    const initialTags: string[] = Array.isArray(initialData?.tags) ? (initialData!.tags as string[]) : []
+    const tagsEqual = initialTags.length === tags.length && initialTags.every((t, i) => t === tags[i])
+    if (!tagsEqual) return true
+    const normAuthor = (a: AuthorEntry) =>
+      `${(a.lastName ?? '').trim().toLowerCase()}|${(a.firstName ?? '').trim().toLowerCase()}|${(a.email ?? '').trim().toLowerCase()}|${a.userId ?? ''}`
+    const initialAuthors: AuthorEntry[] = Array.isArray(initialData?.authorOrder) ? (initialData!.authorOrder as AuthorEntry[]) : []
+    if (initialAuthors.length !== authors.length) return true
+    for (let i = 0; i < initialAuthors.length; i++) {
+      if (normAuthor(initialAuthors[i]!) !== normAuthor(authors[i]!)) return true
+    }
+    const initialBlob = (initialData as any)?.blobUrl ?? null
+    const currentBlob = documentValue?.blobUrl ?? null
+    if ((initialBlob ?? '') !== (currentBlob ?? '')) return true
+    const initialFileName = (initialData as any)?.fileName ?? null
+    const currentFileName = documentValue?.fileName ?? null
+    if ((initialFileName ?? '') !== (currentFileName ?? '')) return true
+    return false
+  }, [title, abstract, tags, authors, documentValue, initialData])
+
+  // Sync when server payload changes — but do NOT overwrite dirty local edits (e.g., tags/authors typed before save)
+  // If user has unsaved changes (hasChangesEarly true) and we get a stale server refresh (initialData still old), skip sync
+  // to preserve local tags/authors/document. After a successful save, initialData will equal current, hasChangesEarly becomes false,
+  // and next sync will be allowed.
   useEffect(() => {
+    if (hasChangesEarly && !isReadOnly) return
     setTitle(initialData?.title ?? '')
-  }, [initialData?.title])
+  }, [initialData?.title, hasChangesEarly, isReadOnly])
   useEffect(() => {
+    if (hasChangesEarly && !isReadOnly) return
     setAbstract(initialData?.abstract ?? '')
-  }, [initialData?.abstract])
+  }, [initialData?.abstract, hasChangesEarly, isReadOnly])
   useEffect(() => {
+    if (hasChangesEarly && !isReadOnly) return
     setTags(Array.isArray(initialData?.tags) ? [...initialData!.tags] : [])
-  }, [initialData?.tags])
+  }, [initialData?.tags, hasChangesEarly, isReadOnly])
   useEffect(() => {
-    // Preserve snapshot even if group member removed — keep whatever was persisted
+    if (hasChangesEarly && !isReadOnly) return
     setAuthors(Array.isArray(initialData?.authorOrder) ? [...(initialData!.authorOrder as AuthorEntry[])] : [])
-  }, [initialData?.authorOrder])
+  }, [initialData?.authorOrder, hasChangesEarly, isReadOnly])
   useEffect(() => {
+    if (hasChangesEarly && !isReadOnly) return
     if (!initialData?.blobUrl || !initialData?.fileName) {
       setDocumentValue(null)
     } else {
@@ -367,13 +405,12 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     (initialData as any)?.updatedAt,
     (initialData as any)?.uploadedById,
     (initialData as any)?.uploadedByName,
+    hasChangesEarly,
+    isReadOnly,
   ])
   useEffect(() => {
     setStatus(initialStatus)
   }, [initialStatus])
-
-  // Derived readOnly — per PROMPT 6
-  const isReadOnly = status === 'IN_REVIEW' || status === 'CAPSTONE_ARCHIVED'
 
   // Compute submit-disabled (all required invalid including document) — used for gradient button opacity + tooltip
   // Validates same as server: title 25w/200c, abstract 4s/600c, tags min1, authors min1 valid triple, PDF present
@@ -383,41 +420,8 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
   )
   const isSubmitDisabled = !validationForSubmit.valid || isReadOnly
 
-  // Save Draft — disabled when no changes from loaded draft, enabled when any change (including removals).
-  // Compares current form vs initialData (the loaded draft). All empty with no draft => no changes => disabled.
-  const hasChanges = useMemo(() => {
-    const norm = (s: string | null | undefined) => (s ?? '').trim()
-    const initialTitle = norm(initialData?.title)
-    const initialAbstract = norm(initialData?.abstract)
-    const currentTitle = norm(title)
-    const currentAbstract = norm(abstract)
-    if (currentTitle !== initialTitle) return true
-    if (currentAbstract !== initialAbstract) return true
-
-    const initialTags: string[] = Array.isArray(initialData?.tags) ? (initialData!.tags as string[]) : []
-    const tagsEqual =
-      initialTags.length === tags.length && initialTags.every((t, i) => t === tags[i])
-    if (!tagsEqual) return true
-
-    const normAuthor = (a: AuthorEntry) =>
-      `${(a.lastName ?? '').trim().toLowerCase()}|${(a.firstName ?? '').trim().toLowerCase()}|${(a.email ?? '').trim().toLowerCase()}|${a.userId ?? ''}`
-    const initialAuthors: AuthorEntry[] = Array.isArray(initialData?.authorOrder)
-      ? (initialData!.authorOrder as AuthorEntry[])
-      : []
-    if (initialAuthors.length !== authors.length) return true
-    for (let i = 0; i < initialAuthors.length; i++) {
-      if (normAuthor(initialAuthors[i]!) !== normAuthor(authors[i]!)) return true
-    }
-
-    const initialBlob = (initialData as any)?.blobUrl ?? null
-    const currentBlob = documentValue?.blobUrl ?? null
-    if ((initialBlob ?? '') !== (currentBlob ?? '')) return true
-    const initialFileName = (initialData as any)?.fileName ?? null
-    const currentFileName = documentValue?.fileName ?? null
-    if ((initialFileName ?? '') !== (currentFileName ?? '')) return true
-
-    return false
-  }, [title, abstract, tags, authors, documentValue, initialData])
+  // hasChanges already computed as hasChangesEarly for sync guards
+  const hasChanges = hasChangesEarly
 
   // Keep hasAnyInput for server guard, but Save disabled now uses hasChanges
   const hasAnyInput = useMemo(() => {

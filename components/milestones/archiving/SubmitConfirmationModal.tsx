@@ -423,13 +423,7 @@ export function SubmitConfirmationModal({
           ) : (
             <div id="tab-preview" role="tabpanel" aria-labelledby="tab-btn-preview" className="px-[24px] py-[20px] flex justify-center">
               <div className="w-full max-w-[560px]">
-                <CapstonePreviewCard
-                  title={title}
-                  abstract={abstract}
-                  tags={tags}
-                  authors={authors}
-                  document={docValue}
-                />
+                <CapstonePreviewCard title={title} abstract={abstract} tags={tags} authors={authors} />
                 <p className="pt-[10px] text-center font-sans text-[11px] leading-[16px] text-[#8a93b4]">
                   Repository preview — tags wrap to new line, authors formatted as Lastname, Initials.
                 </p>

@@ -98,36 +98,6 @@ export function AuthorList({
     }
   }, [session?.user?.id, authors.length])
 
-  useEffect(() => {
-    if (pendingNewIndex == null || readOnly) return
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (!containerRef.current) return
-      if (containerRef.current.contains(target)) return
-      const modal = document.querySelector('[role="dialog"]')
-      if (modal && modal.contains(target)) return
-      const idx = pendingNewIndex
-      if (idx == null || idx < 0 || idx >= authors.length) {
-        setPendingNewIndex(null)
-        return
-      }
-      const author = authors[idx]
-      if (!author) {
-        setPendingNewIndex(null)
-        return
-      }
-      const isEmpty = !author.lastName?.trim() && !author.firstName?.trim() && !author.email?.trim()
-      if (isEmpty) {
-        const next = authors.filter((_, i) => i !== idx)
-        onChange(next)
-        if (onReorder) onReorder(next)
-      }
-      setPendingNewIndex(null)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [pendingNewIndex, authors, onChange, onReorder, readOnly])
-
   const isAllMembersSelected = (() => {
     if (groupMembers.length === 0) return false
     return groupMembers.every((m) =>
@@ -276,13 +246,27 @@ export function AuthorList({
           </div>
         ) : (
           authors.map((author, index) => {
-            const rowError = getAuthorRowError(author)
             const isDuplicateRow = duplicateSet.has(index)
-            const hasRowError = Boolean(rowError) || isDuplicateRow
-            const showRowError = !readOnly && ((touched && hasRowError) || isDuplicateRow)
+            // No error border for empty fields — only duplicate and email format
+            const hasRowError = isDuplicateRow
+            const showRowError = !readOnly && isDuplicateRow
             const rowBorder = showRowError ? 'border-[#e11d48]' : activeIndex === index ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.15)] bg-white' : 'border-[#e8ebf8]'
             const stableKey = author.id ?? `author-${index}`
             const isActive = activeIndex === index
+            // Per-field: only duplicate and invalid email format, not empty
+            const lastNameInvalid = false
+            const firstNameInvalid = false
+            const emailInvalid = !readOnly && author.email.trim() && !isValidEmailFormat(author.email)
+            const isDuplicateEmail = isDuplicateRow && authors.some((a, i) => i !== index && a.email.trim().toLowerCase() === author.email.trim().toLowerCase() && author.email.trim())
+            const isDuplicateName =
+              isDuplicateRow &&
+              authors.some(
+                (a, i) =>
+                  i !== index &&
+                  `${a.firstName.trim().toLowerCase()}|${a.lastName.trim().toLowerCase()}` ===
+                    `${author.firstName.trim().toLowerCase()}|${author.lastName.trim().toLowerCase()}` &&
+                  `${author.firstName.trim().toLowerCase()}|${author.lastName.trim().toLowerCase()}` !== '|',
+              )
             return (
               <div
                 key={stableKey}
@@ -334,7 +318,7 @@ export function AuthorList({
                     readOnly={readOnly}
                     placeholder="Lastname"
                     aria-label={`Author ${index + 1} last name`}
-                    className={`flex-1 min-w-[110px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[#9ea8c6] placeholder:font-normal transition-colors ${showRowError && !author.lastName.trim() ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
+                    className={`flex-1 min-w-[110px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[#9ea8c6] placeholder:font-normal transition-colors ${lastNameInvalid || isDuplicateName ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
                   />
                   <input
                     type="text"
@@ -345,7 +329,7 @@ export function AuthorList({
                     readOnly={readOnly}
                     placeholder="Firstname"
                     aria-label={`Author ${index + 1} first name`}
-                    className={`flex-1 min-w-[110px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[#9ea8c6] placeholder:font-normal transition-colors ${showRowError && !author.firstName.trim() ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
+                    className={`flex-1 min-w-[110px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[#9ea8c6] placeholder:font-normal transition-colors ${firstNameInvalid || isDuplicateName ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
                   />
                   <input
                     type="email"
@@ -356,7 +340,7 @@ export function AuthorList({
                     readOnly={readOnly}
                     placeholder="Email"
                     aria-label={`Author ${index + 1} email`}
-                    className={`flex-1 min-w-[160px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[rgba(158,168,198,0.7)] placeholder:font-normal transition-colors ${showRowError && (!author.email.trim() || !isValidEmailFormat(author.email)) ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
+                    className={`flex-1 min-w-[160px] bg-white border rounded-[8px] h-[33px] px-[10px] font-sans font-medium text-[12.5px] leading-[16px] outline-none placeholder:text-[rgba(158,168,198,0.7)] placeholder:font-normal transition-colors ${emailInvalid || isDuplicateEmail ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]' : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'} ${readOnly ? 'text-[#8a93b4] bg-[#fafbff] cursor-not-allowed' : 'text-[#1e2145]'}`}
                   />
 
                   <div className="flex items-center gap-[4px] shrink-0 lg:ml-1">
@@ -457,3 +441,5 @@ export function AuthorList({
 }
 
 export default AuthorList
+
+

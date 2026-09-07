@@ -47,6 +47,8 @@ export interface ArchivingPayload {
   submission: unknown | null
   archive: unknown | null
   updatedAt: string | null
+  uploadedById: number | null
+  uploadedByName: string | null
 }
 
 export interface ArchivingReviewItem {
@@ -403,7 +405,10 @@ async function getArchivingSubmissionData(groupId: number) {
   cacheLife('max')
 
   const [submission, archive, group] = await Promise.all([
-    (prisma as any).archivingSubmission.findFirst({ where: { groupId, deletedAt: null } }),
+    (prisma as any).archivingSubmission.findFirst({
+      where: { groupId, deletedAt: null },
+      include: { uploadedBy: { select: { id: true, name: true } } },
+    }),
     prisma.capstoneArchive.findFirst({ where: { groupId, deletedAt: null } }),
     prisma.group.findFirst({ where: { id: groupId, deletedAt: null }, select: { id: true, groupName: true, sectionId: true } }),
   ])
@@ -426,6 +431,8 @@ async function getArchivingSubmissionData(groupId: number) {
     submission: submission ?? null,
     archive: archive ?? null,
     updatedAt: submission?.updatedAt ? (submission.updatedAt as Date).toISOString() : archive?.updatedAt ? (archive.updatedAt as Date).toISOString() : null,
+    uploadedById: (submission?.uploadedById as number) ?? null,
+    uploadedByName: (submission?.uploadedBy?.name as string) ?? null,
   }
 
   // Also return raw for flexibility
@@ -571,6 +578,8 @@ export async function getMyArchivingStatus() {
         mimeType: data.payload.mimeType,
         size: data.payload.size,
         updatedAt: data.payload.updatedAt,
+        uploadedById: data.payload.uploadedById,
+        uploadedByName: data.payload.uploadedByName,
       },
     }
   } catch (error) {
@@ -654,6 +663,10 @@ export async function saveArchivingDraft(_prevState: any, formData: FormData) {
       return { success: false, message: validation.message }
     }
 
+    // Preserve original uploader unless a new file is being uploaded
+    const isNewUpload = Boolean(data.blobUrl && data.blobUrl.trim().length > 0 && data.blobUrl !== (existing?.blobUrl as string | null))
+    const nextUploadedById = isNewUpload ? +session.user.id : ((existing?.uploadedById as number | null) ?? +session.user.id)
+
     // Upsert as DRAFT — draft never becomes IN_REVIEW
     const persisted = await (prisma as any).archivingSubmission.upsert({
       where: { groupId },
@@ -666,7 +679,7 @@ export async function saveArchivingDraft(_prevState: any, formData: FormData) {
         blobUrl: effectiveBlobUrl,
         mimeType: effectiveMimeType,
         size: effectiveSize,
-        uploadedById: +session.user.id,
+        uploadedById: nextUploadedById,
         status: 'DRAFT',
         deletedAt: null,
       },
@@ -680,7 +693,7 @@ export async function saveArchivingDraft(_prevState: any, formData: FormData) {
         blobUrl: effectiveBlobUrl,
         mimeType: effectiveMimeType,
         size: effectiveSize,
-        uploadedById: +session.user.id,
+        uploadedById: nextUploadedById,
         status: 'DRAFT',
       },
     })
@@ -762,6 +775,9 @@ export async function submitArchiving(_prevState: any, formData: FormData) {
       return { success: false, message: 'Only PDF files are allowed.' }
     }
 
+    const isNewUploadForSubmit = Boolean(data.blobUrl && data.blobUrl.trim().length > 0 && data.blobUrl !== (existing?.blobUrl as string | null))
+    const nextUploadedByIdForSubmit = isNewUploadForSubmit ? +session.user.id : ((existing?.uploadedById as number | null) ?? +session.user.id)
+
     // Persist as IN_REVIEW
     const persisted = await (prisma as any).archivingSubmission.upsert({
       where: { groupId },
@@ -774,7 +790,7 @@ export async function submitArchiving(_prevState: any, formData: FormData) {
         blobUrl: effectiveBlobUrl,
         mimeType: effectiveMimeType,
         size: effectiveSize,
-        uploadedById: +session.user.id,
+        uploadedById: nextUploadedByIdForSubmit,
         status: 'IN_REVIEW',
         deletedAt: null,
       },
@@ -788,7 +804,7 @@ export async function submitArchiving(_prevState: any, formData: FormData) {
         blobUrl: effectiveBlobUrl,
         mimeType: effectiveMimeType,
         size: effectiveSize,
-        uploadedById: +session.user.id,
+        uploadedById: nextUploadedByIdForSubmit,
         status: 'IN_REVIEW',
       },
     })

@@ -320,6 +320,8 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
       mimeType: initialData.mimeType,
       size: initialData.size,
       uploadedAt: initialData.updatedAt,
+      uploadedById: (initialData as any)?.uploadedById ?? null,
+      uploadedByName: (initialData as any)?.uploadedByName ?? null,
     }
   })
   const [status, setStatus] = useState<ArchivingUiStatus>(initialStatus)
@@ -353,9 +355,19 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
         mimeType: initialData.mimeType,
         size: initialData.size,
         uploadedAt: initialData.updatedAt,
+        uploadedById: (initialData as any)?.uploadedById ?? null,
+        uploadedByName: (initialData as any)?.uploadedByName ?? null,
       })
     }
-  }, [initialData?.blobUrl, initialData?.fileName, initialData?.mimeType, initialData?.size, initialData?.updatedAt])
+  }, [
+    (initialData as any)?.blobUrl,
+    (initialData as any)?.fileName,
+    (initialData as any)?.mimeType,
+    (initialData as any)?.size,
+    (initialData as any)?.updatedAt,
+    (initialData as any)?.uploadedById,
+    (initialData as any)?.uploadedByName,
+  ])
   useEffect(() => {
     setStatus(initialStatus)
   }, [initialStatus])
@@ -371,9 +383,43 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
   )
   const isSubmitDisabled = !validationForSubmit.valid || isReadOnly
 
-  // Save Draft — lenient: disabled only when ALL fields empty, enabled when at least one input has value.
-  // For authors, "has input" means at least one author has ALL fields filled (last, first, email valid).
-  // Empty author cards (all fields empty) do not count as input.
+  // Save Draft — disabled when no changes from loaded draft, enabled when any change (including removals).
+  // Compares current form vs initialData (the loaded draft). All empty with no draft => no changes => disabled.
+  const hasChanges = useMemo(() => {
+    const norm = (s: string | null | undefined) => (s ?? '').trim()
+    const initialTitle = norm(initialData?.title)
+    const initialAbstract = norm(initialData?.abstract)
+    const currentTitle = norm(title)
+    const currentAbstract = norm(abstract)
+    if (currentTitle !== initialTitle) return true
+    if (currentAbstract !== initialAbstract) return true
+
+    const initialTags: string[] = Array.isArray(initialData?.tags) ? (initialData!.tags as string[]) : []
+    const tagsEqual =
+      initialTags.length === tags.length && initialTags.every((t, i) => t === tags[i])
+    if (!tagsEqual) return true
+
+    const normAuthor = (a: AuthorEntry) =>
+      `${(a.lastName ?? '').trim().toLowerCase()}|${(a.firstName ?? '').trim().toLowerCase()}|${(a.email ?? '').trim().toLowerCase()}|${a.userId ?? ''}`
+    const initialAuthors: AuthorEntry[] = Array.isArray(initialData?.authorOrder)
+      ? (initialData!.authorOrder as AuthorEntry[])
+      : []
+    if (initialAuthors.length !== authors.length) return true
+    for (let i = 0; i < initialAuthors.length; i++) {
+      if (normAuthor(initialAuthors[i]!) !== normAuthor(authors[i]!)) return true
+    }
+
+    const initialBlob = (initialData as any)?.blobUrl ?? null
+    const currentBlob = documentValue?.blobUrl ?? null
+    if ((initialBlob ?? '') !== (currentBlob ?? '')) return true
+    const initialFileName = (initialData as any)?.fileName ?? null
+    const currentFileName = documentValue?.fileName ?? null
+    if ((initialFileName ?? '') !== (currentFileName ?? '')) return true
+
+    return false
+  }, [title, abstract, tags, authors, documentValue, initialData])
+
+  // Keep hasAnyInput for server guard, but Save disabled now uses hasChanges
   const hasAnyInput = useMemo(() => {
     const hasTitle = (title ?? '').trim().length > 0
     const hasAbstract = (abstract ?? '').trim().length > 0
@@ -387,7 +433,7 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     () => getFirstInvalidForDraft(title, abstract, tags, authors, documentValue),
     [title, abstract, tags, authors, documentValue],
   )
-  const isSaveDraftDisabled = !hasAnyInput || isReadOnly || isSavingDraft
+  const isSaveDraftDisabled = !hasChanges || isReadOnly || isSavingDraft
 
   // Clear field error for a specific field when user edits (so error disappears on fix)
   const clearFieldError = useCallback((field: keyof FieldErrors) => {
@@ -450,14 +496,14 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     return msg.includes('is required') || msg.includes('At least one')
   }, [])
 
-  // ── Save Draft handler — lenient: allows partial, disabled only when all empty; fail does NOT clear inputs ──
+  // ── Save Draft handler — lenient: allows partial, disabled when no changes from loaded draft; fail does NOT clear inputs ──
   const handleSaveDraft = useCallback(async () => {
     if (isReadOnly) {
       toast.error('Submission is locked — awaiting Program Chair approval.')
       return
     }
     if (isSavingDraft) return
-    if (!hasAnyInput) return
+    if (!hasChanges) return
 
     const result = validationForDraft
     if (!result.valid) {
@@ -541,7 +587,7 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     } finally {
       setIsSavingDraft(false)
     }
-  }, [isReadOnly, isSavingDraft, validationForDraft, title, abstract, tags, authors, documentValue, router, isEmptyRequiredMessage, hasAnyInput])
+  }, [isReadOnly, isSavingDraft, validationForDraft, title, abstract, tags, authors, documentValue, router, isEmptyRequiredMessage, hasChanges])
 
   // ── Submit click handler — validates then opens confirmation modal (2 tabs) ──
   const handleSubmitClick = useCallback(() => {
@@ -612,6 +658,7 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     isSubmitDisabled,
     isSaveDraftDisabled,
     hasAnyInput,
+    hasChanges,
     validationForSubmit,
     validationForDraft,
     // setters / handlers

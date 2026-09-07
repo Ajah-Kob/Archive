@@ -69,7 +69,7 @@ function Header() {
       <div className="size-[26px] rounded-[8px] bg-[rgba(112,125,255,0.05)] border border-[rgba(112,125,255,0.08)] flex items-center justify-center shrink-0">
         <FileText className="size-[13px] text-[#707dff]" strokeWidth={2} />
       </div>
-      <h3 className="font-heading font-bold text-[12px] leading-[18px] tracking-[0.24px] text-[#1e3a8a] uppercase">
+      <h3 className="font-heading font-bold text-[12px] leading-[18px] tracking-[0.24px] text-[#1e3a8a]">
         Capstone Details
       </h3>
     </div>

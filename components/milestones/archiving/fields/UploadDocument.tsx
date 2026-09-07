@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { File as FileIcon, X, Loader2, Upload } from 'lucide-react'
-import { toast } from 'sonner'
 import { isPdfMime } from '@/lib/archiving/validation'
 import { uploadArchivingDocument } from '@/lib/actions/archiving'
 
@@ -13,6 +13,7 @@ export interface UploadDocumentValue {
   size: number | null
   uploadedAt?: string | null
   uploadedByName?: string | null
+  uploadedById?: number | null
 }
 
 interface UploadDocumentProps {
@@ -36,11 +37,20 @@ function formatFileSize(bytes: number | null | undefined): string {
 }
 
 function formatDateLabel(iso: string | null | undefined): string {
-  if (!iso) return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  if (!iso)
+    return new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
   try {
     const d = new Date(iso)
     if (Number.isNaN(d.getTime())) return iso
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
   } catch {
     return iso ?? ''
   }
@@ -55,9 +65,15 @@ export function UploadDocument({
   submittedByName,
   submittedAt,
 }: UploadDocumentProps) {
+  const { data: session } = useSession()
+  const currentUserId = session?.user?.id ? Number(session.user.id) : null
+  const currentUserName = session?.user?.name ?? null
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [pendingFile, setPendingFile] = useState<{ name: string; size: number } | null>(null)
+  const [pendingFile, setPendingFile] = useState<{
+    name: string
+    size: number
+  } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [internalError, setInternalError] = useState<string | null>(null)
 
@@ -94,11 +110,12 @@ export function UploadDocument({
       // No size limit per spec — handle Blob error generically
       const mime = (file.type ?? '').trim()
       // Strict PDF check via isPdfMime; also allow .pdf extension fallback when mime empty (some browsers)
-      const isPdf = isPdfMime(mime) || (mime === '' && file.name.toLowerCase().endsWith('.pdf'))
+      const isPdf =
+        isPdfMime(mime) ||
+        (mime === '' && file.name.toLowerCase().endsWith('.pdf'))
       if (!isPdf) {
         const msg = 'Only PDF files are allowed.'
         setInternalError(msg)
-        toast.error(msg)
         return
       }
 
@@ -114,7 +131,6 @@ export function UploadDocument({
         if (!res.success || !res.payload) {
           const msg = res.message || 'Upload failed. Please try again.'
           setInternalError(msg)
-          toast.error(msg)
           // Keep file in UI? For blob failure there is no file; for DB-save failure parent keeps value.
           return
         }
@@ -132,24 +148,23 @@ export function UploadDocument({
           mimeType: payload.mimeType,
           size: payload.size,
           uploadedAt: new Date().toISOString(),
-          uploadedByName: submittedByName ?? null,
+          uploadedByName: currentUserName ?? submittedByName ?? null,
+          uploadedById: currentUserId,
         }
 
         onChange?.(next)
-        toast.success('File uploaded successfully.')
         // Reset input to allow re-selecting same file for replace
         if (inputRef.current) inputRef.current.value = ''
         setInternalError(null)
       } catch {
         const msg = 'Upload failed. Please try again.'
         setInternalError(msg)
-        toast.error(msg)
       } finally {
         setIsUploading(false)
         setPendingFile(null)
       }
     },
-    [onChange, submittedByName],
+    [onChange, currentUserName, currentUserId],
   )
 
   const handleInputChange = useCallback(
@@ -207,14 +222,25 @@ export function UploadDocument({
     onChange?.(null)
     setInternalError(null)
     if (inputRef.current) inputRef.current.value = ''
-    toast.success('Document removed.')
   }, [readOnly, isUploading, onChange])
 
-  // Meta line: "PDF · 3.7 MB · May 30, 2026 · Submitted by Name"
+  // Meta line: "PDF · 3.7 MB · May 30, 2026 · Submitted by Name" — show "You" only for current user's own upload
   const fileName = value?.fileName ?? ''
   const sizeLabel = formatFileSize(value?.size ?? null)
   const dateLabel = formatDateLabel(value?.uploadedAt ?? submittedAt ?? null)
-  const submitter = value?.uploadedByName ?? submittedByName ?? 'You'
+  const submitter = (() => {
+    if (value?.uploadedByName) {
+      const isOwn = value.uploadedById != null && currentUserId != null && Number(value.uploadedById) === currentUserId
+      return isOwn ? 'You' : value.uploadedByName
+    }
+    if (value?.uploadedById != null && currentUserId != null && Number(value.uploadedById) === currentUserId) return 'You'
+    if (submittedByName) {
+      if (currentUserName && submittedByName === currentUserName) return 'You'
+      return submittedByName
+    }
+    if (value?.uploadedById != null) return value.uploadedByName ?? 'Unknown'
+    return 'You'
+  })()
 
   const idleBorder = hasError
     ? 'border-[#e11d48] bg-[#fff1f2]'
@@ -228,10 +254,15 @@ export function UploadDocument({
   return (
     <div className="flex flex-col gap-[6px] w-full pb-[10px]">
       {/* Label — 12.5px bold #3a4170 + red * */}
-      <label htmlFor={id} className="font-sans font-bold text-[12.5px] leading-[18px] text-[#3a4170]">
+      <label
+        htmlFor={id}
+        className="font-sans font-bold text-[12.5px] leading-[18px] text-[#3a4170]"
+      >
         Upload Final Document <span className="text-[#ef4444]">*</span>
       </label>
-      <p className="font-sans text-[11px] leading-[14px] text-[#9ea8c6]">PDF only. Required before submission.</p>
+      <p className="font-sans text-[11px] leading-[14px] text-[#9ea8c6]">
+        PDF only. Required before submission.
+      </p>
 
       {/* Hidden input — accept only PDF, supports click to open file picker */}
       <input
@@ -247,35 +278,42 @@ export function UploadDocument({
       />
 
       {isUploading && pendingFile ? (
-        // ───────── Uploading — show file but button loading ─────────
-        // Displays file name/size immediately while Blob upload is in progress; button shows spinner
+        // ───────── Uploading — show file with centered layout, button loading + progress bar ─────────
         <div
-          className={`flex gap-[10px] h-[64px] px-[12px] py-[10px] items-start w-full rounded-[9px] border transition-colors ${uploadedBorder} ${uploadedBg} ${hasError ? 'bg-[#fff1f2]' : ''}`}
+          className={`relative overflow-hidden flex items-center gap-3 p-3 min-h-[64px] w-full rounded-xl border bg-white shadow-sm transition-colors ${uploadedBorder} ${hasError ? 'bg-[#fff1f2] border-[#e11d48]' : 'border-[#e8ebf8] hover:border-[#d4d8f0]'}`}
         >
-          <div className="size-[36px] rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] flex items-center justify-center shrink-0">
-            <FileIcon className="size-[16px] text-[#707dff]" strokeWidth={2} />
+          <div className="size-10 rounded-xl bg-[#f4f6ff] border border-[#e5e8ff] flex items-center justify-center shrink-0">
+            <FileIcon className="size-[18px] text-[#707dff]" strokeWidth={2} />
           </div>
 
-          <div className="flex-1 min-w-0 flex flex-col gap-[2px] justify-center py-[1px]">
-            <p className="font-sans font-bold text-[12.5px] leading-[16px] text-[#1e3a8a] truncate" title={pendingFile.name}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+            <p className="font-sans font-semibold text-[13px] leading-[18px] text-[#1e2145] truncate" title={pendingFile.name}>
               {pendingFile.name}
             </p>
-            <p className="font-sans font-medium text-[12px] leading-[16px] text-[#6b7399] truncate">
-              PDF · {formatFileSize(pendingFile.size)} · Uploading…
+            <p className="font-sans font-medium text-xs leading-4 text-[#6b7399] flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1">PDF</span>
+              <span className="text-[#d4d8f0]">·</span>
+              <span>{formatFileSize(pendingFile.size)}</span>
+              <span className="text-[#d4d8f0]">·</span>
+              <span className="inline-flex items-center gap-1 text-[#707dff] font-medium">
+                <Loader2 className="size-3 animate-spin" style={{ animationDuration: '1000ms' } as React.CSSProperties} />
+                Uploading…
+              </span>
             </p>
           </div>
 
-          <div className="flex items-center gap-[8px] shrink-0 self-center">
-            <button
-              type="button"
-              disabled
-              aria-label="Uploading document"
-              className="inline-flex items-center gap-[6px] h-[28px] px-[12px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-medium text-[12px] leading-none text-[#707dff] opacity-80 cursor-wait"
-            >
-              <Loader2 className="size-[12px] animate-spin" style={{ animationDuration: '1000ms' } as React.CSSProperties} />
-              Uploading…
-            </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="hidden sm:inline-flex items-center gap-1.5 h-7 px-3 rounded-lg bg-[#f4f6ff] border border-[#e5e8ff] font-sans font-medium text-xs text-[#707dff]">
+              <Loader2 className="size-3 animate-spin" style={{ animationDuration: '1000ms' } as React.CSSProperties} />
+              Uploading
+            </span>
           </div>
+
+          {/* Progress bar — indeterminate, bottom edge */}
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#eef2ff] overflow-hidden">
+            <div className="h-full w-1/3 bg-gradient-to-r from-[#707dff] to-[#5a6bff] rounded-full" style={{ animation: 'shimmer 1.2s ease-in-out infinite' }} />
+          </div>
+          <style>{`@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }`}</style>
         </div>
       ) : !hasValue ? (
         // ───────── Idle state ─────────
@@ -307,7 +345,9 @@ export function UploadDocument({
 
           {!readOnly && (
             <>
-              <p className="font-sans font-medium text-[12.5px] leading-[16px] text-[#8a93b4]">or</p>
+              <p className="font-sans font-medium text-[12.5px] leading-[16px] text-[#8a93b4]">
+                or
+              </p>
               <button
                 type="button"
                 onClick={handleBrowseClick}
@@ -320,51 +360,53 @@ export function UploadDocument({
           )}
 
           {readOnly && (
-            <p className="font-sans text-[12px] leading-[16px] text-[#9ea8c6] pt-[2px]">Upload locked — submission in review.</p>
+            <p className="font-sans text-[12px] leading-[16px] text-[#9ea8c6] pt-[2px]">
+              Upload locked — submission in review.
+            </p>
           )}
 
-          <p className="font-sans text-[11px] leading-[14px] text-[#bbc0d8] text-center pt-[2px]">Only PDF file format is accepted</p>
+          <p className="font-sans text-[11px] leading-[14px] text-[#bbc0d8] text-center pt-[2px]">
+            Only PDF file format is accepted
+          </p>
         </div>
       ) : (
-        // ───────── Uploaded state ─────────
+        // ───────── Uploaded state — polished, centered, visually appealing ─────────
         <div
-          className={`flex gap-[10px] h-[64px] px-[12px] py-[10px] items-start w-full rounded-[9px] border transition-colors ${uploadedBorder} ${uploadedBg} ${hasError ? 'bg-[#fff1f2]' : ''}`}
+          className={`flex items-center gap-3 p-3 min-h-[68px] w-full rounded-xl border bg-white shadow-sm transition-colors ${hasError ? 'bg-[#fff1f2] border-[#e11d48]' : 'border-[#e8ebf8] hover:border-[#d4d8f0] hover:shadow-md'} ${readOnly ? 'opacity-90' : ''}`}
         >
-          <div className="size-[36px] rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] flex items-center justify-center shrink-0">
-            <FileIcon className="size-[16px] text-[#707dff]" strokeWidth={2} />
+          <div className="size-10 rounded-xl bg-[#f4f6ff] border border-[#e5e8ff] flex items-center justify-center shrink-0">
+            <FileIcon className="size-[18px] text-[#707dff]" strokeWidth={2} />
           </div>
 
-          <div className="flex-1 min-w-0 flex flex-col gap-[2px] justify-center py-[1px]">
-            <p className="font-sans font-bold text-[12.5px] leading-[16px] text-[#1e3a8a] truncate" title={fileName}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+            <p className="font-sans font-semibold text-[13px] leading-[18px] text-[#1e2145] truncate" title={fileName}>
               {fileName}
             </p>
-            <p className="font-sans font-medium text-[12px] leading-[16px] text-[#6b7399] truncate">
-              PDF · {sizeLabel} · {dateLabel} · Submitted by {submitter}
-            </p>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-sans font-medium text-xs leading-4 text-[#6b7399]">
+              <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[#707dff]" /> PDF</span>
+              <span className="text-[#d4d8f0]">·</span>
+              <span>{sizeLabel}</span>
+              <span className="text-[#d4d8f0]">·</span>
+              <span>{dateLabel}</span>
+              <span className="hidden sm:inline text-[#d4d8f0]">·</span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[#8a93b4]">Submitted by <span className="font-semibold text-[#3a4170]">{submitter}</span></span>
+            </div>
+            <p className="sm:hidden font-sans text-[11px] leading-3 text-[#8a93b4] truncate">Submitted by <span className="font-medium text-[#3a4170]">{submitter}</span></p>
           </div>
 
           {!readOnly ? (
-            <div className="flex items-center gap-[8px] shrink-0 self-center">
-              <button
-                type="button"
-                onClick={handleBrowseClick}
-                className="hidden sm:inline-flex h-[28px] px-[10px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-medium text-[12px] leading-none text-[#707dff] hover:bg-[#f8f9ff] hover:border-[#d4d8f0] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)]"
-                aria-label="Replace document"
-              >
-                Replace
-              </button>
-              <button
-                type="button"
-                onClick={handleRemove}
-                aria-label="Remove document"
-                className="inline-flex items-center gap-[4px] font-sans font-semibold text-[12px] leading-none text-[#ef4444] hover:text-[#dc2626] active:text-[#b91c1c] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(239,68,68,0.15)] rounded-[6px] px-[6px] py-[6px]"
-              >
-                <X className="size-[7px] text-[#ef4444]" strokeWidth={2.5} />
-                Remove
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleRemove}
+              aria-label="Remove document"
+              className="inline-flex items-center gap-1 font-sans font-semibold text-xs leading-none text-[#e11d48] hover:text-[#dc2626] active:text-[#b91c1c] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(225,29,72,0.15)] rounded-md px-1.5 py-1.5 -mr-1"
+            >
+              <X className="size-3.5 text-[#e11d48]" strokeWidth={2.5} />
+              Remove
+            </button>
           ) : (
-            <span className="shrink-0 self-center inline-flex items-center rounded-full bg-[#f4f6ff] border border-[#e5e8ff] px-[8px] py-[2px] font-sans text-[11px] font-medium text-[#8a93b4]">
+            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#f4f6ff] border border-[#e5e8ff] px-3 py-1.5 font-sans text-xs font-medium text-[#707dff]">
+              <span className="size-1.5 rounded-full bg-[#707dff] animate-pulse" />
               Locked
             </span>
           )}
@@ -374,13 +416,22 @@ export function UploadDocument({
       {/* Error + uploading helper */}
       <div className="min-h-[16px]">
         {hasError && displayError ? (
-          <p id={`${id}-error`} role="alert" className="font-sans text-[11px] leading-[16px] text-[#e11d48]">
+          <p
+            id={`${id}-error`}
+            role="alert"
+            className="font-sans text-[11px] leading-[16px] text-[#e11d48]"
+          >
             {displayError}
           </p>
         ) : isUploading ? (
-          <p className="font-sans text-[11px] leading-[16px] text-[#8a93b4]">Uploading to Blob storage…</p>
+          <p className="font-sans text-[11px] leading-[16px] text-[#8a93b4]">
+            Uploading to Blob storage…
+          </p>
         ) : (
-          <span aria-hidden="true" className="font-sans text-[11px] leading-[16px] text-transparent select-none">
+          <span
+            aria-hidden="true"
+            className="font-sans text-[11px] leading-[16px] text-transparent select-none"
+          >
             .
           </span>
         )}
@@ -401,3 +452,7 @@ export function UploadDocument({
 }
 
 export default UploadDocument
+
+
+
+

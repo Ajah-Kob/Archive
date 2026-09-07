@@ -44,8 +44,9 @@ export function TagChipInput({
   const getValidationError = useCallback(
     (current: string[]): string | null => {
       // Use validation.ts isValidTags for client+server parity; surface specific message for UX
+      // Empty (required) is NOT shown inline — Submit is disabled when empty.
       if (!isValidTags(current)) {
-        if (current.length < 1) return 'At least one tag is required.'
+        if (current.length < 1) return null
         // isValidTags covers empty/duplicate — duplicate is handled as flash, empty as required
         return 'Tags are invalid.'
       }

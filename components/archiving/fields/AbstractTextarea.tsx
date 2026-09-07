@@ -18,7 +18,7 @@ interface AbstractTextareaProps {
 
 function getAbstractError(value: string): string | null {
   const trimmed = value.trim()
-  if (trimmed.length === 0) return 'Abstract is required.'
+  if (trimmed.length === 0) return null
   if (countChars(value) > ABSTRACT_MAX_CHARS) {
     return `Abstract must be at most ${ABSTRACT_MAX_CHARS} characters (current: ${countChars(value)}).`
   }
@@ -36,10 +36,12 @@ export function AbstractTextarea({
   error: externalError,
 }: AbstractTextareaProps) {
   const [touched, setTouched] = useState(false)
+
   const charCount = countChars(value)
   const sentenceCount = countSentences(value)
   const overChar = charCount > ABSTRACT_MAX_CHARS
   const overSentences = sentenceCount > ABSTRACT_MAX_SENTENCES
+
   const internalError = getAbstractError(value)
   let displayError: string | null = null
   if (externalError !== undefined) {
@@ -51,25 +53,37 @@ export function AbstractTextarea({
   } else if (touched) {
     displayError = internalError
   }
+
   if (!touched && value.trim().length === 0 && !overChar && !overSentences && !externalError) {
     displayError = null
   }
+
   const hasError = Boolean(displayError)
   const borderClass = hasError
     ? 'border-[#e11d48] focus:border-[#e11d48] focus:ring-2 focus:ring-[rgba(225,29,72,0.12)]'
     : 'border-[#e8ebf8] focus:border-[#707dff] focus:ring-2 focus:ring-[rgba(112,125,255,0.12)]'
   const bgClass = readOnly ? 'bg-[#fafbff] cursor-not-allowed' : 'bg-white'
+
   const overLimit = overChar || overSentences
+
   return (
     <div className="flex flex-col gap-[6px] w-full pb-[10px]">
-      <label htmlFor={id} className="font-sans font-bold text-[12.5px] leading-[18px] text-[#3a4170]">
+      {/* Label — 12.5px bold #3a4170 + red * */}
+      <label
+        htmlFor={id}
+        className="font-sans font-bold text-[12.5px] leading-[18px] text-[#3a4170]"
+      >
         Abstract<span className="font-normal text-[#9ea8c6]"> / Overview</span>{' '}
         <span className="text-[#ef4444]">*</span>
       </label>
+
+      {/* Hint — 11px #9ea8c6 */}
       <p className="font-sans text-[11px] leading-[14px] text-[#9ea8c6]">
         Short overview of your capstone — goals, methods, and key outcomes.
       </p>
+
       <div className="flex flex-col gap-0 w-full">
+        {/* Textarea — h140 min-h140 rounded-9px border #e8ebf8 p12, font regular 13px leading 21.45px #1e2145 */}
         <textarea
           id={id}
           value={value}
@@ -83,18 +97,30 @@ export function AbstractTextarea({
           maxLength={ABSTRACT_MAX_CHARS + 50}
           className={`h-[140px] min-h-[140px] w-full rounded-[9px] border p-[12px] font-sans font-normal text-[13px] leading-[21.45px] outline-none transition-colors placeholder:text-[#9ea8c6] resize-none ${borderClass} ${bgClass} ${readOnly ? 'text-[#8a93b4]' : 'text-[#1e2145]'}`}
         />
+
+        {/* Inline error — red helper text */}
         {hasError && displayError && (
-          <p id={`${id}-error`} role="alert" className="font-sans text-[11px] leading-[16px] text-[#e11d48] pt-1">
+          <p
+            id={`${id}-error`}
+            role="alert"
+            className="font-sans text-[11px] leading-[16px] text-[#e11d48] pt-1"
+          >
             {displayError}
           </p>
         )}
+
+        {/* Bottom bar: flex justify-between pt5 h22 — left Recommended, right live char counter + sentence hint */}
         <div className="flex items-center justify-between gap-2 pt-[5px] h-[22px] shrink-0">
-          <span className="font-sans text-[11px] leading-[16px] text-[#9ea8c6] truncate">Recommended: 150-250 words</span>
+          <span className="font-sans text-[11px] leading-[16px] text-[#9ea8c6] truncate">
+            Recommended: 150-250 words
+          </span>
+
           <span
             id={`${id}-counter`}
             aria-live="polite"
             className={`shrink-0 font-sans text-[11px] leading-[16px] tabular-nums flex items-center gap-1 ${overLimit ? 'text-[#e11d48] font-medium' : 'text-[#9ea8c6]'}`}
           >
+            {/* Sentence count for validation visibility; keeps spec xx/600 while also exposing sentences */}
             <span className={overSentences ? 'text-[#e11d48] font-medium' : 'text-[#9ea8c6]'}>
               {sentenceCount}/{ABSTRACT_MAX_SENTENCES} sentences
             </span>

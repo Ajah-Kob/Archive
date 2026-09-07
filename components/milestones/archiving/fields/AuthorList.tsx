@@ -29,7 +29,8 @@ function getAuthorRowError(author: AuthorEntry): string | null {
   const last = author.lastName?.trim() ?? ''
   const first = author.firstName?.trim() ?? ''
   const email = author.email?.trim() ?? ''
-  if (!last && !first && !email) return 'All fields required.'
+  // Empty row (all fields empty) is not shown inline — Submit disabled handles required; row is pristine.
+  if (!last && !first && !email) return null
   if (!last) return 'Last name is required.'
   if (!first) return 'First name is required.'
   if (!email) return 'Email is required.'
@@ -83,11 +84,12 @@ export function AuthorList({
   )
 
   // Validation — use validation.ts isValidAuthors for client+server parity
+  // Empty (required) is NOT shown inline — Submit is disabled when empty.
   const overallError = (() => {
     if (externalError !== undefined) return externalError || null
     if (readOnly) return null
     if (!isValidAuthors(authors)) {
-      if (authors.length === 0 && touched) return 'At least one author is required.'
+      if (authors.length === 0) return null
       if (hasDuplicateAuthors(authors)) return 'Duplicate authors are not allowed.'
       // Check each row has required fields when touched or when any field partially filled
       const hasRowError = authors.some((a) => getAuthorRowError(a) !== null)

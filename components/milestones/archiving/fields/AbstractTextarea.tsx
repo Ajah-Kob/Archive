@@ -18,7 +18,7 @@ interface AbstractTextareaProps {
 
 function getAbstractError(value: string): string | null {
   const trimmed = value.trim()
-  if (trimmed.length === 0) return 'Abstract is required.'
+  if (trimmed.length === 0) return null
   if (countChars(value) > ABSTRACT_MAX_CHARS) {
     return `Abstract must be at most ${ABSTRACT_MAX_CHARS} characters (current: ${countChars(value)}).`
   }

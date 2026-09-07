@@ -20,10 +20,12 @@ interface ResearchTitleInputProps {
 /**
  * Pure validation — mirrors lib/archiving/validation isValidTitle
  * but returns a human-readable message for inline display.
+ * Empty (required) is NOT shown inline — Submit Capstone is disabled when empty,
+ * so required errors are suppressed for inline display (only non-empty limits show).
  */
 function getTitleError(value: string): string | null {
   const trimmed = value.trim()
-  if (trimmed.length === 0) return 'Research title is required.'
+  if (trimmed.length === 0) return null
   if (countChars(value) > TITLE_MAX_CHARS) {
     return `Research title must be at most ${TITLE_MAX_CHARS} characters (current: ${countChars(value)}).`
   }

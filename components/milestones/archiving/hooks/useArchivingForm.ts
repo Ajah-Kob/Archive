@@ -339,6 +339,12 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     [fieldErrors.document, clearFieldError],
   )
 
+  // Helper: empty (required) errors are NOT shown inline — Submit is disabled when empty.
+  // We still keep them for isSubmitDisabled but suppress fieldErrors display.
+  const isEmptyRequiredMessage = useCallback((msg: string) => {
+    return msg.includes('is required') || msg.includes('At least one')
+  }, [])
+
   // ── Save Draft handler ──
   const handleSaveDraft = useCallback(async () => {
     if (isReadOnly) {
@@ -349,10 +355,14 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
 
     const result = validationForDraft
     if (!result.valid) {
-      // Surface field error + toast with reason + focus first invalid (do NOT bypass)
-      const nextErrors: FieldErrors = {}
-      if (result.field) nextErrors[result.field] = result.message
-      setFieldErrors((prev) => ({ ...prev, ...nextErrors }))
+      // Empty (required) → no inline field error (Submit disabled already handles it), but still toast per spec "Do not bypass"
+      // Non-empty (limits, dup, mime) → show inline + toast
+      const isEmpty = isEmptyRequiredMessage(result.message)
+      if (!isEmpty) {
+        const nextErrors: FieldErrors = {}
+        if (result.field) nextErrors[result.field] = result.message
+        setFieldErrors((prev) => ({ ...prev, ...nextErrors }))
+      }
       toast.error(result.message)
       focusFirstInvalid(result.fieldId, result.field)
       return
@@ -405,10 +415,15 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
           fallbackId = 'upload-document'
         }
         if (fallbackField) {
-          setFieldErrors((prev) => ({ ...prev, [fallbackField!]: msg }))
+          // Suppress inline for empty (required) — Submit disabled handles it
+          if (!isEmptyRequiredMessage(msg)) {
+            setFieldErrors((prev) => ({ ...prev, [fallbackField!]: msg }))
+          }
           focusFirstInvalid(fallbackId, fallbackField)
         } else if (!serverResult.valid && serverResult.field) {
-          setFieldErrors((prev) => ({ ...prev, [serverResult.field!]: serverResult.message }))
+          if (!isEmptyRequiredMessage(serverResult.message)) {
+            setFieldErrors((prev) => ({ ...prev, [serverResult.field!]: serverResult.message }))
+          }
           focusFirstInvalid(serverResult.fieldId, serverResult.field)
         } else {
           // Generic — still toast
@@ -420,7 +435,7 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
     } finally {
       setIsSavingDraft(false)
     }
-  }, [isReadOnly, isSavingDraft, validationForDraft, title, abstract, tags, authors, documentValue, router])
+  }, [isReadOnly, isSavingDraft, validationForDraft, title, abstract, tags, authors, documentValue, router, isEmptyRequiredMessage])
 
   // ── Submit click handler — validates then opens confirmation modal (2 tabs) ──
   const handleSubmitClick = useCallback(() => {
@@ -432,9 +447,15 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
 
     const result = validationForSubmit
     if (!result.valid) {
-      const nextErrors: FieldErrors = {}
-      if (result.field) nextErrors[result.field] = result.message
-      setFieldErrors((prev) => ({ ...prev, ...nextErrors }))
+      // Empty → no inline (Submit disabled already), non-empty → inline + toast
+      const isEmpty = isEmptyRequiredMessage(result.message)
+      if (!isEmpty) {
+        const nextErrors: FieldErrors = {}
+        if (result.field) nextErrors[result.field] = result.message
+        setFieldErrors((prev) => ({ ...prev, ...nextErrors }))
+      }
+      // Submit button is disabled when empty, so this toast is only for non-empty limits in practice;
+      // keep it for programmatic calls.
       toast.error(result.message)
       focusFirstInvalid(result.fieldId, result.field)
       return
@@ -442,7 +463,7 @@ export function useArchivingForm({ initialData, initialStatus }: UseArchivingFor
 
     setFieldErrors({})
     setShowSubmitModal(true)
-  }, [isReadOnly, isSubmitting, validationForSubmit])
+  }, [isReadOnly, isSubmitting, validationForSubmit, isEmptyRequiredMessage])
 
   // Called after modal confirms → IN_REVIEW → locks form
   const handleSubmitSuccess = useCallback(() => {

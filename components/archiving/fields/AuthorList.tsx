@@ -18,7 +18,6 @@ interface AuthorListProps {
   onChange: (next: AuthorEntry[]) => void
   readOnly?: boolean
   error?: string
-  /** Optional explicit reorder callback; when omitted onChange handles reorder */
   onReorder?: (next: AuthorEntry[]) => void
   id?: string
 }
@@ -31,7 +30,6 @@ function getAuthorRowError(author: AuthorEntry): string | null {
   const last = author.lastName?.trim() ?? ''
   const first = author.firstName?.trim() ?? ''
   const email = author.email?.trim() ?? ''
-  // Empty row (all fields empty) is not shown inline — Submit disabled handles required; row is pristine.
   if (!last && !first && !email) return null
   if (!last) return 'Last name is required.'
   if (!first) return 'First name is required.'
@@ -73,11 +71,11 @@ export function AuthorList({
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const lastDragOverRef = useRef<number>(0)
   const [showPicker, setShowPicker] = useState(false)
   const pickerTargetIndexRef = useRef<number | null>(null)
   const [groupMembers, setGroupMembers] = useState<{ userId: number; name: string; email: string }[]>([])
 
-  // Fetch group members to know when all are already selected
   useEffect(() => {
     const userId = session?.user?.id ? Number(session.user.id) : NaN
     if (!Number.isFinite(userId)) return
@@ -122,34 +120,14 @@ export function AuthorList({
 
   const isDragging = dragIndex != null
 
-  // Display list with placeholder gap while dragging — avoids DOM reorder glitch.
-  // We keep original authors array, filter out dragged item, insert a placeholder at drop position.
-  // The list visually shows a gap where the dragged author will land, other authors smoothly shift via transition.
-  const displayList = useMemo(() => {
-    if (!isDragging || dragOverIndex == null || dragIndex == null || dragIndex === dragOverIndex) {
-      return authors.map((a, i) => ({ kind: 'author' as const, author: a, originalIndex: i }))
-    }
+  const previewAuthors = useMemo(() => {
     const from = dragIndex
     const to = dragOverIndex
-    if (from < 0 || from >= authors.length || to < 0 || to >= authors.length) {
-      return authors.map((a, i) => ({ kind: 'author' as const, author: a, originalIndex: i }))
-    }
-    const without = authors
-      .map((a, i) => ({ kind: 'author' as const, author: a, originalIndex: i }))
-      .filter((item) => item.originalIndex !== from)
-    let target = to
-    if (from < to) target = to - 1
-    // Map target original index to position in without array
-    // Find where in without the target original index would be
-    const targetPos = without.findIndex((item) => item.originalIndex === to)
-    const insertAt = targetPos !== -1 ? targetPos + (from < to ? 1 : 0) : Math.max(0, Math.min(without.length, target))
-    const placeholder = { kind: 'placeholder' as const, key: `placeholder-${to}` }
-    const arr: (
-      | { kind: 'author'; author: AuthorEntry; originalIndex: number }
-      | { kind: 'placeholder'; key: string }
-    )[] = [...without.slice(0, insertAt), placeholder, ...without.slice(insertAt)]
-    return arr
-  }, [authors, dragIndex, dragOverIndex, isDragging])
+    if (from == null || to == null || from === to) return authors
+    if (from < 0 || from >= authors.length) return authors
+    if (to < 0 || to >= authors.length) return authors
+    return arrayMove(authors, from, to)
+  }, [authors, dragIndex, dragOverIndex])
 
   const notifyChange = useCallback(
     (next: AuthorEntry[]) => {
@@ -159,8 +137,6 @@ export function AuthorList({
     [onChange, onReorder],
   )
 
-  // Validation — use validation.ts isValidAuthors for client+server parity
-  // Empty (required) is NOT shown inline — Submit is disabled when empty.
   const overallError = (() => {
     if (externalError !== undefined) return externalError || null
     if (readOnly) return null
@@ -175,8 +151,6 @@ export function AuthorList({
     }
     return null
   })()
-
-  const showOverallError = Boolean(overallError)
 
   const duplicateSet = (() => {
     const dupIndices = new Set<number>()
@@ -249,7 +223,6 @@ export function AuthorList({
     setShowPicker(true)
   }
 
-  // Drag & drop — use ref for sync value to avoid async state race that caused empty array bug
   const handleDragStart = (index: number) => (e: React.DragEvent) => {
     if (readOnly) {
       e.preventDefault()
@@ -272,14 +245,18 @@ export function AuthorList({
     if (readOnly) return
     const from = dragIndexRef.current ?? dragIndex
     if (from == null) return
-    if (overIndex !== dragOverIndex) setDragOverIndex(overIndex)
+    // Throttle to 80ms to prevent rapid back-and-forth glitch when reordered DOM triggers new dragOver
+    const now = Date.now()
+    if (now - lastDragOverRef.current < 80) return
+    if (overIndex === dragOverIndex) return
+    lastDragOverRef.current = now
+    setDragOverIndex(overIndex)
     e.dataTransfer.dropEffect = 'move'
   }
 
   const handleDrop = (dropIndex: number) => (e: React.DragEvent) => {
     e.preventDefault()
     if (readOnly) return
-    // Prefer ref (sync) then state then dataTransfer
     let from: number | null = dragIndexRef.current
     if (from == null) from = dragIndex
     if (from == null) {
@@ -294,7 +271,6 @@ export function AuthorList({
     if (from < 0 || from >= authors.length) return
     if (dropIndex < 0 || dropIndex >= authors.length) return
     const next = arrayMove(authors, from, dropIndex)
-    // Guard: arrayMove returns same length; if somehow empty, abort
     if (!Array.isArray(next) || next.length !== authors.length) return
     notifyChange(next)
   }
@@ -310,6 +286,9 @@ export function AuthorList({
     notifyChange(next)
   }
 
+  // While dragging, show preview order with smooth shift; dragged item is semi-transparent
+  const listToRender = isDragging && dragOverIndex != null && dragIndex !== dragOverIndex ? previewAuthors : authors
+
   return (
     <div className="flex flex-col gap-[6px] w-full pb-[10px]">
       <label className="font-sans font-bold text-[12.5px] leading-[18px] text-[#3a4170]">
@@ -319,7 +298,34 @@ export function AuthorList({
         Add all researchers involved in this study. Drag to reorder.
       </p>
 
-      <div className="flex flex-col gap-[10px] w-full">
+      <div
+        className="flex flex-col gap-[10px] w-full"
+        onDragOver={(e) => {
+          // Allow drop on container gap (edge) — keep current preview, don't change dragOverIndex
+          e.preventDefault()
+          if (isDragging) e.dataTransfer.dropEffect = 'move'
+        }}
+        onDrop={(e) => {
+          // Drop on container gap (edge) — commit current preview if any
+          e.preventDefault()
+          if (!isDragging || dragIndex == null || dragOverIndex == null) return
+          const from = dragIndex
+          const to = dragOverIndex
+          if (from === to) {
+            dragIndexRef.current = null
+            setDragIndex(null)
+            setDragOverIndex(null)
+            return
+          }
+          const next = arrayMove(authors, from, to)
+          if (Array.isArray(next) && next.length === authors.length) {
+            dragIndexRef.current = null
+            setDragIndex(null)
+            setDragOverIndex(null)
+            notifyChange(next)
+          }
+        }}
+      >
         {authors.length === 0 ? (
           <div className="rounded-[10px] border border-dashed border-[#d4d8f0] bg-[#fafbff] px-[14px] py-[12px] flex items-center justify-center">
             <p className="font-sans text-[12px] leading-[16px] text-[#9ea8c6] text-center">
@@ -327,40 +333,11 @@ export function AuthorList({
             </p>
           </div>
         ) : (
-          displayList.map((item) => {
-            if (item.kind === 'placeholder') {
-              return (
-                <div
-                  key={item.key}
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                  }}
-                  onDrop={(e) => {
-                    // Drop on placeholder itself should commit to current dragOverIndex
-                    e.preventDefault()
-                    if (dragIndex == null || dragOverIndex == null) return
-                    const from = dragIndex
-                    const to = dragOverIndex
-                    if (from === to) return
-                    const next = arrayMove(authors, from, to)
-                    if (Array.isArray(next) && next.length === authors.length) {
-                      dragIndexRef.current = null
-                      setDragIndex(null)
-                      setDragOverIndex(null)
-                      notifyChange(next)
-                    }
-                  }}
-                  className="h-[54px] rounded-[10px] border-2 border-dashed border-[#c4c8ff] bg-[rgba(112,125,255,0.06)] flex items-center justify-center gap-2 transition-all duration-200 ease-out"
-                >
-                  <span className="size-2 rounded-full bg-[#707dff] animate-pulse" />
-                  <span className="font-sans text-[11px] font-semibold text-[#707dff]">Drop here</span>
-                </div>
-              )
-            }
-            const author = item.author
-            const index = item.originalIndex
-            const visualIndex = displayList.filter((i) => i.kind === 'author').findIndex((i) => i.kind === 'author' && i.author === author)
+          listToRender.map((author, displayIndex) => {
+            // Find original index for handlers and validation
+            const originalIndex = authors.indexOf(author)
+            const index = originalIndex !== -1 ? originalIndex : displayIndex
+            const visualIndex = displayIndex
             const rowError = getAuthorRowError(author)
             const isDuplicateRow = duplicateSet.has(index)
             const hasRowError = Boolean(rowError) || isDuplicateRow
@@ -382,7 +359,7 @@ export function AuthorList({
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver(index)}
                 onDrop={handleDrop(index)}
-                className={`bg-[#fafbff] border rounded-[10px] px-[12px] py-[10px] flex gap-[10px] items-center w-full transition-all duration-200 ease-out ${rowBorder} ${isDragOver ? 'ring-2 ring-[rgba(112,125,255,0.18)] bg-white shadow-sm' : ''} ${isDraggedItem ? 'opacity-40 scale-[0.98]' : ''} ${readOnly ? 'opacity-90' : ''}`}
+                className={`bg-[#fafbff] border rounded-[10px] px-[12px] py-[10px] flex gap-[10px] items-center w-full transition-all duration-200 ease-out ${rowBorder} ${isDragOver ? 'ring-2 ring-[rgba(112,125,255,0.18)] bg-white shadow-sm' : ''} ${isDraggedItem ? 'opacity-60 scale-[0.98] shadow-md' : ''} ${readOnly ? 'opacity-90' : ''}`}
               >
                 <div
                   aria-hidden="true"

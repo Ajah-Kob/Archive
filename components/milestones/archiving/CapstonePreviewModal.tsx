@@ -192,7 +192,7 @@ export function CapstonePreviewCard({
   }
 
   return (
-    <div className="bg-white border border-[#eceef8] rounded-[12px] shadow-[0px_8px_24px_rgba(16,19,58,0.10),0px_2px_8px_rgba(0,0,0,0.06)] flex overflow-hidden w-full">
+    <div className="bg-white rounded-[12px] shadow-[0px_8px_24px_rgba(16,19,58,0.10),0px_2px_8px_rgba(0,0,0,0.06)] flex overflow-hidden w-full">
       {cardInner}
     </div>
   )

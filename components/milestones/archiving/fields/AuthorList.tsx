@@ -147,11 +147,6 @@ export function AuthorList({
 
   const pickDisabled = readOnly || isAllMembersSelected
 
-  const canAddAnother = useMemo(() => {
-    if (authors.length === 0) return true
-    return authors.every((a) => a.lastName.trim() && a.firstName.trim() && a.email.trim() && isValidEmailFormat(a.email))
-  }, [authors])
-
   const notifyChange = useCallback(
     (next: AuthorEntry[]) => {
       onChange(next)
@@ -215,7 +210,6 @@ export function AuthorList({
 
   const handleAdd = () => {
     if (readOnly) return
-    if (!canAddAnother) return
     const next = [...authors, createEmptyAuthor()]
     notifyChange(next)
     setTouched(true)
@@ -430,10 +424,9 @@ export function AuthorList({
       <button
         type="button"
         onClick={handleAdd}
-        disabled={readOnly || !canAddAnother}
-        title={!canAddAnother && !readOnly ? 'Fill current author before adding another' : undefined}
+        disabled={readOnly}
         aria-label="Add another author"
-        className={`w-full h-[38px] rounded-[10px] border border-dashed flex items-center justify-center gap-[7px] font-sans font-bold text-[12.5px] leading-[18px] transition-colors ${readOnly || !canAddAnother ? 'border-[#e8ebf8] text-[#9ea8c6] bg-[#fafbff] cursor-not-allowed opacity-60' : 'border-[#d4d8f0] text-[#707dff] bg-white hover:bg-[#f8f9ff] hover:border-[#707dff] active:bg-[#f4f6ff] focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)]'}`}
+        className="w-full h-[38px] rounded-[10px] border border-dashed flex items-center justify-center gap-[7px] font-sans font-bold text-[12.5px] leading-[18px] transition-colors border-[#d4d8f0] text-[#707dff] bg-white hover:bg-[#f8f9ff] hover:border-[#707dff] active:bg-[#f4f6ff] focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)] disabled:border-[#e8ebf8] disabled:text-[#9ea8c6] disabled:bg-[#fafbff] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Plus className="size-[14px]" strokeWidth={2.5} />
         Add Another Author

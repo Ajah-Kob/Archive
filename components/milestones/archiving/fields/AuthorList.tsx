@@ -243,15 +243,20 @@ export function AuthorList({
   const handleDragOver = (overIndex: number) => (e: React.DragEvent) => {
     e.preventDefault()
     if (readOnly) return
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDragEnter = (overIndex: number) => (e: React.DragEvent) => {
+    e.preventDefault()
+    if (readOnly) return
     const from = dragIndexRef.current ?? dragIndex
     if (from == null) return
-    // Throttle to 80ms to prevent rapid back-and-forth glitch when reordered DOM triggers new dragOver
-    const now = Date.now()
-    if (now - lastDragOverRef.current < 80) return
     if (overIndex === dragOverIndex) return
+    // Throttle + use dragEnter (fires once per enter) to prevent glitch from reordered DOM triggering continuous dragOver
+    const now = Date.now()
+    if (now - lastDragOverRef.current < 120) return
     lastDragOverRef.current = now
     setDragOverIndex(overIndex)
-    e.dataTransfer.dropEffect = 'move'
   }
 
   const handleDrop = (dropIndex: number) => (e: React.DragEvent) => {
@@ -358,6 +363,7 @@ export function AuthorList({
                 onDragStart={handleDragStart(index)}
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver(index)}
+                onDragEnter={handleDragEnter(index)}
                 onDrop={handleDrop(index)}
                 className={`bg-[#fafbff] border rounded-[10px] px-[12px] py-[10px] flex gap-[10px] items-center w-full transition-all duration-200 ease-out ${rowBorder} ${isDragOver ? 'ring-2 ring-[rgba(112,125,255,0.18)] bg-white shadow-sm' : ''} ${isDraggedItem ? 'opacity-60 scale-[0.98] shadow-md' : ''} ${readOnly ? 'opacity-90' : ''}`}
               >

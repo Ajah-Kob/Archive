@@ -97,6 +97,7 @@ export async function getMyWorkspace(userId: number): Promise<{
             },
           },
           capstoneArchive: { select: { deletedAt: true } },
+          archivingSubmission: { select: { status: true, deletedAt: true } },
         },
       },
     },

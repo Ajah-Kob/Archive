@@ -1,161 +1,92 @@
 'use server'
 
-import {
-  cacheTag,
-  cacheLife,
-} from 'next/cache'
-import { revalidateTag } from 'next/cache'
-import { put, del } from '@vercel/blob'
 import prisma from '@/lib/prisma'
-import { requireUser } from '@/lib/actions/guard'
+import { cacheTag, cacheLife } from 'next/cache'
+import type { AuthorEntry } from '@/lib/archiving/validation'
 
-const ALLOWED_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-]
-const MAX_SIZE_BYTES = 10 * 1024 * 1024
+export interface RepositoryArchiveRow {
+  id: number
+  groupId: number
+  title: string
+  abstract: string | null
+  tags: string[]
+  authorOrder: AuthorEntry[]
+  blobUrl: string
+  fileName: string
+  mimeType: string
+  size: number
+  datePublished: string
+  uploadedById: number
+}
 
-const table = 'capstoneArchive'
-
-export async function getArchives(page = 1, perPage = 10) {
+// Internal cached reader — 'use cache' persistent, tag-based for instant invalidation on approve
+async function getArchivedCapstonesData(): Promise<RepositoryArchiveRow[]> {
   'use cache'
   cacheTag('archives')
+  cacheTag('repository')
   cacheLife('max')
 
-  const skip = (page - 1) * perPage
-
-  const [archives, total] = await Promise.all([
-    prisma[table].findMany({
-      where: { deletedAt: null },
-      skip,
-      take: perPage,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        uploadedBy: { select: { id: true, name: true, email: true } },
-        group: {
-          include: {
-            students: {
-              include: { user: { select: { id: true, name: true } } },
-            },
-          },
-        },
-      },
-    }),
-    prisma[table].count({ where: { deletedAt: null } }),
-  ])
-
-  return { archives, totalPages: Math.ceil(total / perPage) }
-}
-
-export async function getArchive(id: number) {
-  'use cache'
-  cacheTag(`archive-${id}`)
-  cacheLife('max')
-
-  return prisma[table].findFirst({
-    where: { id, deletedAt: null },
-    include: {
-      uploadedBy: { select: { id: true, name: true, email: true } },
-      group: {
-        include: {
-          students: {
-            include: { user: { select: { id: true, name: true } } },
-          },
-        },
-      },
+  const rows = await prisma.capstoneArchive.findMany({
+    where: { deletedAt: null },
+    select: {
+      id: true,
+      groupId: true,
+      title: true,
+      abstract: true,
+      tags: true,
+      authorOrder: true,
+      blobUrl: true,
+      fileName: true,
+      mimeType: true,
+      size: true,
+      datePublished: true,
+      uploadedById: true,
     },
+    orderBy: { datePublished: 'desc' },
   })
+
+  return rows.map((r) => ({
+    id: r.id,
+    groupId: r.groupId,
+    title: r.title,
+    abstract: r.abstract,
+    tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
+    authorOrder: Array.isArray(r.authorOrder) ? (r.authorOrder as AuthorEntry[]) : [],
+    blobUrl: r.blobUrl,
+    fileName: r.fileName,
+    mimeType: r.mimeType,
+    size: r.size,
+    datePublished: (r.datePublished as Date).toISOString(),
+    uploadedById: r.uploadedById,
+  }))
 }
 
-export async function publishArchive(_prevState: unknown, formData: FormData) {
-  const session = await requireUser()
-  if (!session) {
-    return { success: false, message: 'Not authorized.' }
-  }
-
-  const groupId = parseInt(formData.get('groupId')?.toString() || '', 10)
-  const title = formData.get('title')?.toString().trim()
-  const abstract = formData.get('abstract')?.toString().trim() || null
-  const category = formData.get('category')?.toString().trim()
-  const file = formData.get('file') as File | null
-
-  if (!groupId || !title || !category || !file || file.size === 0) {
-    return { success: false, message: 'Missing required fields.' }
-  }
-
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return {
-      success: false,
-      message: 'Unsupported file type. Only PDF, DOC, DOCX allowed.',
-    }
-  }
-
-  if (file.size > MAX_SIZE_BYTES) {
-    return { success: false, message: 'File too large (max 10MB).' }
-  }
-
+/**
+ * Public reader for /repository — returns ARCHIVED capstones ordered by datePublished desc.
+ * Uses 'use cache' + cacheTag('archives') so approveArchiving's revalidateTag makes Repository show immediately.
+ * No auth guard — repository is shared by any role per proxy (no protection).
+ */
+export async function getRepositoryArchives(): Promise<{
+  success: boolean
+  message: string
+  payload: RepositoryArchiveRow[] | null
+}> {
   try {
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    const blob = await put(`archives/${groupId}/${file.name}`, buffer, {
-      access: 'public',
-      contentType: file.type,
-      addRandomSuffix: true,
-    })
-
-    await prisma[table].create({
-      data: {
-        groupId,
-        title,
-        abstract,
-        datePublished: new Date(),
-        category,
-        fileName: file.name,
-        blobUrl: blob.url,
-        mimeType: file.type,
-        size: file.size,
-        uploadedById: +session.user.id,
-      },
-    })
-
-    revalidateTag('archives', 'max')
-    return { success: true, message: 'Archive published successfully.' }
+    const payload = await getArchivedCapstonesData()
+    return { success: true, message: '', payload }
   } catch (error) {
-    console.error('Error in publishArchive:', error)
-    return { success: false, message: 'Failed to publish archive.' }
+    console.error('[getRepositoryArchives | Error]:', error)
+    return { success: false, message: 'Failed to fetch repository archives.', payload: null }
   }
 }
 
-export async function deleteArchive(id: number) {
-  const session = await requireUser()
-  if (!session) {
-    return { success: false, message: 'Not authorized.' }
-  }
-
-  try {
-    const archive = await prisma[table].findFirst({
-      where: { id, deletedAt: null },
-    })
-
-    if (!archive) {
-      return { success: false, message: 'Archive not found.' }
-    }
-
-    await del(archive.blobUrl)
-
-    await prisma[table].update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    })
-
-    revalidateTag('archives', 'max')
-    revalidateTag(`archive-${id}`, 'max')
-    return { success: true, message: 'Archive deleted.' }
-  } catch (error) {
-    console.error('Error in deleteArchive:', error)
-    return { success: false, message: 'Failed to delete archive.' }
-  }
+/**
+ * Alias for acceptance-criteria naming — also covers tag 'repository'.
+ */
+export async function getArchivedCapstones(): Promise<{
+  success: boolean
+  message: string
+  payload: RepositoryArchiveRow[] | null
+}> {
+  return getRepositoryArchives()
 }
-

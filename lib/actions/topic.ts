@@ -134,6 +134,7 @@ async function loadTopicWorkspace(userId: number) {
             },
           },
           capstoneArchive: { select: { deletedAt: true } },
+          archivingSubmission: { select: { status: true, deletedAt: true } },
         },
       },
     },
@@ -204,6 +205,7 @@ function buildJourneySource(
       submissions: m.submissions,
     })),
     capstoneArchive: group.capstoneArchive,
+    archivingSubmission: (group as unknown as { archivingSubmission?: { status: string; deletedAt: Date | null } | null }).archivingSubmission ?? null,
   }
 }
 

@@ -13,6 +13,7 @@ import {
   Flag,
   Users,
   UserCog,
+  Archive,
   type LucideIcon,
 } from 'lucide-react'
 import { roleHome } from '@/lib/helper'
@@ -34,7 +35,8 @@ function isNavActive(pathname: string, href: string) {
     href === '/faculty/my-sections' ||
     href === '/faculty/document-review' ||
     href === '/faculty/faculties' ||
-    href === '/faculty/coordinators'
+    href === '/faculty/coordinators' ||
+    href === '/faculty/archiving'
   ) {
     return pathname === href || pathname.startsWith(`${href}/`)
   }
@@ -94,6 +96,12 @@ export function NavLinks({
           label: 'Coordinators',
           href: '/faculty/coordinators',
           icon: UserCog,
+          show: isAdmin || isProgramChair,
+        },
+        {
+          label: 'Archiving Review',
+          href: '/faculty/archiving',
+          icon: Archive,
           show: isAdmin || isProgramChair,
         },
       ],

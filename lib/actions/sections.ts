@@ -530,6 +530,7 @@ async function getCoordinatorSectionData(sectionId: number) {
             },
           },
           capstoneArchive: { select: { deletedAt: true } },
+          archivingSubmission: { select: { status: true, deletedAt: true } },
         },
       },
     },
@@ -592,6 +593,7 @@ async function getCoordinatorSectionData(sectionId: number) {
             submissions: m.submissions,
           })),
           capstoneArchive: g.capstoneArchive,
+          archivingSubmission: (g as unknown as { archivingSubmission?: { status: string; deletedAt: Date | null } | null }).archivingSubmission ?? null,
         },
         availability,
       ),
@@ -1483,6 +1485,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
           },
         },
         capstoneArchive: { select: { deletedAt: true } },
+        archivingSubmission: { select: { status: true, deletedAt: true } },
       },
     })
     if (!group) {
@@ -1505,6 +1508,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
           submissions: m.submissions,
         })),
         capstoneArchive: group.capstoneArchive,
+        archivingSubmission: (group as unknown as { archivingSubmission?: { status: string; deletedAt: Date | null } | null }).archivingSubmission ?? null,
       },
       resolveSectionAvailability(
         !!group.section.capstone2OpenedAt,

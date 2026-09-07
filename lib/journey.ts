@@ -31,6 +31,7 @@ export type JourneySource = {
     submissions: { status: string; deletedAt: Date | null }[]
   }[]
   capstoneArchive: { deletedAt: Date | null } | null
+  archivingSubmission?: { status: string; deletedAt: Date | null } | null
 }
 
 // Statically built groupless journey (all locked) so we never allocate it per request.
@@ -218,7 +219,9 @@ export function buildJourneyRows(
     }
   }
 
-  // Archiving — gated by availability, green once archived.
+  // Archiving — gated by availability, derives state from DB (IN_REVIEW → CAPSTONE_ARCHIVED).
+  // READY_FOR_ARCHIVING maps to DEFAULT, IN_REVIEW maps to SUBMITTED (yellow), ARCHIVED maps to APPROVED (green).
+  // This survives refresh because it reads persisted ArchivingSubmission + CapstoneArchive, not local state.
   const archiving: JourneyRow = {
     slug: 'archiving',
     label: 'Archiving',
@@ -227,6 +230,21 @@ export function buildJourneyRows(
   }
   if (isOpen('ARCHIVING')) {
     if (group.capstoneArchive && !group.capstoneArchive.deletedAt) {
+      archiving.state = 'APPROVED'
+      archiving.sublabel = 'Archived'
+    } else if (
+      group.archivingSubmission &&
+      !group.archivingSubmission.deletedAt &&
+      group.archivingSubmission.status === 'IN_REVIEW'
+    ) {
+      archiving.state = 'SUBMITTED'
+      archiving.sublabel = 'In Review'
+    } else if (
+      group.archivingSubmission &&
+      !group.archivingSubmission.deletedAt &&
+      group.archivingSubmission.status === 'ARCHIVED'
+    ) {
+      // Fallback when archive row not yet synced — treat as archived
       archiving.state = 'APPROVED'
       archiving.sublabel = 'Archived'
     } else {

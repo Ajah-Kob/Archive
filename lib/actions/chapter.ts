@@ -204,6 +204,7 @@ export async function getChapterData(
             },
           },
           capstoneArchive: { select: { deletedAt: true } },
+          archivingSubmission: { select: { status: true, deletedAt: true } },
         },
       },
     },
@@ -230,6 +231,7 @@ export async function getChapterData(
             submissions: m.submissions,
           })),
           capstoneArchive: effectiveGroup.capstoneArchive,
+          archivingSubmission: (effectiveGroup as unknown as { archivingSubmission?: { status: string; deletedAt: Date | null } | null }).archivingSubmission ?? null,
         }
       : null,
     availability,

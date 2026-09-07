@@ -8,6 +8,7 @@ import { ComingSoon } from '@/components/workspace/ComingSoon'
 import { getMyWorkspace } from '@/lib/actions/groups'
 import { getChapterData } from '@/lib/actions/chapter'
 import { getTopicSelectionData, getTopicSubmissionData } from '@/lib/actions/topic'
+import { getMyArchivingStatus } from '@/lib/actions/archiving'
 import { GroupContext } from '@/components/milestones/GroupContext'
 import { CapstoneJourney } from '@/components/milestones/CapstoneJourney'
 import { JOURNEY_ROWS, SLUG_TO_CHAPTER, WORKSPACE_SLUGS } from '@/types/milestones'
@@ -16,6 +17,7 @@ import { TopicSelectionView } from '@/components/milestones/topic-selection/Topi
 import { TopicSubmissionView } from '@/components/milestones/topic-submission/TopicSubmissionView'
 import { ChapterSubmissionView } from '@/components/milestones/chapter/ChapterSubmissionView'
 import { LockedChapterPlaceholder } from '@/components/milestones/chapter/LockedChapterPlaceholder'
+import { ArchivingView } from '@/components/milestones/archiving/ArchivingView'
 
 const DEFENSE_SLUGS = ['proposal-defense', 'final-defense']
 
@@ -40,7 +42,7 @@ export default async function MilestoneDetailPage({
 
   const userId = +session.user.id
   const chapter = SLUG_TO_CHAPTER[milestone]
-  const [workspaceRes, topicRes, chapterRes] = await Promise.all([
+  const [workspaceRes, topicRes, chapterRes, archivingRes] = await Promise.all([
     getMyWorkspace(userId),
     milestone === 'topic-submission'
       ? getTopicSubmissionData(userId)
@@ -48,9 +50,72 @@ export default async function MilestoneDetailPage({
         ? getTopicSelectionData(userId)
         : Promise.resolve(null),
     chapter ? getChapterData(chapter) : Promise.resolve(null),
+    milestone === 'archiving' ? getMyArchivingStatus() : Promise.resolve(null),
   ])
 
   const workspace = workspaceRes.success && workspaceRes.payload ? workspaceRes.payload : null
+
+  if (milestone === 'archiving') {
+    if (!workspace) notFound()
+    const raw =
+      archivingRes &&
+      (archivingRes as { success: boolean; payload: { status: string } | null }).success
+        ? (archivingRes as unknown as { success: boolean; payload: { status: 'READY_FOR_ARCHIVING' | 'IN_REVIEW' | 'CAPSTONE_ARCHIVED'; title: string | null; abstract: string | null; tags: string[]; authorOrder: unknown[]; blobUrl: string | null; fileName: string | null; mimeType: string | null; size: number | null; groupId: number | null; updatedAt: string | null } | null }).payload
+        : null
+
+    const status = (raw?.status as 'READY_FOR_ARCHIVING' | 'IN_REVIEW' | 'CAPSTONE_ARCHIVED') ?? 'READY_FOR_ARCHIVING'
+
+    const initialData = raw
+      ? {
+          status,
+          dbStatus: (raw as unknown as { dbStatus: string | null }).dbStatus ?? null,
+          title: raw.title ?? null,
+          abstract: raw.abstract ?? null,
+          tags: raw.tags ?? [],
+          authorOrder: (raw.authorOrder as unknown[]) ?? [],
+          blobUrl: raw.blobUrl ?? null,
+          fileName: raw.fileName ?? null,
+          mimeType: raw.mimeType ?? null,
+          size: raw.size ?? null,
+          groupId: raw.groupId ?? null,
+          submission: (raw as unknown as { submission: unknown }).submission ?? null,
+          archive: (raw as unknown as { archive: unknown }).archive ?? null,
+          updatedAt: raw.updatedAt ?? null,
+        }
+      : {
+          status: 'READY_FOR_ARCHIVING' as const,
+          dbStatus: null,
+          title: null,
+          abstract: null,
+          tags: [] as string[],
+          authorOrder: [] as unknown[],
+          blobUrl: null,
+          fileName: null,
+          mimeType: null,
+          size: null,
+          groupId: workspace.group?.id ?? null,
+          submission: null,
+          archive: null,
+          updatedAt: null,
+        }
+
+    return (
+      <section className="h-full flex min-h-0">
+        <CapstoneJourney journey={workspace.journey} activeSlug="archiving" />
+
+        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          <GroupContext />
+          <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col overflow-hidden">
+            <ArchivingView
+              initialStatus={status}
+              initialData={initialData as unknown as import('@/lib/actions/archiving').ArchivingPayload}
+            />
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   if (!workspace?.group) notFound()
 
   if (milestone === 'topic-submission') {

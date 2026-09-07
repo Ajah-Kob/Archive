@@ -102,6 +102,9 @@ export async function proxy(req: NextRequest) {
     } else if (startsWithPath(pathname, '/faculty/defense-scheduling')) {
       if (!hasCoordinatorAccess(token))
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
+    } else if (startsWithPath(pathname, '/faculty/archiving')) {
+      if (!isAdminOrProgramChair(token))
+        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     }
   }
 
@@ -113,5 +116,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/faculty/:path*', '/student/:path*', '/guest/:path*', '/account/:path*', '/login'],
+  matcher: ['/admin/:path*', '/faculty/:path*', '/faculty/archiving/:path*', '/student/:path*', '/guest/:path*', '/account/:path*', '/login'],
 }

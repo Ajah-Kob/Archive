@@ -48,6 +48,7 @@ model User {
   defensePanelists             DefensePanelist[]
   defenseSubmissions           DefenseSubmission[]           @relation("DefenseSubmissionSubmitter")
   defenseSubmissionReviews     DefenseSubmissionReview[]
+  archivingSubmissions         ArchivingSubmission[]
 
   @@index([email, deletedAt])
 }
@@ -246,9 +247,10 @@ model Group {
   topics           Topic[]
   capstone         Capstone?
   milestones       Milestone[]
-  capstoneArchive  CapstoneArchive?
-  invitations      Invitation[]
-  defenseSchedules DefenseSchedule[]
+  capstoneArchive       CapstoneArchive?
+  archivingSubmission   ArchivingSubmission?
+  invitations           Invitation[]
+  defenseSchedules      DefenseSchedule[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   deletedAt        DateTime?
@@ -415,11 +417,46 @@ model CapstoneArchive {
   size          Int
   uploadedById  Int
   uploadedBy    User      @relation(fields: [uploadedById], references: [id])
+  tags          Json      @default("[]")
+  authorOrder   Json      @default("[]")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
   @@index([deletedAt])
+}
+
+// ───────────────────────────── Archiving Submission ─────────────────────────────
+// Lifecycle: DRAFT ↔ READY_FOR_ARCHIVING, IN_REVIEW, ARCHIVED ↔ CAPSTONE_ARCHIVED
+// ArchivingSubmission captures READY_FOR_ARCHIVING -> IN_REVIEW -> CAPSTONE_ARCHIVED states
+
+enum ArchivingStatus {
+  DRAFT
+  IN_REVIEW
+  ARCHIVED
+}
+
+model ArchivingSubmission {
+  id            Int             @id @default(autoincrement())
+  groupId       Int             @unique
+  group         Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title         String
+  abstract      String
+  tags          Json            @default("[]")
+  authorOrder   Json            @default("[]")
+  status        ArchivingStatus @default(DRAFT)
+  fileName      String?
+  blobUrl       String?
+  mimeType      String?
+  size          Int?
+  uploadedById  Int
+  uploadedBy    User            @relation(fields: [uploadedById], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  deletedAt     DateTime?
+
+  @@index([deletedAt])
+  @@index([status])
 }
 
 // ───────────────────────────── Template ─────────────────────────────

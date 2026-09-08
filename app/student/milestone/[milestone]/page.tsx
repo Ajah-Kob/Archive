@@ -57,6 +57,8 @@ export default async function MilestoneDetailPage({
 
   if (milestone === 'archiving') {
     if (!workspace) notFound()
+    const isLocked = workspace.journey.find((r) => r.slug === 'archiving')?.state === 'LOCKED'
+    if (isLocked) redirect('/student/milestone')
     const raw =
       archivingRes &&
       (archivingRes as { success: boolean; payload: { status: string } | null }).success
@@ -101,15 +103,19 @@ export default async function MilestoneDetailPage({
 
     return (
       <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={workspace.journey} activeSlug="archiving" />
+        <CapstoneJourney journey={workspace.journey} activeSlug="archiving" phaseLocks={(workspace as any).phaseLocks} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col overflow-hidden">
-            <ArchivingView
-              initialStatus={status}
-              initialData={initialData as unknown as import('@/lib/actions/archiving').ArchivingPayload}
-            />
+            {isLocked ? (
+              <LockedChapterPlaceholder chapterLabel="Archiving" />
+            ) : (
+              <ArchivingView
+                initialStatus={status}
+                initialData={initialData as unknown as import('@/lib/actions/archiving').ArchivingPayload}
+              />
+            )}
           </div>
         </div>
       </section>
@@ -121,15 +127,19 @@ export default async function MilestoneDetailPage({
   if (milestone === 'topic-submission') {
     const data = topicRes?.success && topicRes.payload ? topicRes.payload : null
     if (!data?.group) notFound()
+    const isLocked = (data as any).journey?.find((r: any) => r.slug === 'topic-submission')?.state === 'LOCKED'
+    if (isLocked) redirect('/student/milestone')
 
     return (
       <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={data.journey} activeSlug="topic-submission" />
+        <CapstoneJourney journey={data.journey} activeSlug="topic-submission" phaseLocks={(data as any).phaseLocks} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
-            {data.group ? (
+            {isLocked ? (
+              <LockedChapterPlaceholder chapterLabel="Topic Submission" />
+            ) : data.group ? (
               <TopicSubmissionView data={data} />
             ) : (
               <LockedGroupPlaceholder />
@@ -143,15 +153,19 @@ export default async function MilestoneDetailPage({
   if (milestone === 'topic-selection') {
     const data = topicRes?.success && topicRes.payload ? topicRes.payload : null
     if (!data?.group) notFound()
+    const isLocked = (data as any).journey?.find((r: any) => r.slug === 'topic-selection')?.state === 'LOCKED'
+    if (isLocked) redirect('/student/milestone')
 
     return (
       <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={data.journey} activeSlug="topic-selection" />
+        <CapstoneJourney journey={data.journey} activeSlug="topic-selection" phaseLocks={(data as any).phaseLocks} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
-            {data.group ? (
+            {isLocked ? (
+              <LockedChapterPlaceholder chapterLabel="Topic Selection" />
+            ) : data.group ? (
               <TopicSelectionView data={data} />
             ) : (
               <LockedGroupPlaceholder />
@@ -165,20 +179,17 @@ export default async function MilestoneDetailPage({
   if (chapter) {
     const data = chapterRes?.success && chapterRes.payload ? chapterRes.payload : null
     if (!data) notFound()
+    if (!data.open) redirect('/student/milestone')
 
     return (
       <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={data.journey} activeSlug={milestone} />
+        <CapstoneJourney journey={data.journey} activeSlug={milestone} phaseLocks={(data as any).phaseLocks} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
 
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
-            {data.open ? (
-              <ChapterSubmissionView payload={data} />
-            ) : (
-              <LockedChapterPlaceholder chapterLabel={data.chapter.label} />
-            )}
+            <ChapterSubmissionView payload={data} />
           </div>
         </div>
       </section>
@@ -186,10 +197,12 @@ export default async function MilestoneDetailPage({
   }
 
   const row = JOURNEY_ROWS.find((r) => r.slug === milestone)
+  const isGenericLocked = workspace.journey.find((r) => r.slug === milestone)?.state === 'LOCKED'
+  if (isGenericLocked) redirect('/student/milestone')
 
   return (
     <section className="h-full flex min-h-0">
-      <CapstoneJourney journey={workspace.journey} activeSlug={milestone} />
+      <CapstoneJourney journey={workspace.journey} activeSlug={milestone} phaseLocks={(workspace as any).phaseLocks} />
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <GroupContext />

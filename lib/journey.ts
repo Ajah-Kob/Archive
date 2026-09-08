@@ -6,6 +6,7 @@
 // functions, so this logic lives outside of lib/actions/.
 
 import { TOPIC_CAP, type JourneyRow } from '@/types/milestones'
+import { CAPSTONE1_KEYS, CAPSTONE2_KEYS } from '@/lib/milestones/phase'
 
 const CHAPTER_SLUG: Record<string, string> = {
   CHAPTER_1: 'chapter-1',
@@ -51,15 +52,41 @@ const JOURNEY_ROWS_EMPTY: JourneyRow[] = [
 // A single row of a section's milestone-availability table.
 export type SectionAvailabilityRow = { key: string; openedAt: Date | null }
 
-// Resolves each milestone's open/locked flag for a section. Explicit rows win
-// (openedAt set -> open, null -> locked); missing rows fall back to: Topic
-// Submission open by default, Chapters 4/5 following the capstone2 phase gate,
-// everything else locked. Mirrors the coordinator's management UI so both sides
-// read the same source of truth.
+// Resolves each milestone's open/locked flag for a section. Phase gates
+// (capstone1/2) take precedence over explicit rows — when a phase is locked,
+// every milestone in that phase is considered locked even if its row says
+// open. This powers the coordinator's "Capstone X locked" overlay and the
+// student's journey lock state. Missing rows fall back to: Topic Submission
+// open by default (unless its phase is locked), Capstone 2 keys following
+// capstone2OpenedAt, everything else locked.
+export function resolveSectionAvailability(
+  capstone1Open: boolean,
+  capstone2Open: boolean,
+  rows: SectionAvailabilityRow[],
+): Record<string, boolean>
 export function resolveSectionAvailability(
   capstone2Open: boolean,
   rows: SectionAvailabilityRow[],
+): Record<string, boolean>
+export function resolveSectionAvailability(
+  a: boolean,
+  b: boolean | SectionAvailabilityRow[],
+  c?: SectionAvailabilityRow[],
 ): Record<string, boolean> {
+  let capstone1Open: boolean
+  let capstone2Open: boolean
+  let rows: SectionAvailabilityRow[]
+  if (Array.isArray(b)) {
+    // legacy 2-arg call: (capstone2Open, rows) → assume capstone1 is open
+    capstone1Open = true
+    capstone2Open = a
+    rows = b as SectionAvailabilityRow[]
+  } else {
+    capstone1Open = a
+    capstone2Open = b as boolean
+    rows = c as SectionAvailabilityRow[]
+  }
+
   const explicit = new Map(rows.map((r) => [r.key, r.openedAt != null]))
   const keys = [
     'TOPIC_SUBMISSION',
@@ -71,11 +98,21 @@ export function resolveSectionAvailability(
   ]
   const out: Record<string, boolean> = {}
   for (const key of keys) {
+    // Phase gate overrides everything — locked phase means every key in that
+    // phase is locked, regardless of its explicit row.
+    if ((CAPSTONE1_KEYS as string[]).includes(key) && !capstone1Open) {
+      out[key] = false
+      continue
+    }
+    if ((CAPSTONE2_KEYS as string[]).includes(key) && !capstone2Open) {
+      out[key] = false
+      continue
+    }
     if (explicit.has(key)) {
       out[key] = explicit.get(key)!
     } else if (key === 'TOPIC_SUBMISSION') {
       out[key] = true
-    } else if (key === 'CHAPTER_4' || key === 'CHAPTER_5') {
+    } else if ((CAPSTONE2_KEYS as string[]).includes(key)) {
       out[key] = capstone2Open
     } else {
       out[key] = false

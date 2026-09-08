@@ -43,6 +43,7 @@ export async function getMyWorkspace(userId: number): Promise<{
         select: {
           id: true,
           section: true,
+          capstone1OpenedAt: true,
           capstone2OpenedAt: true,
           milestoneAvailability: { select: { key: true, openedAt: true } },
         },
@@ -118,8 +119,16 @@ export async function getMyWorkspace(userId: number): Promise<{
     section: { id: student.section.id, name: student.section.section },
   }
 
+  const capstone1Open = !!(student.section as any).capstone1OpenedAt
+  const capstone2Open = !!student.section.capstone2OpenedAt
+  const phaseLocks = {
+    'CAPSTONE 1': !capstone1Open,
+    'CAPSTONE 2': !capstone2Open,
+  } as const
+
   const availability = resolveSectionAvailability(
-    !!student.section.capstone2OpenedAt,
+    capstone1Open,
+    capstone2Open,
     student.section.milestoneAvailability,
   )
 
@@ -127,7 +136,7 @@ export async function getMyWorkspace(userId: number): Promise<{
     return {
       success: true,
       message: '',
-      payload: { ...base, group: null, journey: buildJourneyRows(null, availability) },
+      payload: { ...base, group: null, journey: buildJourneyRows(null, availability), phaseLocks } as any,
     }
   }
 
@@ -193,7 +202,7 @@ export async function getMyWorkspace(userId: number): Promise<{
     }))
   const pendingCount = invitations.filter((i) => i.status === 'PENDING').length
 
-  const payload: WorkspaceData = {
+  const payload: WorkspaceData & { phaseLocks: Record<string, boolean> } = {
     ...base,
     group: {
       id: group.id,
@@ -206,9 +215,10 @@ export async function getMyWorkspace(userId: number): Promise<{
       invitations,
     },
     journey: buildJourneyRows(group, availability),
-  }
+    phaseLocks,
+  } as any
 
-  return { success: true, message: '', payload }
+  return { success: true, message: '', payload: payload as any }
 }
 
 // Group context for the group-scoped milestone routes. Returns the group the

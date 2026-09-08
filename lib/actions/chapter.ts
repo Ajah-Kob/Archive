@@ -73,14 +73,27 @@ async function getAvailability(sectionId: number): Promise<Record<string, boolea
   const section = await prisma.section.findFirst({
     where: { id: sectionId, deletedAt: null },
     select: {
+      capstone1OpenedAt: true,
       capstone2OpenedAt: true,
       milestoneAvailability: { select: { key: true, openedAt: true } },
     },
   })
   return resolveSectionAvailability(
+    section?.capstone1OpenedAt != null,
     section?.capstone2OpenedAt != null,
     section?.milestoneAvailability ?? [],
   )
+}
+
+async function getPhaseLocks(sectionId: number): Promise<Record<string, boolean>> {
+  const section = await prisma.section.findFirst({
+    where: { id: sectionId, deletedAt: null },
+    select: { capstone1OpenedAt: true, capstone2OpenedAt: true },
+  })
+  return {
+    'CAPSTONE 1': !section?.capstone1OpenedAt,
+    'CAPSTONE 2': !section?.capstone2OpenedAt,
+  }
 }
 
 // Whether the chapter milestone is open for the group's section.
@@ -218,7 +231,7 @@ export async function getChapterData(
 
   const availability = effectiveGroup
     ? await getAvailability(student.sectionId)
-    : resolveSectionAvailability(false, [])
+    : resolveSectionAvailability(false, false, [])
   const open = effectiveGroup ? (availability[chapter] ?? false) : false
 
   const journey = buildJourneyRows(
@@ -236,6 +249,8 @@ export async function getChapterData(
       : null,
     availability,
   )
+
+  const phaseLocks = effectiveGroup ? await getPhaseLocks(student.sectionId) : { 'CAPSTONE 1': false, 'CAPSTONE 2': false }
 
   const milestone = effectiveGroup?.milestones.find((m) => m.chapter === chapter) ?? null
   const requiresCapstone = !!effectiveGroup && !effectiveGroup.capstone
@@ -285,7 +300,8 @@ export async function getChapterData(
       canSubmit: open && !requiresCapstone,
       requiresCapstone,
       journey,
-    },
+      phaseLocks,
+    } as any,
   }
 }
 

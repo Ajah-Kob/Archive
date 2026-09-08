@@ -98,7 +98,9 @@ export function ChairReviewDetailModal({
     try {
       const res = await approveArchiving(submission.groupId)
       if (res.success) {
-        toast.success(res.message || 'Capstone approved and published to Repository.')
+        toast.success(
+          res.message || 'Capstone approved and published to Repository.',
+        )
         onClose()
         onApproved?.()
         router.refresh()
@@ -121,7 +123,9 @@ export function ChairReviewDetailModal({
   return (
     <div
       className={`fixed inset-0 z-40 flex items-center justify-center p-4 transition-all duration-300 ${
-        isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        isOpen
+          ? 'opacity-100 pointer-events-auto'
+          : 'opacity-0 pointer-events-none'
       }`}
       aria-hidden={!isOpen}
     >
@@ -145,15 +149,15 @@ export function ChairReviewDetailModal({
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-[#f0f2fa] shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="size-[28px] rounded-[8px] bg-[rgba(112,125,255,0.08)] border border-[rgba(112,125,255,0.12)] flex items-center justify-center shrink-0">
-              <FileText className="size-[14px] text-[#707dff]" strokeWidth={2} />
+              <FileText
+                className="size-[14px] text-[#707dff]"
+                strokeWidth={2}
+              />
             </div>
             <div className="min-w-0">
               <h2 className="font-heading font-bold text-[14px] leading-[21px] text-[#10133a] truncate">
                 Archiving Details
               </h2>
-              <p className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4] truncate">
-                {submission.groupName} {submission.sectionName ? `· ${submission.sectionName}` : ''}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -174,36 +178,21 @@ export function ChairReviewDetailModal({
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 flex flex-col gap-6">
           {/* Group info */}
           <div className="flex flex-col gap-3 bg-[#fafbff] border border-[#e8ebf8] rounded-xl p-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-heading font-bold text-[15px] leading-[22.5px] text-[#10133a] break-words">
                   {submission.groupName}
                 </p>
                 <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
-                  {submission.sectionName ?? 'No section'} · Submitted {formatDateSubmitted(submission.submittedAt)}
+                  {submission.sectionName ?? 'No section'} · Submitted{' '}
+                  {formatDateSubmitted(submission.submittedAt)}
                 </p>
               </div>
               <span className="inline-flex items-center gap-1.5 font-sans font-medium text-[11px] text-[#8a93b4] shrink-0">
-                <Users className="size-[13px]" /> {submission.groupMembers?.length ?? 0} members
+                <Users className="size-[13px]" />{' '}
+                {submission.groupMembers?.length ?? 0} members
               </span>
             </div>
-            {submission.groupMembers && submission.groupMembers.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {submission.groupMembers.map((m) => (
-                  <span
-                    key={m.id}
-                    className="inline-flex items-center h-[22px] px-[8px] rounded-full bg-white border border-[#e8ebf8] font-sans font-medium text-[11px] text-[#5a6382]"
-                  >
-                    {m.name}
-                  </span>
-                ))}
-              </div>
-            )}
-            {submission.uploadedBy && (
-              <p className="font-sans text-[11.5px] leading-[16px] text-[#9ea8c6]">
-                Submitted by {submission.uploadedBy.name} ({submission.uploadedBy.email})
-              </p>
-            )}
           </div>
 
           {/* Title */}
@@ -236,7 +225,47 @@ export function ChairReviewDetailModal({
             )}
           </div>
 
-
+          {/* Authors */}
+          <div>
+            <SectionLabel>Authors</SectionLabel>
+            {submission.authorOrder.length === 0 ? (
+              <p className="font-sans text-[12.5px] text-[#9ea8c6]">
+                No authors
+              </p>
+            ) : (
+              <div className="border border-[#e8ebf8] rounded-[10px] divide-y divide-[#f0f2fa] overflow-hidden bg-white">
+                {submission.authorOrder.map((a, idx) => (
+                  <div
+                    key={`${a.email}-${idx}`}
+                    className="flex items-center gap-3 px-4 py-2.5"
+                  >
+                    <span className="flex items-center justify-center size-[22px] rounded-full bg-[#f4f6ff] border border-[#e5e8ff] font-sans font-bold text-[10px] text-[#707dff] shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-sans font-semibold text-[12.5px] leading-[18px] text-[#1e2145] truncate">
+                        {a.lastName
+                          ? `${a.lastName}, ${a.firstName ?? ''}`.trim()
+                          : (a.firstName ?? '—')}
+                      </p>
+                      <p className="font-sans text-[11.5px] leading-[14px] text-[#8a93b4] truncate">
+                        {a.email ?? '—'}
+                      </p>
+                    </div>
+                    {a.userId != null ? (
+                      <span className="hidden sm:inline-flex items-center h-[20px] px-[7px] rounded-full bg-[rgba(22,163,74,0.07)] border border-[rgba(22,163,74,0.2)] font-sans font-semibold text-[10px] text-[#16a34a] shrink-0">
+                        Linked
+                      </span>
+                    ) : (
+                      <span className="hidden sm:inline-flex items-center h-[20px] px-[7px] rounded-full bg-[#f8f9ff] border border-[#e5e8ff] font-sans font-medium text-[10px] text-[#8a93b4] shrink-0">
+                        Custom
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Document */}
           <div>
@@ -253,7 +282,9 @@ export function ChairReviewDetailModal({
                     </p>
                     <p className="font-sans text-[11px] leading-[16px] text-[#8a93b4]">
                       {submission.mimeType ?? 'application/pdf'}
-                      {submission.size ? ` · ${(submission.size / 1024).toFixed(1)} KB` : ''}
+                      {submission.size
+                        ? ` · ${(submission.size / 1024).toFixed(1)} KB`
+                        : ''}
                     </p>
                   </div>
                 </div>
@@ -276,7 +307,9 @@ export function ChairReviewDetailModal({
                 </div>
               </div>
             ) : (
-              <p className="font-sans text-[12.5px] text-[#9ea8c6]">No document attached</p>
+              <p className="font-sans text-[12.5px] text-[#9ea8c6]">
+                No document attached
+              </p>
             )}
           </div>
 
@@ -287,8 +320,10 @@ export function ChairReviewDetailModal({
                 Are you sure you want to approve?
               </p>
               <p className="font-sans text-[12px] leading-[18px] text-[#78350f] mt-1">
-                Once approved, this capstone will be published to the Repository as <span className="font-semibold">ARCHIVED</span> and cannot be
-                reverted. The submission will become read-only for the student group.
+                Once approved, this capstone will be published to the Repository
+                as <span className="font-semibold">ARCHIVED</span> and cannot be
+                reverted. The submission will become read-only for the student
+                group.
               </p>
             </div>
           )}
@@ -321,7 +356,8 @@ export function ChairReviewDetailModal({
                 </span>
               ) : confirmStep ? (
                 <>
-                  <Check className="size-[14px]" strokeWidth={2.5} /> Confirm Approve
+                  <Check className="size-[14px]" strokeWidth={2.5} /> Confirm
+                  Approve
                 </>
               ) : (
                 <>

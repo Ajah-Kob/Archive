@@ -25,7 +25,7 @@ export default async function ArchivingReviewRoute() {
 
   return (
     <section className="h-full flex flex-col">
-      <PageLabel label="Archiving Review" />
+      <PageLabel label="Archiving" />
       <ArchivingReviewPage submissions={submissions} />
     </section>
   )

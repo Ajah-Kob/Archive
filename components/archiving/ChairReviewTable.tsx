@@ -3,11 +3,11 @@
 import { Eye, Check, Archive } from 'lucide-react'
 import type { ArchivingReviewItem } from '@/lib/actions/archiving'
 
-const HEADER_LABELS = ['Group', 'Section', 'Title', 'Authors', 'Date Submitted', 'Status', 'Action']
+const HEADER_LABELS = ['Group', 'Title', 'Date Submitted', 'Status', 'Action']
 
-// Weighted grid: Group 1.2fr | Section 1fr | Title 1.8fr | Authors 1.4fr | Date 0.9fr | Status 0.7fr | Action 110px
+// Weighted grid: Group+Section 1.2fr | Title 2.2fr | Date 0.9fr | Status 0.7fr | Action 110px — Group smaller, Authors removed
 // Matches DefenseTable pattern: header h39 bg #fafbff, rows h60 border #f0f2fa
-export const ARCHIVING_GRID_COLS = 'grid-cols-[1.2fr_1fr_1.8fr_1.4fr_0.9fr_0.7fr_110px]'
+export const ARCHIVING_GRID_COLS = 'grid-cols-[1.2fr_2.2fr_0.9fr_0.7fr_110px]'
 
 function formatAuthorsShort(authors: ArchivingReviewItem['authorOrder']): string {
   if (!authors || authors.length === 0) return '—'
@@ -125,16 +125,12 @@ export function ChairReviewTable({ submissions, hasAnySubmissions = false, onVie
                 key={item.id}
                 className={`grid ${ARCHIVING_GRID_COLS} items-center px-[20px] h-[60px] border-b border-[#f0f2fa] last:border-b-0 hover:bg-[#fafbff] transition-colors`}
               >
-                {/* Group */}
-                <div className="min-w-0 pr-4">
+                {/* Group + Section below */}
+                <div className="min-w-0 pr-4 flex flex-col">
                   <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
                     {item.groupName}
                   </span>
-                </div>
-
-                {/* Section */}
-                <div className="min-w-0 pr-4">
-                  <span className="block truncate font-sans font-medium text-[13px] leading-[19.5px] text-[#8a93b4]">
+                  <span className="block truncate font-sans font-medium text-[11px] leading-[16.5px] text-[#8a93b4]">
                     {item.sectionName ?? '—'}
                   </span>
                 </div>
@@ -146,16 +142,6 @@ export function ChairReviewTable({ submissions, hasAnySubmissions = false, onVie
                     title={item.title}
                   >
                     {item.title}
-                  </span>
-                </div>
-
-                {/* Authors */}
-                <div className="min-w-0 pr-4">
-                  <span
-                    className="block truncate font-sans font-medium text-[12.5px] leading-[18.75px] text-[#5a6382]"
-                    title={formatAuthorsShort(item.authorOrder)}
-                  >
-                    {formatAuthorsShort(item.authorOrder)}
                   </span>
                 </div>
 

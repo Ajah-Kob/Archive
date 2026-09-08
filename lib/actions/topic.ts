@@ -105,6 +105,7 @@ async function loadTopicWorkspace(userId: number) {
       section: {
         select: {
           id: true,
+          capstone1OpenedAt: true,
           capstone2OpenedAt: true,
           milestoneAvailability: { select: { key: true, openedAt: true } },
         },
@@ -143,6 +144,7 @@ async function loadTopicWorkspace(userId: number) {
   if (!student) return null
 
   const availability = resolveSectionAvailability(
+    !!(student.section as any).capstone1OpenedAt,
     !!student.section.capstone2OpenedAt,
     student.section.milestoneAvailability,
   )

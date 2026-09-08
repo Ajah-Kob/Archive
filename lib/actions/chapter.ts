@@ -73,11 +73,13 @@ async function getAvailability(sectionId: number): Promise<Record<string, boolea
   const section = await prisma.section.findFirst({
     where: { id: sectionId, deletedAt: null },
     select: {
+      capstone1OpenedAt: true,
       capstone2OpenedAt: true,
       milestoneAvailability: { select: { key: true, openedAt: true } },
     },
   })
   return resolveSectionAvailability(
+    section?.capstone1OpenedAt != null,
     section?.capstone2OpenedAt != null,
     section?.milestoneAvailability ?? [],
   )
@@ -218,7 +220,7 @@ export async function getChapterData(
 
   const availability = effectiveGroup
     ? await getAvailability(student.sectionId)
-    : resolveSectionAvailability(false, [])
+    : resolveSectionAvailability(false, false, [])
   const open = effectiveGroup ? (availability[chapter] ?? false) : false
 
   const journey = buildJourneyRows(

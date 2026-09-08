@@ -43,6 +43,7 @@ export async function getMyWorkspace(userId: number): Promise<{
         select: {
           id: true,
           section: true,
+          capstone1OpenedAt: true,
           capstone2OpenedAt: true,
           milestoneAvailability: { select: { key: true, openedAt: true } },
         },
@@ -119,6 +120,7 @@ export async function getMyWorkspace(userId: number): Promise<{
   }
 
   const availability = resolveSectionAvailability(
+    !!(student.section as any).capstone1OpenedAt,
     !!student.section.capstone2OpenedAt,
     student.section.milestoneAvailability,
   )

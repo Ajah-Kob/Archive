@@ -542,8 +542,10 @@ async function getCoordinatorSectionData(sectionId: number) {
       : null,
   }))
 
+  const capstone1Open = !!(section as any).capstone1OpenedAt
   const capstone2Open = !!section.capstone2OpenedAt
   const availability = resolveSectionAvailability(
+    capstone1Open,
     capstone2Open,
     section.milestoneAvailability,
   )
@@ -631,13 +633,14 @@ async function getCoordinatorSectionData(sectionId: number) {
       }),
       studentsCount: students.length,
       groupsCount: section._count.groups,
+      capstone1OpenedAt: (section as any).capstone1OpenedAt?.toISOString() ?? null,
       capstone2OpenedAt: section.capstone2OpenedAt?.toISOString() ?? null,
       headerColor: (section as any).headerColor ?? null,
     },
     students,
     groups,
     pendingTopics,
-    milestones: buildMilestoneAvailability(section),
+    milestones: buildMilestoneAvailability(section as any),
   }
 }
 
@@ -816,10 +819,12 @@ const MILESTONE_DEFS: ReadonlyArray<{
 // else locked. Shares the same resolution as the student journey
 // (resolveSectionAvailability).
 function buildMilestoneAvailability(section: {
+  capstone1OpenedAt: Date | null
   capstone2OpenedAt: Date | null
   milestoneAvailability: { key: MilestoneKey; openedAt: Date | null }[]
 }): MilestoneAvailabilityItem[] {
   const open = resolveSectionAvailability(
+    !!section.capstone1OpenedAt,
     !!section.capstone2OpenedAt,
     section.milestoneAvailability,
   )
@@ -954,26 +959,30 @@ export async function setPhaseAvailability(
   try {
     const section = await prisma.section.findFirst({
       where: { id: sectionId, coordinatorId: coordinator.id, deletedAt: null },
-      select: { id: true, capstone2OpenedAt: true },
+      select: { id: true, capstone1OpenedAt: true, capstone2OpenedAt: true },
     })
     if (!section) {
       return { success: false, message: 'Section not found.', payload: null }
     }
 
     const now = new Date()
-    // Additive unlock: only create/update where not already open; lock: bulk null
-    await prisma.$transaction(
-      keys.map((key) =>
-        prisma.milestoneAvailability.upsert({
-          where: { sectionId_key: { sectionId: section.id, key } },
-          create: { sectionId: section.id, key, openedAt: open ? now : null },
-          update: { openedAt: open ? now : null },
-        }),
-      ),
-    )
-
-    // Keep legacy capstone2OpenedAt in sync for any CAPSTONE 2 phase change
-    if (phase === 'CAPSTONE 2') {
+    // Gate-only: unlocking/locking a phase does NOT bulk-touch milestones.
+    // It only flips the section's phase gate (capstone1/2OpenedAt). Individual
+    // milestones keep their own availability and are gated by the phase overlay
+    // + journey's resolveSectionAvailability hard gate.
+    if (phase === 'CAPSTONE 1') {
+      if (open && !(section as any).capstone1OpenedAt) {
+        await prisma.section.update({
+          where: { id: section.id },
+          data: { capstone1OpenedAt: now },
+        })
+      } else if (!open && (section as any).capstone1OpenedAt) {
+        await prisma.section.update({
+          where: { id: section.id },
+          data: { capstone1OpenedAt: null },
+        })
+      }
+    } else {
       if (open && !section.capstone2OpenedAt) {
         await prisma.section.update({
           where: { id: section.id },
@@ -1002,8 +1011,8 @@ export async function setPhaseAvailability(
 
     return {
       success: true,
-      message: open ? `${phase} unlocked — ${keys.length} milestones opened.` : `${phase} locked.`,
-      payload: { phase, open, keys },
+      message: open ? `${phase} unlocked.` : `${phase} locked.`,
+      payload: { phase, open },
     }
   } catch (error) {
     console.error('[setPhaseAvailability | Error]:', error)

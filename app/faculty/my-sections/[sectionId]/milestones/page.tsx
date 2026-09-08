@@ -12,5 +12,12 @@ export default async function MySectionMilestonesPage({
   const payload = res.success && res.payload ? res.payload : null
   if (!payload) notFound()
 
-  return <MilestonesTab sectionId={payload.section.id} initial={payload.milestones} />
+  return (
+    <MilestonesTab
+      sectionId={payload.section.id}
+      initial={payload.milestones}
+      capstone1Open={!!payload.section.capstone1OpenedAt}
+      capstone2Open={!!payload.section.capstone2OpenedAt}
+    />
+  )
 }

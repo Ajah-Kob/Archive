@@ -22,7 +22,7 @@ async function getCoordinatorsData(page: number, perPage: number) {
           faculty: {
             include: {
               user: {
-                select: { id: true, name: true, email: true, image: true },
+                select: { id: true, name: true, email: true, image: true, avatarGradient: true },
               },
             },
           },
@@ -85,7 +85,7 @@ export async function addCoordinator(facultyId: number) {
         faculty: {
           include: {
             user: {
-              select: { id: true, name: true, email: true, image: true },
+              select: { id: true, name: true, email: true, image: true, avatarGradient: true },
             },
           },
         },

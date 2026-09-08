@@ -22,29 +22,20 @@ export interface CoordinatorRaw {
   id: number
   faculty: {
     id: number
-    user: { id: number; name: string; email: string; image: string | null }
+    user: { id: number; name: string; email: string; image: string | null; avatarGradient: string }
   }
   _count: { section: number }
 }
 
 export interface FacultyRaw {
   id: number
-  user: { id: number; name: string; email: string; image: string | null }
+  user: { id: number; name: string; email: string; image: string | null; avatarGradient: string }
 }
 
 interface PendingInvitation {
   id: number
   facultyId: number
 }
-
-const gradients = [
-  'linear-gradient(135deg, #fe6f6f, #e85555)',
-  'linear-gradient(135deg, #f59e0b, #e08800)',
-  'linear-gradient(135deg, #22c55e, #16a34a)',
-  'linear-gradient(135deg, #06b6d4, #0891b2)',
-  'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-  'linear-gradient(135deg, #707dff, #5565ff)',
-]
 
 export function ManageCoodinatorDrawer() {
   const { isOpen, close } = useCoordinatorDrawer()
@@ -103,12 +94,12 @@ export function ManageCoodinatorDrawer() {
 
   const assignedCoordinatorList = useMemo(
     () =>
-      (data?.coordinators ?? []).map((coordinator, i) => ({
+      (data?.coordinators ?? []).map((coordinator) => ({
         id: coordinator.id,
         initials: getInitials(coordinator.faculty.user.name),
         name: coordinator.faculty.user.name,
         email: coordinator.faculty.user.email,
-        gradient: gradients[i % gradients.length],
+        gradient: (coordinator.faculty.user as any).avatarGradient,
         sections: coordinator._count.section,
       })),
     [data?.coordinators],
@@ -116,12 +107,12 @@ export function ManageCoodinatorDrawer() {
 
   const availableFacultyList = useMemo(
     () =>
-      (data?.availableFaculty ?? []).map((faculty, i) => ({
+      (data?.availableFaculty ?? []).map((faculty) => ({
         id: faculty.id,
         initials: getInitials(faculty.user.name),
         name: faculty.user.name,
         email: faculty.user.email,
-        gradient: gradients[i % gradients.length],
+        gradient: (faculty.user as any).avatarGradient,
       })),
     [data?.availableFaculty],
   )

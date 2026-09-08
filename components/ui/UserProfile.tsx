@@ -1,7 +1,9 @@
 interface UserProfileProps {
   initials: string
   name: string
-  email: string
+  email?: string
+  /** Details line below name — when omitted, no details row is rendered. Alias for email for backward compat. */
+  details?: string
   gradient?: string
   badge?: string
   /** Override avatar tile size — panelist checklist uses 35px (Figma 1470:5094). Defaults to 32px (size-8) for backward compat. */
@@ -15,10 +17,14 @@ export function UserProfile({
   initials,
   name,
   email,
+  details,
   gradient,
   badge,
   avatarClassName,
 }: UserProfileProps) {
+  const detailsText = (details ?? email)?.trim() ?? ''
+  const showDetails = detailsText.length > 0
+
   return (
     <div className="flex gap-2.5 items-center min-w-0">
       <div
@@ -44,9 +50,11 @@ export function UserProfile({
             </span>
           )}
         </div>
-        <p className="font-sans font-medium text-[11.5px] leading-[17.25px] text-[#8a93b4] truncate">
-          {email}
-        </p>
+        {showDetails && (
+          <p className="font-sans font-medium text-[11.5px] leading-[17.25px] text-[#8a93b4] truncate">
+            {detailsText}
+          </p>
+        )}
       </div>
     </div>
   )

@@ -29,7 +29,7 @@ async function getAvailableFacultyData() {
         isProgramChair: false,
       },
       include: {
-        user: { select: { id: true, name: true, email: true, image: true } },
+        user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } },
       },
       orderBy: { id: 'asc' },
     })
@@ -62,6 +62,7 @@ export async function getFacultyMembers() {
           name: true,
           email: true,
           image: true,
+          avatarGradient: true,
           loggedInAt: true,
         },
       },
@@ -92,6 +93,7 @@ export async function getFacultyMembers() {
       name: f.user.name,
       email: f.user.email,
       image: f.user.image,
+      avatarGradient: (f.user as any).avatarGradient,
       loggedInAt: f.user.loggedInAt,
       activityStatus: activityStatusFor(f.user.loggedInAt),
       isAdviser,
@@ -120,6 +122,7 @@ export async function getFacultyMemberDetail(facultyId: number) {
           name: true,
           email: true,
           image: true,
+          avatarGradient: true,
           loggedInAt: true,
         },
       },

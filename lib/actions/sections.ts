@@ -16,15 +16,6 @@ import type {
 } from '@/types/milestones'
 import type { MilestoneKey } from '@prisma/client'
 
-const gradients = [
-  'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)',
-  'linear-gradient(135deg, #fe6f6f 0%, #e85555 100%)',
-  'linear-gradient(135deg, #f59e0b 0%, #e08800 100%)',
-  'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-  'linear-gradient(135deg, #14b8a6 0%, #0d9488 55%, #0f766e 100%)',
-  'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 55%, #6d28d9 100%)',
-]
-
 const table = 'section'
 
 // A student is considered "active now" if they signed in within this window.
@@ -34,10 +25,6 @@ function activityStatusFor(loggedInAt: Date | null): 'active' | string {
   if (!loggedInAt) return 'Never'
   if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
   return timeAgo(loggedInAt)
-}
-
-function getGradient(id: number) {
-  return gradients[id % gradients.length]
 }
 
 async function getSectionsData() {
@@ -53,7 +40,7 @@ async function getSectionsData() {
           faculty: {
             include: {
               user: {
-                select: { id: true, name: true, email: true },
+                select: { id: true, name: true, email: true, avatarGradient: true },
               },
             },
           },
@@ -73,7 +60,7 @@ async function getSectionsData() {
       initials: getInitials(s.coordinator.faculty.user.name),
       name: s.coordinator.faculty.user.name,
       email: s.coordinator.faculty.user.email,
-      avatarGradient: getGradient(s.id),
+      avatarGradient: s.coordinator.faculty.user.avatarGradient,
     },
     section: s.section,
     capstonePhase: s.capstone2OpenedAt ? 'CAPSTONE_2' : 'CAPSTONE_1',
@@ -160,13 +147,14 @@ async function getSectionDetailData(id: number) {
         orderBy: { user: { name: 'asc' } },
         include: {
           user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              loggedInAt: true,
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                avatarGradient: true,
+                loggedInAt: true,
+              },
             },
-          },
           group: {
             select: {
               id: true,
@@ -190,7 +178,7 @@ async function getSectionDetailData(id: number) {
     initials: getInitials(s.user.name),
     name: s.user.name,
     email: s.user.email,
-    avatarGradient: getGradient(s.id),
+    avatarGradient: (s.user as any).avatarGradient,
     activityStatus: activityStatusFor(s.user.loggedInAt),
     loggedInAt: s.user.loggedInAt,
     group: s.group
@@ -413,7 +401,7 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
     include: {
       students: {
         where: { deletedAt: null },
-        select: { id: true, user: { select: { name: true } } },
+        select: { id: true, user: { select: { name: true, avatarGradient: true } } },
         orderBy: { user: { name: 'asc' } },
       },
       joinCode: true,
@@ -451,7 +439,7 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
         capstone2OpenedAt: s.capstone2OpenedAt?.toISOString() ?? null,
         previewAvatars: s.students.slice(0, 3).map((st) => ({
           initials: getInitials(st.user.name),
-          gradient: getGradient(st.id),
+          gradient: (st.user as any).avatarGradient,
         })),
         headerColor: (s as any).headerColor ?? null,
       }
@@ -475,7 +463,7 @@ async function getCoordinatorSectionData(sectionId: number) {
         orderBy: { user: { name: 'asc' } },
         include: {
           user: {
-            select: { id: true, name: true, email: true, loggedInAt: true },
+            select: { id: true, name: true, email: true, avatarGradient: true, loggedInAt: true },
           },
           group: {
             select: {
@@ -545,7 +533,7 @@ async function getCoordinatorSectionData(sectionId: number) {
     initials: getInitials(s.user.name),
     name: s.user.name,
     email: s.user.email,
-    avatarGradient: getGradient(s.id),
+    avatarGradient: (s.user as any).avatarGradient,
     activityStatus: activityStatusFor(s.user.loggedInAt),
     loggedInAt: s.user.loggedInAt,
     group: s.group

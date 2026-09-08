@@ -57,6 +57,7 @@ export default async function MilestoneDetailPage({
 
   if (milestone === 'archiving') {
     if (!workspace) notFound()
+    const isLocked = workspace.journey.find((r) => r.slug === 'archiving')?.state === 'LOCKED'
     const raw =
       archivingRes &&
       (archivingRes as { success: boolean; payload: { status: string } | null }).success
@@ -106,10 +107,14 @@ export default async function MilestoneDetailPage({
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col overflow-hidden">
-            <ArchivingView
-              initialStatus={status}
-              initialData={initialData as unknown as import('@/lib/actions/archiving').ArchivingPayload}
-            />
+            {isLocked ? (
+              <LockedChapterPlaceholder chapterLabel="Archiving" />
+            ) : (
+              <ArchivingView
+                initialStatus={status}
+                initialData={initialData as unknown as import('@/lib/actions/archiving').ArchivingPayload}
+              />
+            )}
           </div>
         </div>
       </section>
@@ -121,6 +126,7 @@ export default async function MilestoneDetailPage({
   if (milestone === 'topic-submission') {
     const data = topicRes?.success && topicRes.payload ? topicRes.payload : null
     if (!data?.group) notFound()
+    const isLocked = (data as any).journey?.find((r: any) => r.slug === 'topic-submission')?.state === 'LOCKED'
 
     return (
       <section className="h-full flex min-h-0">
@@ -129,7 +135,9 @@ export default async function MilestoneDetailPage({
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
-            {data.group ? (
+            {isLocked ? (
+              <LockedChapterPlaceholder chapterLabel="Topic Submission" />
+            ) : data.group ? (
               <TopicSubmissionView data={data} />
             ) : (
               <LockedGroupPlaceholder />
@@ -143,6 +151,7 @@ export default async function MilestoneDetailPage({
   if (milestone === 'topic-selection') {
     const data = topicRes?.success && topicRes.payload ? topicRes.payload : null
     if (!data?.group) notFound()
+    const isLocked = (data as any).journey?.find((r: any) => r.slug === 'topic-selection')?.state === 'LOCKED'
 
     return (
       <section className="h-full flex min-h-0">
@@ -151,7 +160,9 @@ export default async function MilestoneDetailPage({
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
           <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
-            {data.group ? (
+            {isLocked ? (
+              <LockedChapterPlaceholder chapterLabel="Topic Selection" />
+            ) : data.group ? (
               <TopicSelectionView data={data} />
             ) : (
               <LockedGroupPlaceholder />
@@ -186,6 +197,7 @@ export default async function MilestoneDetailPage({
   }
 
   const row = JOURNEY_ROWS.find((r) => r.slug === milestone)
+  const isGenericLocked = workspace.journey.find((r) => r.slug === milestone)?.state === 'LOCKED'
 
   return (
     <section className="h-full flex min-h-0">
@@ -195,24 +207,30 @@ export default async function MilestoneDetailPage({
         <GroupContext />
 
         <div className="flex-1 min-h-0 p-8 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-heading font-bold text-[22px] leading-[33px] text-[#10133a] tracking-[-0.135px]">
-              {row?.label ?? 'Workspace'}
-            </h2>
-            <Link
-              href="/student/milestone"
-              className="flex gap-[7px] items-center h-[30px] px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
-            >
-              <ArrowLeft className="size-3.5" />
-              Back to Milestones
-            </Link>
-          </div>
-          <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] -mt-1">{row?.header} workspace</p>
+          {isGenericLocked ? (
+            <LockedChapterPlaceholder chapterLabel={row?.label ?? 'This milestone'} />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="font-heading font-bold text-[22px] leading-[33px] text-[#10133a] tracking-[-0.135px]">
+                  {row?.label ?? 'Workspace'}
+                </h2>
+                <Link
+                  href="/student/milestone"
+                  className="flex gap-[7px] items-center h-[30px] px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
+                >
+                  <ArrowLeft className="size-3.5" />
+                  Back to Milestones
+                </Link>
+              </div>
+              <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] -mt-1">{row?.header} workspace</p>
 
-          <ComingSoon
-            title={`${row?.label ?? 'This workspace'} is coming soon`}
-            description={`The ${row?.header} workspace for ${row?.label?.toLowerCase() ?? 'this step'} is not available yet. Track the current status of each step from the Milestones page.`}
-          />
+              <ComingSoon
+                title={`${row?.label ?? 'This workspace'} is coming soon`}
+                description={`The ${row?.header} workspace for ${row?.label?.toLowerCase() ?? 'this step'} is not available yet. Track the current status of each step from the Milestones page.`}
+              />
+            </>
+          )}
         </div>
       </div>
     </section>

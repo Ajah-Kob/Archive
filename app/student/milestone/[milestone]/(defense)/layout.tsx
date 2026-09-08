@@ -8,6 +8,7 @@ import { CapstoneJourney } from '@/components/milestones/CapstoneJourney'
 import { MilestoneDefenseHeader } from '@/components/milestones/defense/MilestoneDefenseHeader'
 import { DefenseTabsRefreshProvider } from '@/components/milestones/defense/DefenseTabsRefreshContext'
 import { DefenseTabsShell } from '@/components/milestones/defense/DefenseTabsShell'
+import { LockedChapterPlaceholder } from '@/components/milestones/chapter/LockedChapterPlaceholder'
 
 const DEFENSE_SLUGS: readonly string[] = ['proposal-defense', 'final-defense']
 
@@ -40,16 +41,24 @@ export default async function DefenseTabsLayout({
   const data = defenseRes.success && defenseRes.payload ? defenseRes.payload : null
   if (!data) notFound()
 
+  const isLocked = workspace.journey.find((r) => r.slug === milestone)?.state === 'LOCKED'
+
   return (
     <section className="h-full flex min-h-0">
       <CapstoneJourney journey={workspace.journey} activeSlug={milestone} phaseLocks={(workspace as any).phaseLocks} />
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <DefenseTabsRefreshProvider>
-          <MilestoneDefenseHeader milestone={milestone} data={data} />
-          <DefenseTabsShell defenseType={resolveDefenseType(milestone) as 'PROPOSAL' | 'FINAL'}>
-            <div className="flex-1 min-h-0 flex flex-col min-w-0">{children}</div>
-          </DefenseTabsShell>
-        </DefenseTabsRefreshProvider>
+        {isLocked ? (
+          <div className="flex-1 min-h-0 p-8 flex flex-col">
+            <LockedChapterPlaceholder chapterLabel={milestone === 'proposal-defense' ? 'Proposal Defense' : 'Final Defense'} />
+          </div>
+        ) : (
+          <DefenseTabsRefreshProvider>
+            <MilestoneDefenseHeader milestone={milestone} data={data} />
+            <DefenseTabsShell defenseType={resolveDefenseType(milestone) as 'PROPOSAL' | 'FINAL'}>
+              <div className="flex-1 min-h-0 flex flex-col min-w-0">{children}</div>
+            </DefenseTabsShell>
+          </DefenseTabsRefreshProvider>
+        )}
       </div>
     </section>
   )

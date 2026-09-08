@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { authOptions } from '@/lib/authOptions'
 import { getMyWorkspace } from '@/lib/actions/groups'
 import { getDefenseSessionData } from '@/lib/actions/student-defense'
@@ -42,23 +42,18 @@ export default async function DefenseTabsLayout({
   if (!data) notFound()
 
   const isLocked = workspace.journey.find((r) => r.slug === milestone)?.state === 'LOCKED'
+  if (isLocked) redirect('/student/milestone')
 
   return (
     <section className="h-full flex min-h-0">
       <CapstoneJourney journey={workspace.journey} activeSlug={milestone} phaseLocks={(workspace as any).phaseLocks} />
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        {isLocked ? (
-          <div className="flex-1 min-h-0 p-8 flex flex-col">
-            <LockedChapterPlaceholder chapterLabel={milestone === 'proposal-defense' ? 'Proposal Defense' : 'Final Defense'} />
-          </div>
-        ) : (
-          <DefenseTabsRefreshProvider>
-            <MilestoneDefenseHeader milestone={milestone} data={data} />
-            <DefenseTabsShell defenseType={resolveDefenseType(milestone) as 'PROPOSAL' | 'FINAL'}>
-              <div className="flex-1 min-h-0 flex flex-col min-w-0">{children}</div>
-            </DefenseTabsShell>
-          </DefenseTabsRefreshProvider>
-        )}
+        <DefenseTabsRefreshProvider>
+          <MilestoneDefenseHeader milestone={milestone} data={data} />
+          <DefenseTabsShell defenseType={resolveDefenseType(milestone) as 'PROPOSAL' | 'FINAL'}>
+            <div className="flex-1 min-h-0 flex flex-col min-w-0">{children}</div>
+          </DefenseTabsShell>
+        </DefenseTabsRefreshProvider>
       </div>
     </section>
   )

@@ -111,10 +111,7 @@ export function MilestonesTab({ sectionId, initial }: MilestonesTabProps) {
     return (
       <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col min-w-0 overflow-hidden">
         <div className="px-5 py-[12px] border-b border-[#f0f2fa] flex items-center justify-between gap-3">
-          <div>
-            <h4 className="font-heading font-bold text-[13px] leading-[19.5px] text-[#1e3a8a] tracking-[-0.14px]">{title}</h4>
-            <p className="font-sans font-medium text-[11px] leading-[16.5px] text-[#8a93b4]">{openCount}/{phaseItems.length} milestones open</p>
-          </div>
+          <h4 className="font-heading font-bold text-[13px] leading-[19.5px] text-[#1e3a8a] tracking-[-0.14px]">{title}</h4>
           <span className="flex items-center gap-2 shrink-0">
             <PhaseStatus open={allOpen} total={phaseItems.length} count={openCount} />
             <button

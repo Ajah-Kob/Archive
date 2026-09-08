@@ -6,6 +6,7 @@
 // functions, so this logic lives outside of lib/actions/.
 
 import { TOPIC_CAP, type JourneyRow } from '@/types/milestones'
+import { CAPSTONE2_KEYS } from '@/lib/milestones/phase'
 
 const CHAPTER_SLUG: Record<string, string> = {
   CHAPTER_1: 'chapter-1',
@@ -75,7 +76,7 @@ export function resolveSectionAvailability(
       out[key] = explicit.get(key)!
     } else if (key === 'TOPIC_SUBMISSION') {
       out[key] = true
-    } else if (key === 'CHAPTER_4' || key === 'CHAPTER_5') {
+    } else if ((CAPSTONE2_KEYS as string[]).includes(key)) {
       out[key] = capstone2Open
     } else {
       out[key] = false

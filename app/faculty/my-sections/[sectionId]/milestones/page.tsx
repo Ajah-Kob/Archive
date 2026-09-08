@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
-import { ProgressOverview } from '@/components/my-sections/progress/ProgressOverview'
+import { MilestonesTab } from '@/components/my-sections/milestones/MilestonesTab'
 import { getCoordinatorSectionById } from '@/lib/actions/sections'
 
-export default async function MySectionProgressPage({
+export default async function MySectionMilestonesPage({
   params,
 }: {
   params: Promise<{ sectionId: string }>
@@ -12,11 +12,5 @@ export default async function MySectionProgressPage({
   const payload = res.success && res.payload ? res.payload : null
   if (!payload) notFound()
 
-  const { groups } = payload
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <ProgressOverview groups={groups} />
-    </div>
-  )
+  return <MilestonesTab sectionId={payload.section.id} initial={payload.milestones} />
 }

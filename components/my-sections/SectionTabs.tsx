@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 
-export type SectionTabKey = 'students' | 'progress' | 'topics'
+export type SectionTabKey = 'students' | 'progress' | 'milestones' | 'topics'
 
 interface SectionTabsProps {
   sectionId: string
@@ -17,11 +17,13 @@ interface SectionTabsProps {
 
 const TABS: { key: SectionTabKey; label: string; segment: string }[] = [
   { key: 'students', label: 'Students', segment: 'students' },
-  { key: 'progress', label: 'Milestones', segment: 'progress' },
+  { key: 'progress', label: 'Progress', segment: 'progress' },
+  { key: 'milestones', label: 'Milestones', segment: 'milestones' },
   { key: 'topics', label: 'Topic Reviews', segment: 'topics' },
 ]
 
 function getActiveKey(pathname: string): SectionTabKey {
+  if (pathname.includes('/milestones')) return 'milestones'
   if (pathname.includes('/progress')) return 'progress'
   if (pathname.includes('/topics')) return 'topics'
   return 'students'

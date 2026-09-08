@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import { setMilestoneAvailability, setPhaseAvailability } from '@/lib/actions/sections'
 import type { MilestoneAvailabilityItem } from '@/lib/actions/sections'
 import { CAPSTONE1_KEYS, CAPSTONE2_KEYS } from '@/lib/milestones/phase'
+import { MilestoneConfirmModal } from '@/components/my-sections/milestones/MilestoneConfirmModal'
+import { PhaseConfirmModal } from '@/components/my-sections/milestones/PhaseConfirmModal'
 
 interface MilestonesTabProps {
   sectionId: number
@@ -63,6 +65,8 @@ export function MilestonesTab({ sectionId, initial }: MilestonesTabProps) {
   const [items, setItems] = useState<MilestoneAvailabilityItem[]>(initial)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [busyPhase, setBusyPhase] = useState<'CAPSTONE 1' | 'CAPSTONE 2' | null>(null)
+  const [pendingMilestone, setPendingMilestone] = useState<{ item: MilestoneAvailabilityItem; willOpen: boolean } | null>(null)
+  const [pendingPhase, setPendingPhase] = useState<{ phase: 'CAPSTONE 1' | 'CAPSTONE 2'; willOpen: boolean } | null>(null)
 
   const cap1 = useMemo(() => items.filter((m) => (CAPSTONE1_KEYS as string[]).includes(m.key)), [items])
   const cap2 = useMemo(() => items.filter((m) => (CAPSTONE2_KEYS as string[]).includes(m.key)), [items])
@@ -76,6 +80,7 @@ export function MilestonesTab({ sectionId, initial }: MilestonesTabProps) {
     setBusyKey(item.key)
     const res = await setMilestoneAvailability(sectionId, item.key as any, open)
     setBusyKey(null)
+    setPendingMilestone(null)
     if (!res.success) {
       toast.error(res.message)
       return
@@ -90,6 +95,7 @@ export function MilestonesTab({ sectionId, initial }: MilestonesTabProps) {
     setBusyPhase(phase)
     const res = await setPhaseAvailability(sectionId, phase, open)
     setBusyPhase(null)
+    setPendingPhase(null)
     if (!res.success) {
       toast.error(res.message)
       return
@@ -116,7 +122,7 @@ export function MilestonesTab({ sectionId, initial }: MilestonesTabProps) {
             <PhaseStatus open={allOpen} total={phaseItems.length} count={openCount} />
             <button
               type="button"
-              onClick={() => applyPhase(phase, nextOpen)}
+              onClick={() => setPendingPhase({ phase, willOpen: nextOpen })}
               disabled={!!busyKey || !!busyPhase}
               className={`inline-flex items-center gap-1.5 h-[28px] px-3 rounded-[9px] font-sans font-bold text-[11.5px] leading-none border transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${allOpen ? 'bg-white border-[#dddff0] text-[#5a6382] hover:bg-gray-50' : 'bg-[#707dff] border-[#707dff] text-white hover:bg-[#5a67ff]'}`}
               aria-label={nextOpen ? `Unlock ${title}` : `Lock ${title}`}
@@ -134,7 +140,7 @@ export function MilestonesTab({ sectionId, initial }: MilestonesTabProps) {
                 <StatusDot open={item.open} />
                 <button
                   type="button"
-                  onClick={() => applySingle(item, !item.open)}
+                  onClick={() => setPendingMilestone({ item, willOpen: !item.open })}
                   disabled={!!busyKey || !!busyPhase}
                   aria-label={item.open ? `Lock ${item.label}` : `Unlock ${item.label}`}
                   className={`flex items-center justify-center size-[26px] rounded-[7px] transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${item.open ? 'bg-white border border-[#dddff0] text-[#8a93b4] hover:bg-gray-50 hover:text-[#5a6382]' : 'bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#eeefff]'}`}
@@ -150,12 +156,43 @@ export function MilestonesTab({ sectionId, initial }: MilestonesTabProps) {
   }
 
   return (
-    <div className="flex flex-col gap-[16px] flex-1 min-h-0">
-      <Group title="Capstone 1" phase="CAPSTONE 1" phaseItems={cap1} allOpen={cap1AllOpen} openCount={cap1Open} />
-      <Group title="Capstone 2" phase="CAPSTONE 2" phaseItems={cap2} allOpen={cap2AllOpen} openCount={cap2Open} />
-      <p className="font-sans font-medium text-[11px] leading-[16.5px] text-[#8a93b4] px-1">
-        Unlocking a phase opens all milestones in that phase. You can still lock individual milestones after.
-      </p>
-    </div>
+    <>
+      <div className="flex flex-col gap-[16px] flex-1 min-h-0">
+        <Group title="Capstone 1" phase="CAPSTONE 1" phaseItems={cap1} allOpen={cap1AllOpen} openCount={cap1Open} />
+        <Group title="Capstone 2" phase="CAPSTONE 2" phaseItems={cap2} allOpen={cap2AllOpen} openCount={cap2Open} />
+        <p className="font-sans font-medium text-[11px] leading-[16.5px] text-[#8a93b4] px-1">
+          Unlocking a phase opens all milestones in that phase. You can still lock individual milestones after.
+        </p>
+      </div>
+
+      <MilestoneConfirmModal
+        isOpen={!!pendingMilestone}
+        milestoneLabel={pendingMilestone?.item.label ?? ''}
+        willOpen={pendingMilestone?.willOpen ?? false}
+        isLoading={!!busyKey}
+        onConfirm={() => {
+          if (pendingMilestone) applySingle(pendingMilestone.item, pendingMilestone.willOpen)
+        }}
+        onCancel={() => {
+          if (!busyKey) setPendingMilestone(null)
+        }}
+      />
+
+      <PhaseConfirmModal
+        isOpen={!!pendingPhase}
+        phase={pendingPhase?.phase ?? 'CAPSTONE 1'}
+        willOpen={pendingPhase?.willOpen ?? false}
+        milestoneLabels={
+          pendingPhase?.phase === 'CAPSTONE 1' ? cap1.map((m) => m.label) : cap2.map((m) => m.label)
+        }
+        isLoading={!!busyPhase}
+        onConfirm={() => {
+          if (pendingPhase) applyPhase(pendingPhase.phase, pendingPhase.willOpen)
+        }}
+        onCancel={() => {
+          if (!busyPhase) setPendingPhase(null)
+        }}
+      />
+    </>
   )
 }

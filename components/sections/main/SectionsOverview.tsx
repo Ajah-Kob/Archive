@@ -6,6 +6,7 @@ import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
 import { ManageCoordinatorsButton } from '@/components/sections/main/ManageCoordinatorsButton'
 import { SectionTable } from '@/components/sections/main/SectionTable'
+import { SectionTableSkeleton } from '@/components/sections/main/SectionTableSkeleton'
 import { getSections } from '@/lib/actions/sections'
 import type { SectionData } from '@/components/sections/main/SectionDataRow'
 
@@ -49,9 +50,7 @@ export default function SectionsOverview() {
           </div>
         </HeaderBar>
         <div className="flex-1 flex flex-col min-h-0 pt-[16px] px-8 pb-[30px]">
-          <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08)] flex-1 flex items-center justify-center">
-            <p className="font-sans text-[13px] text-[#8a93b4]">Loading sections…</p>
-          </div>
+          <SectionTableSkeleton rows={5} />
         </div>
       </div>
     )

@@ -7,6 +7,7 @@ interface MilestoneConfirmModalProps {
   isOpen: boolean
   milestoneLabel: string
   willOpen: boolean
+  phase?: 'CAPSTONE 1' | 'CAPSTONE 2'
   isLoading?: boolean
   onConfirm: () => void
   onCancel: () => void
@@ -16,6 +17,7 @@ export function MilestoneConfirmModal({
   isOpen,
   milestoneLabel,
   willOpen,
+  phase,
   isLoading = false,
   onConfirm,
   onCancel,
@@ -46,19 +48,29 @@ export function MilestoneConfirmModal({
           >
             {isUnlock ? <Unlock className="size-5" /> : <Lock className="size-5" />}
           </div>
-          <div className="flex flex-col gap-1 min-w-0 flex-1">
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
             <p className="font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">{milestoneLabel}</p>
+            {phase && (
+              <span className="inline-flex self-start items-center px-2 py-0.5 rounded-full bg-[#f8f9fe] border border-[#eceef8] font-sans font-bold text-[10px] leading-[15px] tracking-[0.4px] uppercase text-[#8a93b4]">
+                {phase === 'CAPSTONE 1' ? 'Capstone 1' : 'Capstone 2'}
+              </span>
+            )}
             <p className="font-sans font-medium text-[13px] leading-[20px] text-[#5a6382]">
               {isUnlock ? (
                 <>
-                  Students in this section will be able to submit and view <span className="font-bold text-[#1e2145]">{milestoneLabel}</span>. You can lock it again anytime.
+                  Students will be able to submit and view <span className="font-bold text-[#1e2145]">{milestoneLabel}</span> <span className="font-medium text-[#8a93b4]">{phase ? `when ${phase === 'CAPSTONE 1' ? 'Capstone 1' : 'Capstone 2'} is unlocked` : ''}</span>. You can lock it again anytime.
                 </>
               ) : (
                 <>
-                  Students will no longer see <span className="font-bold text-[#1e2145]">{milestoneLabel}</span> in their journey. In-progress submissions stay saved but become locked.
+                  Students will no longer see <span className="font-bold text-[#1e2145]">{milestoneLabel}</span> in their journey, even if its phase is unlocked. In-progress submissions stay saved but become locked.
                 </>
               )}
             </p>
+            {phase && isUnlock && (
+              <p className="font-sans font-medium text-[11px] leading-[16.5px] text-[#8a93b4] bg-[#f8f9fe] border border-[#f0f2fa] rounded-[8px] px-2.5 py-1.5">
+                This milestone is inside {phase === 'CAPSTONE 1' ? 'Capstone 1' : 'Capstone 2'} — it stays hidden while the phase shows “locked”.
+              </p>
+            )}
           </div>
         </div>
 

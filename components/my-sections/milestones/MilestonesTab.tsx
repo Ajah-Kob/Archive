@@ -202,6 +202,11 @@ export function MilestonesTab({ sectionId, initial, capstone1Open: initialCap1Op
         isOpen={!!pendingMilestone}
         milestoneLabel={pendingMilestone?.item.label ?? ''}
         willOpen={pendingMilestone?.willOpen ?? false}
+        phase={
+          pendingMilestone
+            ? ((CAPSTONE1_KEYS as string[]).includes(pendingMilestone.item.key) ? 'CAPSTONE 1' : 'CAPSTONE 2')
+            : undefined
+        }
         isLoading={!!busyKey}
         onConfirm={() => {
           if (pendingMilestone) applySingle(pendingMilestone.item, pendingMilestone.willOpen)

@@ -54,23 +54,28 @@ export function PhaseConfirmModal({
             <p className="font-sans font-medium text-[13px] leading-[20px] text-[#5a6382]">
               {isUnlock ? (
                 <>
-                  This will unlock <span className="font-bold text-[#1e2145]">{count} milestones</span> in {title}. Students will immediately see them in their journey.
+                  This will unlock <span className="font-bold text-[#1e2145]">{title}</span>. Students will see the phase and can access its milestones, but each milestone stays as you left it — still <span className="font-bold text-[#1e2145]">locked until you unlock it individually</span>.
                 </>
               ) : (
                 <>
-                  This will lock <span className="font-bold text-[#1e2145]">{count} milestones</span> in {title}. Students will no longer see them until you unlock again.
+                  This will lock <span className="font-bold text-[#1e2145]">{title}</span>. Students will see a <span className="font-bold text-[#1e2145]">“{title} locked”</span> overlay and can’t access any of its milestones, even if they were unlocked — their states are preserved underneath and return when you unlock.
                 </>
               )}
             </p>
-            <div className="flex flex-wrap gap-[6px] pt-1">
-              {milestoneLabels.map((label) => (
-                <span
-                  key={label}
-                  className={`inline-flex items-center px-[9px] py-[4px] rounded-full border font-sans font-semibold text-[11px] leading-[16.5px] ${isUnlock ? 'bg-[#f7f7ff] border-[#e0e3ff] text-[#707dff]' : 'bg-[#fffbeb] border-[#fde68a] text-[#b45309]'}`}
-                >
-                  {label}
-                </span>
-              ))}
+            <div className="rounded-[10px] border border-[#f0f2fa] bg-[#f8f9fe] px-3 py-2.5 flex flex-col gap-1.5">
+              <p className="font-sans font-bold text-[10.5px] leading-[15.75px] tracking-[0.5px] uppercase text-[#8a93b4]">
+                Contains · {count} milestones
+              </p>
+              <div className="flex flex-wrap gap-[6px]">
+                {milestoneLabels.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center px-[9px] py-[4px] rounded-full border bg-white border-[#eceef8] font-sans font-semibold text-[11px] leading-[16.5px] text-[#5a6382]"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>

@@ -1,64 +1,49 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import type { ReactNode } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 
 export type SectionTabKey = 'students' | 'progress' | 'topics'
 
 interface SectionTabsProps {
-  activeTab: SectionTabKey
+  sectionId: string
   pendingTopics: number
   actions?: ReactNode
-  studentsPanel: ReactNode
-  progressPanel: ReactNode
-  topicsPanel: ReactNode
+  children: ReactNode
 }
 
-const TABS: { key: SectionTabKey; label: string }[] = [
-  { key: 'students', label: 'Students' },
-  { key: 'progress', label: 'Milestones' },
-  { key: 'topics', label: 'Topic Reviews' },
+const TABS: { key: SectionTabKey; label: string; segment: string }[] = [
+  { key: 'students', label: 'Students', segment: 'students' },
+  { key: 'progress', label: 'Milestones', segment: 'progress' },
+  { key: 'topics', label: 'Topic Reviews', segment: 'topics' },
 ]
 
-export function SectionTabs({
-  activeTab,
-  pendingTopics,
-  actions,
-  studentsPanel,
-  progressPanel,
-  topicsPanel,
-}: SectionTabsProps) {
-  const router = useRouter()
+function getActiveKey(pathname: string): SectionTabKey {
+  if (pathname.includes('/progress')) return 'progress'
+  if (pathname.includes('/topics')) return 'topics'
+  return 'students'
+}
+
+export function SectionTabs({ sectionId, pendingTopics, actions, children }: SectionTabsProps) {
   const pathname = usePathname()
-  const [tab, setTab] = useState<SectionTabKey>(activeTab)
-
-  function select(key: SectionTabKey) {
-    setTab(key)
-    router.replace(`${pathname}?tab=${key}`)
-  }
-
-  const panels: Record<SectionTabKey, ReactNode> = {
-    students: studentsPanel,
-    progress: progressPanel,
-    topics: topicsPanel,
-  }
+  const activeKey = getActiveKey(pathname)
+  const base = `/faculty/my-sections/${sectionId}`
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <HeaderBar actions={actions}>
         {TABS.map((t) => {
-          const isActive = tab === t.key
+          const isActive = activeKey === t.key
           return (
-            <button
+            <Link
               key={t.key}
-              type="button"
-              onClick={() => select(t.key)}
+              href={`${base}/${t.segment}`}
+              aria-current={isActive ? 'page' : undefined}
               className={`relative flex items-center gap-[7px] h-[40px] px-[14px] font-sans text-[13px] transition-colors ${
-                isActive
-                  ? 'font-bold text-[#707dff]'
-                  : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
+                isActive ? 'font-bold text-[#707dff]' : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
               }`}
             >
               {t.label}
@@ -68,17 +53,13 @@ export function SectionTabs({
                   {pendingTopics}
                 </span>
               )}
-              {isActive && (
-                <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
-              )}
-            </button>
+              {isActive && <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />}
+            </Link>
           )
         })}
       </HeaderBar>
 
-      <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
-        {panels[tab]}
-      </div>
+      <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">{children}</div>
     </div>
   )
 }

@@ -76,6 +76,7 @@ async function getSectionsData() {
       avatarGradient: getGradient(s.id),
     },
     section: s.section,
+    capstonePhase: s.capstone2OpenedAt ? 'CAPSTONE_2' : 'CAPSTONE_1',
     dateCreated: s.createdAt.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',

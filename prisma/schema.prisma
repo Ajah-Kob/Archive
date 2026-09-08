@@ -27,6 +27,7 @@ model User {
   name                         String
   email                        String                        @unique
   image                        String?
+  avatarGradient               String                        @default("linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)")
   role                         Role                          @default(GUEST)
   activatedAt                  DateTime?
   createdAt                    DateTime                      @default(now())

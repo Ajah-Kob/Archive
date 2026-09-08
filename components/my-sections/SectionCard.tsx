@@ -83,15 +83,13 @@ export function SectionCard({ section }: SectionCardProps) {
               backgroundColor: (header as any).bg,
             }}
           >
-            <div className="flex items-start justify-between relative shrink-0 w-full">
-              <div className="flex flex-col items-start relative shrink-0 min-w-0">
-                <p
-                  className="font-['Sora',sans-serif] font-extrabold leading-[normal] text-[20px] tracking-[-0.15px] whitespace-nowrap"
-                  style={{ color: (header as any).text }}
-                >
-                  {section.name}
-                </p>
-              </div>
+            <div className="flex items-center gap-3 relative shrink-0 w-full">
+              <p
+                className="font-['Sora',sans-serif] font-extrabold leading-[normal] text-[20px] tracking-[-0.15px] whitespace-nowrap min-w-0"
+                style={{ color: (header as any).text }}
+              >
+                {section.name}
+              </p>
             </div>
 
             {/* JoinCode row — CODE [copy icon] whole button clickable, icon adopts header color */}
@@ -179,8 +177,12 @@ export function SectionCard({ section }: SectionCardProps) {
               </div>
             </div>
 
-            {/* Footer — Figma 1463:5616 bottom-right action menu */}
-            <div className="flex items-center justify-end pb-[5px] px-[5px] relative shrink-0 w-full">
+            {/* Footer — left bottom Capstone phase + right action menu */}
+            <div className="flex items-center justify-between pb-[8px] px-[12px] relative shrink-0 w-full">
+              <span className="inline-flex items-center gap-1.5 font-sans font-bold text-[11px] leading-[16.5px] text-[#9fa5b7] shrink-0">
+                <span className="size-[6px] rounded-full shrink-0 bg-[#9fa5b7]" />
+                {section.capstone2OpenedAt ? 'Capstone 2' : 'Capstone 1'}
+              </span>
               <div
                 onClick={(e) => {
                   e.preventDefault()

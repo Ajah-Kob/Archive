@@ -5,10 +5,17 @@ import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
+import { Filter, type FilterOption } from '@/components/ui/Filter'
 import { SectionCard } from './SectionCard'
 import { SectionModal } from './SectionModal'
 import type { MySectionCardData } from '@/lib/actions/sections'
 import { useSectionsRefresh } from '@/store/useSectionsRefresh'
+
+const PHASE_OPTIONS: FilterOption[] = [
+  { value: 'all', label: 'All Phases' },
+  { value: 'CAPSTONE_1', label: 'Capstone 1' },
+  { value: 'CAPSTONE_2', label: 'Capstone 2' },
+]
 
 interface MySectionsPageProps {
   initialSections: MySectionCardData[]
@@ -19,19 +26,23 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
   const version = useSectionsRefresh((s) => s.version)
   const bump = useSectionsRefresh((s) => s.bump)
   const [search, setSearch] = useState('')
+  const [phaseFilter, setPhaseFilter] = useState('all')
   const [createOpen, setCreateOpen] = useState(false)
 
-  // Derive filtered list from props + search; version busts memo on refresh
+  // Derive filtered list from props + search + phase; version busts memo on refresh
   const filtered = useMemo(() => {
     void version
     const q = search.trim().toLowerCase()
-    if (!q) return initialSections
-    return initialSections.filter(
-      (s) =>
+    return initialSections.filter((s) => {
+      const phase = s.capstone2OpenedAt ? 'CAPSTONE_2' : 'CAPSTONE_1'
+      if (phaseFilter !== 'all' && phase !== phaseFilter) return false
+      if (!q) return true
+      return (
         s.name.toLowerCase().includes(q) ||
-        (s.joinCode ?? '').toLowerCase().includes(q),
-    )
-  }, [initialSections, search, version])
+        (s.joinCode ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [initialSections, search, phaseFilter, version])
 
   function handleCreateSuccess() {
     setCreateOpen(false)
@@ -58,13 +69,21 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
           </button>
         }
       >
-        <div className="w-[280px] shrink-0 py-[8px]">
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Search section..."
-            ariaLabel="Search sections"
-            clearable
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="w-[280px] shrink-0 py-[8px]">
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search section..."
+              ariaLabel="Search sections"
+              clearable
+            />
+          </div>
+          <Filter
+            value={phaseFilter}
+            options={PHASE_OPTIONS}
+            onChange={setPhaseFilter}
+            ariaLabel="Filter by capstone phase"
           />
         </div>
       </HeaderBar>
@@ -73,11 +92,11 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-6 bg-white border border-dashed border-[#e8ebf8] rounded-[12px]">
             <p className="font-sans font-semibold text-[13px] text-[#8a93b4] text-center">
-              {search
-                ? `No sections match “${search}”`
+              {search || phaseFilter !== 'all'
+                ? `No sections match your search or filter.`
                 : 'No sections yet. Create your first class.'}
             </p>
-            {!search && (
+            {!search && phaseFilter === 'all' && (
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}

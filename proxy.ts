@@ -80,12 +80,19 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(url)
     }
 
+    // Legacy plural route — /faculty/coordinators → /faculty/sections
+    if (startsWithPath(pathname, '/faculty/coordinators')) {
+      const url = req.nextUrl.clone()
+      url.pathname = pathname.replace('/faculty/coordinators', '/faculty/sections')
+      return NextResponse.redirect(url)
+    }
+
     // Faculty sub-role routes (only reachable by admins/faculty, see above).
     if (startsWithPath(pathname, '/faculty/faculties')) {
       if (!hasCoordinatorAccess(token))
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     } else if (startsWithPath(pathname, '/faculty/sections')) {
-      if (!isAdminOrProgramChair(token))
+      if (!hasCoordinatorAccess(token))
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     } else if (startsWithPath(pathname, '/faculty/templates')) {
       if (!hasCoordinatorAccess(token))
@@ -95,9 +102,6 @@ export async function proxy(req: NextRequest) {
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     } else if (startsWithPath(pathname, '/faculty/my-sections')) {
       if (token.isCoordinator !== true)
-        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/coordinators')) {
-      if (!hasCoordinatorAccess(token))
         return NextResponse.redirect(new URL(roleHome(token.role), req.url))
     } else if (startsWithPath(pathname, '/faculty/defense-scheduling')) {
       if (!hasCoordinatorAccess(token))

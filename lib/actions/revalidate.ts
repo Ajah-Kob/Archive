@@ -7,7 +7,7 @@ export function revalidateFeature(feature: 'sections' | 'templates' | 'faculties
   switch (feature) {
     case 'sections':
       revalidatePath('/admin/sections')
-      revalidatePath('/faculty/coordinators')
+      revalidatePath('/faculty/sections')
       break
     case 'templates':
       revalidatePath('/admin/templates')

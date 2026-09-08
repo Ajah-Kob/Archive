@@ -22,7 +22,7 @@ export function UserProfile({
   return (
     <div className="flex gap-2.5 items-center min-w-0">
       <div
-        className={`flex text-center justify-center items-center rounded-full shrink-0 drop-shadow-[0_2px_2px_rgba(0,0,0,0.14)] ${avatarClassName ?? 'size-8'}`}
+        className={`flex justify-center items-center rounded-full shrink-0 drop-shadow-[0_2px_2px_rgba(0,0,0,0.14)] ${avatarClassName ?? 'size-8'}`}
         style={{
           backgroundImage:
             gradient ||

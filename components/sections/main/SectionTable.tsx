@@ -4,10 +4,9 @@ import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { NoSectionIcon } from '@/assets/NoSectionIcon'
-import { TableListHeader } from './TableListHeader'
 import { SectionDataRow, type SectionData } from './SectionDataRow'
 
-type SortKey = 'coordinator' | 'section' | 'dateCreated' | 'students' | 'groups'
+type SortKey = 'coordinator' | 'section' | 'capstonePhase' | 'dateCreated' | 'students' | 'groups'
 
 function SortHeader({
   field,
@@ -24,7 +23,7 @@ function SortHeader({
 }) {
   return (
     <div
-      className="flex items-center gap-1 cursor-pointer select-none text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase"
+      className="flex items-center gap-1 cursor-pointer select-none font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase"
       onClick={() => onSort?.(field)}
     >
       {label}
@@ -67,6 +66,8 @@ export function SectionTable({ sections, actions }: SectionTableProps) {
         cmp = a.coordinator.name.localeCompare(b.coordinator.name)
       } else if (sortField === 'section') {
         cmp = a.section.localeCompare(b.section)
+      } else if (sortField === 'capstonePhase') {
+        cmp = a.capstonePhase.localeCompare(b.capstonePhase)
       } else if (sortField === 'dateCreated') {
         cmp = a.dateCreated.localeCompare(b.dateCreated)
       } else if (sortField === 'students') {
@@ -81,8 +82,7 @@ export function SectionTable({ sections, actions }: SectionTableProps) {
 
   if (sections.length === 0) {
     return (
-      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0">
-        <TableListHeader title="Sections" action={actions} />
+      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="flex flex-col items-center justify-center px-10 py-16 w-full">
           <div className="mb-5">
             <NoSectionIcon />
@@ -100,20 +100,22 @@ export function SectionTable({ sections, actions }: SectionTableProps) {
   }
 
   return (
-    <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0">
-      {/* Table Header */}
-      <TableListHeader title="Sections" action={actions} />
-
-      {/* Header Row */}
-      <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_150px] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]">
-        <SortHeader
-          field="coordinator"
-          label="Coordinator"
-          {...{ sortField, sortDir, onSort: handleSort }}
-        />
+    <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* Header Row — Section first, Phase second, Coordinator third */}
+      <div className="grid grid-cols-[1.6fr_0.9fr_1.5fr_1fr_0.8fr_0.8fr_150px] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] rounded-t-[14px]">
         <SortHeader
           field="section"
           label="Section"
+          {...{ sortField, sortDir, onSort: handleSort }}
+        />
+        <SortHeader
+          field="capstonePhase"
+          label="Phase"
+          {...{ sortField, sortDir, onSort: handleSort }}
+        />
+        <SortHeader
+          field="coordinator"
+          label="Coordinator"
           {...{ sortField, sortDir, onSort: handleSort }}
         />
         <SortHeader

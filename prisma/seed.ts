@@ -3,7 +3,12 @@ import { PrismaNeon } from '@prisma/adapter-neon'
 import bcrypt from 'bcrypt'
 import { config } from 'dotenv'
 import defaultUsers from '../data/default-user'
+import { AVATAR_GRADIENTS } from '../lib/gradients'
 config({ path: '.env.local' })
+
+function pickRandomGradient(): string {
+  return AVATAR_GRADIENTS[Math.floor(Math.random() * AVATAR_GRADIENTS.length)]!
+}
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL_UNPOOLED! })
 const prisma = new PrismaClient({ adapter })
@@ -24,6 +29,7 @@ async function main() {
         email: seed.email,
         password: passwordHash,
         role: seed.role,
+        avatarGradient: pickRandomGradient(),
         activatedAt: new Date(),
       },
     })
@@ -91,6 +97,7 @@ async function seedDefenseResubmissions(passwordHash: string) {
           email: def.email,
           password: passwordHash,
           role: 'FACULTY',
+          avatarGradient: pickRandomGradient(),
           activatedAt: new Date(),
         },
       })

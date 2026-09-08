@@ -8,6 +8,7 @@ import { cacheLife, cacheTag } from "next/cache"
 import { USERS_PER_PAGE } from "@/config/constants"
 import { isValidEmail } from "@/lib/helper"
 import { requireAdmin, requireUser, sanitizeUser, sanitizeUsers } from "@/lib/actions/guard"
+import { pickRandomGradient } from "@/lib/gradients"
 
 const table = "user"
 const MIN_PASSWORD_LENGTH = 8
@@ -180,6 +181,7 @@ async function persistNewUser(data: { name: string; email: string; password: str
         email: data.email,
         password: await hash(data.password, 12),
         role: data.role as any,
+        avatarGradient: pickRandomGradient(),
       },
     })
 

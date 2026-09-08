@@ -18,6 +18,30 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/faculty/my-section/:path*',
+        destination: '/faculty/my-sections/:path*',
+        permanent: true,
+      },
+      {
+        source: '/faculty/coordinators/:path*',
+        destination: '/faculty/sections/:path*',
+        permanent: true,
+      },
+      {
+        source: '/faculty/my-section',
+        destination: '/faculty/my-sections',
+        permanent: true,
+      },
+      {
+        source: '/faculty/coordinators',
+        destination: '/faculty/sections',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default nextConfig

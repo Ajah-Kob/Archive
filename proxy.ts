@@ -10,115 +10,77 @@ interface Token extends JWT {
   isAdviser?: boolean
 }
 
-const ADMIN_ROLES = ['SUPERADMIN', 'ADMIN']
-const PROTECTED_ROOTS = ['/admin', '/faculty', '/student', '/guest', '/account']
+const ADMIN_SET = new Set(['SUPERADMIN', 'ADMIN'])
+const PROTECTED_SET = new Set(['/admin', '/faculty', '/student', '/guest', '/account'])
 
-// Faculty sub-role helpers. Admins pass root-level checks but do NOT inherit
-// coordinator/adviser records, so those routes check the explicit flags.
 function isAdmin(role?: string): boolean {
-  return ADMIN_ROLES.includes(role ?? '')
+  return ADMIN_SET.has(role ?? '')
 }
 
 function hasCoordinatorAccess(token: Token): boolean {
-  return (
-    isAdmin(token.role) ||
-    token.isProgramChair === true ||
-    token.isCoordinator === true
-  )
+  return isAdmin(token.role) || token.isProgramChair === true || token.isCoordinator === true
 }
 
 function isAdminOrProgramChair(token: Token): boolean {
   return isAdmin(token.role) || token.isProgramChair === true
 }
 
-function startsWithPath(pathname: string, root: string): boolean {
-  return pathname === root || pathname.startsWith(`${root}/`)
-}
-
 export async function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl
+
+  // /login is handled client-side (RedirectIfAuthed) — no token needed at the edge
+  if (pathname === '/login') return NextResponse.next()
+
+  const seg = pathname.split('/', 3)
+  const root = `/${seg[1]}`
+
+  if (!PROTECTED_SET.has(root)) return NextResponse.next()
+
   const token = (await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
   })) as Token | null
-  const { pathname } = req.nextUrl
 
-  const protectedRoot = PROTECTED_ROOTS.find((root) =>
-    startsWithPath(pathname, root),
-  )
-
-  // Unauthenticated users cannot reach any protected role/account root.
-  if (protectedRoot && !token) {
+  if (!token) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // Route protection: role-root isolation + sub-role checks (token-based).
-  // Page layouts no longer guard routes — the proxy is the single authority.
-  // Tradeoff: role/sub-role changes reflect in the JWT within ~60s (client
-  // session poll). Server actions still DB-check every mutation instantly.
-  if (token) {
-    if (startsWithPath(pathname, '/admin') && !isAdmin(token.role)) {
-      return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    }
-    if (startsWithPath(pathname, '/student') && token.role !== 'STUDENT') {
-      return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    }
-    if (startsWithPath(pathname, '/guest') && token.role !== 'GUEST') {
-      return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    }
-    if (
-      startsWithPath(pathname, '/faculty') &&
-      !isAdmin(token.role) &&
-      token.role !== 'FACULTY'
-    ) {
-      return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    }
+  const home = roleHome(token.role)
+  const redirectHome = () => NextResponse.redirect(new URL(home, req.url))
 
-    // Legacy singular route — consolidate to plural /my-sections
-    if (startsWithPath(pathname, '/faculty/my-section')) {
-      const url = req.nextUrl.clone()
-      url.pathname = pathname.replace('/faculty/my-section', '/faculty/my-sections')
-      return NextResponse.redirect(url)
-    }
+  // Role-root isolation
+  if (root === '/admin' && !isAdmin(token.role)) return redirectHome()
+  if (root === '/student' && token.role !== 'STUDENT') return redirectHome()
+  if (root === '/guest' && token.role !== 'GUEST') return redirectHome()
+  if (root === '/faculty' && !isAdmin(token.role) && token.role !== 'FACULTY') return redirectHome()
 
-    // Legacy plural route — /faculty/coordinators → /faculty/sections
-    if (startsWithPath(pathname, '/faculty/coordinators')) {
-      const url = req.nextUrl.clone()
-      url.pathname = pathname.replace('/faculty/coordinators', '/faculty/sections')
-      return NextResponse.redirect(url)
-    }
-
-    // Faculty sub-role routes (only reachable by admins/faculty, see above).
-    if (startsWithPath(pathname, '/faculty/faculties')) {
-      if (!hasCoordinatorAccess(token))
-        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/sections')) {
-      if (!hasCoordinatorAccess(token))
-        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/templates')) {
-      if (!hasCoordinatorAccess(token))
-        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/document-review')) {
-      if (token.isAdviser !== true)
-        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/my-sections')) {
-      if (token.isCoordinator !== true)
-        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/defense-scheduling')) {
-      if (!hasCoordinatorAccess(token))
-        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
-    } else if (startsWithPath(pathname, '/faculty/archiving')) {
-      if (!isAdminOrProgramChair(token))
-        return NextResponse.redirect(new URL(roleHome(token.role), req.url))
+  // Faculty sub-role gates — only when inside /faculty
+  if (root === '/faculty') {
+    const sub = seg[2]
+    switch (sub) {
+      case 'faculties':
+      case 'sections':
+      case 'templates':
+      case 'defense-scheduling':
+        if (!hasCoordinatorAccess(token)) return redirectHome()
+        break
+      case 'document-review':
+        if (token.isAdviser !== true) return redirectHome()
+        break
+      case 'my-sections':
+        if (token.isCoordinator !== true) return redirectHome()
+        break
+      case 'archiving':
+        if (!isAdminOrProgramChair(token)) return redirectHome()
+        break
+      default:
+        break
     }
   }
-
-  // Signed-in users who open /login are sent back to their previous route by
-  // the client-side RedirectIfAuthed guard on the login page (the server
-  // cannot know where they came from). Expired sessions simply see the form.
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/faculty/:path*', '/faculty/archiving/:path*', '/student/:path*', '/guest/:path*', '/account/:path*', '/login'],
+  matcher: ['/admin/:path*', '/faculty/:path*', '/student/:path*', '/guest/:path*', '/account/:path*'],
 }

@@ -134,14 +134,20 @@ function MilestoneRow({ row, isActive }: MilestoneRowProps) {
 export function CapstoneJourney({
   journey,
   activeSlug,
+  phaseLocks,
 }: {
   journey: JourneyRow[]
   activeSlug?: string
+  phaseLocks?: Partial<Record<JourneyRow['header'], boolean>>
 }) {
   const groups = HEADER_ORDER.map((header) => ({
     header,
     rows: journey.filter((row) => row.header === header),
   })).filter((group) => group.rows.length > 0)
+
+  // When phaseLocks[header] === true, the phase is locked — show transparent
+  // overlay covering its milestone rows, matching the coordinator's Milestones tab.
+  const isPhaseLocked = (header: JourneyRow['header']) => phaseLocks?.[header] === true
 
   return (
     <aside className="self-stretch bg-white shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] w-[200px] shrink-0 flex flex-col gap-[12px] px-[13px] py-[26px] overflow-hidden">
@@ -150,25 +156,38 @@ export function CapstoneJourney({
       </p>
 
       <div className="flex flex-col gap-[16px] flex-1 min-h-0 overflow-y-auto pr-[2px]">
-        {groups.map((group, groupIndex) => (
-          <section key={group.header} className={groupIndex > 0 ? 'pt-[1px]' : ''}>
-            <p className="font-sans font-extrabold text-[9.5px] leading-[14.25px] tracking-[0.95px] uppercase text-[#bbc0d8] px-[4px] pb-[7px]">
-              {group.header}
-            </p>
-            <div className="relative">
-              <div className="absolute left-[17px] top-[9px] bottom-[9px] w-[2px] rounded-full bg-gradient-to-b from-[#e0e3f0] to-[#f0f2fa]" />
-              <div className="relative flex flex-col gap-[5px]">
-                {group.rows.map((row) => (
-                  <MilestoneRow
-                    key={row.slug}
-                    row={row}
-                    isActive={row.slug === activeSlug}
-                  />
-                ))}
+        {groups.map((group, groupIndex) => {
+          const locked = isPhaseLocked(group.header)
+          return (
+            <section key={group.header} className={groupIndex > 0 ? 'pt-[1px]' : ''}>
+              <p className="font-sans font-extrabold text-[9.5px] leading-[14.25px] tracking-[0.95px] uppercase text-[#bbc0d8] px-[4px] pb-[7px]">
+                {group.header}
+              </p>
+              <div className="relative">
+                <div className="absolute left-[17px] top-[9px] bottom-[9px] w-[2px] rounded-full bg-gradient-to-b from-[#e0e3f0] to-[#f0f2fa]" />
+                <div className="relative flex flex-col gap-[5px]">
+                  {group.rows.map((row) => (
+                    <MilestoneRow
+                      key={row.slug}
+                      row={row}
+                      isActive={row.slug === activeSlug && !locked}
+                    />
+                  ))}
+                </div>
+                {locked && (
+                  <div className="absolute inset-0 bg-white/75 backdrop-blur-[1.5px] rounded-[10px] border border-dashed border-[#d8ddf2] flex flex-col items-center justify-center gap-1.5 p-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#eceef8] shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                      <Lock className="size-[10px] text-[#8a93b4]" />
+                      <span className="font-sans font-bold text-[10px] leading-[15px] tracking-[0.3px] text-[#5a6382] whitespace-nowrap">
+                        {group.header} locked
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
-            </div>
-          </section>
-        ))}
+            </section>
+          )
+        })}
       </div>
     </aside>
   )

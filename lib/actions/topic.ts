@@ -149,9 +149,14 @@ async function loadTopicWorkspace(userId: number) {
     student.section.milestoneAvailability,
   )
 
+  const phaseLocks = {
+    'CAPSTONE 1': !(student.section as any).capstone1OpenedAt,
+    'CAPSTONE 2': !student.section.capstone2OpenedAt,
+  } as const
+
   const group = student.group
   if (!group) {
-    return { availability, group: null, topics: [], history: [], capstoneTopicId: null }
+    return { availability, phaseLocks, group: null, topics: [], history: [], capstoneTopicId: null }
   }
 
   // Group every topic into its revision chain (topicGroupKey). Legacy rows
@@ -189,6 +194,7 @@ async function loadTopicWorkspace(userId: number) {
 
   return {
     availability,
+    phaseLocks,
     group,
     topics,
     history,
@@ -221,7 +227,7 @@ export async function getTopicSubmissionData(
     return { success: false, message: 'Not authorized', payload: null }
   }
 
-  const { availability, group, topics, history, capstoneTopicId } = loaded
+  const { availability, phaseLocks, group, topics, history, capstoneTopicId } = loaded
 
   if (!group) {
     return {
@@ -230,13 +236,14 @@ export async function getTopicSubmissionData(
       payload: {
         group: null,
         journey: buildJourneyRows(null, availability),
+        phaseLocks,
         topics: [],
         history: [],
         count: 0,
         cap: TOPIC_CAP,
         hasApproved: false,
         canSubmit: false,
-      },
+      } as any,
     }
   }
 
@@ -255,13 +262,14 @@ export async function getTopicSubmissionData(
         sectionId: group.sectionId,
       },
       journey,
+      phaseLocks,
       topics,
       history,
       count,
       cap: TOPIC_CAP,
       hasApproved,
       canSubmit: !hasApproved && count < TOPIC_CAP,
-    },
+    } as any,
   }
 }
 
@@ -276,7 +284,7 @@ export async function getTopicSelectionData(
     return { success: false, message: 'Not authorized', payload: null }
   }
 
-  const { availability, group, topics, capstoneTopicId } = loaded
+  const { availability, phaseLocks, group, topics, capstoneTopicId } = loaded
 
   if (!group) {
     return {
@@ -285,9 +293,10 @@ export async function getTopicSelectionData(
       payload: {
         group: null,
         journey: buildJourneyRows(null, availability),
+        phaseLocks,
         topics: [],
         confirmedTopicId: null,
-      },
+      } as any,
     }
   }
 
@@ -303,9 +312,10 @@ export async function getTopicSelectionData(
         sectionId: group.sectionId,
       },
       journey,
+      phaseLocks,
       topics,
       confirmedTopicId: capstoneTopicId,
-    },
+    } as any,
   }
 }
 

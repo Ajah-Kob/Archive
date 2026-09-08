@@ -21,7 +21,7 @@ export default async function MilestonePage() {
 
   return (
     <section className="h-full flex min-h-0">
-      <CapstoneJourney journey={workspace.journey} />
+      <CapstoneJourney journey={workspace.journey} phaseLocks={(workspace as any).phaseLocks} />
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <GroupContext />

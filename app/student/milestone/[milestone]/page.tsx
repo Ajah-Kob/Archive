@@ -101,7 +101,7 @@ export default async function MilestoneDetailPage({
 
     return (
       <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={workspace.journey} activeSlug="archiving" />
+        <CapstoneJourney journey={workspace.journey} activeSlug="archiving" phaseLocks={(workspace as any).phaseLocks} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
@@ -124,7 +124,7 @@ export default async function MilestoneDetailPage({
 
     return (
       <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={data.journey} activeSlug="topic-submission" />
+        <CapstoneJourney journey={data.journey} activeSlug="topic-submission" phaseLocks={(data as any).phaseLocks} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
@@ -146,7 +146,7 @@ export default async function MilestoneDetailPage({
 
     return (
       <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={data.journey} activeSlug="topic-selection" />
+        <CapstoneJourney journey={data.journey} activeSlug="topic-selection" phaseLocks={(data as any).phaseLocks} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
@@ -168,7 +168,7 @@ export default async function MilestoneDetailPage({
 
     return (
       <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={data.journey} activeSlug={milestone} />
+        <CapstoneJourney journey={data.journey} activeSlug={milestone} phaseLocks={(data as any).phaseLocks} />
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
@@ -189,7 +189,7 @@ export default async function MilestoneDetailPage({
 
   return (
     <section className="h-full flex min-h-0">
-      <CapstoneJourney journey={workspace.journey} activeSlug={milestone} />
+      <CapstoneJourney journey={workspace.journey} activeSlug={milestone} phaseLocks={(workspace as any).phaseLocks} />
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <GroupContext />

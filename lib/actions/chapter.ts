@@ -85,6 +85,17 @@ async function getAvailability(sectionId: number): Promise<Record<string, boolea
   )
 }
 
+async function getPhaseLocks(sectionId: number): Promise<Record<string, boolean>> {
+  const section = await prisma.section.findFirst({
+    where: { id: sectionId, deletedAt: null },
+    select: { capstone1OpenedAt: true, capstone2OpenedAt: true },
+  })
+  return {
+    'CAPSTONE 1': !section?.capstone1OpenedAt,
+    'CAPSTONE 2': !section?.capstone2OpenedAt,
+  }
+}
+
 // Whether the chapter milestone is open for the group's section.
 async function chapterIsOpen(sectionId: number, chapter: ChapterKey) {
   const availability = await getAvailability(sectionId)
@@ -239,6 +250,8 @@ export async function getChapterData(
     availability,
   )
 
+  const phaseLocks = effectiveGroup ? await getPhaseLocks(student.sectionId) : { 'CAPSTONE 1': false, 'CAPSTONE 2': false }
+
   const milestone = effectiveGroup?.milestones.find((m) => m.chapter === chapter) ?? null
   const requiresCapstone = !!effectiveGroup && !effectiveGroup.capstone
 
@@ -287,7 +300,8 @@ export async function getChapterData(
       canSubmit: open && !requiresCapstone,
       requiresCapstone,
       journey,
-    },
+      phaseLocks,
+    } as any,
   }
 }
 

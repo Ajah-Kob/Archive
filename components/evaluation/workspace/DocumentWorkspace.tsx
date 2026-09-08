@@ -19,17 +19,21 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
+import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
 import {
-  DocumentManagerPluginPackage,
-} from '@embedpdf/plugin-document-manager/react'
-import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
+  Viewport,
+  ViewportPluginPackage,
+} from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
   InteractionManagerPluginPackage,
 } from '@embedpdf/plugin-interaction-manager/react'
-import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
+import {
+  SelectionLayer,
+  SelectionPluginPackage,
+} from '@embedpdf/plugin-selection/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 import {
   AnnotationPluginPackage,
@@ -334,9 +338,8 @@ function WorkspaceLayout({
 
   // Whether the adviser has added any annotations on this submission —
   // Request Revisions requires at least one annotation.
-  const { state: annotationState, provides: annotationApi } = useAnnotation(
-    CURRENT_DOCUMENT_ID,
-  )
+  const { state: annotationState, provides: annotationApi } =
+    useAnnotation(CURRENT_DOCUMENT_ID)
   const hasAnnotations = Object.keys(annotationState.byUid).length > 0
 
   // Seed the bottom-bar status from the persisted row so an existing draft
@@ -370,7 +373,9 @@ function WorkspaceLayout({
   // user cancels, clicks outside, or closes the panel without saving, the
   // pending annotation is deleted so an empty highlight never lingers.
   const [autoEditId, setAutoEditId] = useState<string | null>(null)
-  const [highlightCommentId, setHighlightCommentId] = useState<string | null>(null)
+  const [highlightCommentId, setHighlightCommentId] = useState<string | null>(
+    null,
+  )
   const inlineToolArmedRef = useRef(false)
 
   // Clicking an annotation in the viewer opens the Comments panel (if closed)
@@ -399,7 +404,10 @@ function WorkspaceLayout({
   // highlights it and the settings strip reads the annotation's own
   // color/size (ToolSettingsPanel already prefers the selected object).
   // Deselecting keeps the current tool — only a positive selection switches.
+  // READ-ONLY (student) must never arm a tool — otherwise a subsequent
+  // drag on empty page would create a new annotation.
   useEffect(() => {
+    if (isStudent) return
     const uid = annotationState.selectedUid
     if (!uid) return
     const type = annotationState.byUid[uid]?.object?.type
@@ -409,7 +417,7 @@ function WorkspaceLayout({
     handleActiveToolChange(tool)
     annotationApi?.setActiveTool(tool)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annotationState.selectedUid, annotationState.byUid])
+  }, [annotationState.selectedUid, annotationState.byUid, isStudent])
 
   useEffect(() => {
     if (!annotationCapability) return
@@ -456,7 +464,10 @@ function WorkspaceLayout({
   function handleCancelEdit(comment: { id: string; pageIndex: number }) {
     if (!pendingCommentIdsRef.current.has(comment.id)) return
     pendingCommentIdsRef.current.delete(comment.id)
-    annotationCapabilityRef.current?.deleteAnnotation(comment.pageIndex, comment.id)
+    annotationCapabilityRef.current?.deleteAnnotation(
+      comment.pageIndex,
+      comment.id,
+    )
   }
 
   // Closing the panel without saving discards any pending annotations.
@@ -537,7 +548,9 @@ function WorkspaceLayout({
       )}
 
       {/* Disable cursor text selection/copying (highlight tools unaffected) */}
-      {activeDocumentId && <DisableTextSelection documentId={activeDocumentId} />}
+      {activeDocumentId && (
+        <DisableTextSelection documentId={activeDocumentId} />
+      )}
 
       {/* Header bar: back + context | draft status | tools | zoom | undo/redo | panels + verdict */}
       <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
@@ -586,7 +599,9 @@ function WorkspaceLayout({
               >
                 <Check
                   className={`size-[12px] shrink-0 ${
-                    draftSaveStatus === 'saved' ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
+                    draftSaveStatus === 'saved'
+                      ? 'text-[#16a34a]'
+                      : 'text-[#9ea8c6]'
                   }`}
                   strokeWidth={2.5}
                   aria-hidden="true"
@@ -608,7 +623,9 @@ function WorkspaceLayout({
           />
         )}
 
-        {!isStudent && <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />}
+        {!isStudent && (
+          <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+        )}
 
         {/* Zoom controls — 20% to 200%, per active document (viewing tool) */}
         {activeDocumentId && <ZoomControl documentId={activeDocumentId} />}
@@ -639,7 +656,9 @@ function WorkspaceLayout({
             <>
               <button
                 type="button"
-                onClick={() => setPanel(panel === 'versions' ? null : 'versions')}
+                onClick={() =>
+                  setPanel(panel === 'versions' ? null : 'versions')
+                }
                 aria-pressed={panel === 'versions'}
                 className={`flex items-center gap-[6px] h-[32px] px-[12px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none ${
                   panel === 'versions'
@@ -688,7 +707,10 @@ function WorkspaceLayout({
 
       {/* Per-tool settings strip (color / size) — REVIEWER ONLY, while a tool is active */}
       {!isStudent && activeDocumentId && (
-        <ToolSettingsPanel documentId={activeDocumentId} activeTool={activeTool} />
+        <ToolSettingsPanel
+          documentId={activeDocumentId}
+          activeTool={activeTool}
+        />
       )}
 
       {/* Viewer + right-side panel (inline — the PDF shrinks to make room) */}
@@ -790,7 +812,10 @@ function WorkspaceLayout({
           />
         )}
         {panel === 'versions' && isStudent && (
-          <VersionPanel versions={versions ?? []} onClose={() => setPanel(null)} />
+          <VersionPanel
+            versions={versions ?? []}
+            onClose={() => setPanel(null)}
+          />
         )}
       </div>
 

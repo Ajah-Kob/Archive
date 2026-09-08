@@ -351,6 +351,7 @@ function DefenseWorkspaceLayout({
   }
 
   useEffect(() => {
+    if (isStudent) return
     const uid = annotationState.selectedUid
     if (!uid) return
     const type = annotationState.byUid[uid]?.object?.type
@@ -360,7 +361,7 @@ function DefenseWorkspaceLayout({
     handleActiveToolChange(tool)
     annotationApi?.setActiveTool(tool)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annotationState.selectedUid, annotationState.byUid])
+  }, [annotationState.selectedUid, annotationState.byUid, isStudent])
 
   useEffect(() => {
     if (!annotationCapability) return

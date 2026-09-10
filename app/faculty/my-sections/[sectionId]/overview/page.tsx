@@ -25,7 +25,7 @@ export default async function MySectionOverviewPage({
   void _students
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-5 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 sm:gap-5 w-full">
       {/* Phase gates — derived via capstone1/2OpenedAt + milestoneAvailability
           through PhaseGatePills' internal resolveSectionAvailability hard gate.
           Passing milestones ensures a locked phase never shows Open even if a

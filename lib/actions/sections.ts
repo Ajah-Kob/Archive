@@ -1481,6 +1481,32 @@ export interface SectionGroupTopic {
   createdAt: string
 }
 
+export interface SectionGroupChapter {
+  chapter: string
+  label: string
+  status: 'LOCKED' | 'DEFAULT' | 'SUBMITTED' | 'NEEDS_REVISION' | 'APPROVED'
+  fileName: string | null
+  blobUrl: string | null
+  submittedAt: string | null
+  reviewedAt: string | null
+  reviewNote: string | null
+}
+
+export interface SectionGroupDefense {
+  id: number
+  type: 'PROPOSAL' | 'FINAL'
+  date: string
+  venue: string
+  verdict: string
+}
+
+export interface SectionGroupArchiving {
+  status: string | null
+  title: string | null
+  fileName: string | null
+  blobUrl: string | null
+}
+
 export interface SectionGroupDetail {
   id: number
   name: string
@@ -1489,6 +1515,9 @@ export interface SectionGroupDetail {
   adviser: { name: string; email: string; image: string | null } | null
   topic: SectionGroupTopic | null
   journey: JourneyRow[]
+  chapters: SectionGroupChapter[]
+  defenses: SectionGroupDefense[]
+  archiving: SectionGroupArchiving | null
 }
 
 // Live per-group detail for the coordinator progress drawer. Not 'use cache':
@@ -1513,6 +1542,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
       include: {
         section: {
           select: {
+            capstone1OpenedAt: true,
             capstone2OpenedAt: true,
             milestoneAvailability: { select: { key: true, openedAt: true } },
           },
@@ -1551,14 +1581,19 @@ export async function getCoordinatorGroupDetail(groupId: number) {
           include: {
             submissions: {
               where: { deletedAt: null },
-              select: { status: true, deletedAt: true },
+              select: { status: true, deletedAt: true, fileName: true, blobUrl: true, createdAt: true, reviewedAt: true, reviewNote: true, mimeType: true, size: true },
               orderBy: { createdAt: 'desc' },
               take: 1,
             },
           },
         },
         capstoneArchive: { select: { deletedAt: true } },
-        archivingSubmission: { select: { status: true, deletedAt: true } },
+        archivingSubmission: { select: { status: true, deletedAt: true, title: true, fileName: true, blobUrl: true, mimeType: true, size: true } },
+        defenseSchedules: {
+          where: { deletedAt: null },
+          select: { id: true, type: true, date: true, venue: true, verdict: true, startTime: true, endTime: true },
+          orderBy: { date: 'desc' },
+        },
       },
     })
     if (!group) {
@@ -1584,10 +1619,45 @@ export async function getCoordinatorGroupDetail(groupId: number) {
         archivingSubmission: (group as unknown as { archivingSubmission?: { status: string; deletedAt: Date | null } | null }).archivingSubmission ?? null,
       },
       resolveSectionAvailability(
+        !!(group.section as unknown as { capstone1OpenedAt: Date | null }).capstone1OpenedAt,
         !!group.section.capstone2OpenedAt,
         group.section.milestoneAvailability,
       ),
     )
+
+    const chapters: SectionGroupChapter[] = journey
+      .filter((r) => r.slug.startsWith('chapter-'))
+      .map((row) => {
+        const milestone = group.milestones.find((m) => `chapter-${m.chapter.slice(-1)}` === row.slug)
+        const sub = milestone?.submissions[0]
+        return {
+          chapter: row.slug,
+          label: row.label,
+          status: row.state as SectionGroupChapter['status'],
+          fileName: (sub as unknown as { fileName?: string })?.fileName ?? null,
+          blobUrl: (sub as unknown as { blobUrl?: string })?.blobUrl ?? null,
+          submittedAt: (sub as unknown as { createdAt?: Date })?.createdAt?.toISOString() ?? null,
+          reviewedAt: (sub as unknown as { reviewedAt?: Date | null })?.reviewedAt?.toISOString() ?? null,
+          reviewNote: (sub as unknown as { reviewNote?: string | null })?.reviewNote ?? null,
+        }
+      })
+
+    const defenses: SectionGroupDefense[] = ((group as unknown as { defenseSchedules?: { id: number; type: string; date: Date; venue: string; verdict: string }[] }).defenseSchedules ?? []).map((d) => ({
+      id: d.id,
+      type: d.type as 'PROPOSAL' | 'FINAL',
+      date: d.date.toISOString(),
+      venue: d.venue,
+      verdict: d.verdict,
+    }))
+
+    const archiving: SectionGroupArchiving | null = (group as unknown as { archivingSubmission?: { status: string; title: string; fileName: string; blobUrl: string } | null }).archivingSubmission
+      ? {
+          status: (group as unknown as { archivingSubmission: { status: string } }).archivingSubmission.status,
+          title: (group as unknown as { archivingSubmission: { title: string } }).archivingSubmission.title,
+          fileName: (group as unknown as { archivingSubmission: { fileName: string } }).archivingSubmission.fileName,
+          blobUrl: (group as unknown as { archivingSubmission: { blobUrl: string } }).archivingSubmission.blobUrl,
+        }
+      : null
 
     return {
       success: true,
@@ -1621,6 +1691,9 @@ export async function getCoordinatorGroupDetail(groupId: number) {
             }
           : null,
         journey,
+        chapters,
+        defenses,
+        archiving,
       } satisfies SectionGroupDetail,
     }
   } catch (error) {

@@ -18,14 +18,40 @@ export default async function Home() {
       <div className="absolute -top-20 -right-20 size-96 opacity-20 bg-indigo-400 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-20 -left-20 w-[493px] h-[475px] opacity-20 bg-radial from-red-400 to-pink-800 rounded-full blur-3xl pointer-events-none" />
 
+      <header className="relative z-10 w-full flex items-center justify-between px-6 md:px-10 py-5">
+        <Link href="/" className="inline-flex items-center gap-3">
+          <div className="size-8 bg-white/20 rounded-xl outline outline-1 outline-offset-[-1px] outline-white/20 flex justify-center items-center text-white text-sm backdrop-blur-md">
+            📖
+          </div>
+          <span className="text-white text-sm font-bold leading-6 tracking-widest">ARCHIVE</span>
+        </Link>
+        <nav className="hidden sm:flex items-center gap-5 text-white/60 text-xs font-medium">
+          <Link href="#" className="hover:text-white transition-colors">
+            Help Center
+          </Link>
+          <Link href="#" className="hover:text-white transition-colors">
+            Privacy
+          </Link>
+          {session ? (
+            <Link
+              href={home}
+              className="inline-flex items-center justify-center h-8 px-4 rounded-full bg-white text-slate-900 text-xs font-bold hover:bg-white/90 transition-colors"
+            >
+              Go to {home.replace('/', '') || 'home'}
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center h-8 px-4 rounded-full bg-white text-slate-900 text-xs font-bold hover:bg-white/90 transition-colors"
+            >
+              Login
+            </Link>
+          )}
+        </nav>
+      </header>
+
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-16 md:py-24 w-full">
         <div className="w-full max-w-[640px] flex flex-col gap-8 items-center text-center">
-          <div className="inline-flex justify-center items-center gap-3">
-            <div className="size-10 bg-white/20 rounded-2xl outline outline-1 outline-offset-[-1px] outline-white/20 flex justify-center items-center text-white text-base backdrop-blur-md">
-              📖
-            </div>
-            <span className="text-white text-base font-bold leading-6 tracking-widest">ARCHIVE</span>
-          </div>
 
           <div className="w-full flex flex-col gap-5 items-center">
             <div className="px-3 py-1.5 bg-white/10 rounded-full outline outline-1 outline-offset-[-1px] outline-white/20 inline-flex justify-center items-center gap-2">

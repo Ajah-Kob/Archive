@@ -9,8 +9,13 @@ export default async function Home() {
   const home = role ? roleHome(role) : '/guest'
 
   return (
-    <div className="min-h-dvh w-full bg-[#f4f6ff] flex flex-col">
-      <header className="w-full flex items-center justify-between px-6 md:px-10 py-4 bg-white border-b border-[#eceef8]">
+    <div className="min-h-dvh w-full bg-[#f4f6ff] flex flex-col relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-24 -right-24 size-[420px] bg-[#a5b4fc]/22 rounded-full blur-[80px]" />
+        <div className="absolute -bottom-32 -left-32 size-[460px] bg-[#fe6f6f]/18 rounded-full blur-[85px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(112,125,255,0.16)_1px,transparent_0)] bg-[size:22px_22px]" />
+      </div>
+      <header className="relative z-10 w-full flex items-center justify-between px-6 md:px-10 py-4 bg-white/80 backdrop-blur-md border-b border-[#eceef8]">
         <Link href="/" className="inline-flex items-center gap-2.5">
           <div className="size-8 rounded-[10px] bg-[#707dff] flex items-center justify-center text-white text-sm shadow-[0_2px_8px_rgba(112,125,255,0.3)]">
             📖
@@ -43,8 +48,8 @@ export default async function Home() {
         </nav>
       </header>
 
-      <section className="flex-1 flex flex-col items-center px-6 py-12 md:py-16">
-        <div className="w-full max-w-[720px] flex flex-col items-center text-center gap-6">
+      <section className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 md:py-16">
+        <div className="w-full max-w-[720px] flex flex-col items-center justify-center text-center gap-6 mx-auto">
           <h1 className="font-heading font-extrabold tracking-tight leading-[0.95] text-[#10133a] text-[36px] sm:text-[44px] md:text-[48px]">
             Capstone submissions,
             <br />
@@ -105,27 +110,11 @@ export default async function Home() {
             </div>
           )}
 
-          <div className="w-full max-w-[440px] mt-4 bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden text-left">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#f0f2fa]">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-[#707dff] bg-[#f7f7ff] border border-[#e0e3ff] rounded-full px-2.5 py-1">
-                <span className="size-1.5 rounded-full bg-[#22c55e]" /> Approved
-              </span>
-              <span className="font-sans font-bold text-[11px] text-[#8a93b4]">96%</span>
-            </div>
-            <div className="px-4 py-3 flex flex-col gap-2">
-              <p className="font-sans font-bold text-[13px] leading-[18px] text-[#10133a]">Chapter 1 — In Review</p>
-              <p className="font-sans font-normal text-[12px] leading-[18px] text-[#5a6382]">Adviser feedback stays in the document. Version 2 awaiting review.</p>
-              <div className="h-1.5 w-full bg-[#f0f2fa] rounded-full overflow-hidden">
-                <div className="h-full w-[68%] bg-[#707dff] rounded-full" />
-              </div>
-            </div>
-          </div>
-
           <p className="font-sans font-medium text-[11px] leading-[16.5px] text-[#8a93b4]">BSIS-only · Invitation code required to join</p>
         </div>
       </section>
 
-      <footer className="w-full bg-white border-t border-[#eceef8] flex flex-col sm:flex-row items-center justify-between gap-3 px-6 md:px-10 py-4">
+      <footer className="relative z-10 w-full bg-white/80 backdrop-blur-md border-t border-[#eceef8] flex flex-col sm:flex-row items-center justify-between gap-3 px-6 md:px-10 py-4">
         <div className="flex items-center gap-2 font-sans text-[#8a93b4] text-[11px]">
           <span className="font-bold">© 2025 ARCHIVE</span>
           <span className="opacity-40">·</span>

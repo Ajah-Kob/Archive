@@ -1481,15 +1481,24 @@ export interface SectionGroupTopic {
   createdAt: string
 }
 
+export interface ChapterSubmissionBrief {
+  id: number
+  version: number
+  fileName: string
+  blobUrl: string
+  mimeType: string
+  size: number
+  status: string
+  createdAt: string
+  comments: number
+  pages: number
+}
+
 export interface SectionGroupChapter {
   chapter: string
   label: string
   status: 'LOCKED' | 'DEFAULT' | 'SUBMITTED' | 'NEEDS_REVISION' | 'APPROVED'
-  fileName: string | null
-  blobUrl: string | null
-  submittedAt: string | null
-  reviewedAt: string | null
-  reviewNote: string | null
+  submissions: ChapterSubmissionBrief[]
 }
 
 export interface SectionGroupDefense {
@@ -1580,10 +1589,14 @@ export async function getCoordinatorGroupDetail(groupId: number) {
           where: { deletedAt: null },
           include: {
             submissions: {
-              where: { deletedAt: null },
-              select: { status: true, deletedAt: true, fileName: true, blobUrl: true, createdAt: true, reviewedAt: true, reviewNote: true, mimeType: true, size: true },
+              include: {
+                user: { select: { name: true } },
+                annotations: {
+                  where: { deletedAt: null },
+                  select: { data: true },
+                },
+              },
               orderBy: { createdAt: 'desc' },
-              take: 1,
             },
           },
         },
@@ -1628,17 +1641,48 @@ export async function getCoordinatorGroupDetail(groupId: number) {
     const chapters: SectionGroupChapter[] = journey
       .filter((r) => r.slug.startsWith('chapter-'))
       .map((row) => {
-        const milestone = group.milestones.find((m) => `chapter-${m.chapter.slice(-1)}` === row.slug)
-        const sub = milestone?.submissions[0]
+        const chapKey = row.slug.toUpperCase().replace('-', '_') as string
+        const milestone = (group as unknown as { milestones: Array<{ chapter: string; submissions: Array<{ id: number; fileName: string; blobUrl: string; mimeType: string; size: number; status: string; createdAt: Date; deletedAt: Date | null; annotations?: Array<{ data: unknown }> }> }> }).milestones.find((m) => m.chapter === chapKey)
+        const allSubs = (milestone?.submissions ?? []) as Array<{ id: number; fileName: string; blobUrl: string; mimeType: string; size: number; status: string; createdAt: Date; deletedAt: Date | null; annotations?: Array<{ data: unknown }> }>
+        const submissions: ChapterSubmissionBrief[] = allSubs
+          .slice()
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+          .map((s, idx, arr) => {
+            const version = arr.length - idx
+            let comments = 0
+            let pages = 0
+            if (s.annotations && s.annotations.length > 0) {
+              const allItems = s.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
+              comments = allItems.filter((it) => {
+                const obj = it as { annotation?: { contents?: string } }
+                return obj.annotation?.contents && String(obj.annotation.contents).trim().length > 0
+              }).length
+              const pageSet = new Set(
+                allItems
+                  .map((it) => (it as { annotation?: { pageIndex?: number } })?.annotation?.pageIndex)
+                  .filter((v): v is number => typeof v === 'number'),
+              )
+              pages = pageSet.size || (comments > 0 ? 1 : 0)
+            }
+            return {
+              id: s.id,
+              version,
+              fileName: s.fileName,
+              blobUrl: s.blobUrl,
+              mimeType: s.mimeType,
+              size: s.size,
+              status: s.status,
+              createdAt: s.createdAt.toISOString(),
+              comments,
+              pages,
+            }
+          })
+
         return {
           chapter: row.slug,
           label: row.label,
           status: row.state as SectionGroupChapter['status'],
-          fileName: (sub as unknown as { fileName?: string })?.fileName ?? null,
-          blobUrl: (sub as unknown as { blobUrl?: string })?.blobUrl ?? null,
-          submittedAt: (sub as unknown as { createdAt?: Date })?.createdAt?.toISOString() ?? null,
-          reviewedAt: (sub as unknown as { reviewedAt?: Date | null })?.reviewedAt?.toISOString() ?? null,
-          reviewNote: (sub as unknown as { reviewNote?: string | null })?.reviewNote ?? null,
+          submissions,
         }
       })
 

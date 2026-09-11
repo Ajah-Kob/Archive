@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import { JourneyTracker } from '@/components/milestones/JourneyTracker'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { getInitials } from '@/lib/helper'
@@ -18,6 +18,10 @@ function formatDate(iso: string) {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+function formatDateShort(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function TopicStatusPill({ status }: { status: SectionGroupTopic['status'] }) {
@@ -56,6 +60,8 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
   const [detail, setDetail] = useState<SectionGroupDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
+  const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set())
+  const [showAllMap, setShowAllMap] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (groupId == null) return
@@ -175,28 +181,101 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
           ) : activeTab === 'chapters' ? (
             <div className="flex flex-col gap-3">
               <SectionHeading>Chapters 1–5</SectionHeading>
-              {(detail as unknown as { chapters: { chapter: string; label: string; status: string; fileName: string | null; blobUrl: string | null; submittedAt: string | null; reviewNote: string | null }[] }).chapters?.length ? (
-                (detail as unknown as { chapters: { chapter: string; label: string; status: string; fileName: string | null; blobUrl: string | null; submittedAt: string | null; reviewNote: string | null }[] }).chapters.map((c) => (
-                  <div key={c.chapter} className="border border-[#eceef8] rounded-[9px] px-3 py-2.5 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-sans font-bold text-[12px] text-[#1e2145]">{c.label}</span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${c.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : c.status === 'NEEDS_REVISION' ? 'bg-red-50 border-red-200 text-red-600' : c.status === 'SUBMITTED' ? 'bg-amber-50 border-amber-200 text-amber-700' : c.status === 'LOCKED' ? 'bg-slate-50 border-[#eceef8] text-[#8a93b4]' : 'bg-[#f4f6ff] border-[#e0e3ff] text-[#707dff]'}`}
+              {(detail as unknown as { chapters: { chapter: string; label: string; status: string; submissions: { id: number; version: number; fileName: string; blobUrl: string; createdAt: string; status: string; comments: number; pages: number }[] }[] }).chapters?.length ? (
+                (detail as unknown as { chapters: { chapter: string; label: string; status: string; submissions: { id: number; version: number; fileName: string; blobUrl: string; createdAt: string; status: string; comments: number; pages: number }[] }[] }).chapters.map((ch) => {
+                  const key = ch.chapter
+                  const isOpen = expandedChapters.has(key)
+                  const showAll = showAllMap.has(key)
+                  const visible = showAll ? ch.submissions.slice(0, 6) : ch.submissions.slice(0, 3)
+                  const isLocked = ch.status === 'LOCKED'
+                  const isEmpty = !isLocked && ch.submissions.length === 0
+                  return (
+                    <div key={ch.chapter} className="border border-[#eceef8] rounded-[9px] overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = new Set(expandedChapters)
+                          if (next.has(key)) next.delete(key)
+                          else next.add(key)
+                          setExpandedChapters(next)
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50/60 transition-colors"
                       >
-                        {c.status}
-                      </span>
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="font-sans font-bold text-[12px] text-[#1e2145] truncate">{ch.label}</span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${ch.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : ch.status === 'NEEDS_REVISION' ? 'bg-red-50 border-red-200 text-red-600' : ch.status === 'SUBMITTED' ? 'bg-amber-50 border-amber-200 text-amber-700' : isLocked ? 'bg-slate-50 border-[#eceef8] text-[#8a93b4]' : 'bg-[#f4f6ff] border-[#e0e3ff] text-[#707dff]'}`}
+                          >
+                            {isLocked ? 'Locked' : ch.submissions.length === 0 ? 'No submission' : ch.status}
+                          </span>
+                          {ch.submissions.length > 0 && <span className="font-sans text-[11px] text-[#8a93b4] hidden sm:inline">{ch.submissions.length} versions</span>}
+                        </span>
+                        <ChevronDown className={`size-4 text-[#8a93b4] shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isOpen && (
+                        <div className="border-t border-[#f0f2fa] bg-white">
+                          {isLocked ? (
+                            <div className="px-3 py-3 text-center">
+                              <p className="font-sans text-[11px] text-[#8a93b4]">Locked — wait for coordinator to unlock this chapter.</p>
+                            </div>
+                          ) : isEmpty ? (
+                            <div className="px-3 py-3 text-center">
+                              <p className="font-sans text-[11px] text-[#8a93b4]">No submission yet.</p>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="divide-y divide-[#f4f5fc]">
+                                {visible.map((sub) => (
+                                  <div key={sub.id} className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-[#fafbff] transition-colors">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <a href={sub.blobUrl} target="_blank" rel="noopener noreferrer" className="font-sans font-semibold text-[11px] leading-[16.5px] text-[#707dff] hover:text-[#5a67ff] hover:underline truncate">
+                                          {sub.fileName}
+                                        </a>
+                                        <span className="font-sans text-[10px] px-1.5 py-0.5 rounded bg-[#f4f6ff] border border-[#e0e3ff] text-[#707dff] shrink-0">v{sub.version}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 pt-1">
+                                        <span className="font-sans text-[11px] text-[#8a93b4]">{formatDateShort(sub.createdAt)}</span>
+                                        <span className="size-1 rounded-full bg-[#e8ebf8]" />
+                                        <span className={`text-[11px] font-semibold ${sub.status === 'APPROVED' ? 'text-[#16a34a]' : sub.status === 'NEED_REVISION' || sub.status === 'NEEDS_REVISION' ? 'text-[#dc2626]' : 'text-[#d97706]'}`}>{sub.status === 'APPROVED' ? 'Approved' : sub.status === 'NEED_REVISION' || sub.status === 'NEEDS_REVISION' ? 'Need Revision' : 'In Review'}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2.5 shrink-0">
+                                      <span className="inline-flex items-center gap-1 font-sans text-[11px] text-[#8a93b4]">
+                                        <span className="size-1.5 rounded-full bg-[#e0e3ff]" />
+                                        {sub.comments} comments
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 font-sans text-[11px] text-[#8a93b4]">
+                                        <span className="size-1.5 rounded-full bg-[#e0e3ff]" />
+                                        {sub.pages} {sub.pages === 1 ? 'page' : 'pages'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {ch.submissions.length > 3 && (
+                                <div className="px-3 py-2 border-t border-[#f0f2fa] flex justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = new Set(showAllMap)
+                                      if (next.has(key)) next.delete(key)
+                                      else next.add(key)
+                                      setShowAllMap(next)
+                                    }}
+                                    className="font-sans font-semibold text-[11px] text-[#707dff] hover:text-[#5a67ff] transition-colors"
+                                  >
+                                    {showAll ? 'Show less' : `+${Math.min(3, ch.submissions.length - 3)} more`}
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {c.fileName ? (
-                      <a href={c.blobUrl ?? '#'} target="_blank" rel="noopener noreferrer" className="font-sans text-[11px] text-[#707dff] hover:underline truncate">
-                        {c.fileName}
-                      </a>
-                    ) : (
-                      <span className="font-sans text-[11px] italic text-[#c4cadf]">No submission</span>
-                    )}
-                    {c.submittedAt && <span className="font-sans text-[10px] text-[#9ea8c6]">Submitted {formatDate(c.submittedAt)}</span>}
-                    {c.reviewNote && <p className="font-sans text-[11px] leading-[16px] text-[#6b7399] border-t border-[#f4f5fc] pt-1.5 mt-1">{c.reviewNote}</p>}
-                  </div>
-                ))
+                  )
+                })
               ) : (
                 <p className="font-sans text-[12px] italic text-[#c4cadf]">No chapter submissions yet.</p>
               )}

@@ -19,46 +19,55 @@ export interface RepositoryArchiveRow {
   uploadedById: number
 }
 
-// Internal cached reader — 'use cache' persistent, tag-based for instant invalidation on approve
-async function getArchivedCapstonesData(): Promise<RepositoryArchiveRow[]> {
+// Internal cached reader — 'use cache' persistent, tag-based for instant invalidation on approve.
+// Never rejects: a throw across the 'use cache' boundary fails the /repository
+// prerender (and the whole Vercel build) even when the caller handles failure,
+// e.g. when the connected database is missing tables. Persist null instead so
+// callers degrade to empty/error UI.
+async function getArchivedCapstonesData(): Promise<RepositoryArchiveRow[] | null> {
   'use cache'
   cacheTag('archives')
   cacheTag('repository')
   cacheLife('max')
 
-  const rows = await prisma.capstoneArchive.findMany({
-    where: { deletedAt: null },
-    select: {
-      id: true,
-      groupId: true,
-      title: true,
-      abstract: true,
-      tags: true,
-      authorOrder: true,
-      blobUrl: true,
-      fileName: true,
-      mimeType: true,
-      size: true,
-      datePublished: true,
-      uploadedById: true,
-    },
-    orderBy: { datePublished: 'desc' },
-  })
+  try {
+    const rows = await prisma.capstoneArchive.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        groupId: true,
+        title: true,
+        abstract: true,
+        tags: true,
+        authorOrder: true,
+        blobUrl: true,
+        fileName: true,
+        mimeType: true,
+        size: true,
+        datePublished: true,
+        uploadedById: true,
+      },
+      orderBy: { datePublished: 'desc' },
+    })
 
-  return rows.map((r) => ({
-    id: r.id,
-    groupId: r.groupId,
-    title: r.title,
-    abstract: r.abstract,
-    tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
-    authorOrder: Array.isArray(r.authorOrder) ? (r.authorOrder as unknown as AuthorEntry[]) : [],
-    blobUrl: r.blobUrl,
-    fileName: r.fileName,
-    mimeType: r.mimeType,
-    size: r.size,
-    datePublished: (r.datePublished as Date).toISOString(),
-    uploadedById: r.uploadedById,
-  }))
+    return rows.map((r) => ({
+      id: r.id,
+      groupId: r.groupId,
+      title: r.title,
+      abstract: r.abstract,
+      tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
+      authorOrder: Array.isArray(r.authorOrder) ? (r.authorOrder as unknown as AuthorEntry[]) : [],
+      blobUrl: r.blobUrl,
+      fileName: r.fileName,
+      mimeType: r.mimeType,
+      size: r.size,
+      datePublished: (r.datePublished as Date).toISOString(),
+      uploadedById: r.uploadedById,
+    }))
+  } catch (error) {
+    console.error('[getArchivedCapstonesData | Error]:', error)
+    return null
+  }
 }
 
 /**
@@ -71,13 +80,11 @@ export async function getRepositoryArchives(): Promise<{
   message: string
   payload: RepositoryArchiveRow[] | null
 }> {
-  try {
-    const payload = await getArchivedCapstonesData()
-    return { success: true, message: '', payload }
-  } catch (error) {
-    console.error('[getRepositoryArchives | Error]:', error)
+  const payload = await getArchivedCapstonesData()
+  if (!payload) {
     return { success: false, message: 'Failed to fetch repository archives.', payload: null }
   }
+  return { success: true, message: '', payload }
 }
 
 /**

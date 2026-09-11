@@ -17,8 +17,8 @@ const STATUS_LABEL: Record<JourneyRow['state'], string> = {
 }
 
 const SIZES = {
-  sm: { circle: 16, connector: 10, check: 8, dot: 5, smallDot: 4, badge: 12 },
-  md: { circle: 20, connector: 14, check: 10, dot: 6, smallDot: 5, badge: 14 },
+  sm: { circle: 20, connector: 10, check: 9, dot: 6, smallDot: 5, badge: 12 },
+  md: { circle: 24, connector: 14, check: 11, dot: 7, smallDot: 6, badge: 14 },
 }
 
 interface JourneyTrackerProps {
@@ -155,7 +155,7 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     border: '1px solid #dde0f0',
                   }}
                 >
-                  <Lock className="text-[#9ea8c6]" strokeWidth={2} style={{ width: s.smallDot + 2, height: s.smallDot + 2 }} />
+                  <Lock className="text-[#9ea8c6]" strokeWidth={2} style={{ width: s.check - 1, height: s.check - 1 }} />
                 </div>
               ) : (
                 <div

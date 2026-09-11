@@ -47,6 +47,8 @@ next-env.d.ts
 .opencode
 PROMPT.md
 CONTEXT.md
+.codex
+.impeccable
 
 .tmp
 

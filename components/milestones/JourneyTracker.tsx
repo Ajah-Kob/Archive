@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, TriangleAlert } from 'lucide-react'
+import { Check, Lock, TriangleAlert } from 'lucide-react'
 import type { JourneyRow } from '@/types/milestones'
 
 const STATUS_LABEL: Record<JourneyRow['state'], string> = {
@@ -145,6 +145,18 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     style={{ width: s.dot, height: s.dot }}
                   />
                 </div>
+              ) : row.state === 'LOCKED' ? (
+                <div
+                  className="flex items-center justify-center rounded-full"
+                  style={{
+                    width: s.circle,
+                    height: s.circle,
+                    backgroundColor: '#f0f2fa',
+                    border: '1px solid #dde0f0',
+                  }}
+                >
+                  <Lock className="text-[#9ea8c6]" strokeWidth={2} style={{ width: s.smallDot + 2, height: s.smallDot + 2 }} />
+                </div>
               ) : (
                 <div
                   className="flex items-center justify-center rounded-full"
@@ -155,10 +167,7 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     border: '1px solid #dde0f0',
                   }}
                 >
-                  <span
-                    className="rounded-full bg-[#c4cadf]"
-                    style={{ width: s.smallDot, height: s.smallDot }}
-                  />
+                  <span className="rounded-full bg-[#c4cadf]" style={{ width: s.smallDot, height: s.smallDot }} />
                 </div>
               )}
             </div>

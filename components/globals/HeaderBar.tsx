@@ -5,7 +5,7 @@ interface HeaderBarProps {
 
 export function HeaderBar({ children, actions }: HeaderBarProps) {
   return (
-    <div className="flex flex-wrap h-fit items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+    <div className="flex flex-wrap h-fit items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#e3e8fb] border-b border-[#d3daf0] shrink-0 min-h-[56px]">
       <div className="flex items-center gap-1 min-w-0">{children}</div>
 
       {actions && (

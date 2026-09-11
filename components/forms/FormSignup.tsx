@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { signupUser } from '@/lib/actions/user'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { safeNextPath } from '@/lib/helper'
 import Link from 'next/link'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
@@ -12,6 +13,9 @@ import { useAuthFormValidity } from '@/components/forms/useAuthFormValidity'
 export default function FormSignup({ className }: { className?: string }) {
   // Hooks
   const { push: redirect } = useRouter()
+  const searchParams = useSearchParams()
+  // Resume target after signup → login (e.g. /join/<code> from an invite link).
+  const next = safeNextPath(searchParams.get('next'))
 
   // Refs
   const formRef = useRef<HTMLFormElement>(null)
@@ -27,7 +31,7 @@ export default function FormSignup({ className }: { className?: string }) {
       formRef.current.reset()
       // Use delay 1000 to show form message before redirect
       setTimeout(() => {
-        redirect('/login')
+        redirect(next ? `/login?next=${encodeURIComponent(next)}` : '/login')
       }, 1000)
     }
   }, [state?.success])
@@ -122,7 +126,7 @@ export default function FormSignup({ className }: { className?: string }) {
         <div className="mt-2 text-center text-sm text-slate-500 font-medium">
           Don't have an account?{' '}
           <Link
-            href="/login"
+            href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}
             className="font-medium text-indigo-400 hover:text-indigo-500 transition-colors"
           >
             Sign In

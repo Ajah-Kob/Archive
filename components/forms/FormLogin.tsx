@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useRef, useTransition } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
 import { PasswordToggle } from '@/components/ui/PasswordToggle'
 import { useAuthFormValidity } from '@/components/forms/useAuthFormValidity'
-import { isValidEmail, roleHome } from '@/lib/helper'
+import { isValidEmail, roleHome, safeNextPath } from '@/lib/helper'
 
 export default function FormLogin({ className }: { className?: string }) {
   // Refs
@@ -17,6 +18,9 @@ export default function FormLogin({ className }: { className?: string }) {
   const [pending, startTransition] = useTransition()
   const { isFormValid, checkFormValidity } = useAuthFormValidity(formRef)
   const { update } = useSession()
+  const searchParams = useSearchParams()
+  // Resume target after login (e.g. /join/<code> from an invite link).
+  const next = safeNextPath(searchParams.get('next'))
 
   // State
   const [state, setState] = useState({
@@ -78,14 +82,14 @@ export default function FormLogin({ className }: { className?: string }) {
             },
           })
 
-          // Refresh the session so the role is available, then land on the
-          // role's home route.
+          // Refresh the session so the role is available, then resume the
+          // invite link when present, else land on the role's home route.
           const refreshed = await update()
           const role = (refreshed?.user?.role as string) ?? 'GUEST'
 
           // Wait 1 second before redirecting
           setTimeout(() => {
-            window.location.href = roleHome(role)
+            window.location.href = next ?? roleHome(role)
           }, 1000)
         } else {
           setState({
@@ -196,7 +200,7 @@ export default function FormLogin({ className }: { className?: string }) {
       <div className="mt-2 text-center text-sm text-slate-500 font-medium">
         Don't have an account?{' '}
         <Link
-          href="/signup"
+          href={next ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}
           className="font-medium text-indigo-400 hover:text-indigo-500 transition-colors"
         >
           Sign Up

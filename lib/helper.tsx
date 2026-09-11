@@ -4,6 +4,15 @@ export function isValidEmail(email: string): boolean {
   return emailRegex.test(email)
 }
 
+// Returns a safe same-origin resume path from a `?next=` value, or null.
+// Only allows paths starting with a single '/' — blocks open redirects like
+// '//evil.com' or 'https://evil.com'. Used by the login/signup resume flow.
+export function safeNextPath(value?: string | null): string | null {
+  if (!value) return null
+  if (!value.startsWith('/') || value.startsWith('//')) return null
+  return value
+}
+
 // Returns the role-root home route for a given role, falling back to /guest.
 // Used by the login flow, the proxy, and the Join flow to land users on their
 // own role's home page after auth changes.

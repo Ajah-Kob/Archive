@@ -6,6 +6,7 @@ import { getMyWorkspace } from '@/lib/actions/groups'
 import { CapstoneJourney } from '@/components/milestones/CapstoneJourney'
 import { GroupContext } from '@/components/milestones/GroupContext'
 import { MilestonesView } from '@/components/milestones/MilestonesView'
+import { JoinedToast } from '@/components/join-archive/JoinedToast'
 
 export const metadata: Metadata = {
   title: 'Milestones',
@@ -21,6 +22,7 @@ export default async function MilestonePage() {
 
   return (
     <section className="h-full flex min-h-0">
+      <JoinedToast message="You've joined your section." />
       <CapstoneJourney journey={workspace.journey} phaseLocks={(workspace as any).phaseLocks} />
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">

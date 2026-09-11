@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getCoordinatorSectionById } from '@/lib/actions/sections'
 import { SectionOverviewCard } from '@/components/my-sections/overview/SectionOverviewCard'
-import { MilestoneOverviewGrid } from '@/components/my-sections/overview/MilestoneOverviewGrid'
 import { AtRiskStrip, OverviewStats } from '@/components/my-sections/overview/OverviewStats'
 import { PhaseGatePills } from '@/components/my-sections/overview/PhaseGatePills'
 
@@ -50,22 +49,7 @@ export default async function MySectionOverviewPage({
       {/* Attention strip — collapsed when no risks (no adviser / needs revision / pending) */}
       <AtRiskStrip groups={groups} pendingTopicsCount={pendingTopics.length} />
 
-      {/* Milestone grid — Open/Locked dot + Groups working N/total.
-          MilestoneAvailabilityItem.open already reflects resolveSectionAvailability;
-          MilestoneOverviewGrid computes working counts as groups where
-          journey row for that milestone slug != LOCKED (topic via topicStatus,
-          archiving via journey row). No extra queries. */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2.5 px-1">
-          <h3 className="font-heading font-bold text-[14px] leading-[21px] tracking-[-0.14px] text-[#1e3a8a]">
-            Milestones
-          </h3>
-          <span className="font-sans font-semibold text-[12px] leading-[18px] text-[#9ea8c6]">
-            {milestones.length} milestones · {groups.length} {groups.length === 1 ? 'group' : 'groups'}
-          </span>
-        </div>
-        <MilestoneOverviewGrid milestones={milestones} groups={groups} />
-      </div>
+      {/* Milestone grid removed per request — keep Overview focused on section + stats */}
     </div>
   )
 }

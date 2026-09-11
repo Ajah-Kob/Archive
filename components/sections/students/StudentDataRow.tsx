@@ -1,6 +1,5 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { ActivityStatus } from '@/components/ui/ActivityStatus'
 
@@ -18,16 +17,26 @@ export interface StudentData {
 
 interface StudentDataRowProps {
   data: StudentData
-  renderActions?: () => ReactNode
+  selected: boolean
+  onToggle: () => void
 }
 
-export function StudentDataRow({ data, renderActions }: StudentDataRowProps) {
+export function StudentDataRow({ data, selected, onToggle }: StudentDataRowProps) {
   return (
     <div
-      className={`grid items-center px-[20px] h-[63px] border-b border-[#f0f2fa] hover:bg-slate-50/40 transition-colors ${
-        renderActions ? 'grid-cols-[2fr_1fr_1fr_1fr]' : 'grid-cols-[2fr_1fr_1fr]'
+      className={`grid grid-cols-[32px_2fr_1fr_1fr] items-center px-[20px] h-[63px] border-b border-[#f0f2fa] transition-colors ${
+        selected ? 'bg-[#f4f6ff]/60' : 'hover:bg-slate-50/40'
       }`}
     >
+      <div className="flex items-center">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          aria-label={`Select ${data.name}`}
+          className="size-4 rounded border-[#dddff0] accent-[#707dff] cursor-pointer"
+        />
+      </div>
       <div className="min-w-0 pr-4">
         <UserProfile
           initials={data.initials}
@@ -52,10 +61,6 @@ export function StudentDataRow({ data, renderActions }: StudentDataRowProps) {
           </span>
         )}
       </div>
-
-      {renderActions && (
-        <div className="flex justify-end pl-4">{renderActions()}</div>
-      )}
     </div>
   )
 }

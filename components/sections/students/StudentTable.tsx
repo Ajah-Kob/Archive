@@ -1,10 +1,9 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { StudentDataRow, type StudentData } from './StudentDataRow'
 
-export type StudentSortKey = 'name' | 'activity'
+export type StudentSortKey = 'name' | 'activity' | 'group'
 
 function SortHeader({
   field,
@@ -21,7 +20,7 @@ function SortHeader({
 }) {
   return (
     <div
-      className="flex items-center gap-1 cursor-pointer select-none text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase"
+      className="flex items-center gap-1 cursor-pointer select-none font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase"
       onClick={() => onSort?.(field)}
     >
       {label}
@@ -44,7 +43,9 @@ interface StudentTableProps {
   sortField?: StudentSortKey
   sortDir?: 'asc' | 'desc'
   onSort?: (field: StudentSortKey) => void
-  renderActions?: (student: StudentData) => ReactNode
+  selectedIds: Set<number>
+  onToggle: (id: number) => void
+  onToggleAll: () => void
 }
 
 export function StudentTable({
@@ -53,16 +54,29 @@ export function StudentTable({
   sortField,
   sortDir,
   onSort,
-  renderActions,
+  selectedIds,
+  onToggle,
+  onToggleAll,
 }: StudentTableProps) {
+  const allSelected = students.length > 0 && students.every((s) => selectedIds.has(s.id))
+  const someSelected = students.some((s) => selectedIds.has(s.id))
+
   return (
     <div className="w-full flex flex-col flex-1">
       {/* Header Row */}
-      <div
-        className={`grid items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] ${
-          renderActions ? 'grid-cols-[2fr_1fr_1fr_1fr]' : 'grid-cols-[2fr_1fr_1fr]'
-        }`}
-      >
+      <div className="grid grid-cols-[32px_2fr_1fr_1fr] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] rounded-t-[14px]">
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = !allSelected && someSelected
+            }}
+            onChange={onToggleAll}
+            aria-label="Select all visible students"
+            className="size-4 rounded border-[#dddff0] accent-[#707dff] cursor-pointer"
+          />
+        </div>
         <SortHeader
           field="name"
           label="Student"
@@ -73,10 +87,11 @@ export function StudentTable({
           label="Activity"
           {...{ sortField, sortDir, onSort }}
         />
-        <div className="text-[11px] font-bold text-[#9ea8c6] tracking-[0.88px] uppercase">
-          Group
-        </div>
-        {renderActions && <div />}
+        <SortHeader
+          field="group"
+          label="Group"
+          {...{ sortField, sortDir, onSort }}
+        />
       </div>
 
       {students.length === 0 ? (
@@ -93,9 +108,8 @@ export function StudentTable({
           <StudentDataRow
             key={student.id}
             data={student}
-            renderActions={
-              renderActions ? () => renderActions(student) : undefined
-            }
+            selected={selectedIds.has(student.id)}
+            onToggle={() => onToggle(student.id)}
           />
         ))
       )}

@@ -1,28 +1,43 @@
 'use client'
 
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
-import { removeStudentFromSection } from '@/lib/actions/sections'
+import { removeStudentsFromSection } from '@/lib/actions/sections'
 import type { StudentData } from '@/components/sections/students/StudentDataRow'
 
 interface RemoveStudentModalProps {
-  student: StudentData | null
+  students: StudentData[]
   onClose: () => void
   onSuccess: () => void
 }
 
+const VISIBLE_NAMES = 5
+
 export function RemoveStudentModal({
-  student,
+  students,
   onClose,
   onSuccess,
 }: RemoveStudentModalProps) {
-  if (!student) return null
+  const [isPending, setIsPending] = useState(false)
+  if (students.length === 0) return null
+
+  const count = students.length
+  const shown = students.slice(0, VISIBLE_NAMES)
+  const hiddenCount = count - shown.length
 
   async function handleConfirm() {
-    const result = await removeStudentFromSection(student.id)
+    if (isPending) return
+    setIsPending(true)
+    const result = await removeStudentsFromSection(students.map((s) => s.id))
+    setIsPending(false)
     if (result.success) {
-      toast.success(`${student.name} was removed from the section.`)
+      toast.success(
+        count === 1
+          ? `${students[0].name} was removed from the section.`
+          : `${count} students were removed from the section.`,
+      )
       onSuccess()
     } else {
       toast.error(result.message)
@@ -36,7 +51,8 @@ export function RemoveStudentModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+          disabled={isPending}
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors disabled:opacity-50"
         >
           <X size={18} />
         </button>
@@ -46,10 +62,23 @@ export function RemoveStudentModal({
             <AlertTriangle size={24} />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Remove Student</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-xs">
-              Are you sure you want to remove &quot;{student.name}&quot; from
-              this section? Their user account will be kept.
+            <h3 className="text-lg font-bold text-slate-900">
+              Remove {count === 1 ? 'Student' : `${count} Students`}
+            </h3>
+            <div className="mt-2 flex flex-col gap-1 max-w-xs max-h-[120px] overflow-y-auto">
+              {shown.map((s) => (
+                <p key={s.id} className="text-xs font-semibold text-slate-700 truncate">
+                  {s.name}
+                </p>
+              ))}
+              {hiddenCount > 0 && (
+                <p className="text-xs text-slate-500">+{hiddenCount} more</p>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-2 max-w-xs">
+              {count === 1
+                ? 'This student will be removed from their group (if any) and from this section. Their user account will be kept.'
+                : 'These students will be removed from their groups (if any) and from this section. Their user accounts will be kept.'}
             </p>
           </div>
         </div>
@@ -58,16 +87,18 @@ export function RemoveStudentModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors border border-slate-200"
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors border border-slate-200 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleConfirm}
-            className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white transition-all shadow-sm active:scale-95 bg-red-500 hover:bg-red-600"
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white transition-all shadow-sm active:scale-95 bg-red-500 hover:bg-red-600 disabled:opacity-60"
           >
-            Remove
+            {isPending ? 'Removing…' : `Remove${count > 1 ? ` ${count}` : ''}`}
           </button>
         </div>
       </div>

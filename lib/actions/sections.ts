@@ -1341,6 +1341,88 @@ export async function removeStudentFromSection(studentId: number) {
   }
 }
 
+export async function removeStudentsFromSection(studentIds: number[]) {
+  const coordinator = await requireCoordinatorRow()
+  if (!coordinator) {
+    return { success: false, message: 'You are not authorized to perform this action.' }
+  }
+
+  const ids = [...new Set(studentIds.filter((id) => Number.isInteger(id)))]
+  if (ids.length === 0) {
+    return { success: false, message: 'Select at least one student to remove.' }
+  }
+
+  try {
+    const students = await prisma.student.findMany({
+      where: {
+        id: { in: ids },
+        deletedAt: null,
+        section: { coordinatorId: coordinator.id, deletedAt: null },
+      },
+      select: { id: true, userId: true, groupId: true, sectionId: true },
+    })
+    if (students.length !== ids.length) {
+      return { success: false, message: 'Some students were not found in your sections. Nothing was removed.' }
+    }
+
+    const removedIds = new Set(students.map((s) => s.id))
+    const groupIds = [...new Set(students.map((s) => s.groupId).filter((g): g is number => g != null))]
+    const sectionIds = [...new Set(students.map((s) => s.sectionId))]
+    const userIds = students.map((s) => s.userId)
+
+    await prisma.$transaction([
+      ...students.map((s) =>
+        prisma.student.update({
+          where: { id: s.id },
+          data: { groupId: null, deletedAt: new Date() },
+        }),
+      ),
+      ...userIds.map((userId) =>
+        prisma.user.update({ where: { id: userId }, data: { role: 'GUEST' } }),
+      ),
+    ])
+
+    for (const groupId of groupIds) {
+      const remaining = await prisma.student.findMany({
+        where: { groupId, deletedAt: null },
+        orderBy: { id: 'asc' },
+        select: { id: true },
+      })
+      if (remaining.length === 0) {
+        await prisma.group.update({
+          where: { id: groupId },
+          data: { deletedAt: new Date(), leaderStudentId: null },
+        })
+      } else {
+        const group = await prisma.group.findFirst({
+          where: { id: groupId },
+          select: { leaderStudentId: true },
+        })
+        if (group && (group.leaderStudentId == null || removedIds.has(group.leaderStudentId))) {
+          await prisma.group.update({
+            where: { id: groupId },
+            data: { leaderStudentId: remaining[0].id },
+          })
+        }
+      }
+    }
+
+    for (const sectionId of sectionIds) revalidateCoordinatorCache(sectionId)
+    revalidateTag('users', 'max')
+    revalidateFeature('users')
+    for (const userId of userIds) {
+      revalidateTag(`workspace-${userId}`, 'max')
+      revalidateTag(`classmates-${userId}`, 'max')
+    }
+    for (const groupId of groupIds) revalidateTag(`journey-${groupId}`, 'max')
+    const count = students.length
+    return { success: true, message: count === 1 ? 'Student removed from the section.' : `${count} students removed from the section.` }
+  } catch (error) {
+    console.error('[removeStudentsFromSection | Error]:', error)
+    return { success: false, message: 'Failed to remove students.' }
+  }
+}
+
 export async function copySectionJoinCode(sectionId: number) {
   const coordinator = await requireCoordinatorRow()
   if (!coordinator) {

@@ -191,34 +191,38 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
                   const isEmpty = !isLocked && ch.submissions.length === 0
                   return (
                     <div key={ch.chapter} className="border border-[#eceef8] rounded-[9px] overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = new Set(expandedChapters)
-                          if (next.has(key)) next.delete(key)
-                          else next.add(key)
-                          setExpandedChapters(next)
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50/60 transition-colors"
-                      >
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span className="font-sans font-bold text-[12px] text-[#1e2145] truncate">{ch.label}</span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${ch.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : ch.status === 'NEEDS_REVISION' ? 'bg-red-50 border-red-200 text-red-600' : ch.status === 'SUBMITTED' ? 'bg-amber-50 border-amber-200 text-amber-700' : isLocked ? 'bg-slate-50 border-[#eceef8] text-[#8a93b4]' : 'bg-[#f4f6ff] border-[#e0e3ff] text-[#707dff]'}`}
-                          >
-                            {isLocked ? 'Locked' : ch.submissions.length === 0 ? 'No submission' : ch.status}
+                      {isLocked ? (
+                        <div className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50/50 cursor-not-allowed">
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="font-sans font-bold text-[12px] text-[#9ea8c6] truncate">{ch.label}</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap bg-slate-50 border-[#eceef8] text-[#8a93b4]">Locked</span>
+                            {ch.submissions.length > 0 && <span className="font-sans text-[11px] text-[#c4cadf] hidden sm:inline">{ch.submissions.length} versions</span>}
                           </span>
-                          {ch.submissions.length > 0 && <span className="font-sans text-[11px] text-[#8a93b4] hidden sm:inline">{ch.submissions.length} versions</span>}
-                        </span>
-                        <ChevronDown className={`size-4 text-[#8a93b4] shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      {isOpen && (
+                          <span className="size-4 flex items-center justify-center">
+                            <span className="size-2 rounded-full bg-[#e0e3ff]" />
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = new Set(expandedChapters)
+                            if (next.has(key)) next.delete(key)
+                            else next.add(key)
+                            setExpandedChapters(next)
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50/60 transition-colors"
+                        >
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="font-sans font-bold text-[12px] text-[#1e2145] truncate">{ch.label}</span>
+                            {ch.submissions.length > 0 && <span className="font-sans text-[11px] text-[#8a93b4] hidden sm:inline">{ch.submissions.length} versions</span>}
+                          </span>
+                          <ChevronDown className={`size-4 text-[#8a93b4] shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
+                      {isOpen && !isLocked && (
                         <div className="border-t border-[#f0f2fa] bg-white">
-                          {isLocked ? (
-                            <div className="px-3 py-3 text-center">
-                              <p className="font-sans text-[11px] text-[#8a93b4]">Locked — wait for coordinator to unlock this chapter.</p>
-                            </div>
-                          ) : isEmpty ? (
+                          {isEmpty ? (
                             <div className="px-3 py-3 text-center">
                               <p className="font-sans text-[11px] text-[#8a93b4]">No submission yet.</p>
                             </div>

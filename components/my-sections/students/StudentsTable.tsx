@@ -37,7 +37,7 @@ function SortHeader({
   )
 }
 
-interface StudentTableProps {
+interface StudentsTableProps {
   students: StudentData[]
   emptyMessage?: string
   sortField?: StudentSortKey
@@ -48,7 +48,7 @@ interface StudentTableProps {
   onToggleAll: () => void
 }
 
-export function StudentTable({
+export function StudentsTable({
   students,
   emptyMessage = 'No students in this section yet.',
   sortField,
@@ -57,12 +57,12 @@ export function StudentTable({
   selectedIds,
   onToggle,
   onToggleAll,
-}: StudentTableProps) {
+}: StudentsTableProps) {
   const allSelected = students.length > 0 && students.every((s) => selectedIds.has(s.id))
   const someSelected = students.some((s) => selectedIds.has(s.id))
 
   return (
-    <div className="w-full flex flex-col flex-1">
+    <div className="w-full flex flex-col flex-1 min-h-full">
       {/* Header Row */}
       <div className="grid grid-cols-[32px_2fr_1fr_1fr] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] rounded-t-[14px]">
         <div className="flex items-center">

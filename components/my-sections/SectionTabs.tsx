@@ -76,7 +76,15 @@ export function SectionTabs({ sectionId, pendingTopics, actions, children }: Sec
         })}
       </HeaderBar>
 
-      <div className="flex-1 min-h-0 pt-[16px] px-8 pb-6 flex flex-col overflow-y-auto">{children}</div>
+      <div
+        className={
+          activeKey === 'students'
+            ? 'flex-1 min-h-0 flex flex-col overflow-hidden'
+            : 'flex-1 min-h-0 pt-[16px] px-8 pb-6 flex flex-col overflow-y-auto'
+        }
+      >
+        {children}
+      </div>
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { removeStudentsFromSection } from '@/lib/actions/sections'
-import type { StudentData } from '@/components/sections/students/StudentDataRow'
+import type { StudentData } from './StudentDataRow'
 
 interface RemoveStudentModalProps {
   students: StudentData[]

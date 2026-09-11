@@ -24,7 +24,7 @@ export function StudentsActionBar({
   onDeleteClick,
 }: StudentsActionBarProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px] -mt-[16px] -mx-8">
+    <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
       <div className="flex flex-wrap items-center gap-2.5">
         <SearchBar
           value={search}

@@ -1,7 +1,7 @@
 'use client'
 
-import { StudentList } from '@/components/sections/students/StudentList'
-import type { StudentData } from '@/components/sections/students/StudentDataRow'
+import { StudentList } from './StudentList'
+import type { StudentData } from './StudentDataRow'
 
 interface MySectionStudentsProps {
   students: StudentData[]

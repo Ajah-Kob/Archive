@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { ChevronLeft, TriangleAlert } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 
 export type SectionTabKey = 'overview' | 'students' | 'progress' | 'milestones' | 'topics'
@@ -40,9 +40,18 @@ export function SectionTabs({ sectionId, pendingTopics, actions, children }: Sec
   const activeKey = getActiveKey(pathname)
   const base = `/faculty/my-sections/${sectionId}`
 
+  const backButton = (
+    <Link
+      href="/faculty/my-sections"
+      className="inline-flex items-center gap-0.5 font-sans font-semibold text-[13px] text-[#8a93b4] hover:text-[#5a6382] hover:bg-white/60 rounded-full px-2 py-1 transition-colors"
+    >
+      <ChevronLeft className="size-4" /> Back
+    </Link>
+  )
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <HeaderBar actions={actions}>
+      <HeaderBar actions={actions ? <>{actions}{backButton}</> : backButton}>
         {TABS.map((t) => {
           const isActive = activeKey === t.key
           return (

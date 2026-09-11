@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import { PageLabel } from '@/components/globals/PageLabel'
-import { SectionContext } from '@/components/my-sections/SectionContext'
 import { SectionTabs } from '@/components/my-sections/SectionTabs'
 import { getCoordinatorSectionById } from '@/lib/actions/sections'
 
@@ -22,21 +21,7 @@ export default async function MySectionLayout({
     <section className="min-h-full flex flex-col">
       <PageLabel label={section.name} />
       <div className="flex-1 pb-[30px] flex flex-col min-h-0">
-        <SectionTabs
-          sectionId={sectionId}
-          pendingTopics={pendingTopics.length}
-          actions={
-            <SectionContext
-              section={{
-                id: section.id,
-                name: section.name,
-                hasJoinCode: section.hasJoinCode,
-                joinCode: section.joinCode,
-                headerColor: (section as any).headerColor ?? null,
-              }}
-            />
-          }
-        >
+        <SectionTabs sectionId={sectionId} pendingTopics={pendingTopics.length}>
           {children}
         </SectionTabs>
       </div>

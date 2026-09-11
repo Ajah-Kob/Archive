@@ -69,48 +69,71 @@ export function SectionOverviewCard({ section }: SectionOverviewCardProps) {
   const hasCode = !!section.joinCode
 
   return (
-    <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
-      <div className="p-5 sm:p-6 flex flex-col gap-4">
-        <h2 className="font-heading font-extrabold text-[20px] leading-[1.2] tracking-[-0.15px] text-[#1e3a8a] truncate">{section.name}</h2>
+    <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] overflow-hidden h-fit">
+      <div className="p-5 sm:p-6 flex flex-col gap-2">
+        <h2 className="font-heading font-extrabold text-[30px] leading-[1.2] tracking-[-0.15px] text-black truncate">
+          {section.name}
+        </h2>
 
-        <div className="h-px w-full bg-[#f0f2fa]" />
-
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 p-0">
+          <button
+            type="button"
+            onClick={handleCopyCode}
+            disabled={!hasCode || copiedCode}
+            aria-label={copiedCode ? 'Copied' : 'Copy invite code'}
+            className={`group flex items-center py-[3px] px-[8px] gap-1 min-w-0 rounded-md transition-colors disabled:cursor-not-allowed ${hasCode ? 'hover:bg-[#f7f7ff] cursor-pointer' : 'cursor-default'}`}
+          >
             <span
-              className={`inline-flex items-center h-[32px] px-3 rounded-[8px] border font-mono font-bold text-[13px] tracking-[0.6px] truncate max-w-[160px] sm:max-w-[180px] ${hasCode ? 'bg-[#f7f7ff] border-[#e8ebf8] text-[#1e3a8a]' : 'bg-[#fafbff] border-[#eceef8] text-[#9ea8c6]'}`}
+              className={`font-sans font-semibold text-[12.5px] leading-[18.75px] whitespace-nowrap transition-colors ${copiedCode ? 'text-[#22c55e]' : hasCode ? 'text-[#5a6382] group-hover:text-[#707dff]' : 'text-[#9ea8c6]'}`}
               title={section.joinCode ?? 'No code'}
             >
               {section.joinCode ?? '—'}
             </span>
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              disabled={!hasCode || copiedCode}
-              aria-label={copiedCode ? 'Copied' : 'Copy code'}
-              className={`inline-flex items-center justify-center size-[32px] rounded-[8px] border shrink-0 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${copiedCode ? 'bg-[rgba(34,197,94,0.08)] border-[rgba(34,197,94,0.25)] text-[#22c55e]' : 'bg-white border-[#eceef8] text-[#707dff] hover:bg-[#f7f7ff]'}`}
+            <span
+              className={`inline-flex items-center justify-center size-5 shrink-0 transition-colors ${copiedCode ? 'text-[#22c55e]' : 'text-[#707dff] group-hover:text-[#5a67ff]'}`}
             >
-              {copiedCode ? <Check className="size-4" /> : <Copy className="size-4" />}
-            </button>
-          </div>
+              {copiedCode ? (
+                <Check className="size-3.5" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </span>
+          </button>
 
-          <span className="hidden sm:block w-px h-[24px] bg-[#eceef8] shrink-0" aria-hidden />
+          <span
+            className="hidden sm:block w-px h-[20px] bg-[#d2d5e0] shrink-0"
+            aria-hidden
+          />
 
-          <div className="flex items-center gap-2">
-            <span className="font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#5a6382] whitespace-nowrap">Copy Invite Link</span>
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              disabled={!hasCode || copiedLink}
-              aria-label={copiedLink ? 'Copied' : 'Copy invite link'}
-              className={`inline-flex items-center justify-center size-[32px] rounded-[8px] border shrink-0 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${copiedLink ? 'bg-[rgba(34,197,94,0.08)] border-[rgba(34,197,94,0.25)] text-[#22c55e]' : 'bg-white border-[#eceef8] text-[#707dff] hover:bg-[#f7f7ff]'}`}
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            disabled={!hasCode || copiedLink}
+            aria-label={copiedLink ? 'Copied' : 'Copy invite link'}
+            className={`group flex items-center py-[3px]  px-[8px] gap-1 rounded-md transition-colors disabled:cursor-not-allowed ${hasCode ? 'hover:bg-[#f7f7ff] cursor-pointer' : 'cursor-default'}`}
+          >
+            <span
+              className={`font-sans font-semibold text-[12.5px] leading-[18.75px] whitespace-nowrap transition-colors ${copiedLink ? 'text-[#22c55e]' : hasCode ? 'text-[#5a6382] group-hover:text-[#707dff]' : 'text-[#9ea8c6]'}`}
             >
-              {copiedLink ? <Check className="size-4" /> : <Copy className="size-4" />}
-            </button>
-          </div>
+              Copy Invite Link
+            </span>
+            <span
+              className={`inline-flex items-center justify-center size-5 shrink-0 transition-colors ${copiedLink ? 'text-[#22c55e]' : 'text-[#707dff] group-hover:text-[#5a67ff]'}`}
+            >
+              {copiedLink ? (
+                <Check className="size-3.5" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </span>
+          </button>
         </div>
 
-        {!hasCode && <p className="font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">No invite code yet.</p>}
+        {!hasCode && (
+          <p className="font-sans font-medium text-[12px] leading-[18px] text-[#9ea8c6]">
+            No invite code yet.
+          </p>
+        )}
       </div>
     </div>
   )

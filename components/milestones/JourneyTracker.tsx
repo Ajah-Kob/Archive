@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, TriangleAlert } from 'lucide-react'
+import { Check, Lock, TriangleAlert } from 'lucide-react'
 import type { JourneyRow } from '@/types/milestones'
 
 const STATUS_LABEL: Record<JourneyRow['state'], string> = {
@@ -17,8 +17,8 @@ const STATUS_LABEL: Record<JourneyRow['state'], string> = {
 }
 
 const SIZES = {
-  sm: { circle: 16, connector: 10, check: 8, dot: 5, smallDot: 4, badge: 12 },
-  md: { circle: 20, connector: 14, check: 10, dot: 6, smallDot: 5, badge: 14 },
+  sm: { circle: 20, connector: 10, check: 9, dot: 6, smallDot: 5, badge: 12 },
+  md: { circle: 24, connector: 14, check: 11, dot: 7, smallDot: 6, badge: 14 },
 }
 
 interface JourneyTrackerProps {
@@ -145,6 +145,18 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     style={{ width: s.dot, height: s.dot }}
                   />
                 </div>
+              ) : row.state === 'LOCKED' ? (
+                <div
+                  className="flex items-center justify-center rounded-full"
+                  style={{
+                    width: s.circle,
+                    height: s.circle,
+                    backgroundColor: '#f0f2fa',
+                    border: '1px solid #dde0f0',
+                  }}
+                >
+                  <Lock className="text-[#9ea8c6]" strokeWidth={2} style={{ width: s.check - 1, height: s.check - 1 }} />
+                </div>
               ) : (
                 <div
                   className="flex items-center justify-center rounded-full"
@@ -155,10 +167,7 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     border: '1px solid #dde0f0',
                   }}
                 >
-                  <span
-                    className="rounded-full bg-[#c4cadf]"
-                    style={{ width: s.smallDot, height: s.smallDot }}
-                  />
+                  <span className="rounded-full bg-[#c4cadf]" style={{ width: s.smallDot, height: s.smallDot }} />
                 </div>
               )}
             </div>

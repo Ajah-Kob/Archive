@@ -115,7 +115,9 @@ async function softDeleteJoinCode(code: JoinCode) {
   }
 }
 
-export async function validateFacultyCode(code: string) {
+export async function validateFacultyCode(rawCode: string) {
+  // Codes are stored UPPERCASE — normalize so lowercase input still matches.
+  const code = rawCode.trim().toUpperCase()
   const record = await prisma[table].findFirst({
     where: {
       code,

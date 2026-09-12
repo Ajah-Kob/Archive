@@ -13,17 +13,8 @@ export default async function AccountProfilePage() {
     <section className="min-h-full flex flex-col pt-[30px] px-[30px] pb-[30px]">
       <PageLabel label="Profile" />
 
-      <div className="flex flex-col">
-        <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
-          Profile
-        </h1>
-        <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] mt-1">
-          Manage your personal information.
-        </p>
-      </div>
-
-      <div className="flex-1 mt-6">
-        <FormProfile m={me} className="w-full max-w-80" />
+      <div className="flex flex-1 items-center justify-center py-6">
+        <FormProfile m={me} className="w-full max-w-xl" />
       </div>
     </section>
   )

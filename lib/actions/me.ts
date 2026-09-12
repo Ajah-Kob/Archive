@@ -89,16 +89,28 @@ export async function updateMe(_prevState: User, formData: FormData) {
   const removeImage = formData.get('removeProfile') === 'true'
 
   try {
-    // Prepare the update data
-    let updateData: Record<string, any> = {
-      updatedAt: updatedAt,
+    // Load the stored row first so only genuinely changed columns are
+    // written — a photo-only save must not rewrite name/email, and a
+    // no-op save must not bump updatedAt.
+    const current = await prisma[table].findFirst({
+      where: { id: +id, deletedAt: null },
+    })
+    if (!current) {
+      return {
+        success: false,
+        payload: null,
+        message: 'User not found.',
+      }
     }
-    if (name) updateData.name = name
-    if (email) updateData.email = email
-    if (image) updateData.image = image
+
+    // Prepare the update data — changed columns only.
+    let updateData: Record<string, any> = {}
+    if (name && name !== current.name) updateData.name = name
+    if (email && email !== current.email) updateData.email = email
+    if (image && image !== current.image) updateData.image = image
 
     // Handle profile image removal
-    if (removeImage) {
+    if (removeImage && current.image !== null) {
       updateData.image = null
     }
 
@@ -136,24 +148,37 @@ export async function updateMe(_prevState: User, formData: FormData) {
       }
     }
 
-    // Check if email already exists
-    const userExist = await prisma[table].findFirst({
-      where: {
-        email: email,
-        deletedAt: null,
-      },
-    })
+    // Nothing actually changed — skip the write (and the updatedAt bump).
+    if (Object.keys(updateData).length === 0) {
+      return {
+        success: true,
+        payload: sanitizeUser(current),
+        message: 'No changes to save.',
+      }
+    }
 
-    // If email already exists, return error
-    if (userExist) {
-      if (userExist.id !== +id) {
-        return {
-          success: false,
-          payload: null,
-          message: `Email ${email} already exists. Please use a different email.`,
+    // Check if email already exists — only when the email itself changed.
+    if (updateData.email) {
+      const userExist = await prisma[table].findFirst({
+        where: {
+          email: updateData.email,
+          deletedAt: null,
+        },
+      })
+
+      // If email already exists, return error
+      if (userExist) {
+        if (userExist.id !== +id) {
+          return {
+            success: false,
+            payload: null,
+            message: `Email ${updateData.email} already exists. Please use a different email.`,
+          }
         }
       }
     }
+
+    updateData.updatedAt = new Date()
 
     // Update me data
     const updatedUser = await prisma[table].update({

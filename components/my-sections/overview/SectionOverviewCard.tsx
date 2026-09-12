@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { APP_BASE_URL } from '@/config/constants'
+import { headerStyleFor } from '@/lib/sectionHeader'
 
 // Reuses getCoordinatorSectionById data shape — `section` object only.
 // Accepts the coordinator section payload without extra queries.
@@ -67,14 +68,27 @@ export function SectionOverviewCard({ section }: SectionOverviewCardProps) {
   }
 
   const hasCode = !!section.joinCode
+  const header = headerStyleFor(section.headerColor ?? null)
 
   return (
     <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] overflow-hidden h-fit">
-      <div className="p-5 sm:p-6 flex flex-col gap-2">
-        <h2 className="font-heading font-extrabold text-[30px] leading-[1.2] tracking-[-0.15px] text-black truncate">
-          {section.name}
-        </h2>
+      {/* Upper part — same colored header as the /my-sections SectionCard */}
+      <div
+        className="border-[#e4e7f8] border-b border-solid flex flex-col items-start pb-[15px] pt-[20px] px-[20px] relative shrink-0 w-full"
+        style={{ backgroundColor: (header as any).bg }}
+      >
+        <div className="flex items-center gap-3 relative shrink-0 w-full">
+          <p
+            className="font-['Sora',sans-serif] font-extrabold leading-[normal] text-[20px] tracking-[-0.15px] whitespace-nowrap min-w-0 truncate"
+            style={{ color: (header as any).text }}
+          >
+            {section.name}
+          </p>
+        </div>
+      </div>
 
+      {/* Bottom part — copy code + copy invite link */}
+      <div className="px-[20px] py-[15px]">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 p-0">
           <button
             type="button"

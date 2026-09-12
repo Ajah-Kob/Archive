@@ -13,8 +13,11 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        // Wildcard: Blob store hostnames change when the store/token rotates
+        // (e.g. wgpce2xm9p68d2cx... vs tosysoik0rjt4ojn...). Pinning one host
+        // crashes every next/image avatar the moment uploads land elsewhere.
         protocol: 'https',
-        hostname: 'tosysoik0rjt4ojn.public.blob.vercel-storage.com',
+        hostname: '*.public.blob.vercel-storage.com',
       },
     ],
   },

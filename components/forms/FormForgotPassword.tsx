@@ -3,6 +3,7 @@
 import { useState, useRef, useActionState } from 'react'
 import { forgotPassword } from '@/lib/actions/util'
 import { AuthInput } from '@/components/ui/AuthInput'
+import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
 
 export default function FormForgotPassword({
   className,
@@ -37,6 +38,16 @@ export default function FormForgotPassword({
       noValidate
       className={`${className} flex flex-col gap-4`}
     >
+      {/* Header Section */}
+      <div className="text-left flex flex-col gap-1">
+        <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-normal">
+          Forgot your password?
+        </h2>
+        <p className="text-gray-500 font-inter text-[13px] non-italic font-medium leading-[20.8px]">
+          Enter your email and we&apos;ll send you a reset link.
+        </p>
+      </div>
+
       <AuthInput
         label="Email"
         name="email"
@@ -57,17 +68,11 @@ export default function FormForgotPassword({
         </div>
       )}
 
-      <div>
-        <button
-          type="submit"
-          disabled={isPending || !isFormValid}
-          className="self-stretch h-9 px-3.5 py-3.5 bg-gradient-to-r from-indigo-400 via-violet-400 via-[57%] to-red-400 to-[140%] rounded-md shadow-[0px_2px_8px_0px_rgba(0,0,0,0.08),0px_4px_22px_0px_rgba(112,125,255,0.27)] inline-flex justify-center items-center disabled:animate-pulse disabled:opacity-50 transition-all hover:opacity-95 w-full"
-        >
-          <div className="text-center justify-start text-white text-sm font-semibold leading-5 tracking-tight">
-            {isPending ? 'Please wait...' : 'Submit'}
-          </div>
-        </button>
-      </div>
+      <AuthSubmitButton
+        pending={isPending}
+        label="Submit"
+        disabled={!isFormValid}
+      />
     </form>
   )
 }

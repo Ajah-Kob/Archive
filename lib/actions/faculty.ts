@@ -286,24 +286,30 @@ export async function joinFaculty(formData: FormData) {
     return { success: false, message: 'Please enter an invitation code.' }
   }
 
+  return joinFacultyWithCode(+session.user.id, code)
+}
+
+// Shared core behind joinFaculty and the one-click /join/[code] route.
+// Takes an explicit userId + code so both callers run identical guards.
+export async function joinFacultyWithCode(userId: number, code: string) {
   const validation = await validateFacultyCode(code)
   if (!validation.success) {
     return { success: false, message: validation.message }
   }
 
   const existing = await prisma.faculty.findFirst({
-    where: { userId: +session.user.id, deletedAt: null },
+    where: { userId, deletedAt: null },
   })
   if (existing) {
     return { success: false, message: 'You are already registered as faculty.' }
   }
 
   await prisma.faculty.create({
-    data: { userId: +session.user.id },
+    data: { userId },
   })
 
   await prisma.user.update({
-    where: { id: +session.user.id },
+    where: { id: userId },
     data: { role: 'FACULTY' },
   })
 

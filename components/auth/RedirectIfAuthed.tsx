@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { roleHome } from '@/lib/helper'
+import { roleHome, safeNextPath } from '@/lib/helper'
 import { LAST_ROUTE_KEY } from '@/components/globals/RouteTracker'
 
 /**
@@ -16,18 +16,22 @@ import { LAST_ROUTE_KEY } from '@/components/globals/RouteTracker'
 export function RedirectIfAuthed() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // An explicit resume target (e.g. /join/<code>) wins over last-route.
+  const next = safeNextPath(searchParams.get('next'))
 
   useEffect(() => {
     if (status !== 'authenticated') return
 
     const last = sessionStorage.getItem(LAST_ROUTE_KEY)
     const target =
-      last && last.startsWith('/') && last !== '/login'
+      next ??
+      (last && last.startsWith('/') && last !== '/login'
         ? last
-        : roleHome(session?.user?.role)
+        : roleHome(session?.user?.role))
 
     router.replace(target)
-  }, [status, session, router])
+  }, [status, session, router, next])
 
   return null
 }

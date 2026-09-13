@@ -257,6 +257,12 @@ export async function joinSection(formData: FormData) {
     return { success: false, message: 'Please enter an invitation code.' }
   }
 
+  return joinSectionWithCode(+session.user.id, code)
+}
+
+// Shared core behind joinSection and the one-click /join/[code] route.
+// Takes an explicit userId + code so both callers run identical guards.
+export async function joinSectionWithCode(userId: number, code: string) {
   try {
     const joinCode = await prisma.joinCode.findFirst({
       where: {
@@ -277,7 +283,7 @@ export async function joinSection(formData: FormData) {
     }
 
     const existingStudent = await prisma.student.findFirst({
-      where: { userId: +session.user.id },
+      where: { userId },
     })
 
     if (existingStudent && !existingStudent.deletedAt) {
@@ -302,14 +308,14 @@ export async function joinSection(formData: FormData) {
     } else {
       await prisma.student.create({
         data: {
-          userId: +session.user.id,
+          userId,
           sectionId: joinCode.section.id,
         },
       })
     }
 
     await prisma.user.update({
-      where: { id: +session.user.id },
+      where: { id: userId },
       data: { role: 'STUDENT' },
     })
 

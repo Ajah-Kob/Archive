@@ -50,11 +50,9 @@ export function SectionOverviewCard({ section }: SectionOverviewCardProps) {
 
   async function handleCopyLink() {
     if (!section.joinCode || copiedLink) return
-    // TODO(invite-link): final invite flow / link shape is TBD — currently
-    // copies `${APP_BASE_URL}/guest/join-archive?code=${joinCode}` as a
-    // functional placeholder. Also supports `/join?code=` alias if routing
-    // changes — keep this functional until the invite route is finalized.
-    const inviteLink = `${APP_BASE_URL}/guest/join-archive?code=${section.joinCode}`
+    // One-click invite link — /join/[code] auto-joins on open (with
+    // login-then-resume for guests). /guest/join-archive stays for manual entry.
+    const inviteLink = `${APP_BASE_URL}/join/${section.joinCode}`
     try {
       await navigator.clipboard.writeText(inviteLink)
     } catch {

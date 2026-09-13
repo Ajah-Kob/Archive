@@ -2,6 +2,7 @@ import { ClipboardCheck, FileText, Layers, Users } from 'lucide-react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import Link from 'next/link'
+import { JoinedToast } from '@/components/join-archive/JoinedToast'
 
 export default async function FacultyHomePage() {
   const session = await getServerSession(authOptions)
@@ -18,6 +19,7 @@ export default async function FacultyHomePage() {
 
   return (
     <section className="min-h-full flex flex-col gap-6 pt-[30px] px-[30px] pb-[30px]">
+      <JoinedToast message="You've joined as faculty." />
       <div className="flex flex-col">
         <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
           Faculty

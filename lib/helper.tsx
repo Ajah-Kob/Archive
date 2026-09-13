@@ -31,9 +31,10 @@ export function getInitials(name: string): string {
     .toUpperCase()
 }
 
-// Generates invitation code
+// Generates invitation code — UPPERCASE letters + digits only so codes are
+// easy to read out and type (no lowercase confusion).
 export function generateJoinCode(length = 8): string {
-  const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   let code = ''
   for (let i = 0; i < length; i++) {
     code += CHARS.charAt(Math.floor(Math.random() * CHARS.length))

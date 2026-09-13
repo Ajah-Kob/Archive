@@ -280,7 +280,8 @@ export async function joinFaculty(formData: FormData) {
     return { success: false, message: 'Not authenticated' }
   }
 
-  const code = formData.get('code')?.toString().trim()
+  // Codes are stored UPPERCASE — normalize input so pasted lowercase works.
+  const code = formData.get('code')?.toString().trim().toUpperCase()
   if (!code) {
     return { success: false, message: 'Please enter an invitation code.' }
   }

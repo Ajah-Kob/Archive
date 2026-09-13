@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useRef, useActionState } from 'react'
+import { useEffect, useRef, useState, useActionState } from 'react'
+import { toast } from 'sonner'
+import { Check } from 'lucide-react'
 import { forgotPassword } from '@/lib/actions/util'
+import { isValidEmail } from '@/lib/helper'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
 
@@ -10,31 +13,48 @@ export default function FormForgotPassword({
 }: {
   className: string
 }) {
-  const formRef = useRef<HTMLFormElement>(null)
-
   const [state, handleSubmit, isPending] = useActionState(forgotPassword, {
     success: false,
     message: null,
     errors: null,
   })
-  const [isFormValid, setIsFormValid] = useState(false)
 
-  function checkFormValidity() {
-    const form = formRef.current
-    if (!form) return
-    const inputs = form.querySelectorAll('input[required]:not([type="hidden"])')
-    setIsFormValid(
-      Array.from(inputs).every(
-        (input) => (input as HTMLInputElement).value.trim() !== ''
-      )
-    )
-  }
+  const [email, setEmail] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  const toastShownRef = useRef(false)
+
+  const emailValid = isValidEmail(email)
+
+  // Returning to this page (including back-forward cache restores, which
+  // skip remounting) must always show a fresh form.
+  useEffect(() => {
+    const resetForm = () => {
+      setEmail('')
+      setSubmitted(false)
+      toastShownRef.current = false
+    }
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) resetForm()
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
+  // After a completed submit: toast once and lock the form in its sent state.
+  useEffect(() => {
+    if (isPending || state.message == null || toastShownRef.current) return
+    toastShownRef.current = true
+    if (state.success) {
+      toast.success(state.message)
+      setSubmitted(true)
+    } else {
+      toast.error(state.message)
+    }
+  }, [isPending, state.message, state.success])
 
   return (
     <form
-      ref={formRef}
       action={handleSubmit}
-      onInput={checkFormValidity}
       noValidate
       className={`${className} flex flex-col gap-4`}
     >
@@ -53,25 +73,26 @@ export default function FormForgotPassword({
         name="email"
         type="email"
         placeholder="johnthomas@email.com"
-        error={state?.errors?.email}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        error={!submitted ? state?.errors?.email : undefined}
+        success={submitted}
+        disabled={submitted}
         required
       />
 
-      {/* Alert */}
-      {state && state.message && (
-        <div
-          className={`alert ${
-            state.success ? 'alert--success' : 'alert--danger'
-          }`}
-        >
-          {state.message}
-        </div>
+      {/* Sent confirmation */}
+      {submitted && (
+        <p className="flex items-center gap-1 text-green-600 text-xs font-medium -mt-2">
+          <Check className="size-3.5" /> Reset link sent — please check your
+          inbox.
+        </p>
       )}
 
       <AuthSubmitButton
         pending={isPending}
-        label="Submit"
-        disabled={!isFormValid}
+        label="Send Reset Link"
+        disabled={!emailValid || isPending || submitted}
       />
     </form>
   )

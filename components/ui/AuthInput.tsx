@@ -6,6 +6,7 @@ interface AuthInputProps extends InputHTMLAttributes<HTMLInputElement> {
   type?: string
   placeholder?: string
   error?: string
+  success?: boolean
   children?: ReactNode
   endPadding?: string
 }
@@ -16,6 +17,7 @@ export function AuthInput({
   type = 'text',
   placeholder,
   error,
+  success,
   children,
   endPadding,
   required,
@@ -40,7 +42,9 @@ export function AuthInput({
           className={`w-full py-1.5 border rounded-xl text-sm font-normal text-[#0F0E2E] leading-6 transition-colors duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-50 placeholder:text-[#939393] placeholder:text-sm placeholder:leading-6 placeholder:font-normal pl-4 ${children ? (endPadding ?? 'pr-11') : 'pr-4'}${
             error
               ? 'border-red-500/50 ring-2 ring-red-500/20'
-              : 'border-[#E3E3E3] focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+              : success
+                ? 'border-green-500/50 ring-2 ring-green-500/20 focus:border-green-500 focus:ring-green-500/20'
+                : 'border-[#E3E3E3] focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
           }${className ? ` ${className}` : ''}`}
           {...rest}
         />

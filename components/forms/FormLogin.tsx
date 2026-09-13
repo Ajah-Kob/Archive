@@ -125,7 +125,7 @@ export default function FormLogin({ className }: { className?: string }) {
       className={`${className} flex flex-col gap-4`}
     >
       {/* Header Section */}
-      <div className=" text-left flex flex-col gap-2.5">
+      <div className="text-left flex flex-col gap-1">
         <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-normal">
           Login to your account
         </h2>
@@ -171,7 +171,7 @@ export default function FormLogin({ className }: { className?: string }) {
           />
         </AuthInput>
 
-        {/* 4. Remember Me & Forgot Password Links Row */}
+        {/* Remember Me & Forgot Password Links Row */}
         <div className="flex items-center justify-between mt-1 text-sm">
           <label className="flex items-center gap-2 text-slate-500 font-medium cursor-pointer select-none">
             <input
@@ -194,17 +194,6 @@ export default function FormLogin({ className }: { className?: string }) {
           label="Sign in →"
           disabled={!isFormValid}
         />
-      </div>
-
-      {/* Footer Registration Navigation link */}
-      <div className="mt-2 text-center text-sm text-slate-500 font-medium">
-        Don't have an account?{' '}
-        <Link
-          href={next ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}
-          className="font-medium text-indigo-400 hover:text-indigo-500 transition-colors"
-        >
-          Sign Up
-        </Link>
       </div>
     </form>
   )

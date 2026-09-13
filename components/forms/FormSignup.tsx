@@ -4,7 +4,6 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import { signupUser } from '@/lib/actions/user'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { safeNextPath } from '@/lib/helper'
-import Link from 'next/link'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
 import { PasswordToggle } from '@/components/ui/PasswordToggle'
@@ -45,7 +44,7 @@ export default function FormSignup({ className }: { className?: string }) {
       className={`flex flex-col gap-4 ${className ?? ''}`}
     >
       {/* Header Section */}
-      <div className="text-left flex flex-col gap-2.5">
+      <div className="text-left flex flex-col gap-1">
         <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-normal">
           Create an account
         </h2>
@@ -122,16 +121,6 @@ export default function FormSignup({ className }: { className?: string }) {
           label="Signup →"
           disabled={!isFormValid}
         />
-        {/* Footer Registration Navigation link */}
-        <div className="mt-2 text-center text-sm text-slate-500 font-medium">
-          Don't have an account?{' '}
-          <Link
-            href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}
-            className="font-medium text-indigo-400 hover:text-indigo-500 transition-colors"
-          >
-            Sign In
-          </Link>
-        </div>
       </div>
     </form>
   )

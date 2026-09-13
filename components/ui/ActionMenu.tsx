@@ -2,11 +2,11 @@
 
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreVertical } from 'lucide-react'
+import { Loader2, MoreVertical } from 'lucide-react'
 
 export interface ActionItem {
   label: string
-  onClick: () => void
+  onClick: () => void | Promise<unknown>
   variant?: 'default' | 'danger'
   icon?: ReactNode
 }
@@ -23,8 +23,22 @@ interface ActionMenuProps {
 export function ActionMenu({ items }: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const [pendingIndex, setPendingIndex] = useState<number | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Async-aware item click: the menu stays open with a spinner on the item
+  // until the handler settles, then closes. Sync handlers close as before.
+  async function handleItemClick(item: ActionItem, index: number) {
+    if (pendingIndex !== null) return
+    setPendingIndex(index)
+    try {
+      await item.onClick()
+    } finally {
+      setPendingIndex(null)
+      setIsOpen(false)
+    }
+  }
 
   const toggle = () => {
     if (!isOpen && btnRef.current) {
@@ -81,23 +95,28 @@ export function ActionMenu({ items }: ActionMenuProps) {
             style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 50 }}
           >
             <div className="bg-white border border-[#eceef8] rounded-[10px] w-[148px] py-1 shadow-[0_8px_24px_rgba(112,125,255,0.14),0_2px_6px_rgba(0,0,0,0.06)]">
-              {items.map((item, index) => (
-                <div key={index}>
-                  {index > 0 && <div className="mx-[10px] h-px bg-[#f0f2fa]" />}
-                  <button
-                    onClick={() => {
-                      item.onClick()
-                      setIsOpen(false)
-                    }}
-                    className={`w-full text-left px-[14px] py-[9px] font-sans font-semibold text-[13px] hover:bg-[#fafbff] transition-colors flex items-center gap-[8px] ${
-                      item.variant === 'danger' ? 'text-[#ef4444]' : 'text-[#3d4566]'
-                    }`}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </button>
-                </div>
-              ))}
+              {items.map((item, index) => {
+                const isPending = pendingIndex === index
+                return (
+                  <div key={index}>
+                    {index > 0 && <div className="mx-[10px] h-px bg-[#f0f2fa]" />}
+                    <button
+                      onClick={() => handleItemClick(item, index)}
+                      disabled={pendingIndex !== null}
+                      className={`w-full text-left px-[14px] py-[9px] font-sans font-semibold text-[13px] hover:bg-[#fafbff] transition-colors flex items-center gap-[8px] disabled:cursor-wait ${
+                        item.variant === 'danger' ? 'text-[#ef4444]' : 'text-[#3d4566]'
+                      }`}
+                    >
+                      {isPending ? (
+                        <Loader2 className="size-[14px] animate-spin" />
+                      ) : (
+                        item.icon
+                      )}
+                      {item.label}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>,
           document.body,

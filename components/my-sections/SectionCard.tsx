@@ -11,6 +11,7 @@ import {
   copySectionJoinCode,
   type MySectionCardData,
 } from '@/lib/actions/sections'
+import { APP_BASE_URL } from '@/config/constants'
 import { headerStyleFor } from '@/lib/sectionHeader'
 import { useSectionsRefresh } from '@/store/useSectionsRefresh'
 
@@ -37,20 +38,34 @@ export function SectionCard({ section }: SectionCardProps) {
   }
 
   async function handleMenuCopy() {
+    // Fast path: the on-screen code is virtually always fresh (3-day TTL,
+    // cache-tagged section data) — copy synchronously with no server call.
+    // A stale copy still lands on the expired page, which self-heals.
+    if (section.joinCode) {
+      try {
+        await navigator.clipboard.writeText(`${APP_BASE_URL}/join/${section.joinCode}`)
+      } catch {
+        toast.error('Could not copy invite link.')
+        return
+      }
+      toast.success('Invite link copied.')
+      return
+    }
+    // Rare path: no code on the card — generate first (menu shows spinner).
     const res = await copySectionJoinCode(section.id)
     if (!res.success || !res.payload) {
       toast.error(res.message)
       return
     }
     try {
-      await navigator.clipboard.writeText(res.payload.code)
+      await navigator.clipboard.writeText(`${APP_BASE_URL}/join/${res.payload.code}`)
     } catch {
       // clipboard unavailable — code still regenerated
     }
     toast.success(
       res.payload.regenerated
-        ? 'New invite code generated and copied.'
-        : 'Invite code copied.',
+        ? 'New invite link generated and copied.'
+        : 'Invite link copied.',
     )
     router.refresh()
     bump()
@@ -200,7 +215,7 @@ export function SectionCard({ section }: SectionCardProps) {
                       onClick: () => setEditOpen(true),
                     },
                     {
-                      label: 'Copy code',
+                      label: 'Copy invite link',
                       onClick: handleMenuCopy,
                     },
                   ]}

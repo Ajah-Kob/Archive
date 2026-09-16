@@ -408,8 +408,8 @@ model SubmissionAnnotation {
 
 model CapstoneArchive {
   id            Int       @id @default(autoincrement())
-  groupId       Int       @unique
-  group         Group     @relation(fields: [groupId], references: [id])
+  groupId       Int?      @unique
+  group         Group?    @relation(fields: [groupId], references: [id], onDelete: Restrict)
   title         String
   abstract      String?
   datePublished DateTime

@@ -64,6 +64,8 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 | Email          | `nodemailer`                           | 7.x                           |
 | Toasts         | `sonner`                               | 2.x                           |
 | Icons          | `lucide-react`                         | 1.x                           |
+| Date picking   | `react-day-picker`                     | 10.x (defense-scheduling wizard only) |
+| Calendar       | `@fullcalendar/react`                  | 7.x (`/calendar` page only; daygrid/list/interaction via `@fullcalendar/react/*` entrypoints) |
 | PDF viewing    | `@embedpdf/react-pdf-viewer`           | 2.15.x                        |
 | PDF engine     | `@embedpdf/core` / `@embedpdf/engines` | 2.15.x                        |
 | CSS            | `tailwindcss`                          | 4.x (PostCSS, no config file) |

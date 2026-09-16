@@ -1,15 +1,23 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Archive, Star, Eye, ExternalLink, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Archive, Star, Eye, ExternalLink, X, Plus } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
+// Wired to the subtask 03 spec path (built in parallel — see report if the
+// export shape differs when subtask 03 lands).
+import UploadArchiveModal from '@/components/repository/UploadArchiveModal'
+import { ActionMenu } from '@/components/ui/ActionMenu'
+import { DeleteArchiveModal } from '@/components/repository/DeleteArchiveModal'
+import { EditArchiveModal } from '@/components/repository/EditArchiveModal'
 import { formatAuthorsForRepository, formatRepositoryDate } from '@/lib/archiving/validation'
 import type { RepositoryArchiveRow } from '@/lib/actions/repository'
 
 interface RepositoryClientProps {
   archives: RepositoryArchiveRow[]
+  isAdmin?: boolean
 }
 
 function EmptyState() {
@@ -115,10 +123,14 @@ function DetailsModal({ item, onClose }: { item: RepositoryArchiveRow | null; on
   )
 }
 
-export function RepositoryClient({ archives }: RepositoryClientProps) {
+export function RepositoryClient({ archives, isAdmin = false }: RepositoryClientProps) {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('newest')
   const [selected, setSelected] = useState<RepositoryArchiveRow | null>(null)
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<RepositoryArchiveRow | null>(null)
+  const [editTarget, setEditTarget] = useState<RepositoryArchiveRow | null>(null)
 
   const SORT_OPTIONS: FilterOption[] = [
     { value: 'newest', label: 'Newest First' },
@@ -149,7 +161,20 @@ export function RepositoryClient({ archives }: RepositoryClientProps) {
 
   return (
     <>
-      <HeaderBar>
+      <HeaderBar
+        actions={
+          isAdmin ? (
+            <button
+              type="button"
+              onClick={() => setIsUploadOpen(true)}
+              className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+            >
+              <Plus className="size-4" strokeWidth={2} />
+              <span className="whitespace-nowrap">Upload Research</span>
+            </button>
+          ) : undefined
+        }
+      >
         <div className="flex flex-wrap items-center gap-2.5">
           <SearchBar
             value={searchTerm}
@@ -163,7 +188,7 @@ export function RepositoryClient({ archives }: RepositoryClientProps) {
         </div>
       </HeaderBar>
 
-      <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] gap-4 overflow-y-auto">
+      <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
         <div className="flex justify-between items-center text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6] px-1">
           <span>{filtered.length} RESULTS</span>
           <span>Showing {filtered.length} of {archives.length}</span>
@@ -182,13 +207,45 @@ export function RepositoryClient({ archives }: RepositoryClientProps) {
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-[12px] shadow-[0px_1px_4px_0px_rgba(0,0,0,0.04)] flex overflow-hidden w-full"
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`Open document: ${item.title}`}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('button, a')) return
+                    window.open(item.blobUrl, '_blank', 'noopener,noreferrer')
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return
+                    if ((e.target as HTMLElement).closest('button, a')) return
+                    e.preventDefault()
+                    window.open(item.blobUrl, '_blank', 'noopener,noreferrer')
+                  }}
+                  className="bg-white rounded-[12px] shadow-[0px_1px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_28px_rgba(112,125,255,0.16)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex overflow-hidden w-full"
                 >
                   <div className="w-[5px] bg-[#707dff] shrink-0 self-stretch rounded-l-[12px]" aria-hidden="true" />
                   <div className="flex-1 min-w-0 p-[20px] flex flex-col gap-[12px]">
-                    <h2 className="font-heading font-bold text-[15px] leading-[21.75px] tracking-[-0.15px] text-[#10133a] break-words line-clamp-3">
-                      {item.title}
-                    </h2>
+                    <div className="flex items-start justify-between gap-2">
+                      <h2 className="flex-1 min-w-0 font-heading font-bold text-[15px] leading-[21.75px] tracking-[-0.15px] text-[#10133a] break-words line-clamp-3">
+                        {item.title}
+                      </h2>
+                      {isAdmin ? (
+                        <div className="shrink-0 -mr-1 -mt-1">
+                          <ActionMenu
+                            items={[
+                              {
+                                label: 'Edit',
+                                onClick: () => setEditTarget(item),
+                              },
+                              {
+                                label: 'Delete',
+                                variant: 'danger',
+                                onClick: () => setDeleteTarget(item),
+                              },
+                            ]}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
 
                     <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] break-words">
                       Published {dateLabel}
@@ -252,6 +309,30 @@ export function RepositoryClient({ archives }: RepositoryClientProps) {
       </div>
 
       <DetailsModal item={selected} onClose={() => setSelected(null)} />
+
+      <DeleteArchiveModal archive={deleteTarget} onClose={() => setDeleteTarget(null)} />
+
+      {isAdmin ? (
+        <EditArchiveModal
+          archive={editTarget}
+          onClose={() => setEditTarget(null)}
+          onEditComplete={() => {
+            setEditTarget(null)
+            router.refresh()
+          }}
+        />
+      ) : null}
+
+      {isAdmin ? (
+        <UploadArchiveModal
+          isOpen={isUploadOpen}
+          onClose={() => setIsUploadOpen(false)}
+          onUploadComplete={() => {
+            setIsUploadOpen(false)
+            router.refresh()
+          }}
+        />
+      ) : null}
     </>
   )
 }

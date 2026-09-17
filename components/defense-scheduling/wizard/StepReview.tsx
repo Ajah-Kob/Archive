@@ -50,7 +50,7 @@ function ReviewCard({ title, rows }: { title: string; rows: ReviewRow[] }) {
 interface StepReviewProps {
   sectionName: string
   groupName: string
-  defenseType: DefenseType
+  defenseType: DefenseType | null
   date: Date | null
   startTime: string
   endTime: string
@@ -78,7 +78,11 @@ export function StepReview({
           {
             label: 'Type',
             value:
-              defenseType === 'PROPOSAL' ? 'Proposal Defense' : 'Final Defense',
+              defenseType === 'PROPOSAL'
+                ? 'Proposal Defense'
+                : defenseType === 'FINAL'
+                  ? 'Final Defense'
+                  : '—',
           },
         ]}
       />

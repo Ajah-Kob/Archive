@@ -79,6 +79,19 @@ export function DefenseSchedulingPage({
     [schedules],
   )
 
+  // Same-day taken time ranges, for disabling conflicting times in the
+  // wizard time pickers (the wizard narrows these to the selected date).
+  const existingSchedules = useMemo(
+    () =>
+      schedules.map((s) => ({
+        id: s.id,
+        date: s.date,
+        startTime: s.startTime,
+        endTime: s.endTime,
+      })),
+    [schedules],
+  )
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
     return schedules.filter((s) => {
@@ -252,6 +265,7 @@ export function DefenseSchedulingPage({
         groups={groups}
         faculty={faculty}
         existingScheduleDates={existingScheduleDates}
+        existingSchedules={existingSchedules}
         editingSchedule={null}
         onSubmit={handleWizardSubmit}
       />

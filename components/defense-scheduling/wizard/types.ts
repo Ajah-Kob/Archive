@@ -28,6 +28,12 @@ export interface PanelSlotState {
 
 export type DefenseType = 'PROPOSAL' | 'FINAL'
 
+/** A taken time span ("HH:MM") on some date — drives disabled times. */
+export interface TakenTimeRange {
+  start: string
+  end: string
+}
+
 export interface WizardActionResponse {
   success: boolean
   message: string

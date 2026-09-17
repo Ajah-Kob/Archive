@@ -159,7 +159,7 @@ interface StepSectionGroupProps {
   sectionGroups: GroupOption[]
   sectionId: number | null
   groupId: number | null
-  defenseType: DefenseType
+  defenseType: DefenseType | null
   /** Edit mode: section/group are locked; the scheduled group is allowed. */
   isEdit: boolean
   onSectionChange: (id: number | null) => void
@@ -196,28 +196,49 @@ export function StepSectionGroup({
     disabled: group.hasSchedule && !(isEdit && group.id === groupId),
   }))
 
-  const typeOptions: DropdownOption[] = [
-    { value: 'PROPOSAL', label: 'Proposal Defense (Capstone 1)' },
-    { value: 'FINAL', label: 'Final Defense (Capstone 2)' },
+  const typeOptions: Array<{
+    value: DefenseType
+    label: string
+    description: string
+  }> = [
+    {
+      value: 'PROPOSAL',
+      label: 'Proposal Defense (Capstone 1)',
+      description: 'Topic and Chapters 1–3 readiness review',
+    },
+    {
+      value: 'FINAL',
+      label: 'Final Defense (Capstone 2)',
+      description: 'Chapters 4–5 and manuscript final review',
+    },
   ]
+
+  // Per-type accents mirror the SubmitVerdictOptions pattern (selected card
+  // gets a tinted border/bg + filled radio circle): proposal purple, final red.
+  function getTypeAccent(type: DefenseType) {
+    if (type === 'FINAL') {
+      return {
+        border: 'border-[#e11d48]',
+        bg: 'bg-[rgba(225,29,72,0.08)]',
+        circleBorder: 'border-[#e11d48]',
+        circleBg: 'bg-[#e11d48]',
+      }
+    }
+    return {
+      border: 'border-[#a178cd]',
+      bg: 'bg-[rgba(161,120,205,0.08)]',
+      circleBorder: 'border-[#a178cd]',
+      circleBg: 'bg-[#a178cd]',
+    }
+  }
 
   return (
     <div className="flex flex-col gap-[16px] w-[450px]">
       {/*Section Dropdown Menu */}
       <div className="flex flex-col gap-[6px]">
-        <label className={LABEL_CLASS}>Defense Type</label>
-        <Dropdown
-          value={defenseType}
-          options={typeOptions}
-          onChange={(v) => onTypeChange(v as DefenseType)}
-          placeholder="Select a defense type…"
-          ariaLabel="Defense Type"
-        />
-      </div>
-
-      {/*Section Dropdown Menu */}
-      <div className="flex flex-col gap-[6px]">
-        <label className={LABEL_CLASS}>Section</label>
+        <label className={LABEL_CLASS}>
+          Section <span className="text-[#ef4444]">*</span>
+        </label>
         <Dropdown
           value={sectionId ? String(sectionId) : ''}
           options={sectionOptions}
@@ -228,9 +249,11 @@ export function StepSectionGroup({
         />
       </div>
 
-      {/*Section Dropdown Menu */}
+      {/*Group Dropdown Menu */}
       <div className="flex flex-col gap-[6px]">
-        <label className={LABEL_CLASS}>Group</label>
+        <label className={LABEL_CLASS}>
+          Group <span className="text-[#ef4444]">*</span>
+        </label>
         <Dropdown
           value={groupId ? String(groupId) : ''}
           options={groupOptions}
@@ -252,6 +275,62 @@ export function StepSectionGroup({
         {!isEdit && allScheduled ? (
           <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
             All groups in this section already have a defense schedule.
+          </p>
+        ) : null}
+      </div>
+
+      {/*Defense Type radio options (bottom; enabled once a section is picked) */}
+      <div className="flex flex-col gap-[6px]">
+        <span className={LABEL_CLASS} id="defense-type-label">
+          Defense Type <span className="text-[#ef4444]">*</span>
+        </span>
+        <div
+          role="radiogroup"
+          aria-labelledby="defense-type-label"
+          className="flex flex-col gap-[8px]"
+        >
+          {typeOptions.map((option) => {
+            const isSelected = defenseType === option.value
+            const accent = getTypeAccent(option.value)
+            const locked = !sectionId
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                onClick={() => onTypeChange(option.value)}
+                disabled={locked}
+                className={`flex items-center gap-[12px] w-full text-left rounded-[10px] border px-[14px] py-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  isSelected
+                    ? `${accent.border} ${accent.bg}`
+                    : 'border-[#eceef8] bg-white hover:bg-[#fafbff]'
+                }`}
+              >
+                <span
+                  className={`flex size-[22px] items-center justify-center rounded-full border shrink-0 ${
+                    isSelected
+                      ? `${accent.circleBorder} ${accent.circleBg} text-white`
+                      : 'border-[#eceef8] bg-[#fafbff] text-[#bbc0d8]'
+                  }`}
+                >
+                  {isSelected ? <Check className="size-[12px]" strokeWidth={2.5} /> : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="font-sans font-bold text-[13px] leading-[19px] text-[#12143a]">
+                    {option.label}
+                  </span>
+                  <span className="block font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
+                    {option.description}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        {!sectionId ? (
+          <p className="font-sans font-medium text-[11px] leading-[15px] text-[#8a93b4]">
+            Select a section first to choose a defense type.
           </p>
         ) : null}
       </div>

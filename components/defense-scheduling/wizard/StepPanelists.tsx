@@ -16,6 +16,8 @@ interface SlotZoneProps {
   onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void
   onDrop: (e: React.DragEvent<HTMLDivElement>) => void
   onDragStart: (e: React.DragEvent<HTMLDivElement>, memberId: number) => void
+  onDragEnd: () => void
+  onZoneClick: () => void
   onRemoveMember: (memberId: number) => void
 }
 
@@ -29,6 +31,8 @@ function SlotZone({
   onDragLeave,
   onDrop,
   onDragStart,
+  onDragEnd,
+  onZoneClick,
   onRemoveMember,
 }: SlotZoneProps) {
   const icon = isChair ? (
@@ -55,6 +59,7 @@ function SlotZone({
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
+        onClick={onZoneClick}
         className={`flex flex-col items-center gap-[10px] rounded-[14px] border-[2px] border-dashed px-[12px] py-[10px] transition-colors
   ${
     highlight
@@ -71,6 +76,7 @@ function SlotZone({
               key={member.id}
               draggable
               onDragStart={(e) => onDragStart(e, member.id)}
+              onDragEnd={onDragEnd}
               title="Drag to change role"
               className="group flex w-full h-fit items-center justify-between gap-[8px] px-[12px] py-[8px] rounded-[10px] bg-[#f4f5fc] border border-[#e8ebf8] hover:border-[rgba(112,125,255,0.5)] transition-colors cursor-grab active:cursor-grabbing select-none"
             >
@@ -115,6 +121,10 @@ export function StepPanelists({
   onRemove,
 }: StepPanelistsProps) {
   const [overSlot, setOverSlot] = useState<PanelSlot | null>(null)
+  // Click fallback for when drag-and-drop is unavailable (touch devices, or
+  // a wedged browser drag operation): click a faculty card to select it,
+  // then click a zone to assign. Mirrors the drop targets exactly.
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const assignedIds = [slots.chair?.id, slots.member1?.id, slots.member2?.id]
   const available = faculty.filter((member) => !assignedIds.includes(member.id))
@@ -122,7 +132,9 @@ export function StepPanelists({
   function handleDragOver(e: React.DragEvent<HTMLDivElement>, slot: PanelSlot) {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setOverSlot(slot)
+    // dragover fires continuously — only update on actual change so every
+    // pointer move doesn't schedule render work mid-drag (drag lag).
+    setOverSlot((prev) => (prev === slot ? prev : slot))
   }
 
   function handleDragLeave(
@@ -141,7 +153,15 @@ export function StepPanelists({
     const memberId = Number(e.dataTransfer.getData('text/plain'))
     if (!Number.isInteger(memberId)) return
     const member = faculty.find((f) => f.id === memberId)
-    if (member) onAssign(slot, member)
+    // Defer past the drag sequence: assigning synchronously unmounts the
+    // dragged card mid-drag, which sticks the ghost/cursor in some browsers.
+    if (member) requestAnimationFrame(() => onAssign(slot, member))
+  }
+
+  function assignToMembers(member: FacultyMember) {
+    if (!slots.member1) requestAnimationFrame(() => onAssign('member1', member))
+    else if (!slots.member2)
+      requestAnimationFrame(() => onAssign('member2', member))
   }
 
   // The Panel Members dropzone accepts up to two members. Assign to the first
@@ -154,8 +174,23 @@ export function StepPanelists({
     if (!Number.isInteger(memberId)) return
     const member = faculty.find((f) => f.id === memberId)
     if (!member) return
-    if (!slots.member1) onAssign('member1', member)
-    else if (!slots.member2) onAssign('member2', member)
+    assignToMembers(member)
+  }
+
+  // Click fallback: assign the selected faculty card to a zone.
+  function handleZoneClick(slot: PanelSlot) {
+    if (selectedId == null) return
+    const member = faculty.find((f) => f.id === selectedId)
+    setSelectedId(null)
+    if (!member) return
+    if (slot === 'chair') requestAnimationFrame(() => onAssign('chair', member))
+    else assignToMembers(member)
+  }
+
+  // Clears the drop highlight when a drag ends anywhere — cancelled drags
+  // (Esc) and drops outside a zone never fire drop/dragleave.
+  function handleDragEnd() {
+    setOverSlot(null)
   }
 
   // Dragging an assigned member card starts a drag with that member's id so
@@ -193,7 +228,16 @@ export function StepPanelists({
                   e.dataTransfer.setData('text/plain', String(member.id))
                   e.dataTransfer.effectAllowed = 'move'
                 }}
-                className="flex items-center h-fit gap-[8px] px-[12px] py-[8px] rounded-[10px] border border-[#e8ebf8] bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] cursor-grab active:cursor-grabbing select-none hover:border-[rgba(112,125,255,0.5)] hover:shadow-[0px_2px_8px_rgba(112,125,255,0.12)] transition-all"
+                onDragEnd={handleDragEnd}
+                onClick={() =>
+                  setSelectedId((prev) => (prev === member.id ? null : member.id))
+                }
+                title="Click to select, then click a slot — or drag"
+                className={`flex items-center h-fit gap-[8px] px-[12px] py-[8px] rounded-[10px] border bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] cursor-pointer select-none hover:border-[rgba(112,125,255,0.5)] hover:shadow-[0px_2px_8px_rgba(112,125,255,0.12)] transition-all ${
+                  selectedId === member.id
+                    ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.35)]'
+                    : 'border-[#e8ebf8]'
+                }`}
               >
                 <UserProfile
                   initials={getInitials(member.name)}
@@ -217,6 +261,8 @@ export function StepPanelists({
           onDragLeave={(e) => handleDragLeave(e, 'chair')}
           onDrop={(e) => handleDrop(e, 'chair')}
           onDragStart={handleMemberDragStart}
+          onDragEnd={handleDragEnd}
+          onZoneClick={() => handleZoneClick('chair')}
           onRemoveMember={() => onRemove('chair')}
         />
         <SlotZone
@@ -229,6 +275,8 @@ export function StepPanelists({
           onDragLeave={(e) => handleDragLeave(e, 'member1')}
           onDrop={handleMembersDrop}
           onDragStart={handleMemberDragStart}
+          onDragEnd={handleDragEnd}
+          onZoneClick={() => handleZoneClick('member1')}
           onRemoveMember={(id) => {
             if (slots.member1?.id === id) onRemove('member1')
             else if (slots.member2?.id === id) onRemove('member2')

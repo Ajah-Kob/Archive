@@ -16,6 +16,7 @@ import type {
   PanelSlot,
   PanelSlotState,
   SectionOption,
+  TakenTimeRange,
   WizardActionResponse,
 } from './wizard/types'
 
@@ -53,6 +54,13 @@ interface CreateDefenseWizardProps {
   faculty: FacultyMember[]
   /** ISO dates that already have a schedule — marked on the calendar. */
   existingScheduleDates: string[]
+  /** Same-day taken time spans — conflicting times disable in time pickers. */
+  existingSchedules: Array<{
+    id: number
+    date: string
+    startTime: string
+    endTime: string
+  }>
   /**
    * When set, the wizard opens in edit mode: section/group are locked and the
    * form is pre-filled from the schedule being edited; submit includes the
@@ -118,13 +126,14 @@ export function CreateDefenseWizard({
   groups,
   faculty,
   existingScheduleDates,
+  existingSchedules,
   editingSchedule,
   onSubmit,
 }: CreateDefenseWizardProps) {
   const [step, setStep] = useState(0)
   const [sectionId, setSectionId] = useState<number | null>(null)
   const [groupId, setGroupId] = useState<number | null>(null)
-  const [defenseType, setDefenseType] = useState<DefenseType>('PROPOSAL')
+  const [defenseType, setDefenseType] = useState<DefenseType | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
@@ -170,7 +179,7 @@ export function CreateDefenseWizard({
 
     setSectionId(null)
     setGroupId(null)
-    setDefenseType('PROPOSAL')
+    setDefenseType(null)
     setSelectedDate(null)
     setStartTime('')
     setEndTime('')
@@ -183,6 +192,16 @@ export function CreateDefenseWizard({
     [existingScheduleDates],
   )
 
+  // Taken spans on the selected day (own schedule excluded in edit mode so
+  // its current times stay pickable) — fed to the time pickers.
+  const takenRanges: TakenTimeRange[] = useMemo(() => {
+    if (!selectedDate) return []
+    const key = toDateKey(selectedDate)
+    return existingSchedules
+      .filter((s) => s.date.slice(0, 10) === key && s.id !== editingSchedule?.id)
+      .map((s) => ({ start: s.startTime, end: s.endTime }))
+  }, [existingSchedules, selectedDate, editingSchedule])
+
   if (!open) return null
 
   const sectionGroups = groups.filter((g) => g.sectionId === sectionId)
@@ -193,6 +212,7 @@ export function CreateDefenseWizard({
     !!sectionId &&
     !!groupId &&
     !!selectedGroup &&
+    !!defenseType &&
     (isEdit || !selectedGroup.hasSchedule)
   const timeError = timeErrorFor(startTime, endTime)
   const step2Valid =
@@ -231,6 +251,7 @@ export function CreateDefenseWizard({
     if (
       !canSubmit ||
       !groupId ||
+      !defenseType ||
       !selectedDate ||
       !chair ||
       !member1 ||
@@ -320,6 +341,7 @@ export function CreateDefenseWizard({
               endTime={endTime}
               venue={venue}
               existingDates={existingDates}
+              takenRanges={takenRanges}
               onDateChange={setSelectedDate}
               onStartTimeChange={setStartTime}
               onEndTimeChange={setEndTime}

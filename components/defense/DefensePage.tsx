@@ -69,7 +69,6 @@ export function DefensePage({ schedules, resubmissions }: DefensePageProps) {
         ) : (
           <UpcomingSessionsContainer
             schedules={completed}
-            title="Completed Sessions"
             emptyTitle="No Completed Defenses"
             emptyDescription="Completed defenses will appear here once verdicts are finalized."
           />

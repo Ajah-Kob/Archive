@@ -1,0 +1,101 @@
+/* /calendar theming for the FullCalendar v7 classic theme.
+ *
+ * Every rule below is rooted at .calendar-scope so nothing leaks into the
+ * rest of the app — never add :root overrides here (the library's own
+ * palette.css keeps its defaults globally; this file only narrows them
+ * inside the calendar wrapper). Structural tokens only: per-event colors
+ * arrive from the feed as backgroundColor/borderColor and are intentionally
+ * left untouched.
+ */
+
+.calendar-scope {
+  --fc-classic-border: #e8ebf8;
+  --fc-classic-strong-border: #dfe3fb;
+  --fc-classic-today: rgba(112, 125, 255, 0.12);
+  --fc-classic-primary: #707dff;
+  --fc-classic-event: #707dff;
+  --fc-classic-event-contrast: #ffffff;
+  --fc-classic-button: #707dff;
+  --fc-classic-button-border: none;
+  --fc-classic-button-strong: #5565ff;
+  --fc-classic-button-strong-border: #5565ff;
+  --fc-classic-button-foreground: #ffffff;
+  --fc-classic-background: #ffffff;
+  --fc-classic-foreground: #10133a;
+  --fc-classic-muted-foreground: #5a6382;
+  --fc-classic-faint-foreground: #8a93b4;
+
+  font-family: var(--font-sans), sans-serif;
+  font-size: 11px;
+}
+
+/* Toolbar title matches the app heading voice. */
+.calendar-scope .fc-toolbar-title {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.16px;
+  color: #10133a;
+}
+
+/* Column headers + day numbers stay muted so event colors carry the meaning. */
+.calendar-scope .fc-col-header-cell-cushion {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a93b4;
+}
+
+.calendar-scope .fc-daygrid-day-number {
+  font-weight: 600;
+  font-size: 11px;
+  color: #5a6382;
+}
+
+/* Past events dim back per the layout doc; today keeps the tinted cell. */
+.calendar-scope .fc-event-past {
+  opacity: 0.55;
+}
+
+/* Event pills read as pills, not raw theme blocks. */
+.calendar-scope .fc-daygrid-event,
+.calendar-scope .fc-list-event {
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+/* Outer event chrome stays transparent — every pill paints itself via
+ * renderEventContent (solid purple for manual events, fill-less colored
+ * outline for defenses), so no theme fill can leak through. */
+.calendar-scope .fc-daygrid-event,
+.calendar-scope .fc-list-event {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Custom event content (renderEventContent): owned DOM so theme tints can't
+ * interfere. Colors arrive inline per variant — this class only handles
+ * shape and truncation. */
+.calendar-scope .fc-custom-event {
+  display: block;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* List-view events read smaller than the 12px date cushions above them. */
+.calendar-scope .fc-list-event .fc-custom-event {
+  font-size: 1px;
+  font-weight: 500;
+}
+
+.calendar-scope .fc-list-day-cushion {
+  background-color: #f4f6ff;
+  font-weight: 500;
+  font-size: 11px;
+  color: #3d4566;
+}

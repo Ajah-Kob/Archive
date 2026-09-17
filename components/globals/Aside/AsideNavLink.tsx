@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Shield,
   CalendarClock,
+  Calendar,
   Flag,
   Users,
   UserCog,
@@ -110,6 +111,7 @@ export function NavLinks({
       label: 'RESOURCES',
       items: [
         { label: 'Repositories', href: '/repository', icon: BookMarked, show: true },
+        { label: 'Calendar', href: '/calendar', icon: Calendar, show: true },
         ...(templatesHref ? [{ label: 'Templates', href: templatesHref, icon: FileText, show: true } as NavItem] : []),
       ],
     },

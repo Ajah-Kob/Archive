@@ -11,7 +11,7 @@ interface Token extends JWT {
 }
 
 const ADMIN_SET = new Set(['SUPERADMIN', 'ADMIN'])
-const PROTECTED_SET = new Set(['/admin', '/faculty', '/student', '/guest', '/account'])
+const PROTECTED_SET = new Set(['/admin', '/faculty', '/student', '/guest', '/account', '/calendar'])
 
 function isAdmin(role?: string): boolean {
   return ADMIN_SET.has(role ?? '')
@@ -54,6 +54,9 @@ export async function proxy(req: NextRequest) {
   if (root === '/guest' && token.role !== 'GUEST') return redirectHome()
   if (root === '/faculty' && !isAdmin(token.role) && token.role !== 'FACULTY') return redirectHome()
 
+  // Shared /calendar route — all signed-in roles except GUEST pass (no sub-role gate)
+  if (root === '/calendar' && token.role === 'GUEST') return redirectHome()
+
   // Faculty sub-role gates — only when inside /faculty
   if (root === '/faculty') {
     const sub = seg[2]
@@ -82,5 +85,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/faculty/:path*', '/student/:path*', '/guest/:path*', '/account/:path*'],
+  matcher: ['/admin/:path*', '/faculty/:path*', '/student/:path*', '/guest/:path*', '/account/:path*', '/calendar/:path*'],
 }

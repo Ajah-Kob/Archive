@@ -12,35 +12,30 @@
 ┌────────────────────────────────────────────────────────────────┐
 │ PageLabel: Calendar                                            │
 │ HeaderBar                                                      │
-│  [Month | List]  [Category ▾]  [Section ▾]*   [+ New Event]**   │
+│  [<] [>] [Today]  [Month | Week | Day | List]   [+ New Event]*    │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
 │   ┌────────────────────────────────────────────────────────┐   │
-│   │              FullCalendar month grid                   │   │
-│   │                                                        │   │
+│   │                   September 2026                       │   │
 │   │   Mon 12 ──● Proposal Defense (BSIS 4A)                │   │
-│   │   Wed 14 ━━━ Chapter 3 window (Oct 1–14)               │   │
+│   │   Wed 14 ━━━ Defense Week (custom span)                │   │
 │   │   Fri 16 ──● Manuscript deadline                      │   │
 │   │                                                        │   │
-│   │   (List view swaps the grid: chronological agenda)     │   │
+│   │   (List/Week/Day views swap the grid)                  │   │
 │   └────────────────────────────────────────────────────────┘   │
-│                                                                │
-│   Legend: ● Defense  ● Milestone  ● Deadline  ● Custom         │
 └────────────────────────────────────────────────────────────────┘
- *  Section filter: chair/admin only (others locked to own scope)
- ** New Event button: chair/admin only (never rendered for others)
+ *  New Event button: chair/admin only (never rendered for others)
 ```
 
 ## Regions
 
 | Region | Contents |
 |---|---|
-| Action bar (HeaderBar) | View switcher (Month/List), category filter, section filter (chair/admin), **New Event** button (chair/admin) |
-| Month grid | `dayGridMonth`; event bars/dots colored by category; past events dimmed; today highlighted `#707dff` |
+| Action bar (HeaderBar) | Prev/next/Today buttons, segmented view switcher (Month/Week/Day/List), **New Event** button (chair/admin) |
+| Month grid | `dayGridMonth`; per-event colors (defense type colors; manual events user-picked); past events dimmed; today highlighted `#707dff` |
 | List view | `listMonth` chronological agenda; same colors; defense times + venues inline |
-| Legend | Fixed row under the grid: Defense / Milestone / Deadline / Custom |
-| Event click | `EventDetailsModal`: title, date span, category chip, venue (defenses), description, deep-link button (defense page / milestone page / repository item); Edit/Delete inside modal for manual events (chair/admin) |
-| Date-span select | Chair/admin only: drag across days → `NewEventModal` prefilled with the span (title, category, section/program scope) |
+| Event click | `EventDetailsModal`: title, date span, venue (defenses), description, audience (manual), deep-link button per kind; Edit/Delete inside modal for manual events (chair/admin) |
+| Date-span select | Chair/admin only: drag across days → `NewEventModal` prefilled with the span (title, audience, dates) |
 
 ## Event colors (existing tokens)
 
@@ -48,9 +43,10 @@
 |---|---|---|
 | Proposal defense | `#707dff` | `DefenseSchedule` type + verdict |
 | Final defense | `#fe6f6f` | `DefenseSchedule` type + verdict |
-| Milestone opened / submitted / reviewed | `#22c55e` / `#f59e0b` | `MilestoneAvailability` / `MilestoneSubmission` |
-| Deadline (manual) | `#f59e0b` | `CalendarEvent` (new model) |
-| Custom (manual) | `#a178cd` | `CalendarEvent` (new model) |
+| Manual event | user-picked | `CalendarEvent.color` (chair/admin-chosen swatch; `#a178cd` fallback for pre-color rows) |
+
+> Feed scope: defenses (`DefenseSchedule`) + manual events only. Milestone
+> openings, submissions, and repository publishes are intentionally excluded.
 
 ## Role matrix
 

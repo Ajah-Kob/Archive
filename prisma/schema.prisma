@@ -50,6 +50,7 @@ model User {
   defenseSubmissions           DefenseSubmission[]           @relation("DefenseSubmissionSubmitter")
   defenseSubmissionReviews     DefenseSubmissionReview[]
   archivingSubmissions         ArchivingSubmission[]
+  calendarEvents               CalendarEvent[]
 
   @@index([email, deletedAt])
 }
@@ -477,6 +478,42 @@ model Template {
 
   @@index([deletedAt])
   @@index([uploadedById])
+}
+
+// ───────────────────────────── Calendar ─────────────────────────────
+
+// Manual calendar events (chair/admin-created). Automatic sources
+// (DefenseSchedule, MilestoneAvailability, MilestoneSubmission) are merged
+// at read time in the event feed action — not stored here.
+// Audience controls visibility: STUDENT = students only, FACULTY = staff
+// only, ALL = everyone with calendar access.
+enum CalendarEventCategory {
+  DEADLINE
+  CUSTOM
+}
+
+enum CalendarEventAudience {
+  STUDENT
+  FACULTY
+  ALL
+}
+
+model CalendarEvent {
+  id          Int                   @id @default(autoincrement())
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime
+  allDay      Boolean                   @default(true)
+  audience      CalendarEventAudience @default(ALL)
+  createdById   Int
+  createdBy   User                  @relation(fields: [createdById], references: [id])
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  deletedAt   DateTime?
+
+  @@index([startsAt])
+  @@index([deletedAt])
 }
 
 // ───────────────────────────── Defense Scheduling ─────────────────────────────

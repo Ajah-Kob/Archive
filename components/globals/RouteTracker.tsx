@@ -14,7 +14,9 @@ export function RouteTracker() {
   const pathname = usePathname()
 
   useEffect(() => {
-    if (pathname !== '/login') {
+    // The public landing page is an entry point, not a resumable app route —
+    // remembering it makes post-login bounce through `/` (visible flash).
+    if (pathname !== '/login' && pathname !== '/') {
       sessionStorage.setItem(LAST_ROUTE_KEY, pathname)
     }
   }, [pathname])

@@ -26,7 +26,7 @@ export function RedirectIfAuthed() {
     const last = sessionStorage.getItem(LAST_ROUTE_KEY)
     const target =
       next ??
-      (last && last.startsWith('/') && last !== '/login'
+      (last && last.startsWith('/') && last !== '/login' && last !== '/'
         ? last
         : roleHome(session?.user?.role))
 

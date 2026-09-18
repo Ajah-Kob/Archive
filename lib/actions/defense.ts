@@ -930,6 +930,49 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
 
+    // The student defense readers are cached under per-submission (+per-user)
+    // tags that 'defense' does not cover — without busting them, the student
+    // workspace keeps serving the pre-verdict payload indefinitely. Resolve
+    // the affected submissions + group members and invalidate each variant.
+    // Best-effort: a lookup failure must never fail the verdict itself.
+    try {
+      const affected = await prisma.defenseSchedule.findFirst({
+        where: { id: scheduleId },
+        select: {
+          submissions: {
+            where: { deletedAt: null },
+            select: { id: true },
+          },
+          group: {
+            select: {
+              students: {
+                where: { deletedAt: null },
+                select: { userId: true },
+              },
+            },
+          },
+        },
+      })
+      const memberUserIds = [
+        ...new Set(
+          (affected?.group.students ?? [])
+            .map((s) => s.userId)
+            .filter((id): id is number => Number.isInteger(id)),
+        ),
+      ]
+      for (const submission of affected?.submissions ?? []) {
+        revalidateTag(`defense-submission-${submission.id}-detail`, 'max')
+        revalidateTag(`defense-submission-${submission.id}-annotations`, 'max')
+        for (const userId of memberUserIds) {
+          revalidateTag(`defense-student-detail-${submission.id}-${userId}`, 'max')
+          revalidateTag(`defense-student-annotations-${submission.id}-${userId}`, 'max')
+          revalidateTag(`defense-student-versions-${submission.id}-${userId}`, 'max')
+        }
+      }
+    } catch (revalidateError) {
+      console.error('[submitPanelistVerdict | revalidate students | Error]:', revalidateError)
+    }
+
     return { success: true, message: 'Verdict submitted successfully.', payload: updated }
   } catch (error) {
     return { success: false, message: 'Failed to submit verdict.', payload: null }

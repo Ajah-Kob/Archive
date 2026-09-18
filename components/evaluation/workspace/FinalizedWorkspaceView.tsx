@@ -110,6 +110,7 @@ export function FinalizedWorkspaceView({
           src={submission.blobUrl}
           annotationAuthor={submission.reviewedBy ?? 'Adviser'}
           initialAnnotations={annotations as unknown as AnnotationTransferItem[]}
+          readOnly
         />
       </div>
     </div>

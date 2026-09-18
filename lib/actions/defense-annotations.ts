@@ -164,6 +164,9 @@ export async function getDefenseAnnotations(submissionId: number) {
 async function getDefenseAnnotationsData(submissionId: number, authorId: number) {
   'use cache'
   cacheTag(tag(submissionId, authorId))
+  // Shared tag: every author's write revalidates it (see save/commit
+  // below), so cross-author readers below stay fresh.
+  cacheTag(`defense-submission-${submissionId}-annotations`)
   cacheLife('max')
   try {
     const submission = await findDefenseSubmission(submissionId, authorId)
@@ -174,14 +177,32 @@ async function getDefenseAnnotationsData(submissionId: number, authorId: number)
         payload: null,
       }
     }
-    const row = await (prisma as any).defenseSubmissionAnnotation.findFirst({
-      where: { submissionId, authorId, deletedAt: null },
-      select: { data: true, status: true },
+    // Own row (any status — needed for draft editing) plus every other
+    // author's COMMITTED rows (read-only cross-panelist review). Drafts of
+    // other authors stay private. Visibility flags are honored for all rows
+    // by the existing filter below.
+    const rows = await (prisma as any).defenseSubmissionAnnotation.findMany({
+      where: {
+        submissionId,
+        deletedAt: null,
+        OR: [{ authorId }, { status: 'COMMITTED' }],
+      },
+      select: { data: true, status: true, authorId: true },
     })
-    if (!row) return { success: true, message: '', payload: null }
-    const deduped = dedupeAnnotationData(row.data)
+    const own = rows.find((r: { authorId: number }) => r.authorId === authorId) ?? null
+    const merged = rows.flatMap((r: { data: unknown }) =>
+      Array.isArray(r.data) ? (r.data as unknown[]) : [],
+    )
+    if (!own && merged.length === 0) {
+      return { success: true, message: '', payload: null }
+    }
+    const deduped = dedupeAnnotationData(merged)
     const data = filterVisibleAnnotations(deduped)
-    return { success: true, message: '', payload: { data, status: row.status } }
+    return {
+      success: true,
+      message: '',
+      payload: { data, status: own?.status ?? 'COMMITTED' },
+    }
   } catch (error) {
     console.error('[getDefenseAnnotations | Error]:', error)
     return { success: false, message: 'Failed to load annotations.', payload: null }

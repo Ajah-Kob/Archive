@@ -55,6 +55,12 @@ export interface DefensePanelistItem {
   email: string
   image: string | null
   role: PanelistRole
+  /**
+   * Counts from the initial submission's COMMITTED annotation rows only.
+   * DRAFT rows are never exposed (counts or content) — mirrors the faculty
+   * side, which prefers committed and treats draft-only as unsubmitted.
+   */
+  feedback?: { comments: number; pages: number; hasCommitted?: boolean } | null
 }
 
 export interface StudentDefenseMemberItem {
@@ -198,6 +204,33 @@ async function getStudentDefenseSessionData(
 
   if (!schedule) return null
 
+  // Per-panelist feedback for the student tab — same source rule as the
+  // faculty side: the INITIAL submission's COMMITTED rows only (never
+  // reset by resubmissions, never leaking DRAFT content or counts).
+  const initialForFeedback = (schedule.submissions.find((s) => s.isInitial) ??
+    schedule.submissions[0]) as
+    | { annotations?: Array<{ authorId: number; status: string; data: unknown }> }
+    | undefined
+  const committedByAuthor = new Map<number, { comments: number; pages: number }>()
+  for (const row of initialForFeedback?.annotations ?? []) {
+    if (row.status !== 'COMMITTED') continue
+    const items = Array.isArray(row.data) ? (row.data as unknown[]) : []
+    if (items.length === 0) continue
+    const pages = new Set(
+      items
+        .map(
+          (it) =>
+            (it as unknown as { annotation?: { pageIndex?: number } })?.annotation
+              ?.pageIndex,
+        )
+        .filter((v): v is number => typeof v === 'number'),
+    ).size
+    committedByAuthor.set(row.authorId, {
+      comments: items.length,
+      pages: pages || 1,
+    })
+  }
+
   return {
     id: schedule.id,
     groupId: schedule.groupId,
@@ -211,13 +244,19 @@ async function getStudentDefenseSessionData(
     venue: schedule.venue,
     verdict: schedule.verdict,
     verdictSubmittedAt: (schedule as unknown as { verdictSubmittedAt?: Date | null }).verdictSubmittedAt?.toISOString() ?? null,
-    panelists: schedule.panelists.map((p) => ({
-      userId: p.userId,
-      name: p.user.name,
-      email: p.user.email,
-      image: p.user.image,
-      role: p.role,
-    })),
+    panelists: schedule.panelists.map((p) => {
+      const fb = committedByAuthor.get(p.userId) ?? null
+      return {
+        userId: p.userId,
+        name: p.user.name,
+        email: p.user.email,
+        image: p.user.image,
+        role: p.role,
+        feedback: fb
+          ? { comments: fb.comments, pages: fb.pages, hasCommitted: true }
+          : null,
+      }
+    }),
     members: mapStudentMembers(
       schedule.group.students as unknown as Array<{
         id: number

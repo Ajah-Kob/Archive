@@ -41,6 +41,7 @@ import {
 } from '@/components/defense/workspace/annotation-visibility'
 import { toggleDefenseAnnotationVisibility } from '@/lib/actions/defense-annotation-visibility'
 import { toast } from 'sonner'
+import { Filter } from '@/components/ui/Filter'
 
 interface DefenseCommentsPanelProps {
   /** Active document id from the headless DocumentManagerPluginPackage. */
@@ -65,6 +66,13 @@ interface DefenseCommentsPanelProps {
   onCancelEdit: (comment: CommentItem) => void
   /** Fired after a comment is saved. */
   onSaveComment: (comment: CommentItem) => void
+  /**
+   * Author-name filter (null = all reviewers). Owned by the workspace so the
+   * document rendering filters in sync — see AnnotationLayerWithDrag and
+   * AnnotationHover `visibleAuthorName`.
+   */
+  authorFilter?: string | null
+  onAuthorFilterChange?: (author: string | null) => void
 }
 
 /** A flattened, render-ready annotation entry for the comment list. */
@@ -434,6 +442,8 @@ export function DefenseCommentsPanel({
   onClose,
   onCancelEdit,
   onSaveComment,
+  authorFilter = null,
+  onAuthorFilterChange,
 }: DefenseCommentsPanelProps) {
   const { state, provides } = useAnnotation(documentId)
   const scroll = useScroll(documentId)
@@ -567,8 +577,25 @@ export function DefenseCommentsPanel({
   }
 
   const showStudentSubtitle = isStudent
-  const visibleCount = comments.filter((c) => c.isVisible).length
-  const hiddenCount = comments.length - visibleCount
+  // Author filter (workspace-owned so the document filters in sync).
+  // Options derive from loaded comments; the dropdown only renders when at
+  // least two distinct authors exist.
+  const authorOptions = useMemo(() => {
+    const names = new Set<string>()
+    for (const c of comments) {
+      if (c.author.trim()) names.add(c.author.trim())
+    }
+    return [...names].sort((a, b) => a.localeCompare(b))
+  }, [comments])
+  const shownComments = useMemo(
+    () =>
+      authorFilter
+        ? comments.filter((c) => c.author.trim() === authorFilter)
+        : comments,
+    [comments, authorFilter],
+  )
+  const visibleCount = shownComments.filter((c) => c.isVisible).length
+  const hiddenCount = shownComments.length - visibleCount
 
   return (
     <WorkspacePanel
@@ -576,16 +603,29 @@ export function DefenseCommentsPanel({
       subtitle={
         showStudentSubtitle
           ? hiddenCount > 0
-            ? `${comments.length} annotation${comments.length !== 1 ? 's' : ''} · ${hiddenCount} hidden from panelist · Click to jump to page.`
+            ? `${shownComments.length} annotation${shownComments.length !== 1 ? 's' : ''} · ${hiddenCount} hidden from panelist · Click to jump to page.`
             : 'Reviewer annotations on this document. Use Eye to hide from panelist.'
           : readOnly
             ? 'Reviewer annotations on this document. Click one to jump to its page.'
             : 'Annotations on this document. Click one to jump to its page.'
       }
-      count={comments.length}
+      count={shownComments.length}
       onClose={onClose}
     >
-      {comments.length === 0 ? (
+      {authorOptions.length > 1 && onAuthorFilterChange ? (
+        <div className="px-[14px] pt-[12px]">
+          <Filter
+            value={authorFilter ?? ''}
+            options={[
+              { value: '', label: 'All reviewers' },
+              ...authorOptions.map((name) => ({ value: name, label: name })),
+            ]}
+            onChange={(v) => onAuthorFilterChange(v === '' ? null : v)}
+            ariaLabel="Filter comments by author"
+          />
+        </div>
+      ) : null}
+      {shownComments.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center px-[8px] py-[24px]">
           <div className="size-[40px] rounded-full bg-[#f4f5fc] flex items-center justify-center">
             <MessageSquareText
@@ -594,15 +634,17 @@ export function DefenseCommentsPanel({
             />
           </div>
           <p className="pt-[8px] font-sans font-semibold text-[12.5px] text-[#8a93b4]">
-            No comments yet
+            {authorFilter ? `No comments from ${authorFilter}` : 'No comments yet'}
           </p>
           <p className="pt-[3px] font-sans font-medium text-[11px] text-[#c4cadf] leading-[16.5px]">
-            Annotations you add to the document will appear here.
+            {authorFilter
+              ? 'Try another reviewer.'
+              : 'Annotations you add to the document will appear here.'}
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-[10px]">
-          {comments.map((comment) => (
+          {shownComments.map((comment) => (
             <DefenseCommentCard
               key={comment.id}
               comment={comment}

@@ -26,6 +26,11 @@ interface AnnotationHoverProps {
   initialMenuId?: string | null
   /** Called when clicking outside any annotation to deselect. */
   onDeselectAnnotation: () => void
+  /**
+   * Author-name filter (comments-panel dropdown): hover, click-menu, and
+   * selected outlines ignore other authors. Null shows everyone.
+   */
+  visibleAuthorName?: string | null
 }
 
 interface Box {
@@ -83,6 +88,7 @@ export function AnnotationHover({
   onSelectAnnotation,
   onDeselectAnnotation,
   initialMenuId,
+  visibleAuthorName = null,
 }: AnnotationHoverProps) {
   const { state, provides } = useAnnotation(documentId)
   const storeState = useStoreState()
@@ -158,6 +164,14 @@ export function AnnotationHover({
           // Native document annotations (hyperlinks etc.) are not review
           // targets — no hover border, no delete menu. Links stay clickable.
           if (!isReviewAnnotation(obj)) continue
+          // Author filter (comments-panel dropdown) — other authors are
+          // neither hoverable nor clickable.
+          if (
+            visibleAuthorName != null &&
+            (typeof obj.author !== 'string' ||
+              obj.author.trim() !== visibleAuthorName)
+          )
+            continue
           // Hit-test the EXACT annotated fragments (per-quad for text markup)
           // — unannotated text inside the union /Rect must not react.
           const pageX = (e.clientX - pageRect.left) / scale
@@ -189,6 +203,12 @@ export function AnnotationHover({
         if (!uids.includes(id)) continue
         const obj = state.byUid[id]?.object
         if (!obj || !isReviewAnnotation(obj)) continue
+        if (
+          visibleAuthorName != null &&
+          (typeof obj.author !== 'string' ||
+            obj.author.trim() !== visibleAuthorName)
+        )
+          continue
         return buildTarget(pageEl, pageIndex, id, obj)
       }
       return null
@@ -277,7 +297,14 @@ export function AnnotationHover({
       viewer.removeEventListener('click', handleClick)
       resizeObserver.disconnect()
     }
-  }, [viewerRef, state, storeState, documentId, readOnly, initialMenuId])
+  }, [viewerRef, state, storeState, documentId, readOnly, initialMenuId, visibleAuthorName])
+
+  // Author filter changed — drop outlines/menu for now-hidden annotations.
+  useEffect(() => {
+    setHovered(null)
+    setMenu(null)
+    setSelected([])
+  }, [visibleAuthorName])
 
   // Hovering an already-selected annotation must not double-draw its outline.
   const hoveredVisible =

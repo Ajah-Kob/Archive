@@ -23,7 +23,10 @@ import {
   AnnotationPluginPackage,
   useAnnotation,
 } from '@embedpdf/plugin-annotation/react'
-import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
+import type {
+  AnnotationTransferItem,
+  FreeTextClickBehavior,
+} from '@embedpdf/plugin-annotation'
 
 export interface PdfViewerProps {
   /** Public Vercel Blob URL of the submitted document. */
@@ -32,6 +35,14 @@ export interface PdfViewerProps {
   annotationAuthor: string
   /** Saved annotations to hydrate on load (serialized AnnotationTransferItem[]). */
   initialAnnotations?: AnnotationTransferItem[]
+  /**
+   * Read-only mode (finalized evaluations): every tool is registered with
+   * interaction overrides that disable drag/resize/rotate — mirroring student
+   * mode in DocumentWorkspace. Without this the plugin's own drag surface
+   * lets a selected ink or free-text annotation be moved, which no CSS rule
+   * can prevent (canvas-level interaction).
+   */
+  readOnly?: boolean
 }
 
 /**
@@ -44,7 +55,12 @@ export interface PdfViewerProps {
  * Each rendered page is wrapped in `PagePointerProvider` with the layer stack
  * `RenderLayer` → `SelectionLayer` → `AnnotationLayer` on top.
  */
-export function PdfViewer({ src, annotationAuthor, initialAnnotations }: PdfViewerProps) {
+export function PdfViewer({
+  src,
+  annotationAuthor,
+  initialAnnotations,
+  readOnly = false,
+}: PdfViewerProps) {
   const { engine, isLoading, error } = usePdfiumEngine()
 
   const plugins = useMemo(
@@ -63,9 +79,58 @@ export function PdfViewer({ src, annotationAuthor, initialAnnotations }: PdfView
       createPluginRegistration(HistoryPluginPackage),
       createPluginRegistration(AnnotationPluginPackage, {
         annotationAuthor,
+        // Read-only locks (same shape as student mode in DocumentWorkspace):
+        // highlight/strikeout/freeText lose drag/resize, ink and sticky-note
+        // (textComment) lose everything — a selected annotation can no longer
+        // be moved through the plugin's own drag surface.
+        tools: [
+          {
+            id: 'highlight',
+            behavior: { useAppearanceStream: false, selectAfterCreate: true },
+            interaction: { exclusive: false, isDraggable: !readOnly },
+          },
+          {
+            id: 'strikeout',
+            behavior: { useAppearanceStream: false, selectAfterCreate: true },
+            interaction: { exclusive: false, isDraggable: !readOnly },
+          },
+          {
+            id: 'freeText',
+            behavior: { editAfterCreate: false, selectAfterCreate: true },
+            clickBehavior: { enabled: false } as FreeTextClickBehavior,
+            interaction: {
+              exclusive: false,
+              isDraggable: !readOnly,
+              isResizable: !readOnly,
+              isRotatable: false,
+            },
+          },
+          // Read-only locks for tools without reviewer overrides above.
+          ...(readOnly
+            ? [
+                {
+                  id: 'ink',
+                  interaction: {
+                    exclusive: false,
+                    isDraggable: false,
+                    isResizable: false,
+                    isRotatable: false,
+                  },
+                },
+                {
+                  id: 'textComment',
+                  interaction: {
+                    exclusive: false,
+                    isDraggable: false,
+                    isResizable: false,
+                  },
+                },
+              ]
+            : []),
+        ],
       }),
     ],
-    [src, annotationAuthor],
+    [src, annotationAuthor, readOnly],
   )
 
   if (error) {

@@ -318,6 +318,9 @@ function DefenseWorkspaceLayout({
 
   const [panel, setPanel] = useState<PanelId | null>(null)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
+  // Author filter shared by the comments panel, the annotation layer, and
+  // the hover overlay so list + document stay in sync. Null = all reviewers.
+  const [visibleAuthor, setVisibleAuthor] = useState<string | null>(null)
   const [resubmissionVerdict, setResubmissionVerdict] = useState<ResubmissionVerdictState | null>(null)
   const isResubmission =
     (submission as unknown as { isInitial?: boolean }).isInitial === false ||
@@ -710,6 +713,7 @@ function DefenseWorkspaceLayout({
                                 documentId={activeDocumentId}
                                 pageIndex={pageIndex}
                                 readOnly={isStudent}
+                                visibleAuthorName={visibleAuthor}
                               />
                             </PagePointerProvider>
                           </div>
@@ -732,6 +736,7 @@ function DefenseWorkspaceLayout({
               onSelectAnnotation={handleSelectAnnotation}
               onDeselectAnnotation={handleDeselectAnnotation}
               initialMenuId={openMenuId}
+              visibleAuthorName={visibleAuthor}
             />
           )}
         </div>
@@ -745,6 +750,8 @@ function DefenseWorkspaceLayout({
             initialAnnotations={initialAnnotations as unknown[] | null}
             autoEditId={autoEditId}
             highlightId={highlightCommentId}
+            authorFilter={visibleAuthor}
+            onAuthorFilterChange={setVisibleAuthor}
             onClose={() => {
               discardPendingAnnotations()
               setPanel(null)

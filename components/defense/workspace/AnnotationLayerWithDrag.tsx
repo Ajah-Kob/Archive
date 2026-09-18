@@ -21,6 +21,11 @@ interface AnnotationLayerWithDragProps {
    * annotations cannot be moved.
    */
   readOnly?: boolean
+  /**
+   * Author-name filter (comments-panel author dropdown): when set, only
+   * annotations by this author render. Null shows everyone.
+   */
+  visibleAuthorName?: string | null
 }
 
 /**
@@ -68,6 +73,7 @@ export function AnnotationLayerWithDrag({
   documentId,
   pageIndex,
   readOnly = false,
+  visibleAuthorName = null,
 }: AnnotationLayerWithDragProps) {
   const { plugin } = useAnnotationPlugin()
   const dragStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -82,6 +88,17 @@ export function AnnotationLayerWithDrag({
       pageHeight,
       onSelect,
     }: CustomAnnotationRendererProps<PdfAnnotationObject>) => {
+      // Author filter (comments-panel dropdown): skip rendering annotations
+      // by other authors. children (the visual) is skipped too — a filtered
+      // annotation neither renders nor captures the pointer. Compared
+      // trimmed: the panel derives options from the same trimmed names.
+      const itemAuthor = (annotation as unknown as { author?: unknown }).author
+      if (
+        visibleAuthorName != null &&
+        (typeof itemAuthor !== 'string' || itemAuthor.trim() !== visibleAuthorName)
+      ) {
+        return null
+      }
       const type = annotation.type
       const draggable = !readOnly && DRAGGABLE_TYPES.has(type)
 
@@ -156,7 +173,7 @@ export function AnnotationLayerWithDrag({
         </>
       )
     },
-    [documentId, plugin, readOnly],
+    [documentId, plugin, readOnly, visibleAuthorName],
   )
 
   return (

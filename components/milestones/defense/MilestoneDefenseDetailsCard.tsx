@@ -265,7 +265,11 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
         </div>
       </div>
       <div className="flex items-center justify-center sm:h-[50px] sm:px-2 min-w-0 w-full">
-        <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-[#9ea8c6] text-center">
+        <p
+          className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-center ${
+            centerText.startsWith('✓') ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
+          }`}
+        >
           {centerText}
         </p>
       </div>

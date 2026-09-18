@@ -30,7 +30,7 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 **Feature areas**
 
 - **Role-based access** — `GUEST`, `STUDENT`, `FACULTY`, `ADMIN`, `SUPERADMIN`. Faculty hold adviser/coordinator records; Program Chair is a flag on `Faculty`, not a role.
-- **Join by invitation code** — guests join as student or faculty via a code (`/guest/join-archive`).
+- **Join by invitation code** — guests join as student or faculty via a code (on `/guest` itself).
 - **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`); the workload-monitoring list lives at `/faculty/faculties`.
 - **Sections** — coordinators own sections, students enroll; the overview is the admin/program-chair view (duplicated at `/admin/sections` and `/faculty/sections`), and the coordinator's own section workspace lives at `/faculty/my-section/[sectionId]`.
 - **Templates** — capstone document templates (upload/remove), duplicated at `/admin/templates` and `/faculty/templates`.
@@ -330,7 +330,7 @@ only wrap templates — they do NOT guard.
 | `/faculty/evaluation`                        | `isAdviser` (advisers only)                    | `Main` (full-bleed)  | Adviser evaluation                               |
 | `/faculty/my-section/[sectionId]`            | `isCoordinator`                                | `Main` (full-bleed)  | Coordinator section workspace                    |
 | `/student`, `/student/milestone`, `/student/milestone/[milestone]` | role `STUDENT`                  | `Main` (full-bleed)  | Student capstone journey                         |
-| `/guest`, `/guest/join-archive`              | role `GUEST`                                   | `Welcome`            | Guest join-by-invite-code flow                   |
+| `/guest`                                       | role `GUEST`                                   | `Welcome`            | Guest join-by-invite-code flow                   |
 | `/account/profile`, `/account/security`      | any signed-in user                             | `Main`               | Shared profile/security                          |
 | `/repository`                                | none (any role)                                | `Main`               | Shared capstone repository                       |
 

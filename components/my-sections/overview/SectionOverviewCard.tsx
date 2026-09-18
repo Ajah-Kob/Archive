@@ -51,7 +51,7 @@ export function SectionOverviewCard({ section }: SectionOverviewCardProps) {
   async function handleCopyLink() {
     if (!section.joinCode || copiedLink) return
     // One-click invite link — /join/[code] auto-joins on open (with
-    // login-then-resume for guests). /guest/join-archive stays for manual entry.
+    // login-then-resume for guests). /guest itself stays for manual entry.
     const inviteLink = `${APP_BASE_URL}/join/${section.joinCode}`
     try {
       await navigator.clipboard.writeText(inviteLink)

@@ -71,6 +71,15 @@ export const archiveMuiTheme = createTheme({
         },
       },
     },
+    MuiDigitalClock: {
+      styleOverrides: {
+        root: {
+          '& .MuiMenuItem-root': {
+            justifyContent: 'center',
+          },
+        },
+      },
+    },
     MuiOutlinedInput: {
       styleOverrides: {
         root: {

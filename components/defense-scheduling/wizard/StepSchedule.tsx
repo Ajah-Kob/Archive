@@ -70,6 +70,10 @@ export function StepSchedule({
   const startValue = timeStringToDate(startTime, timeBase)
   const endValue = timeStringToDate(endTime, timeBase)
 
+  // Defenses run 6am–6pm — the pickers enforce it alongside taken slots.
+  const minTime = timeStringToDate('06:00', timeBase)
+  const maxTime = timeStringToDate('18:00', timeBase)
+
   function handleTimeChange(value: Date | null, onChange: (time: string) => void) {
     if (value && isValid(value)) onChange(format(value, 'HH:mm'))
   }
@@ -147,19 +151,29 @@ export function StepSchedule({
       <div className="grid grid-cols-2 gap-[12px]">
         <div className="flex flex-col gap-[6px]">
           <label className={LABEL_CLASS}>Start Time <span className="text-[#ef4444]">*</span></label>
-          <AppTimePicker
-            value={startValue}
-            onChange={(value) => handleTimeChange(value, onStartTimeChange)}
-            shouldDisableTime={shouldDisableTime}
-          />
+            <AppTimePicker
+              value={startValue}
+              onChange={(value) => handleTimeChange(value, onStartTimeChange)}
+              shouldDisableTime={shouldDisableTime}
+              digitalClock
+              minTime={minTime}
+              maxTime={maxTime}
+              skipDisabled
+              timeSteps={{ minutes: 30 }}
+            />
         </div>
         <div className="flex flex-col gap-[6px]">
           <label className={LABEL_CLASS}>End Time <span className="text-[#ef4444]">*</span></label>
-          <AppTimePicker
-            value={endValue}
-            onChange={(value) => handleTimeChange(value, onEndTimeChange)}
-            shouldDisableTime={shouldDisableTime}
-          />
+            <AppTimePicker
+              value={endValue}
+              onChange={(value) => handleTimeChange(value, onEndTimeChange)}
+              shouldDisableTime={shouldDisableTime}
+              digitalClock
+              minTime={minTime}
+              maxTime={maxTime}
+              skipDisabled
+              timeSteps={{ minutes: 30 }}
+            />
         </div>
       </div>
       {timeError ? (

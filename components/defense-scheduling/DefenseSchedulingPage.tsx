@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
-import { DefenseTable } from '@/components/defense-scheduling/DefenseTable'
+import { DefenseTable, type SortKey } from '@/components/defense-scheduling/DefenseTable'
 import { DefenseDetailsDrawer } from '@/components/defense-scheduling/DefenseDetailsDrawer'
 import { CreateDefenseWizard } from '@/components/defense-scheduling/CreateDefenseWizard'
 import {
@@ -52,7 +52,8 @@ export function DefenseSchedulingPage({
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [sectionFilter, setSectionFilter] = useState('')
+  const [sortField, setSortField] = useState<SortKey>('datetime')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   // "All" toggle — ON by default so every schedule (including those created
   // by coordinators) is shown. Toggling OFF narrows to the current user's
   // own schedules.
@@ -64,14 +65,6 @@ export function DefenseSchedulingPage({
   const [wizardOpen, setWizardOpen] = useState(false)
   const [deletingSchedule, setDeletingSchedule] =
     useState<DefenseScheduleSummary | null>(null)
-
-  // The section filter dropdown is keyed by section id, but the schedule
-  // payload only carries the section name — resolve ids to names for the
-  // comparison (duplicate names across coordinators are rare and benign).
-  const sectionNamesById = useMemo(
-    () => new Map(sections.map((s) => [s.id, s.name])),
-    [sections],
-  )
 
   // Dates that already have a schedule, for the wizard calendar dots.
   const existingScheduleDates = useMemo(
@@ -102,10 +95,6 @@ export function DefenseSchedulingPage({
       }
       if (typeFilter && s.type !== typeFilter) return false
       if (statusFilter && s.verdict !== statusFilter) return false
-      if (sectionFilter) {
-        const name = sectionNamesById.get(Number(sectionFilter))
-        if (!name || s.sectionName !== name) return false
-      }
       if (!term) return true
       return (
         s.groupName.toLowerCase().includes(term) ||
@@ -119,11 +108,40 @@ export function DefenseSchedulingPage({
     search,
     typeFilter,
     statusFilter,
-    sectionFilter,
     mySchedules,
     currentUserId,
-    sectionNamesById,
   ])
+
+  function handleSort(field: SortKey) {
+    setSortDir((prev) =>
+      sortField === field ? (prev === 'asc' ? 'desc' : 'asc') : 'desc',
+    )
+    setSortField(field)
+  }
+
+  const visible = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      switch (sortField) {
+        case 'group':
+          return a.groupName.localeCompare(b.groupName) * dir
+        case 'section':
+          return a.sectionName.localeCompare(b.sectionName) * dir
+        case 'type':
+          return a.type.localeCompare(b.type) * dir
+        case 'datetime': {
+          const day =
+            new Date(a.date).getTime() - new Date(b.date).getTime()
+          if (day !== 0) return day * dir
+          return a.startTime.localeCompare(b.startTime) * dir
+        }
+        case 'venue':
+          return a.venue.localeCompare(b.venue) * dir
+        case 'verdict':
+          return a.verdict.localeCompare(b.verdict) * dir
+      }
+    })
+  }, [filtered, sortField, sortDir])
 
   function openCreateWizard() {
     setWizardOpen(true)
@@ -167,11 +185,6 @@ export function DefenseSchedulingPage({
     { value: 'MINOR_REVISION', label: 'Minor Revisions' },
     { value: 'MAJOR_REVISION', label: 'Major Revisions' },
     { value: 'REJECTED', label: 'Rejected' },
-  ]
-
-  const sectionOptions: FilterOption[] = [
-    { value: '', label: 'All Sections' },
-    ...sections.map((s) => ({ value: String(s.id), label: s.name })),
   ]
 
   return (
@@ -232,22 +245,19 @@ export function DefenseSchedulingPage({
             onChange={setStatusFilter}
             ariaLabel="Filter by status"
           />
-          <Filter
-            value={sectionFilter}
-            options={sectionOptions}
-            onChange={setSectionFilter}
-            ariaLabel="Filter by section"
-          />
         </div>
       </HeaderBar>
 
       <div className="flex-1 flex flex-col min-h-0 px-8 pt-[16px] pb-[30px]">
         <DefenseTable
-          schedules={filtered}
+          schedules={visible}
           currentUserId={currentUserId}
           onView={handleView}
           onDelete={handleDelete}
           hasAnySchedules={hasAnySchedules}
+          sortField={sortField}
+          sortDir={sortDir}
+          onSort={handleSort}
         />
       </div>
 

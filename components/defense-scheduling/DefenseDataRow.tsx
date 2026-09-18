@@ -7,7 +7,7 @@ import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 // Shared grid template for the defense schedule table. Keep it here so the
 // header (DefenseTable) and every row use exactly the same column widths.
 export const DEFENSE_GRID_COLS =
-  'grid-cols-[2fr_1.3fr_1.2fr_1fr_1.2fr_1.3fr_1.1fr_120px]'
+  'grid-cols-[2fr_1.3fr_1.2fr_2fr_1.3fr_1.1fr_120px]'
 
 const TYPE_META: Record<DefenseType, { label: string; dotClass: string }> = {
   PROPOSAL: { label: 'Proposal Defense', dotClass: 'bg-[#a855f7]' },
@@ -136,14 +136,11 @@ export function DefenseDataRow({
         </span>
       </div>
 
-      <div className="pr-4">
-        <span className="whitespace-nowrap font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+      <div className="min-w-0 pr-4">
+        <span className="block truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3d4566]">
           {formatDefenseDate(schedule.date)}
         </span>
-      </div>
-
-      <div className="pr-4">
-        <span className="whitespace-nowrap font-sans font-medium text-[12.5px] leading-[18.75px] text-[#6b7399]">
+        <span className="block truncate font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
           {formatTime12hr(schedule.startTime)} – {formatTime12hr(schedule.endTime)}
         </span>
       </div>

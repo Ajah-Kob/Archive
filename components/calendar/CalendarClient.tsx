@@ -17,6 +17,7 @@ import interactionPlugin from '@fullcalendar/react/interaction'
 import classicThemePlugin from '@fullcalendar/react/themes/classic'
 import type {
   CalendarRef,
+  DateClickInfo,
   DateSelectInfo,
   EventClickInfo,
   ContentGenerator,
@@ -83,13 +84,34 @@ const renderEventContent: ContentGenerator<EventDisplayInfo> = (arg) => {
 
 // Forces the theme variable to OUR feed color on the real element, so every
 // theme-driven bit (outer tint wash, dots, list markers) agrees with the
-// custom inner pill. Defined at module scope like renderEventContent.
+// custom inner pill. Also stamps a hover tooltip summarizing the event.
+// Defined at module scope like renderEventContent.
 function handleEventMount(info: MountInfo<EventDisplayInfo>) {
   const feed = info.event.extendedProps.feed as CalendarFeedEvent | undefined
   const raw = feed?.color
   if (typeof raw === 'string' && raw !== '') {
     info.el.style.setProperty('--fc-event-color', raw)
   }
+  if (feed) {
+    const extra = feed.description ? `\n${feed.description}` : ''
+    info.el.setAttribute('title', `${feed.title}\n${formatFeedSpan(feed)}${extra}`)
+  }
+}
+
+// Short human span for tooltips: single day (with times when timed) or range.
+function formatFeedSpan(feed: CalendarFeedEvent): string {
+  const start = new Date(feed.start)
+  const end = new Date(feed.end)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return feed.start
+  const dateFmt = (d: Date) =>
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const timeFmt = (d: Date) =>
+    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  const sameDay = start.toDateString() === end.toDateString()
+  if (sameDay) {
+    return feed.allDay ? dateFmt(start) : `${dateFmt(start)} · ${timeFmt(start)}–${timeFmt(end)}`
+  }
+  return `${dateFmt(start)} – ${dateFmt(end)}`
 }
 
 // Date span selected on the grid — subtask 06 feeds this into NewEventModal.
@@ -170,6 +192,7 @@ export function CalendarClient({
   const calendarRef = useRef<CalendarRef | null>(null)
   const [view, setView] = useState(MONTH_VIEW)
   const [title, setTitle] = useState('')
+  const [isCurrentPeriod, setIsCurrentPeriod] = useState(true)
   // Modal targets — null = closed. Draft span doubles as the NewEventModal
   // open flag so read-only roles (which never set it) never render the modal.
   const [selectedEvent, setSelectedEvent] = useState<CalendarFeedEvent | null>(null)
@@ -179,15 +202,6 @@ export function CalendarClient({
   // list-default can be picked without a server/client mismatch (the server
   // always renders the skeleton).
   const [ready, setReady] = useState(false)
-
-  // TEMPORARY DEBUG (remove after color investigation): report exactly what
-  // colors the browser received, so we can split feed vs render causes.
-  useEffect(() => {
-    console.log(
-      '[calendar-feed-colors]',
-      events.map((e) => `${e.id}:${e.title}:${e.color}`).join(' | '),
-    )
-  }, [events])
 
   // Mobile defaults to the agenda list; the month grid stays one tap away
   // in the view dropdown.
@@ -228,6 +242,26 @@ export function CalendarClient({
 
   function goToday() {
     calendarRef.current?.getApi().today()
+  }
+
+  function handleDatesSet(arg: {
+    view: { title: string }
+    start: Date
+    end: Date
+  }) {
+    setTitle(arg.view.title)
+    const now = new Date()
+    setIsCurrentPeriod(arg.start <= now && now < arg.end)
+  }
+
+  // Clicking a day background drills into Day view (read-only roles included;
+  // span-select creation still belongs to canManage).
+  function handleDateClick(clickInfo: DateClickInfo) {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    api.changeView(DAY_VIEW)
+    api.gotoDate(clickInfo.date)
+    setView(DAY_VIEW)
   }
 
   function handleEventClick(clickInfo: EventClickInfo) {
@@ -301,7 +335,8 @@ export function CalendarClient({
             <button
               type="button"
               onClick={goToday}
-              className="flex items-center justify-center h-[37.5px] px-[14px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] hover:bg-[#f4f6ff] hover:text-[#707dff] hover:border-[#d5dbff] active:scale-[0.98] transition-colors shrink-0"
+              disabled={isCurrentPeriod}
+              className="flex items-center justify-center h-[37.5px] px-[14px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] hover:bg-[#f4f6ff] hover:text-[#707dff] hover:border-[#d5dbff] active:scale-[0.98] transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-[#5a6382] disabled:hover:border-[#e8ebf8] disabled:active:scale-100"
             >
               Today
             </button>
@@ -312,7 +347,7 @@ export function CalendarClient({
 
       <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
         <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)] p-4 sm:p-6 w-full max-w-5xl mx-auto">
-          <div className="flex items-center justify-center pb-4">
+          <div className="flex items-center justify-center pb-1">
             <span
               aria-live="polite"
               className="font-heading font-bold text-[15px] leading-[22px] text-[#10133a] whitespace-nowrap"
@@ -320,6 +355,11 @@ export function CalendarClient({
               {title}
             </span>
           </div>
+          {events.length === 0 ? (
+            <p className="text-center font-sans font-medium text-[13px] leading-[20px] text-[#8a93b4] pb-3">
+              No events scheduled — check back soon.
+            </p>
+          ) : null}
           <div className="calendar-scope">
             {ready ? (
               <FullCalendar
@@ -327,15 +367,20 @@ export function CalendarClient({
                     plugins={CALENDAR_PLUGINS}
                     initialView={view}
                     headerToolbar={false}
-                    datesSet={(arg: { view: { title: string } }) =>
-                      setTitle(arg.view.title)
-                    }
+                    datesSet={handleDatesSet}
+                    firstDay={1}
+                    timeZone="Asia/Manila"
+                    slotMinTime="06:00:00"
+                    slotMaxTime="18:00:00"
+                    nowIndicator
                     events={fcEvents}
                     eventContent={renderEventContent}
                     eventDidMount={handleEventMount}
                     eventClick={handleEventClick}
+                    dateClick={handleDateClick}
                 selectable={canManage}
                 selectMirror={canManage}
+                selectMinDistance={8}
                 select={canManage ? handleSelect : undefined}
                     height="auto"
                     dayMaxEvents

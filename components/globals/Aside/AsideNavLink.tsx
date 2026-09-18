@@ -14,6 +14,7 @@ import {
   Flag,
   Users,
   UserCog,
+  UserPlus,
   Archive,
   type LucideIcon,
 } from 'lucide-react'
@@ -53,6 +54,7 @@ export function NavLinks({
 }) {
   const { data: session } = useSession()
   const role = session?.user?.role
+  const isGuest = role === 'GUEST'
   const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN'
   const isFaculty = !!session?.user?.isFaculty
   const isCoordinator = !!session?.user?.isCoordinator
@@ -72,7 +74,10 @@ export function NavLinks({
   const sections: NavSection[] = [
     {
       label: 'OVERVIEW',
-      items: [{ label: 'Dashboard', href: dashboardHref, icon: LayoutDashboard, show: true }],
+      items: [
+        { label: 'Dashboard', href: dashboardHref, icon: LayoutDashboard, show: !isGuest && !isStudent },
+        { label: 'Join Archive', href: '/guest', icon: UserPlus, show: isGuest },
+      ],
     },
     {
       label: 'CAPSTONE',
@@ -111,7 +116,7 @@ export function NavLinks({
       label: 'RESOURCES',
       items: [
         { label: 'Repositories', href: '/repository', icon: BookMarked, show: true },
-        { label: 'Calendar', href: '/calendar', icon: Calendar, show: true },
+        { label: 'Calendar', href: '/calendar', icon: Calendar, show: !isGuest },
         ...(templatesHref ? [{ label: 'Templates', href: templatesHref, icon: FileText, show: true } as NavItem] : []),
       ],
     },

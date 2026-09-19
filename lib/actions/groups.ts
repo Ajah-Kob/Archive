@@ -53,14 +53,14 @@ export async function getMyWorkspace(userId: number): Promise<{
           students: {
             where: { deletedAt: null },
             include: {
-              user: { select: { id: true, name: true, email: true, image: true } },
+              user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } },
             },
           },
           adviser: {
             include: {
               faculty: {
                 include: {
-                  user: { select: { id: true, name: true, email: true, image: true } },
+                  user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } },
                 },
               },
             },
@@ -75,7 +75,7 @@ export async function getMyWorkspace(userId: number): Promise<{
               },
               faculty: {
                 include: {
-                  user: { select: { id: true, name: true, email: true, image: true } },
+                  user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } },
                 },
               },
             },
@@ -149,6 +149,7 @@ export async function getMyWorkspace(userId: number): Promise<{
     name: s.user.name,
     email: s.user.email,
     image: s.user.image,
+    avatarGradient: (s.user as any).avatarGradient ?? null,
     isLeader: s.id === group.leaderStudentId,
   }))
 
@@ -169,6 +170,7 @@ export async function getMyWorkspace(userId: number): Promise<{
       name: adviserRecord.faculty.user.name,
       email: adviserRecord.faculty.user.email,
       image: adviserRecord.faculty.user.image,
+      avatarGradient: (adviserRecord.faculty.user as any).avatarGradient ?? null,
       workload,
       atCap: workload >= ADVISER_CAP,
     }
@@ -186,6 +188,7 @@ export async function getMyWorkspace(userId: number): Promise<{
         name: facultyUser?.name,
         email: facultyUser?.email,
         image: facultyUser?.image ?? null,
+        avatarGradient: (facultyUser as any)?.avatarGradient ?? null,
       }
     }
   }

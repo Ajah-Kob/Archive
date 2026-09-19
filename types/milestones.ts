@@ -52,6 +52,7 @@ export interface WorkspaceMember {
   name: string
   email: string
   image: string | null
+  avatarGradient: string | null
   isLeader: boolean
 }
 
@@ -65,6 +66,7 @@ export type AdviserState =
       name?: string
       email?: string
       image?: string | null
+      avatarGradient?: string | null
     }
   | {
       state: 'assigned'
@@ -73,6 +75,7 @@ export type AdviserState =
       name: string
       email: string
       image: string | null
+      avatarGradient: string | null
       workload: number
       atCap: boolean
     }

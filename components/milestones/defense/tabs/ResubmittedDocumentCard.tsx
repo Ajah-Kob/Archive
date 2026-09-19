@@ -1,4 +1,8 @@
-import { Clock, Eye, FileSearch } from 'lucide-react'
+'use client'
+
+import { useState } from 'react'
+import { Clock, Eye, FileSearch, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { LatestDocumentCardRoot } from '@/components/defense/DefenseDocumentCard/Root'
 import { LatestDocumentCardHeader } from '@/components/defense/DefenseDocumentCard/Header'
 import { LatestDocumentCardBody } from '@/components/defense/DefenseDocumentCard/Body'
@@ -7,6 +11,7 @@ import {
   deriveResubmissionStatus,
 } from '@/lib/defense/session-helpers'
 import type { ResubmissionStatus } from '@/lib/defense/session-helpers'
+import { getSignedBlobUrl } from '@/lib/blob'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,12 +103,13 @@ function resolveWorkspaceHref(
   latest: StudentResubmittedDocument | null,
   workspaceHref: string | undefined,
   milestone: string | undefined,
-): string {
+): string | null {
   if (workspaceHref) return workspaceHref
   if (latest?.id != null && milestone) {
     return `/student/milestone/${milestone}/${latest.id}`
   }
-  return latest?.blobUrl ?? '#'
+  // No workspace id — caller must fetch via signed blob route, not raw blobUrl
+  return null
 }
 
 function getPillMeta(status: ResubmissionStatus) {
@@ -158,7 +164,80 @@ export function ResubmittedDocumentCard({
   headerTitle = 'Resubmitted Document',
   milestone,
 }: ResubmittedDocumentCardProps) {
+  const [isViewing, setIsViewing] = useState(false)
   const latest = resolveLatest(document, submissions, resubmissions)
+
+  /**
+   * Fetches the resubmitted defense blob via the signed route
+   * /api/blob/defense/... — handles 401/403 with toasts and never leaks
+   * the raw DefenseSubmission.blobUrl in the DOM.
+   */
+  async function handleSignedView() {
+    if (!latest?.blobUrl) {
+      toast.error('Invalid document link.')
+      return
+    }
+    const signedHref = getSignedBlobUrl(latest.blobUrl)
+    if (!signedHref) {
+      toast.error('Invalid document link.')
+      return
+    }
+    setIsViewing(true)
+    try {
+      const res = await fetch(signedHref, { credentials: 'include' })
+      if (res.status === 401) {
+        toast.error('Please sign in to view this document.')
+        return
+      }
+      if (res.status === 403) {
+        toast.error('You do not have access to this document.')
+        return
+      }
+      if (!res.ok) {
+        toast.error('Failed to load document. Please try again.')
+        return
+      }
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        try {
+          const data = await res.json()
+          const url = (data as { downloadUrl?: string; url?: string; payload?: { downloadUrl?: string } }).downloadUrl
+            ?? (data as { url?: string }).url
+            ?? (data as { payload?: { downloadUrl?: string } }).payload?.downloadUrl
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // fall through
+        }
+        toast.error('Failed to load document.')
+        return
+      }
+      const blob = await res.blob()
+      if (blob.type.includes('json')) {
+        try {
+          const text = await blob.text()
+          const data = JSON.parse(text) as { downloadUrl?: string; url?: string }
+          const url = data.downloadUrl ?? data.url
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // not json
+        }
+      }
+      const objectUrl = URL.createObjectURL(blob)
+      window.open(objectUrl, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+    } catch (err) {
+      console.error('[ResubmittedDocumentCard | View failed]:', err)
+      toast.error('Failed to load document. Please try again.')
+    } finally {
+      setIsViewing(false)
+    }
+  }
 
   if (!latest) {
     return (
@@ -191,7 +270,8 @@ export function ResubmittedDocumentCard({
     pages ?? ann?.pages ?? (latest as StudentResubmittedDocument).pages ?? null
   const reviewed =
     reviewedAt ?? (latest as StudentResubmittedDocument).reviewedAt ?? null
-  const href = resolveWorkspaceHref(latest, workspaceHref, milestone)
+  const workspaceHrefResolved = resolveWorkspaceHref(latest, workspaceHref, milestone)
+  const href = workspaceHrefResolved
   const meta = `v${latest.version} · PDF · ${formatSize(latest.size)} · ${latest.dateSubmitted ? `${formatDate(latest.dateSubmitted)} · ` : ''}Submitted by ${latest.submittedByName}`
   const hasCounts = typeof c === 'number' && typeof p === 'number'
   const approvedLabel = `${approved}/${total}`
@@ -238,14 +318,32 @@ export function ResubmittedDocumentCard({
               )}
             </div>
             <div className="flex items-start gap-[10px] shrink-0">
-              <a
-                href={href}
-                aria-label={`View ${latest.fileName}`}
-                title="View document"
-                className="flex items-center gap-[6px] h-[32px] px-[13px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
-              >
-                <Eye className="size-[11px]" strokeWidth={2} /> View
-              </a>
+              {href ? (
+                <a
+                  href={href}
+                  aria-label={`View ${latest.fileName}`}
+                  title="View document"
+                  className="flex items-center gap-[6px] h-[32px] px-[13px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
+                >
+                  <Eye className="size-[11px]" strokeWidth={2} /> View
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleSignedView()}
+                  disabled={isViewing}
+                  aria-label={`View ${latest.fileName}`}
+                  title="View document"
+                  className="flex items-center gap-[6px] h-[32px] px-[13px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isViewing ? (
+                    <Loader2 className="size-[11px] animate-spin motion-reduce:animate-none" />
+                  ) : (
+                    <Eye className="size-[11px]" strokeWidth={2} />
+                  )}{' '}
+                  View
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { ChevronDown, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { JourneyTracker } from '@/components/milestones/JourneyTracker'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { getInitials } from '@/lib/helper'
+import { blobUrlToPathname, toSignedBlobPath } from '@/lib/blob'
 import { getCoordinatorGroupDetail, type SectionGroupDetail, type SectionGroupTopic } from '@/lib/actions/sections'
 
 interface GroupProgressDrawerProps {
@@ -74,6 +76,77 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
   }, [groupId])
 
   const isOpen = groupId != null
+
+  async function handleArchivingOpen(blobUrl: string) {
+    const signedHref = toSignedBlobPath(blobUrl)
+    const pathname = blobUrlToPathname(blobUrl)
+    if (!signedHref || !pathname.startsWith('archiving/')) {
+      toast.error('Invalid document link.')
+      return
+    }
+    try {
+      const res = await fetch(signedHref, { credentials: 'include' })
+      if (res.status === 401) {
+        toast.error('Please sign in to view this document.')
+        return
+      }
+      if (res.status === 403) {
+        toast.error('You do not have access to this document.')
+        return
+      }
+      if (!res.ok) {
+        toast.error('Failed to load document.')
+        return
+      }
+      const contentType = res.headers.get('content-type') ?? ''
+      if (contentType.includes('application/json')) {
+        const data = (await res.json()) as { url?: string; downloadUrl?: string }
+        const url = data.downloadUrl ?? data.url
+        if (url) {
+          window.open(url, '_blank', 'noopener,noreferrer')
+          return
+        }
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      console.error('[GroupProgressDrawer | archiving view failed]:', err)
+      toast.error('Failed to load document.')
+    }
+  }
+
+  async function handleChapterOpen(blobUrl: string) {
+    const signedHref = toSignedBlobPath(blobUrl)
+    const pathname = blobUrlToPathname(blobUrl)
+    if (!signedHref || !pathname.startsWith('chapter/')) {
+      toast.error('Invalid document link.')
+      return
+    }
+    try {
+      const res = await fetch(signedHref, { credentials: 'include' })
+      if (res.status === 401) {
+        toast.error('Please sign in to view this document.')
+        return
+      }
+      if (res.status === 403) {
+        toast.error('You do not have access to this document.')
+        return
+      }
+      if (!res.ok) {
+        toast.error('Failed to load document.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      console.error('[GroupProgressDrawer | chapter view failed]:', err)
+      toast.error('Failed to load document.')
+    }
+  }
 
   return (
     <>
@@ -233,9 +306,13 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
                                   <div key={sub.id} className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-[#fafbff] transition-colors">
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-2 min-w-0">
-                                        <a href={sub.blobUrl} target="_blank" rel="noopener noreferrer" className="font-sans font-semibold text-[11px] leading-[16.5px] text-[#707dff] hover:text-[#5a67ff] hover:underline truncate">
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleChapterOpen(sub.blobUrl)}
+                                          className="font-sans font-semibold text-[11px] leading-[16.5px] text-[#707dff] hover:text-[#5a67ff] hover:underline truncate text-left"
+                                        >
                                           {sub.fileName}
-                                        </a>
+                                        </button>
                                         <span className="font-sans text-[10px] px-1.5 py-0.5 rounded bg-[#f4f6ff] border border-[#e0e3ff] text-[#707dff] shrink-0">v{sub.version}</span>
                                       </div>
                                       <div className="flex items-center gap-2 pt-1">
@@ -312,11 +389,20 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
                   <span className="font-sans text-[11px] px-2 py-0.5 rounded-full bg-[#f4f6ff] border border-[#e0e3ff] text-[#707dff] self-start">
                     {(detail as unknown as { archiving: { status: string } }).archiving.status}
                   </span>
-                  {(detail as unknown as { archiving: { fileName: string | null; blobUrl: string | null } }).archiving.fileName && (
-                    <a href={(detail as unknown as { archiving: { blobUrl: string } }).archiving.blobUrl} target="_blank" rel="noopener noreferrer" className="font-sans text-[11px] text-[#707dff] hover:underline truncate">
-                      {(detail as unknown as { archiving: { fileName: string } }).archiving.fileName}
-                    </a>
-                  )}
+                  {(detail as unknown as { archiving: { fileName: string | null; blobUrl: string | null } }).archiving.fileName &&
+                    (detail as unknown as { archiving: { blobUrl: string } }).archiving.blobUrl && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleArchivingOpen(
+                            (detail as unknown as { archiving: { blobUrl: string } }).archiving.blobUrl,
+                          )
+                        }
+                        className="font-sans text-[11px] text-[#707dff] hover:underline truncate text-left"
+                      >
+                        {(detail as unknown as { archiving: { fileName: string } }).archiving.fileName}
+                      </button>
+                    )}
                 </div>
               ) : (
                 <p className="font-sans text-[12px] italic text-[#c4cadf]">No archiving submission yet.</p>

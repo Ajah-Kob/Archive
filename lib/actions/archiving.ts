@@ -843,7 +843,7 @@ export async function uploadArchivingDocument(_prevState: any, formData: FormDat
 
     // Vercel Blob put — pathname is scoped to this group's archiving folder
     const blob = await put(`archiving/${groupId}/${safeName}`, buffer, {
-      access: 'public',
+      access: 'private',
       contentType: file.type || PDF_MIME,
       addRandomSuffix: true,
     })

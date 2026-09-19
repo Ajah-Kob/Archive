@@ -6,6 +6,7 @@ import { X, FileText, ExternalLink, Download, Users, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { approveArchiving } from '@/lib/actions/archiving'
 import type { ArchivingReviewItem } from '@/lib/actions/archiving'
+import { blobUrlToPathname, toSignedBlobPath } from '@/lib/blob'
 
 interface ChairReviewDetailModalProps {
   submission: ArchivingReviewItem | null
@@ -87,6 +88,97 @@ export function ChairReviewDetailModal({
   }, [isOpen, onClose, isApproving])
 
   if (!submission) return null
+
+  // Private archiving blob: derive signed route (never expose raw blobUrl in href).
+  // DB still stores https://…vercel-storage.com/archiving/{groupId}/… but
+  // View/Download fetch via /api/blob/archiving/... with 401/403 toasts.
+  const signedHref = submission.blobUrl ? toSignedBlobPath(submission.blobUrl) : ''
+  const pathname = submission.blobUrl ? blobUrlToPathname(submission.blobUrl) : ''
+
+  async function handleSignedView() {
+    if (!signedHref || !pathname.startsWith('archiving/')) {
+      toast.error('Invalid document link.')
+      return
+    }
+    try {
+      const res = await fetch(signedHref, { credentials: 'include' })
+      if (res.status === 401) {
+        toast.error('Please sign in to view this document.')
+        return
+      }
+      if (res.status === 403) {
+        toast.error('You do not have access to this document.')
+        return
+      }
+      if (!res.ok) {
+        toast.error('Failed to load document.')
+        return
+      }
+      const contentType = res.headers.get('content-type') ?? ''
+      if (contentType.includes('application/json')) {
+        const data = (await res.json()) as { url?: string; downloadUrl?: string }
+        const url = data.downloadUrl ?? data.url
+        if (url) {
+          window.open(url, '_blank', 'noopener,noreferrer')
+          return
+        }
+      }
+      const blob = await res.blob()
+      if (blob.type.includes('json')) {
+        try {
+          const text = await blob.text()
+          const data = JSON.parse(text) as { url?: string; downloadUrl?: string }
+          const url = data.downloadUrl ?? data.url
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // not json
+        }
+      }
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      console.error('[ChairReviewDetailModal | View failed]:', err)
+      toast.error('Failed to load document.')
+    }
+  }
+
+  async function handleSignedDownload() {
+    if (!signedHref || !pathname.startsWith('archiving/')) {
+      toast.error('Invalid document link.')
+      return
+    }
+    try {
+      const res = await fetch(signedHref, { credentials: 'include' })
+      if (res.status === 401) {
+        toast.error('Please sign in to download this document.')
+        return
+      }
+      if (res.status === 403) {
+        toast.error('You do not have access to this document.')
+        return
+      }
+      if (!res.ok) {
+        toast.error('Failed to download document.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = submission.fileName ?? 'document.pdf'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      console.error('[ChairReviewDetailModal | Download failed]:', err)
+      toast.error('Failed to download document.')
+    }
+  }
 
   async function handleApprove() {
     if (!submission) return
@@ -289,21 +381,22 @@ export function ChairReviewDetailModal({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <a
-                    href={submission.blobUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => void handleSignedView()}
                     className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[9px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[12px] text-[#5a6382] hover:bg-[#f8f9ff] transition-colors"
+                    aria-label={`View ${submission.fileName}`}
                   >
                     <ExternalLink className="size-[13px]" /> View
-                  </a>
-                  <a
-                    href={submission.blobUrl}
-                    download={submission.fileName}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSignedDownload()}
                     className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[9px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[12px] text-[#5a6382] hover:bg-[#f8f9ff] transition-colors"
+                    aria-label={`Download ${submission.fileName}`}
                   >
                     <Download className="size-[13px]" /> Download
-                  </a>
+                  </button>
                 </div>
               </div>
             ) : (

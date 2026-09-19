@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
+  Eye,
   FileText,
   Loader2,
   RefreshCw,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { put as blobPut } from '@vercel/blob/client'
+import { getSignedBlobUrl } from '@/lib/blob'
 import type {
   DefenseDocumentInfo,
   DefenseUploadActions,
@@ -65,6 +67,7 @@ export function ReplaceDocumentModal({
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [replacing, setReplacing] = useState(false)
+  const [isViewing, setIsViewing] = useState(false)
 
   // Close on Escape while open (matches VerdictConfirmModal / drawers).
   useEffect(() => {
@@ -90,7 +93,7 @@ export function ReplaceDocumentModal({
 
     try {
       const blob = await blobPut(tokenRes.payload.pathname, file, {
-        access: 'public',
+        access: 'private',
         contentType: 'application/pdf',
         token: tokenRes.payload.token,
         onUploadProgress: (progress) => {
@@ -150,6 +153,76 @@ export function ReplaceDocumentModal({
     setDraft(null)
     setError(null)
     if (inputRef.current) inputRef.current.value = ''
+  }
+
+  /**
+   * Opens a defense blob via the auth-gated route /api/blob/defense/...
+   * instead of the raw DefenseSubmission.blobUrl. Handles 401/403 with toasts
+   * and never leaks the raw blob URL in a DOM href. Pathname extraction is
+   * via getSignedBlobUrl which mirrors the route's expected pathname
+   * (defense/{scheduleId}/...).
+   */
+  async function handleViewBlob(blobUrl: string | null | undefined) {
+    const signedHref = getSignedBlobUrl(blobUrl)
+    if (!signedHref) {
+      toast.error('Invalid document link.')
+      return
+    }
+    setIsViewing(true)
+    try {
+      const res = await fetch(signedHref, { credentials: 'include' })
+      if (res.status === 401) {
+        toast.error('Please sign in to view this document.')
+        return
+      }
+      if (res.status === 403) {
+        toast.error('You do not have access to this document.')
+        return
+      }
+      if (!res.ok) {
+        toast.error('Failed to load document. Please try again.')
+        return
+      }
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        try {
+          const data = await res.json()
+          const url = (data as { downloadUrl?: string; url?: string; payload?: { downloadUrl?: string } }).downloadUrl
+            ?? (data as { url?: string }).url
+            ?? (data as { payload?: { downloadUrl?: string } }).payload?.downloadUrl
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // fall through
+        }
+        toast.error('Failed to load document.')
+        return
+      }
+      const blob = await res.blob()
+      if (blob.type.includes('json')) {
+        try {
+          const text = await blob.text()
+          const data = JSON.parse(text) as { downloadUrl?: string; url?: string }
+          const url = data.downloadUrl ?? data.url
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // not json
+        }
+      }
+      const objectUrl = URL.createObjectURL(blob)
+      window.open(objectUrl, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+    } catch (err) {
+      console.error('[ReplaceDocumentModal | View failed]:', err)
+      toast.error('Failed to load document. Please try again.')
+    } finally {
+      setIsViewing(false)
+    }
   }
 
   const confirmReplace = async () => {
@@ -218,7 +291,7 @@ export function ReplaceDocumentModal({
 
         {/* Body */}
         <div className="px-6 py-5 flex flex-col gap-[16px]">
-          {/* Current document */}
+          {/* Current document — preview fetches via signed route /api/blob/defense/... (not raw blobUrl) */}
           <div className="flex items-center gap-[11px] px-[14px] py-[12px] rounded-[10px] bg-[#fafbff] border border-[#eceef8]">
             <div className="flex size-[36px] items-center justify-center rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] shrink-0">
               <FileText
@@ -231,6 +304,19 @@ export function ReplaceDocumentModal({
                 {document.fileName}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => void handleViewBlob(document.blobUrl)}
+              disabled={isViewing}
+              className="flex items-center gap-[5px] h-[32px] px-[13px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isViewing ? (
+                <Loader2 className="size-[11px] animate-spin motion-reduce:animate-none" />
+              ) : (
+                <Eye className="size-[11px]" />
+              )}
+              View
+            </button>
           </div>
 
           <input
@@ -258,7 +344,7 @@ export function ReplaceDocumentModal({
           </div>
 
           {draft ? (
-            /* Uploaded (draft) state */
+            /* Uploaded (draft) state — upload-then-preview fetches via signed route, not raw blobUrl */
             <div className="flex flex-col gap-[10px]">
               <div className="flex items-center gap-[11px] px-[14px] py-[12px] rounded-[10px] bg-[#fafbff] border border-[#eceef8]">
                 <div className="flex size-[36px] items-center justify-center rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] shrink-0">
@@ -283,6 +369,21 @@ export function ReplaceDocumentModal({
                         : `PDF · ${formatSize(draft.file.size)} · Ready to replace`}
                   </p>
                 </div>
+                {draft.status === 'ready' && draft.blobUrl && (
+                  <button
+                    type="button"
+                    onClick={() => void handleViewBlob(draft.blobUrl)}
+                    disabled={isViewing || replacing}
+                    className="flex items-center gap-[5px] h-[32px] px-[10px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isViewing ? (
+                      <Loader2 className="size-[11px] animate-spin motion-reduce:animate-none" />
+                    ) : (
+                      <Eye className="size-[11px]" />
+                    )}
+                    Preview
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleRemove}

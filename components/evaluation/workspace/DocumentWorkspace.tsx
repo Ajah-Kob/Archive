@@ -15,9 +15,11 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
+import { blobUrlToPathname, toSignedBlobPath } from '@/lib/blob'
 import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
 import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
 import {
@@ -165,6 +167,152 @@ export function DocumentWorkspace({
   const { engine, isLoading, error } = usePdfiumEngine()
   const { data: session } = useSession()
 
+  // Private Blob: derive signed route pathname (never expose raw blobUrl in EmbedPDF src).
+  // DB stores https://…vercel-storage.com/chapter/{groupId}/… but the viewer fetches
+  // via GET /api/blob/chapter/... with credentials, handling 401/403 with toast/redirect.
+  const pathname = blobUrlToPathname(blobUrl)
+  const signedPath = toSignedBlobPath(blobUrl)
+  const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null)
+  const [pdfFetching, setPdfFetching] = useState(true)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let currentUrl: string | null = null
+
+    async function load() {
+      if (!blobUrl) {
+        if (!cancelled) {
+          setPdfError('No document.')
+          setPdfFetching(false)
+        }
+        return
+      }
+      // Repository archives/* stays public — but chapter blobs are private archiving/chapter.
+      // If pathname is not a private prefix, fall back to direct blobUrl (e.g. legacy public).
+      const isPrivate = pathname.startsWith('chapter/') || pathname.startsWith('archiving/') || pathname.startsWith('defense/')
+      if (!isPrivate) {
+        // Non-private (e.g. archives/* or old public) — allow direct load but still try signed route first when available.
+        if (signedPath && pathname) {
+          // try signed; fall back to raw on failure
+        } else {
+          if (!cancelled) {
+            setPdfObjectUrl(blobUrl)
+            setPdfFetching(false)
+          }
+          return
+        }
+      }
+      if (!signedPath) {
+        if (!cancelled) {
+          setPdfError('Invalid document link.')
+          setPdfFetching(false)
+        }
+        return
+      }
+      if (!cancelled) {
+        setPdfFetching(true)
+        setPdfError(null)
+      }
+      try {
+        const res = await fetch(signedPath, { credentials: 'include', headers: { Accept: 'application/pdf' } })
+        if (cancelled) return
+        if (res.status === 401) {
+          const msg = 'Please sign in to view this document.'
+          setPdfError(msg)
+          toast.error(msg)
+          return
+        }
+        if (res.status === 403) {
+          const msg = 'You do not have access to this document.'
+          setPdfError(msg)
+          toast.error(msg)
+          return
+        }
+        if (!res.ok) {
+          const msg = 'Failed to load document.'
+          setPdfError(msg)
+          toast.error(msg)
+          return
+        }
+        const contentType = res.headers.get('content-type') ?? ''
+        if (contentType.includes('application/json')) {
+          try {
+            const data = (await res.json()) as { url?: string; downloadUrl?: string }
+            const url = data.downloadUrl ?? data.url
+            if (url) {
+              const blobRes = await fetch(url, { credentials: 'include' })
+              if (!blobRes.ok) throw new Error(`Signed URL fetch failed: ${blobRes.status}`)
+              const blob = await blobRes.blob()
+              const urlObj = URL.createObjectURL(blob)
+              if (cancelled) {
+                URL.revokeObjectURL(urlObj)
+                return
+              }
+              currentUrl = urlObj
+              setPdfObjectUrl(urlObj)
+              return
+            }
+          } catch {
+            // fall through
+          }
+        }
+        const blob = await res.blob()
+        if (blob.type.includes('json')) {
+          try {
+            const text = await blob.text()
+            const data = JSON.parse(text) as { url?: string; downloadUrl?: string }
+            const url = data.downloadUrl ?? data.url
+            if (url) {
+              const blobRes = await fetch(url, { credentials: 'include' })
+              if (blobRes.ok) {
+                const inner = await blobRes.blob()
+                const urlObj = URL.createObjectURL(inner)
+                if (cancelled) {
+                  URL.revokeObjectURL(urlObj)
+                  return
+                }
+                currentUrl = urlObj
+                setPdfObjectUrl(urlObj)
+                return
+              }
+            }
+          } catch {
+            // not json
+          }
+        }
+        const urlObj = URL.createObjectURL(blob)
+        if (cancelled) {
+          URL.revokeObjectURL(urlObj)
+          return
+        }
+        currentUrl = urlObj
+        setPdfObjectUrl(urlObj)
+      } catch (err) {
+        if (cancelled) return
+        console.error('[DocumentWorkspace | signed fetch failed]:', err)
+        const msg = 'Failed to load document. Please try again.'
+        setPdfError(msg)
+        toast.error(msg)
+      } finally {
+        if (!cancelled) setPdfFetching(false)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+      if (currentUrl) URL.revokeObjectURL(currentUrl)
+    }
+  }, [blobUrl, pathname, signedPath])
+
+  useEffect(() => {
+    return () => {
+      if (pdfObjectUrl) URL.revokeObjectURL(pdfObjectUrl)
+    }
+  }, [pdfObjectUrl])
+
   // The adviser's display name is stamped on every annotation they create.
   const annotationAuthor = session?.user?.name ?? 'Adviser'
 
@@ -176,10 +324,12 @@ export function DocumentWorkspace({
   // overrides that disable drag/resize/rotate — otherwise a selected ink or
   // sticky-note annotation can still be moved through the plugin's own
   // drag surface even though our custom drag surfaces never mount.
+  // Render PDF from fetched signed-route object URL, not raw blobUrl (private).
+  const effectivePdfUrl = pdfObjectUrl ?? blobUrl
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url: blobUrl, documentId: CURRENT_DOCUMENT_ID }],
+        initialDocuments: [{ url: effectivePdfUrl, documentId: CURRENT_DOCUMENT_ID }],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),
@@ -249,8 +399,35 @@ export function DocumentWorkspace({
         ],
       }),
     ],
-    [blobUrl, annotationAuthor, isStudent],
+    [effectivePdfUrl, annotationAuthor, isStudent],
   )
+
+  // Signed-route loading / 401/403 error precedes engine display — document
+  // requires auth and fails anonymously (curl 401), per private-blobs spec.
+  if (pdfError) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff] px-6 text-center">
+        <TriangleAlert className="size-6 text-[#d97706]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+          {pdfError}
+        </p>
+        <p className="font-sans text-[11px] text-[#9ea8c6] break-all">
+          Stored as private blob {pathname ? `at ${pathname}` : ''} — fetched via {signedPath || '/api/blob/...'}.
+        </p>
+      </div>
+    )
+  }
+
+  if (pdfFetching) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <Loader2 className="size-6 animate-spin text-[#707dff]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+          Loading document…
+        </p>
+      </div>
+    )
+  }
 
   if (error) {
     return (

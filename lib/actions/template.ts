@@ -3,7 +3,7 @@
 import { revalidateTag } from 'next/cache'
 import { put } from '@vercel/blob'
 import prisma from '@/lib/prisma'
-import { requireUser } from '@/lib/actions/guard'
+import { requireUser, unauthorized } from '@/lib/actions/guard'
 
 const ALLOWED_TYPES = [
   'application/pdf',
@@ -15,6 +15,10 @@ const MAX_SIZE_BYTES = 10 * 1024 * 1024
 export async function getTemplates(search?: string) {
   const session = await requireUser()
   if (!session) {
+    return []
+  }
+  // BSIS-only: guests have not joined a section/faculty yet — no templates.
+  if ((session.user.role as string) === 'GUEST') {
     return []
   }
 
@@ -62,6 +66,9 @@ export async function uploadTemplate(formData: FormData) {
   if (!session) {
     return { success: false, payload: null, message: 'Not authorized.' }
   }
+  if ((session.user.role as string) === 'GUEST') {
+    return { success: false, payload: null, message: 'Not authorized.' }
+  }
 
   const file = formData.get('file') as File
 
@@ -88,7 +95,7 @@ export async function uploadTemplate(formData: FormData) {
     const buffer = Buffer.from(arrayBuffer)
 
     const blob = await put(`templates/${file.name}`, buffer, {
-      access: 'public',
+      access: 'private',
       contentType: file.type,
       addRandomSuffix: true,
     })
@@ -125,6 +132,9 @@ export async function uploadTemplate(formData: FormData) {
 export async function deleteTemplate(id: number) {
   const session = await requireUser()
   if (!session) {
+    return { success: false, message: 'Not authorized.' }
+  }
+  if ((session.user.role as string) === 'GUEST') {
     return { success: false, message: 'Not authorized.' }
   }
 

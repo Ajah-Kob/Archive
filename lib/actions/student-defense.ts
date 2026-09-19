@@ -784,7 +784,11 @@ export async function uploadDefenseToken(
       allowedContentTypes: ['application/pdf'],
       maximumSizeInBytes: MAX_SIZE_BYTES,
       addRandomSuffix: true,
-    })
+      // Constrain issued token to private blobs under defense/{scheduleId}/
+      // — single Vercel Blob store, per-upload access: private (adviser request).
+      // Client `blobPut` will create a private blob via this scoped token.
+      access: 'private',
+    } as any)
     return { success: true, message: '', payload: { token, pathname } }
   } catch (error) {
     console.error('[uploadDefenseToken | Error]:', error)

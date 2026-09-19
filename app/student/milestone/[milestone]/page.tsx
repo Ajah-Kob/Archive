@@ -18,6 +18,9 @@ import { TopicSubmissionView } from '@/components/milestones/topic-submission/To
 import { ChapterSubmissionView } from '@/components/milestones/chapter/ChapterSubmissionView'
 import { LockedChapterPlaceholder } from '@/components/milestones/chapter/LockedChapterPlaceholder'
 import { ArchivingView } from '@/components/milestones/archiving/ArchivingView'
+// NOTE: chapter + archiving blobs are private (see lib/blob.ts). Viewers fetch via
+// GET /api/blob/{pathname} where pathname = blobUrlToPathname(blobUrl)
+// (new URL(blobUrl).pathname slice). Repository archives/* stays public.
 
 const DEFENSE_SLUGS = ['proposal-defense', 'final-defense']
 

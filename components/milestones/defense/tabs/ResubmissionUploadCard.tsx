@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { FileText, Loader2, TriangleAlert, UploadCloud, X } from 'lucide-react'
+import { Eye, FileText, Loader2, TriangleAlert, UploadCloud, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { put as blobPut } from '@vercel/blob/client'
 import {
@@ -9,6 +9,7 @@ import {
   uploadDefenseToken,
 } from '@/lib/actions/student-defense'
 import type { DefenseType } from '@prisma/client'
+import { getSignedBlobUrl } from '@/lib/blob'
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024
 
@@ -48,8 +49,83 @@ export function ResubmissionUploadCard({
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [isViewing, setIsViewing] = useState(false)
 
   const openPicker = () => inputRef.current?.click()
+
+  /**
+   * Opens the drafted defense blob via the signed route /api/blob/defense/...
+   * Keeps upload private and ensures old preview still works via migrated URL
+   * because getSignedBlobUrl extracts the pathname from either the old public
+   * or new private blob URL consistently (defense/{scheduleId}/... head pass).
+   * 401/403 are surfaced as toasts; raw blobUrl never appears in DOM href.
+   */
+  async function handlePreviewDraft() {
+    if (!draft?.blobUrl) {
+      toast.error('No document to preview.')
+      return
+    }
+    const signedHref = getSignedBlobUrl(draft.blobUrl)
+    if (!signedHref) {
+      toast.error('Invalid document link.')
+      return
+    }
+    setIsViewing(true)
+    try {
+      const res = await fetch(signedHref, { credentials: 'include' })
+      if (res.status === 401) {
+        toast.error('Please sign in to view this document.')
+        return
+      }
+      if (res.status === 403) {
+        toast.error('You do not have access to this document.')
+        return
+      }
+      if (!res.ok) {
+        toast.error('Failed to load document. Please try again.')
+        return
+      }
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        try {
+          const data = await res.json()
+          const url = (data as { downloadUrl?: string; url?: string; payload?: { downloadUrl?: string } }).downloadUrl
+            ?? (data as { url?: string }).url
+            ?? (data as { payload?: { downloadUrl?: string } }).payload?.downloadUrl
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // fall through
+        }
+        toast.error('Failed to load document.')
+        return
+      }
+      const blob = await res.blob()
+      if (blob.type.includes('json')) {
+        try {
+          const text = await blob.text()
+          const data = JSON.parse(text) as { downloadUrl?: string; url?: string }
+          const url = data.downloadUrl ?? data.url
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // not json
+        }
+      }
+      const objectUrl = URL.createObjectURL(blob)
+      window.open(objectUrl, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+    } catch (err) {
+      console.error('[ResubmissionUploadCard | Preview failed]:', err)
+      toast.error('Failed to load document. Please try again.')
+    } finally {
+      setIsViewing(false)
+    }
+  }
 
   async function startUpload(file: File) {
     setDraft({ file, status: 'uploading', progress: 0 })
@@ -64,7 +140,7 @@ export function ResubmissionUploadCard({
 
     try {
       const blob = await blobPut(tokenRes.payload.pathname, file, {
-        access: 'public',
+        access: 'private',
         contentType: 'application/pdf',
         token: tokenRes.payload.token,
         onUploadProgress: (progress) => {
@@ -191,6 +267,22 @@ export function ResubmissionUploadCard({
                       : `PDF · ${formatSize(draft.file.size)} · Ready to submit`}
                 </p>
               </div>
+              {/* Preview via /api/blob/defense/... — keeps private access, old URLs still resolve via pathname extraction */}
+              {draft.status === 'ready' && draft.blobUrl && (
+                <button
+                  type="button"
+                  onClick={() => void handlePreviewDraft()}
+                  disabled={isViewing || submitting}
+                  className="flex items-center gap-[5px] h-[32px] px-[10px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[11px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isViewing ? (
+                    <Loader2 className="size-[11px] animate-spin motion-reduce:animate-none" />
+                  ) : (
+                    <Eye className="size-[11px]" />
+                  )}
+                  Preview
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleSubmit}

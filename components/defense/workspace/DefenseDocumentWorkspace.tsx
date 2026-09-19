@@ -19,6 +19,7 @@ import type { LucideIcon } from 'lucide-react'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
+import { blobUrlToPathname, isPrivateBlobUrl, toSignedBlobPath } from '@/lib/blob'
 import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
 import {
   DocumentManagerPluginPackage,
@@ -165,10 +166,24 @@ export function DefenseDocumentWorkspace({
 
   const annotationAuthor = session?.user?.name ?? 'Panelist'
 
+  // Private defense/chapter/archiving blobs must be fetched via the
+  // auth-gated route /api/blob/defense/... (single private store).
+  // isPrivateBlobUrl checks the pathname prefix; signed route handles
+  // head+auth and streams the blob so no raw private URL is ever put in
+  // the DOM or handed to PDF.js directly. Public user/* avatars stay direct.
+  const effectiveBlobUrl = useMemo(() => {
+    if (!blobUrl) return blobUrl
+    if (!isPrivateBlobUrl(blobUrl)) return blobUrl
+    const signed = toSignedBlobPath(blobUrl)
+    // Defensive: if pathname extraction failed, fall back to raw (will 404)
+    // but keep old public URLs working via the same signed extraction.
+    return signed || blobUrl
+  }, [blobUrl])
+
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url: blobUrl, documentId: CURRENT_DOCUMENT_ID }],
+        initialDocuments: [{ url: effectiveBlobUrl, documentId: CURRENT_DOCUMENT_ID }],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),
@@ -224,7 +239,7 @@ export function DefenseDocumentWorkspace({
         ],
       }),
     ],
-    [blobUrl, annotationAuthor, isStudent],
+    [effectiveBlobUrl, annotationAuthor, isStudent],
   )
 
   if (error) {

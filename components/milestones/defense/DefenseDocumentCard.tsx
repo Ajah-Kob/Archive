@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { put as blobPut } from '@vercel/blob/client'
 import { SubmitDocumentConfirmModal } from './SubmitDocumentConfirmModal'
 import { ReplaceDocumentModal } from './ReplaceDocumentModal'
+import { getSignedBlobUrl } from '@/lib/blob'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -314,6 +315,7 @@ function DocumentRow({
       milestoneSlug?: string
     }
   const [replaceOpen, setReplaceOpen] = useState(false)
+  const [isViewing, setIsViewing] = useState(false)
 
   const normalizedStatus = (status ?? '').toUpperCase().replace(/\s+/g, '_')
   const isNoVerdict = normalizedStatus === 'PENDING'
@@ -328,6 +330,82 @@ function DocumentRow({
   const meta = versionLabel
     ? `${versionLabel} · PDF · ${formatSize(document.size)} · ${formatDate(document.submittedAt)} · Submitted by ${document.submittedByName}`
     : `PDF · ${formatSize(document.size)} · ${formatDate(document.submittedAt)} · Submitted by ${document.submittedByName}`
+
+  /**
+   * Opens the document via the auth-gated blob route instead of the raw
+   * DefenseSubmission.blobUrl. Workspace href (internal page) is preferred
+   * when available; otherwise the stored blobUrl is resolved to
+   * /api/blob/defense/... via pathname extraction and fetched with credentials.
+   * 401/403 are surfaced as toasts and no raw blob URL is ever rendered in the DOM.
+   */
+  async function handleSignedView() {
+    if (workspaceHref) {
+      window.open(workspaceHref, '_blank', 'noopener,noreferrer')
+      return
+    }
+    const signedHref = getSignedBlobUrl(document.blobUrl)
+    if (!signedHref) {
+      toast.error('Invalid document link.')
+      return
+    }
+    setIsViewing(true)
+    try {
+      const res = await fetch(signedHref, { credentials: 'include' })
+      if (res.status === 401) {
+        toast.error('Please sign in to view this document.')
+        return
+      }
+      if (res.status === 403) {
+        toast.error('You do not have access to this document.')
+        return
+      }
+      if (!res.ok) {
+        toast.error('Failed to load document. Please try again.')
+        return
+      }
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        try {
+          const data = await res.json()
+          const url = (data as { downloadUrl?: string; url?: string; payload?: { downloadUrl?: string } }).downloadUrl
+            ?? (data as { url?: string }).url
+            ?? (data as { payload?: { downloadUrl?: string } }).payload?.downloadUrl
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // fall through to blob handling
+        }
+        toast.error('Failed to load document.')
+        return
+      }
+      const blob = await res.blob()
+      // Some blob routes return JSON inside a blob with application/json type already handled;
+      // handle the case where server JSON is wrapped as blob with json mime but not caught above.
+      if (blob.type.includes('json')) {
+        try {
+          const text = await blob.text()
+          const data = JSON.parse(text) as { downloadUrl?: string; url?: string }
+          const url = data.downloadUrl ?? data.url
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            return
+          }
+        } catch {
+          // not json
+        }
+      }
+      const objectUrl = URL.createObjectURL(blob)
+      window.open(objectUrl, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+    } catch (err) {
+      console.error('[DefenseDocumentCard | View failed]:', err)
+      toast.error('Failed to load document. Please try again.')
+    } finally {
+      setIsViewing(false)
+    }
+  }
 
   return (
     <div className="flex gap-[14px] items-start">
@@ -407,18 +485,36 @@ function DocumentRow({
           )}
         </div>
 
-        {/* Actions: independent — student: View grey when pending/in review, Review Document (primary) after verdict submitted */}
+        {/* Actions: defense documents now fetch via /api/blob/defense/... (private, auth-gated). Raw DefenseSubmission.blobUrl is never rendered in DOM href; workspace href is preferred when available, otherwise a signed fetch with 401/403 toasts. */}
         <div className="flex items-start gap-[10px] shrink-0">
           {forceView || isNoVerdict || isInReview ? (
-            <GhostButton
-              icon={<Eye className="size-[11px]" />}
-              href={workspaceHref ?? document.blobUrl}
-            >
-              View
-            </GhostButton>
-          ) : (
+            workspaceHref ? (
+              <GhostButton
+                icon={<Eye className="size-[11px]" />}
+                href={workspaceHref}
+              >
+                View
+              </GhostButton>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleSignedView()}
+                disabled={isViewing}
+                aria-label={`View ${document.fileName}`}
+                title="View document"
+                className="flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isViewing ? (
+                  <Loader2 className="size-[11px] animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <Eye className="size-[11px]" />
+                )}
+                View
+              </button>
+            )
+          ) : workspaceHref ? (
             <a
-              href={workspaceHref ?? document.blobUrl}
+              href={workspaceHref}
               aria-label={`Review ${document.fileName} in document workspace`}
               title="Open in document workspace to review feedback"
               className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] hover:shadow-[0_4px_12px_rgba(112,125,255,0.32)] transition-all focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-2 outline-none shrink-0"
@@ -426,6 +522,22 @@ function DocumentRow({
               <FileSearch className="size-[13px]" strokeWidth={2} />
               Review Document
             </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleSignedView()}
+              disabled={isViewing}
+              aria-label={`Review ${document.fileName} in document workspace`}
+              title="Open in document workspace to review feedback"
+              className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] hover:shadow-[0_4px_12px_rgba(112,125,255,0.32)] transition-all focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-2 outline-none shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isViewing ? (
+                <Loader2 className="size-[13px] animate-spin motion-reduce:animate-none" />
+              ) : (
+                <FileSearch className="size-[13px]" strokeWidth={2} />
+              )}
+              Review Document
+            </button>
           )}
           {showReplace && (
             <GhostButton onClick={() => setReplaceOpen(true)}>
@@ -482,7 +594,7 @@ function UploadZone({ mode }: { mode?: 'initial' | 'resubmit' }) {
 
     try {
       const blob = await blobPut(tokenRes.payload.pathname, file, {
-        access: 'public',
+        access: 'private',
         contentType: 'application/pdf',
         token: tokenRes.payload.token,
         onUploadProgress: (progress) => {

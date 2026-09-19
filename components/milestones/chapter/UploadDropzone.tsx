@@ -94,7 +94,7 @@ export function UploadDropzone({
 
     try {
       const blob = await blobPut(tokenRes.payload.pathname, file, {
-        access: 'public',
+        access: 'private',
         contentType: 'application/pdf',
         token: tokenRes.payload.token,
         onUploadProgress: (progress) => {

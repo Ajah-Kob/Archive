@@ -10,7 +10,7 @@ export default async function AdminHomePage() {
     { label: 'Users', href: '/admin/users', icon: Users },
     { label: 'Sections', href: '/admin/sections', icon: Layers },
     { label: 'Templates', href: '/admin/templates', icon: FileText },
-    { label: 'Faculties', href: '/faculty/faculties', icon: Link2 },
+    { label: 'Faculty Management', href: '/faculty/faculty-management/members', icon: Link2 },
   ]
 
   return (

@@ -1,6 +1,6 @@
 'use client'
 
-import { UserCog } from 'lucide-react'
+import { UserPlus } from 'lucide-react'
 import { ManageCoodinatorDrawer } from '@/components/faculty/drawer/ManageCoodinatorDrawer'
 import { useCoordinatorDrawer } from '@/store/useCoordinatorDrawer'
 
@@ -23,8 +23,8 @@ export function ManageCoordinatorsButton({ primary = false }: { primary?: boolea
             : 'flex gap-[7px] items-center h-[37px] px-[15px] py-[9px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[13px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0'
         }
       >
-        <UserCog className="size-4" />
-        Manage Coordinators
+        <UserPlus className="size-4" />
+        Add Coordinator
       </button>
       <ManageCoodinatorDrawer />
     </>

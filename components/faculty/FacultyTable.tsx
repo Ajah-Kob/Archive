@@ -7,7 +7,7 @@ import { ActionMenu } from '@/components/ui/ActionMenu'
 import { ActivityStatus } from '../ui/ActivityStatus'
 import { Workload } from './Workload'
 
-export type SortKey = 'name' | 'activity' | 'workload' | 'coordinator'
+export type SortKey = 'name' | 'activity' | 'workload'
 
 function SortHeader({
   field,
@@ -77,9 +77,7 @@ export function FacultyTable({
   manageMode = true,
   viewerUserId = null,
 }: FacultyTableProps) {
-  const gridCols = manageMode
-    ? 'grid-cols-[2fr_1fr_1fr_1fr_150px]'
-    : 'grid-cols-[2fr_1fr_1fr_150px]'
+  const gridCols = 'grid-cols-[2fr_1fr_1fr_150px]'
 
   return (
     <div className="w-full flex flex-col flex-1 min-h-0">
@@ -89,7 +87,7 @@ export function FacultyTable({
       >
         <SortHeader
           field="name"
-          label="Adviser"
+          label="Name"
           {...{ sortField, sortDir, onSort }}
         />
         <SortHeader
@@ -102,13 +100,6 @@ export function FacultyTable({
           label="Workload"
           {...{ sortField, sortDir, onSort }}
         />
-        {manageMode && (
-          <SortHeader
-            field="coordinator"
-            label="Coordinator"
-            {...{ sortField, sortDir, onSort }}
-          />
-        )}
         <div />
       </div>
 
@@ -138,20 +129,6 @@ export function FacultyTable({
                 max={member.workload.max}
               />
             </div>
-            {manageMode && (
-              <div className="pr-4">
-                {member.isCoordinator ? (
-                  <span className="inline-flex items-center px-[10px] py-[4px] bg-[#f4f6ff] border border-[#e5e8ff] rounded-full font-sans font-semibold text-[11px] leading-[16.5px] text-[#707dff] whitespace-nowrap">
-                    {member.sectionsManaged}{' '}
-                    {member.sectionsManaged === 1 ? 'Section' : 'Sections'}
-                  </span>
-                ) : (
-                  <span className="font-sans font-medium italic text-[12.5px] leading-[18.75px] text-[#c4cadf]">
-                    Not assigned as coordinator
-                  </span>
-                )}
-              </div>
-            )}
             <div className="flex justify-end">
               <ActionMenu
                 items={[

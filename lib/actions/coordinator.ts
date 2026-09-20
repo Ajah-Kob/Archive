@@ -2,7 +2,18 @@
 
 import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
+import { timeAgo } from '@/lib/helper'
 import { revalidateFeature } from '@/lib/actions/revalidate'
+
+// A coordinator is considered "active now" if they signed in within this window.
+// Mirrors the faculty activity window in lib/actions/faculty.ts.
+const ACTIVE_NOW_MS = 5 * 60 * 1000
+
+function activityStatusFor(loggedInAt: Date | null): 'active' | string {
+  if (!loggedInAt) return 'Never'
+  if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
+  return timeAgo(loggedInAt)
+}
 import { USERS_PER_PAGE } from '@/config/constants'
 import { requireAdminOrProgramChair, requireUser } from '@/lib/actions/guard'
 
@@ -165,6 +176,85 @@ export async function removeCoordinator(id: string) {
       success: false,
       payload: null,
       message: 'Failed to remove coordinator',
+    }
+  }
+}
+
+// DETAIL — coordinator profile with handled sections and total students.
+// Fresh read on every open so section/student counts never go stale.
+export async function getCoordinatorDetail(facultyId: number) {
+  if (!(await requireAdminOrProgramChair())) {
+    return {
+      success: false,
+      payload: null,
+      message: 'You are not authorized to perform this action.',
+    }
+  }
+
+  try {
+    const faculty = await prisma.faculty.findFirst({
+      where: { id: facultyId, deletedAt: null },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            avatarGradient: true,
+            loggedInAt: true,
+          },
+        },
+        coordinator: {
+          include: {
+            section: {
+              where: { deletedAt: null },
+              select: {
+                id: true,
+                section: true,
+                students: {
+                  where: { deletedAt: null },
+                  select: { id: true },
+                },
+              },
+              orderBy: { section: 'asc' },
+            },
+          },
+        },
+      },
+    })
+
+    if (!faculty || !faculty.coordinator || faculty.coordinator.deletedAt !== null) {
+      return {
+        success: false,
+        payload: null,
+        message: 'Coordinator not found.',
+      }
+    }
+
+    const sections = faculty.coordinator.section.map((s) => ({
+      id: s.id,
+      name: s.section,
+      studentCount: s.students.length,
+    }))
+
+    return {
+      success: true,
+      payload: {
+        id: faculty.id,
+        userId: faculty.userId,
+        name: faculty.user.name,
+        email: faculty.user.email,
+        activityStatus: activityStatusFor(faculty.user.loggedInAt),
+        totalStudents: sections.reduce((n, s) => n + s.studentCount, 0),
+        sections,
+      },
+    }
+  } catch {
+    return {
+      success: false,
+      payload: null,
+      message: 'Failed to get coordinator details',
     }
   }
 }

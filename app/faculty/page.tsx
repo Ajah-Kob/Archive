@@ -11,7 +11,7 @@ export default async function FacultyHomePage() {
   if (session.user.isAdviser)
     links.push({ label: 'Document Review', href: '/faculty/document-review', icon: ClipboardCheck })
   if (session.user.isCoordinator || session.user.isProgramChair)
-    links.push({ label: 'Faculties', href: '/faculty/faculties', icon: Users })
+    links.push({ label: 'Faculty Management', href: '/faculty/faculty-management/members', icon: Users })
   if (session.user.isCoordinator || session.user.isProgramChair)
     links.push({ label: 'Sections', href: '/faculty/sections', icon: Layers })
   if (session.user.isCoordinator || session.user.isProgramChair)

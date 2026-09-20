@@ -93,8 +93,8 @@ export function NavLinks({
       label: 'PROGRAM MANAGEMENT',
       items: [
         {
-          label: 'Faculties',
-          href: '/faculty/faculties',
+          label: 'Faculty Management',
+          href: '/faculty/faculty-management/members',
           icon: Users,
           show: isAdmin || isCoordinator || isProgramChair,
         },

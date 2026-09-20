@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
-import { ManageCoordinatorsButton } from '@/components/sections/main/ManageCoordinatorsButton'
 import { SectionTable } from '@/components/sections/main/SectionTable'
 import { SectionTableSkeleton } from '@/components/sections/main/SectionTableSkeleton'
 import { getSections } from '@/lib/actions/sections'
@@ -43,7 +42,7 @@ export default function SectionsOverview() {
   if (loading) {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <HeaderBar actions={<ManageCoordinatorsButton primary />}>
+        <HeaderBar>
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="h-[37.5px] w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
             <div className="h-[37.5px] w-[140px] rounded-lg bg-[#dfe3fb] animate-pulse" />
@@ -58,7 +57,7 @@ export default function SectionsOverview() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <HeaderBar actions={<ManageCoordinatorsButton primary />}>
+      <HeaderBar>
         <div className="flex flex-wrap items-center gap-2.5">
           <SearchBar
             value={search}

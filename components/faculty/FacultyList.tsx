@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
-import { Filter, type FilterOption } from '@/components/ui/Filter'
 import { FacultyTable, type FacultyMember } from './FacultyTable'
 import { CopyJoinCode } from '@/components/faculty/CopyJoinCode'
 import { FacultyProfileDrawer } from '@/components/faculty/drawer/FacultyProfileDrawer'
@@ -15,15 +13,6 @@ import { getInitials } from '@/lib/helper'
 import { getFacultyMembers, removeFaculty } from '@/lib/actions/faculty'
 import { FacultyTableSkeleton } from '@/components/faculty/FacultyTableSkeleton'
 import { ADVISER_CAP } from '@/config/constants'
-
-type FacultyFilter = 'all' | 'advisers' | 'coordinators' | 'non-advisers'
-
-const FILTER_OPTIONS: FilterOption[] = [
-  { value: 'all', label: 'All Faculty' },
-  { value: 'advisers', label: 'Advisers', dividerBefore: true },
-  { value: 'coordinators', label: 'Coordinators', dividerBefore: true },
-  { value: 'non-advisers', label: 'Non-advisers', dividerBefore: true },
-]
 
 interface RawMember {
   id: number
@@ -39,24 +28,19 @@ interface RawMember {
   sectionsManaged: number
 }
 
-type SortKey = 'name' | 'activity' | 'workload' | 'coordinator'
+type SortKey = 'name' | 'activity' | 'workload'
 
-export function FacultyList() {
+export function FacultyList({ advisersOnly = false }: { advisersOnly?: boolean }) {
   const { data: session } = useSession()
   const viewerCanManage =
     session?.user?.role === 'SUPERADMIN' ||
     session?.user?.role === 'ADMIN' ||
     !!session?.user?.isProgramChair
 
-  const filterOptions = viewerCanManage
-    ? FILTER_OPTIONS
-    : FILTER_OPTIONS.filter((o) => o.value !== 'coordinators')
-
   const openFacultyDrawer = useFacultyDrawer((s) => s.open)
   const [raw, setRaw] = useState<RawMember[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<FacultyFilter>('all')
   const [removeTarget, setRemoveTarget] = useState<FacultyMember | null>(null)
   const [removing, setRemoving] = useState(false)
   const [sortField, setSortField] = useState<SortKey>('activity')
@@ -79,9 +63,7 @@ export function FacultyList() {
   const faculty = useMemo<FacultyMember[]>(() => {
     const term = search.trim().toLowerCase()
     const filtered = raw.filter((m) => {
-      if (filter === 'advisers' && !m.isAdviser) return false
-      if (filter === 'coordinators' && !m.isCoordinator) return false
-      if (filter === 'non-advisers' && m.isAdviser) return false
+      if (advisersOnly && !m.isAdviser) return false
       if (
         term &&
         !m.name.toLowerCase().includes(term) &&
@@ -107,9 +89,6 @@ export function FacultyList() {
         case 'workload':
           cmp = a.groupCount - b.groupCount
           break
-        case 'coordinator':
-          cmp = a.sectionsManaged - b.sectionsManaged
-          break
       }
       return sortDir === 'asc' ? cmp : -cmp
     })
@@ -126,7 +105,7 @@ export function FacultyList() {
         isCoordinator: m.isCoordinator,
         sectionsManaged: m.sectionsManaged,
       }))
-  }, [raw, search, filter, sortField, sortDir])
+  }, [raw, search, sortField, sortDir, advisersOnly])
 
   const handleRemove = async () => {
     if (!removeTarget) return
@@ -145,35 +124,47 @@ export function FacultyList() {
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
-        <HeaderBar actions={viewerCanManage ? <CopyJoinCode /> : undefined}>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Search faculty…"
-              ariaLabel="Search faculty"
-              className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
-            />
-            <Filter
-              value={filter}
-              options={filterOptions}
-              onChange={(v) => setFilter(v as FacultyFilter)}
-              ariaLabel="Filter faculty"
-            />
-          </div>
-        </HeaderBar>
+        <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+          {loading ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="h-[37.5px] w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
+              </div>
+              <div className="h-[37.5px] w-[150px] rounded-[9px] bg-[#dfe3fb] animate-pulse" />
+            </>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <SearchBar
+                  value={search}
+                  onChange={setSearch}
+                  placeholder={
+                    advisersOnly ? 'Search advisers…' : 'Search faculty…'
+                  }
+                  ariaLabel={
+                    advisersOnly ? 'Search advisers' : 'Search faculty'
+                  }
+                  className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+                />
+              </div>
+              {viewerCanManage && !advisersOnly ? <CopyJoinCode /> : null}
+            </>
+          )}
+        </div>
 
         <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
           <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
             {loading ? (
-              <FacultyTableSkeleton manageMode={session?.user ? viewerCanManage : true} />
+              <FacultyTableSkeleton />
             ) : (
               <FacultyTable
                 faculty={faculty}
                 emptyMessage={
-                  raw.length === 0
-                    ? 'No faculty have joined yet. Faculty join using the faculty invite code.'
-                    : 'No faculty match your search or filter.'
+                  advisersOnly
+                    ? 'No advisers found.'
+                    : raw.length === 0
+                      ? 'No faculty have joined yet. Faculty join using the faculty invite code.'
+                      : 'No faculty match your search.'
                 }
                 sortField={sortField}
                 sortDir={sortDir}

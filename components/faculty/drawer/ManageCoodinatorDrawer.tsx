@@ -3,28 +3,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AvailableFacultyList } from '@/components/faculty/drawer/AvaiableFacultyList'
-import { DrawerSkeleton } from '@/components/faculty/drawer/DrawerSkeleton'
-import { AssignedCoordinatorList } from '@/components/faculty/drawer/AssignedCoordinatorList'
+import { AvailableFacultySkeleton } from '@/components/faculty/drawer/AvailableFacultySkeleton'
 import { DrawerHeader } from '@/components/faculty/drawer/DrawerHeader'
 import { useCoordinatorDrawer } from '@/store/useCoordinatorDrawer'
 import { getInitials } from '@/lib/helper'
-import { getCoordinators } from '@/lib/actions/coordinator'
 import { getAvailableFaculty } from '@/lib/actions/faculty'
 import { getPendingCoordinatorInvitations } from '@/lib/actions/invitation'
 
 interface DrawerData {
-  coordinators: CoordinatorRaw[]
   availableFaculty: FacultyRaw[]
   pendingInvitations: PendingInvitation[]
-}
-
-export interface CoordinatorRaw {
-  id: number
-  faculty: {
-    id: number
-    user: { id: number; name: string; email: string; image: string | null; avatarGradient: string }
-  }
-  _count: { section: number }
 }
 
 export interface FacultyRaw {
@@ -46,15 +34,12 @@ export function ManageCoodinatorDrawer() {
     if (!isOpen) return
     setLoading(true)
     Promise.all([
-      getCoordinators(),
       getAvailableFaculty(),
       getPendingCoordinatorInvitations('COORDINATOR'),
-    ]).then(([coordsRes, facultyRes, invitesRes]) => {
-      if (!coordsRes.success) toast.error(coordsRes.message)
+    ]).then(([facultyRes, invitesRes]) => {
       if (!facultyRes.success) toast.error(facultyRes.message)
       if (!invitesRes.success) toast.error(invitesRes.message)
       setData({
-        coordinators: coordsRes.payload ?? [],
         availableFaculty: facultyRes.payload ?? [],
         pendingInvitations: invitesRes.payload ?? [],
       })
@@ -75,35 +60,6 @@ export function ManageCoodinatorDrawer() {
       document.body.style.overflow = ''
     }
   }, [isOpen, close])
-
-  const handleCoordinatorRemoved = (id: number) => {
-    setData((prev) => {
-      if (!prev) return prev
-      const removed = prev.coordinators.find((c) => c.id === id)
-      if (!removed) return prev
-      return {
-        ...prev,
-        coordinators: prev.coordinators.filter((c) => c.id !== id),
-        availableFaculty: [
-          ...prev.availableFaculty.filter((f) => f.id !== removed.faculty.id),
-          removed.faculty,
-        ],
-      }
-    })
-  }
-
-  const assignedCoordinatorList = useMemo(
-    () =>
-      (data?.coordinators ?? []).map((coordinator) => ({
-        id: coordinator.id,
-        initials: getInitials(coordinator.faculty.user.name),
-        name: coordinator.faculty.user.name,
-        email: coordinator.faculty.user.email,
-        gradient: (coordinator.faculty.user as any).avatarGradient,
-        sections: coordinator._count.section,
-      })),
-    [data?.coordinators],
-  )
 
   const availableFacultyList = useMemo(
     () =>
@@ -135,21 +91,12 @@ export function ManageCoodinatorDrawer() {
         <DrawerHeader />
         <div className="flex flex-col px-6 overflow-y-auto h-[calc(100dvh-57px)]">
           {loading ? (
-            <DrawerSkeleton />
+            <AvailableFacultySkeleton />
           ) : (
-            <>
-              <AssignedCoordinatorList
-                data={assignedCoordinatorList}
-                onRemoved={handleCoordinatorRemoved}
-              />
-
-              <div className="self-stretch h-px bg-slate-100 shrink-0" />
-
-              <AvailableFacultyList
-                data={availableFacultyList}
-                pendingInvitations={data?.pendingInvitations ?? []}
-              />
-            </>
+            <AvailableFacultyList
+              data={availableFacultyList}
+              pendingInvitations={data?.pendingInvitations ?? []}
+            />
           )}
         </div>
       </div>

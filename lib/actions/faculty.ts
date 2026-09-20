@@ -103,6 +103,7 @@ export async function getFacultyMembers() {
       // denormalized snapshot — never sum it on top of Group.adviserId.
       groupCount: isAdviser ? f.adviser._count.groups : 0,
       sectionsManaged: isCoordinator ? f.coordinator._count.section : 0,
+      coordinatorId: isCoordinator ? f.coordinator.id : 0,
     }
   })
 

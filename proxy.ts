@@ -57,11 +57,21 @@ export async function proxy(req: NextRequest) {
   // Shared /calendar route — all signed-in roles except GUEST pass (no sub-role gate)
   if (root === '/calendar' && token.role === 'GUEST') return redirectHome()
 
+  // Coordinator management lives under /faculty/faculties/coordinators and is
+  // restricted to admins/program chair even though base /faculty/faculties
+  // also admits coordinators.
+  if (
+    pathname === '/faculty/faculty-management/coordinators' &&
+    !isAdminOrProgramChair(token)
+  )
+    return redirectHome()
+
   // Faculty sub-role gates — only when inside /faculty
   if (root === '/faculty') {
     const sub = seg[2]
     switch (sub) {
       case 'faculties':
+      case 'faculty-management':
       case 'sections':
       case 'templates':
       case 'defense-scheduling':

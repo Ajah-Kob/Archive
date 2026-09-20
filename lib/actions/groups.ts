@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
+import { timeAgo } from '@/lib/helper'
 import { requireStudent, requireUser, unauthorized } from '@/lib/actions/guard'
 import { ADVISER_CAP } from '@/config/constants'
 import { audit } from '@/lib/actions/audit'
@@ -13,6 +14,16 @@ import {
   type Classmate,
   type WorkspaceData,
 } from '@/types/milestones'
+
+// A member is considered "active now" if they signed in within this window.
+// Mirrors the faculty activity window in lib/actions/faculty.ts.
+const ACTIVE_NOW_MS = 5 * 60 * 1000
+
+function activityStatusFor(loggedInAt: Date | null): 'active' | string {
+  if (!loggedInAt) return 'Never'
+  if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
+  return timeAgo(loggedInAt)
+}
 
 function revalidateWorkspace(userId?: number, groupId?: number) {
   if (userId) revalidateTag(`workspace-${userId}`, 'max')
@@ -54,7 +65,7 @@ export async function getMyWorkspace(userId: number): Promise<{
           students: {
             where: { deletedAt: null },
             include: {
-              user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } },
+              user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true, loggedInAt: true } },
             },
           },
           adviser: {
@@ -151,6 +162,7 @@ export async function getMyWorkspace(userId: number): Promise<{
     email: s.user.email,
     image: s.user.image,
     avatarGradient: (s.user as any).avatarGradient ?? null,
+    activityStatus: activityStatusFor((s.user as any).loggedInAt ?? null),
     isLeader: s.id === group.leaderStudentId,
   }))
 

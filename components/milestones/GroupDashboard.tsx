@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Pencil, Send, UserRound, X } from 'lucide-react'
+import { Crown, Pencil, Send, UserPlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { UserProfile } from '@/components/ui/UserProfile'
+import { ActivityStatus } from '@/components/ui/ActivityStatus'
 import {
   cancelAdviserInvitation,
   cancelGroupInvitation,
@@ -18,6 +19,7 @@ import { getInitials } from '@/lib/helper'
 import { ConfirmDialog } from '@/components/milestones/ConfirmDialog'
 import { RenameGroupModal } from '@/components/milestones/RenameGroupModal'
 import { AdviserModal } from '@/components/milestones/AdviserModal'
+import { InviteMembersModal } from '@/components/milestones/InviteMembersModal'
 
 interface ConfirmState {
   title: string
@@ -32,11 +34,13 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
 
   const [renameOpen, setRenameOpen] = useState(false)
   const [adviserOpen, setAdviserOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const [busy, setBusy] = useState(false)
 
   const isLeader = group.isLeader
   const isFull = group.memberCount >= GROUP_CAP
+  const remaining = Math.max(0, GROUP_CAP - group.memberCount)
 
   const runConfirm = async () => {
     if (!confirm) return
@@ -122,33 +126,133 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
 
       {/* Members + Adviser */}
       <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] p-[20px] shrink-0">
+        <div className="flex items-center justify-between">
+          <p className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
+            Members
+          </p>
+          {isFull && (
+            <span className="font-sans font-semibold text-[11px] text-[#16a34a]">
+              Full
+            </span>
+          )}
+        </div>
+
+        <div className="pt-[6px] flex flex-col">
+          {group.members.map((member) => (
+            <div
+              key={member.id}
+              className="grid items-center gap-3 py-[10px]"
+              style={{ gridTemplateColumns: '1fr auto auto auto' }}
+            >
+              <span className="min-w-0">
+                <UserProfile
+                  initials={getInitials(member.name)}
+                  name={member.name}
+                  email={member.email}
+                  gradient={member.avatarGradient ?? undefined}
+                  badge={
+                    member.userId === data.student.userId ? 'You' : undefined
+                  }
+                />
+              </span>
+              {member.isLeader ? (
+                <Crown
+                  className="size-[14px] text-[#f59e0b] shrink-0"
+                  aria-label="Group leader"
+                />
+              ) : (
+                <span className="size-[14px] shrink-0" />
+              )}
+              <ActivityStatus status={member.activityStatus} />
+              {isLeader && !member.isLeader ? (
+                <ActionMenu
+                  items={[
+                    {
+                      label: 'Transfer Leadership',
+                      onClick: () =>
+                        setConfirm(makeTransfer(member.name, member.id)),
+                    },
+                    {
+                      label: 'Remove from Group',
+                      variant: 'danger',
+                      onClick: () => setConfirm(makeRemove(member.name, member.id)),
+                    },
+                  ]}
+                />
+              ) : (
+                <span />
+              )}
+            </div>
+          ))}
+          {pendingInvites.map((invite) => (
+            <div
+              key={`pending-${invite.id}`}
+              className="grid items-center gap-3 py-[10px]"
+              style={{ gridTemplateColumns: '1fr auto auto' }}
+            >
+              <UserProfile
+                initials={getInitials(invite.name)}
+                name={invite.name}
+                email={invite.email}
+              />
+              <span className="px-[10px] py-[4px] bg-[rgba(245,158,11,0.07)] border border-[rgba(245,158,11,0.2)] rounded-full font-sans font-semibold text-[11px] leading-[16.5px] text-[#f59e0b] whitespace-nowrap justify-self-end">
+                Pending
+              </span>
+              {isLeader ? (
+                <button
+                  onClick={() =>
+                    setConfirm(makeCancelInvite(invite.name, invite.id))
+                  }
+                  className="flex items-center gap-[5px] h-[26px] px-[10px] bg-[#fafbff] border border-[#eceef8] rounded-[7px] font-sans font-semibold text-[11.5px] text-[#8a93b4] hover:bg-gray-50 hover:text-[#e85555] transition-colors justify-self-end"
+                >
+                  <X className="size-[11px]" />
+                  Cancel
+                </button>
+              ) : (
+                <span />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {!isFull && isLeader && (
+          <button
+            type="button"
+            onClick={() => setInviteOpen(true)}
+            className="mt-[12px] flex w-full h-[38px] items-center justify-center gap-[7px] rounded-[10px] border border-dashed border-[#d4d8f0] bg-white font-sans font-bold text-[12.5px] leading-[18px] text-[#707dff] hover:bg-[#f8f9ff] hover:border-[#707dff] active:bg-[#f4f6ff] transition-colors"
+          >
+            <UserPlus className="size-[14px]" strokeWidth={2.5} />
+            Invite Members
+          </button>
+        )}
+
+        {!isLeader && (
+          <div className="pt-[6px] border-t border-[#f4f5fc]">
+            <button
+              onClick={() => setConfirm(makeLeave())}
+              className="font-sans font-semibold text-[12px] text-[#e85555] hover:text-[#d84444] transition-colors"
+            >
+              Leave Group
+            </button>
+          </div>
+        )}
+
+        <div aria-hidden="true" className="h-[20px]" />
+
         {/* Adviser */}
         <p className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
           Adviser
         </p>
         <div className="pt-[6px]">
-          {adviser.state === 'none' && (
-            <div className="flex flex-col items-center gap-[12px] py-[10px]">
-              <div className="size-[52px] rounded-full bg-[#f4f5fc] flex items-center justify-center">
-                <UserRound className="size-6 text-[#9ea8c6]" strokeWidth={1.75} />
-              </div>
-              <p className="font-sans text-[12.5px] text-[#8a93b4]">
-                No adviser assigned yet.
-              </p>
-              {isLeader && (
-                <button
-                  onClick={() => setAdviserOpen(true)}
-                  className="flex gap-[7px] items-center h-[36px] px-[16px] rounded-[9px] text-[12.5px] font-semibold text-white shadow-[0px_4px_7px_rgba(112,125,255,0.32)] hover:opacity-95 transition-opacity"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(165deg, #707dff 0%, #5565ff 100%)',
-                  }}
-                >
-                  <Send className="size-[13px]" />
-                  Invite Adviser
-                </button>
-              )}
-            </div>
+          {adviser.state === 'none' && isLeader && (
+            <button
+              type="button"
+              onClick={() => setAdviserOpen(true)}
+              className="flex w-full h-[38px] items-center justify-center gap-[7px] rounded-[10px] border border-dashed border-[#d4d8f0] bg-white font-sans font-bold text-[12.5px] leading-[18px] text-[#707dff] hover:bg-[#f8f9ff] hover:border-[#707dff] active:bg-[#f4f6ff] transition-colors"
+            >
+              <Send className="size-[14px]" strokeWidth={2.5} />
+              Invite Adviser
+            </button>
           )}
 
           {adviser.state === 'pending' && (
@@ -200,104 +304,7 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
             </div>
           )}
         </div>
-
-        <div aria-hidden="true" className="h-[20px]" />
-
-        <div className="flex items-center justify-between">
-          <p className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
-            Group Members
-          </p>
-          {isFull && (
-            <span className="font-sans font-semibold text-[11px] text-[#16a34a]">
-              Full
-            </span>
-          )}
-        </div>
-
-        <div className="pt-[6px] flex flex-col">
-          {group.members.map((member) => (
-            <div
-              key={member.id}
-              className="flex items-center justify-between py-[10px]"
-            >
-              <UserProfile
-                initials={getInitials(member.name)}
-                name={member.name}
-                email={member.email}
-                gradient={member.avatarGradient ?? undefined}
-                badge={member.isLeader ? 'Leader' : undefined}
-              />
-              {isLeader && !member.isLeader && (
-                <ActionMenu
-                  items={[
-                    {
-                      label: 'Transfer Leadership',
-                      onClick: () =>
-                        setConfirm(makeTransfer(member.name, member.id)),
-                    },
-                    {
-                      label: 'Remove from Group',
-                      variant: 'danger',
-                      onClick: () => setConfirm(makeRemove(member.name, member.id)),
-                    },
-                  ]}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {!isLeader && (
-          <div className="pt-[6px] border-t border-[#f4f5fc]">
-            <button
-              onClick={() => setConfirm(makeLeave())}
-              className="font-sans font-semibold text-[12px] text-[#e85555] hover:text-[#d84444] transition-colors"
-            >
-              Leave Group
-            </button>
-          </div>
-        )}
       </div>
-
-      {/* Invites */}
-      {pendingInvites.length > 0 && (
-        <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] p-[20px] shrink-0">
-            <div className="flex items-center gap-[8px]">
-              <p className="font-heading font-bold text-[15px] leading-[22.5px] text-[#12143a] tracking-[-0.15px]">
-                Pending Invitations
-              </p>
-              <span className="bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.18)] rounded-full px-[8px] py-[2px] font-sans font-bold text-[10.5px] text-[#f59e0b]">
-                {pendingInvites.length}
-              </span>
-            </div>
-
-            <div className="pt-[6px] flex flex-col">
-              {pendingInvites.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex items-center justify-between py-[10px] border-b border-[#f4f5fc] last:border-b-0"
-                >
-                  <UserProfile
-                    initials={getInitials(invite.name)}
-                    name={invite.name}
-                    email={invite.email}
-                  />
-                  {isLeader && (
-                    <button
-                      onClick={() =>
-                        setConfirm(makeCancelInvite(invite.name, invite.id))
-                      }
-                      className="flex items-center gap-[5px] h-[26px] px-[10px] bg-[#fafbff] border border-[#eceef8] rounded-[7px] font-sans font-semibold text-[11.5px] text-[#8a93b4] hover:bg-gray-50 hover:text-[#e85555] transition-colors"
-                    >
-                      <X className="size-[11px]" />
-                      Cancel
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
       {/* Modals */}
       {renameOpen && (
@@ -317,6 +324,17 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
           onClose={() => setAdviserOpen(false)}
           onInvited={() => {
             setAdviserOpen(false)
+            router.refresh()
+          }}
+        />
+      )}
+
+      {inviteOpen && (
+        <InviteMembersModal
+          remaining={remaining}
+          onClose={() => setInviteOpen(false)}
+          onInvited={() => {
+            setInviteOpen(false)
             router.refresh()
           }}
         />

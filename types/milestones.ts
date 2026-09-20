@@ -53,6 +53,7 @@ export interface WorkspaceMember {
   email: string
   image: string | null
   avatarGradient: string | null
+  activityStatus: 'active' | string
   isLeader: boolean
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { ChevronUp, ChevronDown } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { ActivityStatus } from '../ui/ActivityStatus'
@@ -81,7 +82,7 @@ export function FacultyTable({
     : 'grid-cols-[2fr_1fr_1fr_150px]'
 
   return (
-    <div className="w-full">
+    <div className="w-full flex flex-col flex-1 min-h-0">
       {/* Header Row */}
       <div
         className={`grid ${gridCols} items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]`}
@@ -112,14 +113,7 @@ export function FacultyTable({
       </div>
 
       {faculty.length === 0 ? (
-        <div className="flex flex-col items-center justify-center px-10 py-16 w-full">
-          <h3 className="font-heading font-bold text-[14px] leading-[21px] text-[#3d4566] tracking-[-0.14px] text-center mb-1">
-            No Faculty Found
-          </h3>
-          <p className="font-sans font-medium text-[12.5px] leading-[20px] text-[#8a93b4] text-center max-w-[340px]">
-            {emptyMessage}
-          </p>
-        </div>
+        <EmptyState heading="No Faculty Found" description={emptyMessage} variant="table" />
       ) : (
         faculty.map((member) => (
           <div

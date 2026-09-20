@@ -142,29 +142,17 @@ export default function TemplateTable({
             {loading ? (
               <TableSkeleton />
             ) : error ? (
-              <div className="flex-1 min-h-0 flex items-center justify-center py-12">
-                <EmptyState
-                  icon={<AlertCircle size={24} className="text-red-500" />}
-                  heading="Failed to Load Templates"
-                  description={error}
-                />
-              </div>
+              <EmptyState heading="Failed to Load Templates" description={error} variant="table" />
             ) : templates.length === 0 ? (
-              <div className="flex-1 min-h-0 flex items-center justify-center py-12">
-                {isEmpty ? (
-                  <EmptyState
-                    icon={<FolderOpen size={24} className="text-slate-400" />}
-                    heading="No templates uploaded yet"
-                    description="Wait for the template uploads."
-                  />
-                ) : (
-                  <EmptyState
-                    icon={<FolderOpen size={24} className="text-slate-400" />}
-                    heading="No templates found"
-                    description="We couldn't find any documents matching your current search."
-                  />
-                )}
-              </div>
+              <EmptyState
+                heading={isEmpty ? 'No Templates Uploaded Yet' : 'No Templates Found'}
+                description={
+                  isEmpty
+                    ? 'Wait for the template uploads.'
+                    : "We couldn't find any documents matching your current search."
+                }
+                variant="table"
+              />
             ) : (
               templates.map((item) => (
                 <div

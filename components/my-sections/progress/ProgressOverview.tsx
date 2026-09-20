@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { SectionGroupProgress } from '@/lib/actions/sections'
 import type { JourneyRow } from '@/types/milestones'
 import { JourneyTracker } from '@/components/milestones/JourneyTracker'
@@ -41,18 +41,11 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
         </div>
 
         {groups.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center px-10 py-16">
-            <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
-              <Users className="size-5 text-[#707dff]" strokeWidth={1.75} />
-            </div>
-            <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#1e3a8a] tracking-[-0.16px] mb-2">
-              No Groups Yet
-            </h3>
-            <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] text-center max-w-[360px]">
-              Once students form groups in this section, their capstone progress
-              will appear here.
-            </p>
-          </div>
+          <EmptyState
+            heading="No Groups Yet"
+            description="Once students form groups in this section, their capstone progress will appear here."
+            variant="card"
+          />
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1.6fr] items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0">

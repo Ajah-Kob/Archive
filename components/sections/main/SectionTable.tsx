@@ -3,10 +3,16 @@
 import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
-import { NoSectionIcon } from '@/assets/NoSectionIcon'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { SectionDataRow, type SectionData } from './SectionDataRow'
 
-type SortKey = 'coordinator' | 'section' | 'capstonePhase' | 'dateCreated' | 'students' | 'groups'
+type SortKey =
+  | 'coordinator'
+  | 'section'
+  | 'capstonePhase'
+  | 'dateCreated'
+  | 'students'
+  | 'groups'
 
 function SortHeader({
   field,
@@ -82,19 +88,12 @@ export function SectionTable({ sections, actions }: SectionTableProps) {
 
   if (sections.length === 0) {
     return (
-      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex flex-col items-center justify-center px-10 py-16 w-full">
-          <div className="mb-5">
-            <NoSectionIcon />
-          </div>
-          <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#1e3a8a] tracking-[-0.16px] text-center mb-2">
-            No Sections Created
-          </h3>
-          <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] text-center max-w-[360px]">
-            No sections have been created by coordinators yet. Sections will
-            appear here once coordinators start setting up their classes.
-          </p>
-        </div>
+      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden w-full">
+        <EmptyState
+          heading="No Sections Created"
+          description="No sections have been created by coordinators yet. Sections will appear here once coordinators start setting up their classes."
+          variant="table"
+        />
       </div>
     )
   }

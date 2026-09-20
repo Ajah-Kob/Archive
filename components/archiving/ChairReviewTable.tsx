@@ -1,6 +1,7 @@
 'use client'
 
-import { Eye, Check, Archive } from 'lucide-react'
+import { Eye, Check } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { ArchivingReviewItem } from '@/lib/actions/archiving'
 
 const HEADER_LABELS = ['Group', 'Title', 'Date Submitted', 'Status', 'Action']
@@ -66,37 +67,7 @@ interface ChairReviewTableProps {
   onApprove?: (item: ArchivingReviewItem) => void
 }
 
-// ── Empty states ─────────────────
-function EmptyState({ hasAny }: { hasAny: boolean }) {
-  if (hasAny) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center px-10 py-16 text-center">
-        <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
-          <Archive className="size-5 text-[#707dff]" strokeWidth={1.75} />
-        </div>
-        <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] tracking-[-0.16px] mb-2">
-          No matching submissions
-        </h3>
-        <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] max-w-sm">
-          No submissions match your search or filter. Try adjusting your search or clear the filter.
-        </p>
-      </div>
-    )
-  }
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center px-10 py-16 text-center">
-      <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
-        <Archive className="size-5 text-[#707dff]" strokeWidth={1.75} />
-      </div>
-      <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] tracking-[-0.16px] mb-2">
-        No submissions for review
-      </h3>
-      <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] max-w-sm">
-        When students submit their capstones for archiving, they will appear here for your review and approval.
-      </p>
-    </div>
-  )
-}
+// Empty states use the shared component below.
 
 export function ChairReviewTable({ submissions, hasAnySubmissions = false, onView, onApprove }: ChairReviewTableProps) {
   return (
@@ -118,7 +89,15 @@ export function ChairReviewTable({ submissions, hasAnySubmissions = false, onVie
           </div>
 
           {submissions.length === 0 ? (
-            <EmptyState hasAny={hasAnySubmissions} />
+            <EmptyState
+              heading={hasAnySubmissions ? 'No Matching Submissions' : 'No Submissions for Review'}
+              description={
+                hasAnySubmissions
+                  ? 'No submissions match your search or filter. Try adjusting your search or clear the filter.'
+                  : 'When students submit their capstones for archiving, they will appear here for your review and approval.'
+              }
+              variant="table"
+            />
           ) : (
             submissions.map((item) => (
               <div

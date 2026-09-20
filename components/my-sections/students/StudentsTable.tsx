@@ -1,6 +1,7 @@
 'use client'
 
 import { ChevronUp, ChevronDown } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { StudentDataRow, type StudentData } from './StudentDataRow'
 
 export type StudentSortKey = 'name' | 'activity' | 'group'
@@ -95,14 +96,7 @@ export function StudentsTable({
       </div>
 
       {students.length === 0 ? (
-        <div className="flex flex-col items-center justify-center px-10 py-16 w-full flex-1">
-          <h3 className="font-heading font-bold text-[14px] leading-[21px] text-[#3d4566] tracking-[-0.14px] text-center mb-1">
-            No Students Found
-          </h3>
-          <p className="font-sans font-medium text-[12.5px] leading-[20px] text-[#8a93b4] text-center max-w-[340px]">
-            {emptyMessage}
-          </p>
-        </div>
+        <EmptyState heading="No Students Found" description={emptyMessage} variant="table" />
       ) : (
         students.map((student) => (
           <StudentDataRow

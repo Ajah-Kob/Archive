@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { SectionCard } from './SectionCard'
 import { SectionModal } from './SectionModal'
 import type { MySectionCardData } from '@/lib/actions/sections'
@@ -90,22 +91,27 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
 
       <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-6 bg-white border border-dashed border-[#e8ebf8] rounded-[12px]">
-            <p className="font-sans font-semibold text-[13px] text-[#8a93b4] text-center">
-              {search || phaseFilter !== 'all'
-                ? `No sections match your search or filter.`
-                : 'No sections yet. Create your first class.'}
-            </p>
-            {!search && phaseFilter === 'all' && (
-              <button
-                type="button"
-                onClick={() => setCreateOpen(true)}
-                className="mt-3 inline-flex items-center justify-center gap-1.5 h-[36px] px-4 rounded-[10px] bg-[#f4f5fc] border border-[#e0e3f0] font-sans font-bold text-[13px] text-[#707dff] hover:bg-[#eef0ff] transition-colors"
-              >
-                <Plus className="size-[14px]" />
-                Create Section
-              </button>
-            )}
+          <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden w-full">
+            <EmptyState
+              heading={search || phaseFilter !== 'all' ? 'No Matching Sections' : 'No Sections Created'}
+              description={
+                search || phaseFilter !== 'all'
+                  ? 'No sections match your search or filter. Try adjusting your search or filter.'
+                  : 'No sections have been created yet. Create your first class to get started.'
+              }
+              variant="card"
+            >
+              {!search && phaseFilter === 'all' ? (
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  className="inline-flex items-center justify-center gap-1.5 h-[36px] px-4 rounded-[10px] bg-[#f4f5fc] border border-[#e0e3f0] font-sans font-bold text-[13px] text-[#707dff] hover:bg-[#eef0ff] transition-colors"
+                >
+                  <Plus className="size-[14px]" />
+                  Create Section
+                </button>
+              ) : null}
+            </EmptyState>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, ClipboardCheck, FileText } from 'lucide-react'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { EvaluationItem } from '@/lib/actions/evaluation'
 import { SubmissionDetailsDrawer } from './SubmissionDetailsDrawer'
 
@@ -194,20 +195,12 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
 
   if (items.length === 0) {
     return (
-      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col items-center justify-center px-10 py-16">
-        <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
-          <ClipboardCheck
-            className="size-5 text-[#707dff]"
-            strokeWidth={1.75}
-          />
-        </div>
-        <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#1e3a8a] tracking-[-0.16px] mb-2">
-          No Submissions Yet
-        </h3>
-        <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] text-center max-w-[360px]">
-          Documents submitted by the groups you advise will appear here for
-          evaluation.
-        </p>
+      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
+        <EmptyState
+          heading="No Submissions Yet"
+          description="Documents submitted by the groups you advise will appear here for evaluation."
+          variant="card"
+        />
       </div>
     )
   }
@@ -265,18 +258,11 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
           </div>
 
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-10 py-16 w-full">
-              <FileText
-                className="size-8 text-[#c4cadf] mb-3"
-                strokeWidth={1.5}
-              />
-              <h3 className="font-heading font-bold text-[14px] leading-[21px] text-[#3d4566] tracking-[-0.14px] text-center mb-1">
-                No Evaluations Found
-              </h3>
-              <p className="font-sans font-medium text-[12.5px] leading-[20px] text-[#8a93b4] text-center max-w-[340px]">
-                No submissions match your search or filter.
-              </p>
-            </div>
+            <EmptyState
+              heading="No Evaluations Found"
+              description="No submissions match your search or filter."
+              variant="table"
+            />
           ) : (
             filtered.map((item) => (
               <div

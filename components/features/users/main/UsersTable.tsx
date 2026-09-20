@@ -118,15 +118,10 @@ export default function UsersTable({
     return <UsersTableSkeleton />
   }
   
-  {/*Returns Error */}
   if (error) {
     return (
-      <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)]">
-        <EmptyState
-          icon={<AlertCircle size={24} className="text-red-500" />}
-          heading="Failed to Load Users"
-          description={error}
-        />
+      <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col min-h-0 overflow-hidden">
+        <EmptyState heading="Failed to Load Users" description={error} variant="table" />
       </div>
     )
   }
@@ -207,21 +202,15 @@ export default function UsersTable({
         </div>
 
         {users.length === 0 ? (
-          <div className="flex-1 min-h-0 flex items-center justify-center">
-            {isEmpty ? (
-              <EmptyState
-                icon={<Users size={24} className="text-slate-400" />}
-                heading="No users yet"
-                description="Users will appear here once they sign up."
-              />
-            ) : (
-              <EmptyState
-                icon={<Users size={24} className="text-slate-400" />}
-                heading="No users found"
-                description="We couldn't find any users matching your current search or filter."
-              />
-            )}
-          </div>
+          <EmptyState
+            heading={isEmpty ? 'No Users Yet' : 'No Users Found'}
+            description={
+              isEmpty
+                ? 'Users will appear here once they sign up.'
+                : "We couldn't find any users matching your current search or filter."
+            }
+            variant="table"
+          />
         ) : (
           <div
             ref={scrollContainerRef}

@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, Star, Eye, ExternalLink, X, Plus } from 'lucide-react'
+import { Star, Eye, ExternalLink, X, Plus } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
+import { EmptyState } from '@/components/ui/EmptyState'
 // Wired to the subtask 03 spec path (built in parallel — see report if the
 // export shape differs when subtask 03 lands).
 import UploadArchiveModal from '@/components/repository/UploadArchiveModal'
@@ -20,35 +21,7 @@ interface RepositoryClientProps {
   isAdmin?: boolean
 }
 
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)]">
-      <div className="size-12 rounded-full bg-[rgba(112,125,255,0.08)] flex items-center justify-center mb-4">
-        <Archive className="size-5 text-[#707dff]" strokeWidth={1.75} />
-      </div>
-      <h3 className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] tracking-[-0.16px] mb-2">
-        No archived capstones yet
-      </h3>
-      <p className="font-sans font-medium text-[13px] leading-[21.45px] text-[#8a93b4] max-w-sm px-4">
-        Approved capstones will appear here once the Program Chair publishes them. Check back soon or refine your search.
-      </p>
-    </div>
-  )
-}
-
-function NoResults() {
-  return (
-    <div className="flex flex-col items-center justify-center py-14 text-center bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)] px-6">
-      <div className="size-12 rounded-full bg-[#f4f6ff] border border-[#e5e8ff] flex items-center justify-center mb-4">
-        <Archive className="size-5 text-[#707dff]" strokeWidth={1.75} />
-      </div>
-      <h3 className="font-heading font-bold text-[15px] leading-[22px] text-[#1e2145] tracking-[-0.15px] mb-1">No results found</h3>
-      <p className="font-sans font-medium text-[13px] leading-[19.5px] text-[#8a93b4] max-w-sm">
-        We couldn’t find anything matching your search. Try a different keyword or clear your filters.
-      </p>
-    </div>
-  )
-}
+// Repository empty states use the shared component below.
 
 function DetailsModal({ item, onClose }: { item: RepositoryArchiveRow | null; onClose: () => void }) {
   if (!item) return null
@@ -195,9 +168,21 @@ export function RepositoryClient({ archives, isAdmin = false }: RepositoryClient
         </div>
 
         {archives.length === 0 ? (
-          <EmptyState />
+          <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)]">
+            <EmptyState
+              heading="No Archived Capstones Yet"
+              description="Approved capstones will appear here once the Program Chair publishes them. Check back soon or refine your search."
+              variant="card"
+            />
+          </div>
         ) : filtered.length === 0 ? (
-          <NoResults />
+          <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)]">
+            <EmptyState
+              heading="No Results Found"
+              description="We couldn't find anything matching your search. Try a different keyword or clear your filters."
+              variant="card"
+            />
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
             {filtered.map((item) => {

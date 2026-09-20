@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { PendingTopic } from '@/lib/actions/sections'
 import { TopicReviewModal } from './TopicReviewModal'
 import { ApproveTopicModal } from './ApproveTopicModal'
@@ -193,14 +194,11 @@ export function TopicReviewQueue({ topics }: TopicReviewQueueProps) {
           </div>
 
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-10 py-16 w-full">
-              <h3 className="font-heading font-bold text-[14px] leading-[21px] text-[#3d4566] tracking-[-0.14px] text-center mb-1">
-                No Topics Found
-              </h3>
-              <p className="font-sans font-medium text-[12.5px] leading-[20px] text-[#8a93b4] text-center max-w-[340px]">
-                No topics match your search or filter.
-              </p>
-            </div>
+            <EmptyState
+              heading="No Topics Found"
+              description="No topics match your search or filter."
+              variant="table"
+            />
           ) : (
             filtered.map((topic) => (
               <div

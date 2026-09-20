@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, ChevronUp, Calendar } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 import { DefenseDataRow, DEFENSE_GRID_COLS } from './DefenseDataRow'
 import { EmptyState } from './EmptyState'
@@ -108,17 +108,15 @@ export function DefenseTable({
 
           {schedules.length === 0 ? (
             <EmptyState
-              icon={Calendar}
-              title={
-                hasAnySchedules
-                  ? 'No matching schedules'
-                  : 'No defense schedules yet'
+              heading={
+                hasAnySchedules ? 'No Matching Schedules' : 'No Defense Schedules Yet'
               }
               description={
                 hasAnySchedules
                   ? 'No defense schedules match your search or filters. Try clearing them, or create a new schedule.'
                   : 'Create your first defense schedule for a capstone group — proposal or final defense — with venue, time, and panelists.'
               }
+              variant="table"
             />
           ) : (
             schedules.map((schedule) => (

@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 // Revalidates the paths that render a given feature. Sections and Templates
 // are duplicated under both the /admin and /faculty role roots, so both
 // canonical paths must be invalidated after a mutation.
-export function revalidateFeature(feature: 'sections' | 'templates' | 'faculties' | 'users' | 'defense' | 'archiving' | 'archives' | 'calendar') {
+export function revalidateFeature(feature: 'sections' | 'templates' | 'faculties' | 'users' | 'defense' | 'archiving' | 'archives' | 'calendar' | 'audit') {
   switch (feature) {
     case 'sections':
       revalidatePath('/admin/sections')
@@ -33,6 +33,9 @@ export function revalidateFeature(feature: 'sections' | 'templates' | 'faculties
       break
     case 'calendar':
       revalidatePath('/calendar')
+      break
+    case 'audit':
+      revalidatePath('/admin/audit')
       break
   }
 }

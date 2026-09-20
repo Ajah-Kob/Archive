@@ -10,6 +10,7 @@ import {
 } from 'next/cache'
 import { revalidateTag } from 'next/cache'
 import { revalidateFeature } from '@/lib/actions/revalidate'
+import { audit } from '@/lib/actions/audit'
 
 // A faculty member is considered "active now" if they signed in within this window.
 const ACTIVE_NOW_MS = 5 * 60 * 1000
@@ -361,6 +362,17 @@ export async function toggleProgramChair(id: number) {
 
     revalidateTag('users', 'max')
     revalidateFeature('users')
+
+    try {
+      await audit({
+        action: "USER_ROLE_UPDATE",
+        entity: "USER",
+        entityId: String(target.userId ?? id),
+        entityName: target.user.email ?? target.user.name,
+        before: { isProgramChair: target.isProgramChair, userId: target.userId, name: target.user.name },
+        after: { isProgramChair: newValue, userId: target.userId, name: target.user.name },
+      })
+    } catch {}
 
     return {
       success: true,

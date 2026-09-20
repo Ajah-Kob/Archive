@@ -9,6 +9,7 @@ import { USERS_PER_PAGE } from "@/config/constants"
 import { isValidEmail } from "@/lib/helper"
 import { requireAdmin, requireUser, sanitizeUser, sanitizeUsers } from "@/lib/actions/guard"
 import { pickRandomGradient } from "@/lib/gradients"
+import { audit } from "@/lib/actions/audit"
 
 const table = "user"
 const MIN_PASSWORD_LENGTH = 8
@@ -188,6 +189,17 @@ async function persistNewUser(data: { name: string; email: string; password: str
     revalidateTag("users", "max")
     revalidateFeature("users")
 
+    try {
+      await audit({
+        action: "USER_CREATE",
+        entity: "USER",
+        entityId: String(user.id),
+        entityName: user.email,
+        before: null,
+        after: { name: user.name, email: user.email, role: user.role },
+      })
+    } catch {}
+
     return { success: true, message: "User created successfully", payload: sanitizeUser(user) }
   } catch {
     return { success: false, payload: null, message: "Failed to create user" }
@@ -229,6 +241,17 @@ export async function softDeleteUser(id: string) {
 
     revalidateTag("users", "max")
     revalidateFeature("users")
+
+    try {
+      await audit({
+        action: "USER_SOFT_DELETE",
+        entity: "USER",
+        entityId: String(targetId),
+        entityName: target.email,
+        before: { id: target.id, email: target.email, name: target.name, role: target.role, deletedAt: null },
+        after: { id: user.id, email: user.email, deletedAt: (user as any).deletedAt ?? new Date().toISOString() },
+      })
+    } catch {}
 
     return { success: true, payload: sanitizeUser(user) }
   } catch {
@@ -295,6 +318,18 @@ export async function updateUser(_prevState: any, formData: FormData) {
 
     revalidateTag("users", "max")
     revalidateFeature("users")
+
+    try {
+      const roleChanged = target.role !== safeRole
+      await audit({
+        action: roleChanged ? "USER_ROLE_UPDATE" : "USER_UPDATE",
+        entity: "USER",
+        entityId: String(targetId),
+        entityName: email!,
+        before: { name: target.name, email: target.email, role: target.role },
+        after: { name, email, role: safeRole },
+      })
+    } catch {}
 
     return { success: true, message: "User updated successfully.", payload: sanitizeUser(user) }
   } catch {

@@ -10,6 +10,7 @@ import {
   unauthorized,
 } from '@/lib/actions/guard'
 import { revalidateFeature } from '@/lib/actions/revalidate'
+import { audit } from '@/lib/actions/audit'
 import {
   isValidTitle,
   isValidAbstract,
@@ -798,6 +799,17 @@ export async function submitArchiving(_prevState: any, formData: FormData) {
 
     revalidateArchiving(groupId)
 
+    try {
+      await audit({
+        action: "ARCHIVING_SUBMIT",
+        entity: "ARCHIVING",
+        entityId: String(groupId),
+        entityName: data.title ?? persisted?.title ?? `Group ${groupId}`,
+        before: existing ? { status: existing.status, title: existing.title, blobUrl: existing.blobUrl } : null,
+        after: { status: "IN_REVIEW", title: data.title, blobUrl: effectiveBlobUrl, fileName: effectiveFileName },
+      })
+    } catch {}
+
     return { success: true, message: 'Capstone submitted for review.', payload: persisted }
   } catch (error) {
     console.error('[submitArchiving | Error]:', error)
@@ -1037,6 +1049,17 @@ export async function approveArchiving(groupId: number) {
     })
 
     revalidateArchiving(groupId)
+
+    try {
+      await audit({
+        action: "ARCHIVING_APPROVE",
+        entity: "ARCHIVING",
+        entityId: String(groupId),
+        entityName: submission.title ?? `Group ${groupId}`,
+        before: { status: submission.status, title: submission.title, blobUrl: submission.blobUrl },
+        after: { status: "ARCHIVED", title: submission.title, blobUrl: submission.blobUrl },
+      })
+    } catch {}
 
     return { success: true, message: 'Capstone approved and published to Repository.' }
   } catch (error) {

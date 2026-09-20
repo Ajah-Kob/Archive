@@ -9,6 +9,7 @@ import type { SectionData } from '@/components/sections/main/SectionDataRow'
 import type { StudentData } from '@/components/my-sections/students/StudentDataRow'
 import { generateJoinCode, getInitials, timeAgo } from '@/lib/helper'
 import { requireCoordinator } from '@/lib/actions/guard'
+import { audit } from '@/lib/actions/audit'
 import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
 import { CAPSTONE1_KEYS, CAPSTONE2_KEYS, keysForPhase } from '@/lib/milestones/phase'
 import type {
@@ -318,6 +319,17 @@ export async function joinSectionWithCode(userId: number, code: string) {
       where: { id: userId },
       data: { role: 'STUDENT' },
     })
+
+    try {
+      await audit({
+        action: "GROUP_JOIN",
+        entity: "SECTION",
+        entityId: String(joinCode.section.id),
+        entityName: joinCode.section.section,
+        before: null,
+        after: { userId, sectionId: joinCode.section.id, section: joinCode.section.section },
+      })
+    } catch {}
 
     updateTag('users')
     updateTag('sections')
@@ -1076,6 +1088,9 @@ export async function createSection(_prevState: any, formData: FormData) {
     const code = generateJoinCode()
     const expiresAt = new Date(Date.now() + JOIN_CODE_TTL_MS)
 
+    let createdSectionId: number | null = null
+    let createdSectionBefore: unknown = null
+
     if (existing && existing.deletedAt) {
       // Resurrect a previously removed section and reassign it to this
       // coordinator with a fresh join code.
@@ -1097,11 +1112,13 @@ export async function createSection(_prevState: any, formData: FormData) {
           deletedAt: null,
         },
       })
+      createdSectionId = existing.id
+      createdSectionBefore = { section: existing.section, deletedAt: existing.deletedAt, headerColor: (existing as any).headerColor ?? null }
     } else {
       const joinCode = await prisma.joinCode.create({
         data: { code, type: 'STUDENT', expiresAt },
       })
-      await prisma.section.create({
+      const created = await prisma.section.create({
         data: {
           coordinatorId: coordinator.id,
           section: name,
@@ -1109,7 +1126,20 @@ export async function createSection(_prevState: any, formData: FormData) {
           joinCodeId: joinCode.id,
         },
       })
+      createdSectionId = created.id
+      createdSectionBefore = null
     }
+
+    try {
+      await audit({
+        action: "SECTION_CREATE",
+        entity: "SECTION",
+        entityId: String(createdSectionId),
+        entityName: name,
+        before: createdSectionBefore,
+        after: { section: name, headerColor },
+      })
+    } catch {}
 
     revalidateCoordinatorCache()
     return { success: true, message: `Section ${name} created successfully.` }
@@ -1163,6 +1193,16 @@ export async function updateSection(_prevState: any, formData: FormData) {
         where: { id: current.id },
         data: { headerColor },
       })
+      try {
+        await audit({
+          action: "SECTION_UPDATE",
+          entity: "SECTION",
+          entityId: String(current.id),
+          entityName: current.section,
+          before: { section: current.section, headerColor: currentColor },
+          after: { section: name, headerColor },
+        })
+      } catch {}
       revalidateCoordinatorCache(sectionId)
       return { success: true, message: 'Section updated.' }
     }
@@ -1214,11 +1254,31 @@ export async function updateSection(_prevState: any, formData: FormData) {
           data: { deletedAt: new Date() },
         }),
       ])
+      try {
+        await audit({
+          action: "SECTION_UPDATE",
+          entity: "SECTION",
+          entityId: String(target.id),
+          entityName: name,
+          before: { section: current.section, headerColor: currentColor, id: current.id },
+          after: { section: name, headerColor, id: target.id, revivedFromDeletedId: target.id },
+        })
+      } catch {}
     } else {
       await prisma.section.update({
         where: { id: current.id },
         data: { section: name, headerColor },
       })
+      try {
+        await audit({
+          action: "SECTION_UPDATE",
+          entity: "SECTION",
+          entityId: String(current.id),
+          entityName: name,
+          before: { section: current.section, headerColor: currentColor },
+          after: { section: name, headerColor },
+        })
+      } catch {}
     }
 
     revalidateCoordinatorCache(sectionId)
@@ -1265,6 +1325,17 @@ export async function removeSection(id: number) {
       where: { id: section.id },
       data: { deletedAt: new Date() },
     })
+
+    try {
+      await audit({
+        action: "SECTION_REMOVE",
+        entity: "SECTION",
+        entityId: String(section.id),
+        entityName: section.section,
+        before: { section: section.section, deletedAt: null },
+        after: { section: section.section, deletedAt: new Date().toISOString() },
+      })
+    } catch {}
 
     revalidateCoordinatorCache(section.id)
     return { success: true, message: `Section ${section.section} removed.` }

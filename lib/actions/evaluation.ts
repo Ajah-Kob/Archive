@@ -3,6 +3,7 @@
 import { revalidateTag } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { requireAdviser, unauthorized } from '@/lib/actions/guard'
+import { audit } from '@/lib/actions/audit'
 
 export interface EvaluationItem {
   id: number
@@ -365,11 +366,15 @@ export async function reviewSubmission(
       },
       select: {
         id: true,
+        fileName: true,
+        status: true,
         milestone: {
           select: {
+            chapter: true,
             group: {
               select: {
                 id: true,
+                groupName: true,
                 sectionId: true,
                 students: {
                   where: { deletedAt: null },
@@ -413,6 +418,18 @@ export async function reviewSubmission(
     revalidateTag(`journey-${group.id}`, config)
     revalidateTag(`evaluations-${adviser.id}`, config)
     revalidateTag(`my-section-${group.sectionId}`, config)
+
+    try {
+      const chapterLabel = CHAPTER_LABELS[(submission as any).milestone.chapter] ?? (submission as any).milestone.chapter
+      await audit({
+        action: "CHAPTER_REVIEW",
+        entity: "CHAPTER",
+        entityId: String(submissionId),
+        entityName: `${chapterLabel} - ${(group as any).groupName ?? `Group ${group.id}`} - ${(submission as any).fileName ?? ''}`.trim(),
+        before: { status: (submission as any).status ?? "PENDING", submissionId },
+        after: { status: decision, reviewNote: decision === 'NEED_REVISION' ? trimmedNote || null : null, reviewedById: adviser.faculty.userId },
+      })
+    } catch {}
 
     return {
       success: true,

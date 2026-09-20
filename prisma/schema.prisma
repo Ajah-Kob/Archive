@@ -649,3 +649,31 @@ model DefenseSubmissionAnnotation {
   @@unique([submissionId, authorId])
   @@index([deletedAt])
 }
+
+// ───────────────────────────── Audit Log ─────────────────────────────
+
+// Append-only audit trail for business-critical mutations. Actor fields are
+// denormalized snapshots (no FK) so history survives user renames/deletes.
+// before/after hold JSON diffs; ip is nullable (not always available).
+// No updatedAt/deletedAt — rows are never mutated or soft-deleted.
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int?
+  actorName  String
+  actorEmail String
+  actorRole  String
+  action     String
+  entity     String
+  entityId   String?
+  entityName String?
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt, action])
+}

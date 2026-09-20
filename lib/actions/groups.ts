@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
 import { requireStudent, requireUser, unauthorized } from '@/lib/actions/guard'
 import { ADVISER_CAP } from '@/config/constants'
+import { audit } from '@/lib/actions/audit'
 import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
 import {
   GROUP_CAP,
@@ -427,6 +428,17 @@ export async function createGroup(name: string) {
       return created
     })
 
+    try {
+      await audit({
+        action: "GROUP_CREATE",
+        entity: "GROUP",
+        entityId: String(group.id),
+        entityName: cleanName,
+        before: null,
+        after: { groupName: cleanName, sectionId: leader.sectionId, leaderStudentId: leader.id },
+      })
+    } catch {}
+
     revalidateTag(`workspace-${session.user.id}`, 'max')
     revalidateTag(`classmates-${session.user.id}`, 'max')
     revalidateTag('sections', 'max')
@@ -590,10 +602,24 @@ export async function removeGroupMember(memberId: number) {
   if (!member) return { success: false, message: 'Member not found in your group.' }
 
   try {
+    const groupRowForAudit = await prisma.group.findFirst({
+      where: { id: student.group.id },
+      select: { groupName: true },
+    })
     await prisma.student.update({
       where: { id: memberId },
       data: { groupId: null },
     })
+    try {
+      await audit({
+        action: "GROUP_REMOVE_MEMBER",
+        entity: "GROUP",
+        entityId: String(student.group.id),
+        entityName: groupRowForAudit?.groupName ?? `Group ${student.group.id}`,
+        before: { groupId: student.group.id, memberId, groupName: groupRowForAudit?.groupName ?? null },
+        after: { groupId: student.group.id, removedMemberId: memberId },
+      })
+    } catch {}
     revalidateWorkspace(+session.user.id, student.group.id)
     revalidateTag(`workspace-${member.user.id}`, 'max')
     revalidateTag(`classmates-${member.user.id}`, 'max')
@@ -628,10 +654,25 @@ export async function transferLeadership(memberId: number) {
   if (!member) return { success: false, message: 'Member not found in your group.' }
 
   try {
+    const groupRowForTransfer = await prisma.group.findFirst({
+      where: { id: student.group.id },
+      select: { groupName: true, leaderStudentId: true },
+    })
+    const beforeLeader = groupRowForTransfer?.leaderStudentId ?? student.id
     await prisma.group.update({
       where: { id: student.group.id },
       data: { leaderStudentId: memberId },
     })
+    try {
+      await audit({
+        action: "GROUP_TRANSFER",
+        entity: "GROUP",
+        entityId: String(student.group.id),
+        entityName: groupRowForTransfer?.groupName ?? `Group ${student.group.id}`,
+        before: { leaderStudentId: beforeLeader },
+        after: { leaderStudentId: memberId },
+      })
+    } catch {}
     revalidateWorkspace(+session.user.id, student.group.id)
     revalidateTag(`workspace-${member.user.id}`, 'max')
     return { success: true, message: 'Leadership transferred successfully.' }
@@ -654,6 +695,13 @@ export async function leaveGroup() {
 
   const isLeader = student.group.leaderStudentId === student.id
 
+  // Resolve human-readable group name for audit (best-effort).
+  let groupNameForAudit: string | null = null
+  try {
+    const g = await prisma.group.findFirst({ where: { id: student.group.id }, select: { groupName: true } })
+    groupNameForAudit = g?.groupName ?? null
+  } catch {}
+
   try {
     if (isLeader) {
       const nextLeader = await prisma.student.findFirst({
@@ -671,6 +719,16 @@ export async function leaveGroup() {
           where: { id: student.id },
           data: { groupId: null },
         })
+        try {
+          await audit({
+            action: "GROUP_LEAVE",
+            entity: "GROUP",
+            entityId: String(student.group.id),
+            entityName: groupNameForAudit ?? `Group ${student.group.id}`,
+            before: { memberId: student.id, isLeader: true, leaderStudentId: student.id },
+            after: { memberId: student.id, left: true, newLeaderId: nextLeader.id },
+          })
+        } catch {}
         revalidateWorkspace(+session.user.id, student.group.id)
         if (nextLeader.user?.id) {
           revalidateTag(`workspace-${nextLeader.user.id}`, 'max')
@@ -685,6 +743,16 @@ export async function leaveGroup() {
           where: { id: student.id },
           data: { groupId: null },
         })
+        try {
+          await audit({
+            action: "GROUP_LEAVE",
+            entity: "GROUP",
+            entityId: String(student.group.id),
+            entityName: groupNameForAudit ?? `Group ${student.group.id}`,
+            before: { memberId: student.id, isLeader: true, groupName: groupNameForAudit },
+            after: { memberId: student.id, left: true, groupDeleted: true },
+          })
+        } catch {}
         revalidateWorkspace(+session.user.id, student.group.id)
         return { success: true, message: 'You left the group.' }
       }
@@ -702,6 +770,16 @@ export async function leaveGroup() {
           data: { deletedAt: new Date() },
         })
       }
+      try {
+        await audit({
+          action: "GROUP_LEAVE",
+          entity: "GROUP",
+          entityId: String(student.group.id),
+          entityName: groupNameForAudit ?? `Group ${student.group.id}`,
+          before: { memberId: student.id, isLeader: false },
+          after: { memberId: student.id, left: true, remaining, groupDeleted: remaining === 0 },
+        })
+      } catch {}
       revalidateWorkspace(+session.user.id, student.group.id)
       return { success: true, message: 'You left the group.' }
     }

@@ -4,6 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { put } from '@vercel/blob'
 import prisma from '@/lib/prisma'
 import { requireUser, unauthorized } from '@/lib/actions/guard'
+import { audit } from '@/lib/actions/audit'
 
 const ALLOWED_TYPES = [
   'application/pdf',
@@ -113,6 +114,17 @@ export async function uploadTemplate(formData: FormData) {
 
     revalidateTag('templates', 'max')
 
+    try {
+      await audit({
+        action: "TEMPLATE_UPLOAD",
+        entity: "TEMPLATE",
+        entityId: String(template.id),
+        entityName: file.name,
+        before: null,
+        after: { name: file.name, fileName: file.name, mimeType: file.type, size: file.size, blobUrl: blob.url },
+      })
+    } catch {}
+
     return {
       success: true,
       payload: {
@@ -157,6 +169,18 @@ export async function deleteTemplate(id: number) {
     })
 
     revalidateTag('templates', 'max')
+
+    try {
+      await audit({
+        action: "TEMPLATE_DELETE",
+        entity: "TEMPLATE",
+        entityId: String(id),
+        entityName: template.name,
+        before: { name: template.name, fileName: template.fileName, deletedAt: null },
+        after: { name: template.name, deletedAt: new Date().toISOString() },
+      })
+    } catch {}
+
     return { success: true, message: 'Template deleted.' }
   } catch (error) {
     console.error('Error in deleteTemplate:', error)

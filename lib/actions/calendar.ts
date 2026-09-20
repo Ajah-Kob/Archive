@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/authOptions'
 import { cacheTag, cacheLife, revalidateTag, revalidatePath } from 'next/cache'
 import { connection } from 'next/server'
 import { requireAdminOrProgramChair } from '@/lib/actions/guard'
+import { audit } from '@/lib/actions/audit'
 
 // ───────────────────────── Event feed reader (subtask 03) ─────────────────────────
 // Role-scoped feed of DefenseSchedule + manual CalendarEvent rows into one
@@ -676,6 +677,16 @@ export async function createCalendarEvent(
         createdById,
       },
     })
+    try {
+      await audit({
+        action: "CALENDAR_CREATE",
+        entity: "CALENDAR",
+        entityId: String(row.id),
+        entityName: row.title,
+        before: null,
+        after: { title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, allDay: (row as any).allDay },
+      })
+    } catch {}
     await revalidateCalendar()
     return { success: true, message: 'Calendar event created.', payload: mapCalendarRow(row) }
   } catch (error) {
@@ -830,6 +841,16 @@ export async function updateCalendarEvent(
       where: { id: numericId },
       data: { title, description, startsAt, endsAt, allDay, audience },
     })
+    try {
+      await audit({
+        action: "CALENDAR_UPDATE",
+        entity: "CALENDAR",
+        entityId: String(numericId),
+        entityName: row.title,
+        before: { title: existing.title, description: existing.description, startsAt: existing.startsAt.toISOString(), endsAt: existing.endsAt.toISOString(), audience: (existing as any).audience, allDay: (existing as any).allDay },
+        after: { title: row.title, description: row.description, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, allDay: (row as any).allDay },
+      })
+    } catch {}
     await revalidateCalendar()
     return { success: true, message: 'Calendar event updated.', payload: mapCalendarRow(row) }
   } catch (error) {
@@ -862,7 +883,7 @@ export async function deleteCalendarEvent(
 
     const existing = await prisma.calendarEvent.findFirst({
       where: { id: numericId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, title: true },
     })
     if (!existing) {
       return { success: false, message: 'Calendar event not found.', payload: null }
@@ -872,6 +893,16 @@ export async function deleteCalendarEvent(
       where: { id: numericId },
       data: { deletedAt: new Date() },
     })
+    try {
+      await audit({
+        action: "CALENDAR_DELETE",
+        entity: "CALENDAR",
+        entityId: String(numericId),
+        entityName: (existing as any).title ?? `Calendar ${numericId}`,
+        before: { title: (existing as any).title, deletedAt: null },
+        after: { deletedAt: new Date().toISOString() },
+      })
+    } catch {}
     await revalidateCalendar()
     return {
       success: true,

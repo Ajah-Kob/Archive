@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
 import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
+import { audit } from '@/lib/actions/audit'
 import {
   CHAPTER_LABELS,
   CHAPTER_PHASE,
@@ -515,7 +516,7 @@ export async function submitChapter(
       }
     }
 
-    const { milestoneId } = await persistChapterSubmission(
+    const { milestoneId, submissionId } = await persistChapterSubmission(
       auth.group.id,
       capstone.id,
       DB_PHASE[chapter],
@@ -523,6 +524,17 @@ export async function submitChapter(
       +session.user.id,
       upload,
     )
+
+    try {
+      await audit({
+        action: "CHAPTER_SUBMIT",
+        entity: "CHAPTER",
+        entityId: String(submissionId ?? milestoneId),
+        entityName: CHAPTER_LABELS[chapter],
+        before: null,
+        after: { chapter, fileName: upload.fileName, blobUrl: upload.blobUrl, size: upload.size, milestoneId, groupId: auth.group.id },
+      })
+    } catch {}
 
     await revalidateChapterGroup(auth.group, { expireNow: true })
 
@@ -565,12 +577,12 @@ export async function resubmitChapter(
   if (uploadError) return { success: false, message: uploadError }
 
   try {
-    const { milestoneId } = await prisma.$transaction(async (tx) => {
+    const { milestoneId, newSubmissionId } = await prisma.$transaction(async (tx) => {
       await tx.milestoneSubmission.updateMany({
         where: { milestoneId: auth.milestoneId, deletedAt: null },
         data: { deletedAt: new Date() },
       })
-      await tx.milestoneSubmission.create({
+      const created = await tx.milestoneSubmission.create({
         data: {
           milestoneId: auth.milestoneId,
           submittedBy: +session.user.id,
@@ -581,8 +593,19 @@ export async function resubmitChapter(
           status: 'PENDING',
         },
       })
-      return { milestoneId: auth.milestoneId }
+      return { milestoneId: auth.milestoneId, newSubmissionId: created.id }
     })
+
+    try {
+      await audit({
+        action: "CHAPTER_RESUBMIT",
+        entity: "CHAPTER",
+        entityId: String(newSubmissionId ?? milestoneId),
+        entityName: CHAPTER_LABELS[chapter],
+        before: { chapter, status: "NEED_REVISION", milestoneId },
+        after: { chapter, fileName: upload.fileName, blobUrl: upload.blobUrl, size: upload.size, milestoneId, submissionId: newSubmissionId },
+      })
+    } catch {}
 
     await revalidateChapterGroup(auth.group, { expireNow: true })
 

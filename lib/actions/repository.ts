@@ -5,6 +5,7 @@ import { cacheTag, cacheLife, revalidateTag } from 'next/cache'
 import { put, del } from '@vercel/blob'
 import { requireAdmin, unauthorized } from '@/lib/actions/guard'
 import { revalidateFeature } from '@/lib/actions/revalidate'
+import { audit } from '@/lib/actions/audit'
 import {
   isValidTitle,
   isValidAbstract,
@@ -418,6 +419,17 @@ export async function publishArchive(_prevState: any, formData: FormData) {
 
     revalidateRepository()
 
+    try {
+      await audit({
+        action: "ARCHIVE_PUBLISH",
+        entity: "ARCHIVE",
+        entityId: String(archive.id),
+        entityName: archive.title,
+        before: null,
+        after: { title: archive.title, fileName: archive.fileName, blobUrl: archive.blobUrl, size: archive.size },
+      })
+    } catch {}
+
     return {
       success: true,
       message: 'Archive published to Repository.',
@@ -611,6 +623,17 @@ export async function updateArchive(id: number, formData: FormData) {
 
       revalidateRepository()
 
+      try {
+        await audit({
+          action: "ARCHIVE_UPDATE",
+          entity: "ARCHIVE",
+          entityId: String(archive.id),
+          entityName: archive.title,
+          before: { title: existing.title, fileName: existing.fileName, blobUrl: existing.blobUrl },
+          after: { title: archive.title, fileName: archive.fileName, blobUrl: archive.blobUrl, size: archive.size },
+        })
+      } catch {}
+
       return {
         success: true,
         message: 'Archive updated.',
@@ -676,6 +699,17 @@ export async function removeArchive(id: number) {
     }
 
     revalidateRepository()
+
+    try {
+      await audit({
+        action: "ARCHIVE_REMOVE",
+        entity: "ARCHIVE",
+        entityId: String(id),
+        entityName: archive.title,
+        before: { title: archive.title, fileName: archive.fileName, blobUrl: archive.blobUrl, deletedAt: null },
+        after: { deletedAt: new Date().toISOString() },
+      })
+    } catch {}
 
     return { success: true, message: 'Archive removed.' }
   } catch (error) {

@@ -12,6 +12,7 @@ import {
 } from '@/lib/actions/guard'
 import { getFacultyMembers } from '@/lib/actions/faculty'
 import { revalidateFeature } from '@/lib/actions/revalidate'
+import { audit } from '@/lib/actions/audit'
 import type {
   DefenseType,
   DefenseVerdict,
@@ -696,6 +697,18 @@ export async function createDefenseSchedule(
       })
     })
 
+    try {
+      const groupForAudit = await prisma.group.findFirst({ where: { id: groupId }, select: { groupName: true } })
+      await audit({
+        action: "DEFENSE_SCHEDULE_CREATE",
+        entity: "DEFENSE_SCHEDULE",
+        entityId: String(schedule.id),
+        entityName: groupForAudit?.groupName ?? `Group ${groupId} - ${type}`,
+        before: null,
+        after: { groupId, type, date: date.toISOString(), startTime, endTime, venue, panelists: parsed.panelists },
+      })
+    } catch {}
+
     // Both the 'use cache' tag and the RSC paths must be invalidated so the
     // scheduling page (faculty/admins) sees the new schedule immediately.
     revalidateTag('defense', 'max')
@@ -727,10 +740,21 @@ export async function updateDefenseSchedule(
   try {
     const schedule = await prisma.defenseSchedule.findFirst({
       where: { id: scheduleId, deletedAt: null },
-      select: { id: true, createdBy: true },
+      select: { id: true, createdBy: true, type: true, date: true, startTime: true, endTime: true, venue: true, verdict: true, groupId: true },
     })
     if (!schedule) {
       return { success: false, message: 'Defense schedule not found.' }
+    }
+
+    // Snapshot before for audit diff.
+    const beforeSnapshot = {
+      type: schedule.type,
+      date: schedule.date?.toISOString?.() ?? String(schedule.date),
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      venue: schedule.venue,
+      verdict: schedule.verdict,
+      groupId: (schedule as any).groupId,
     }
 
     // Coordinators may only edit schedules they created; admins and the
@@ -817,9 +841,21 @@ export async function updateDefenseSchedule(
               }
             : {}),
         },
-        include: { panelists: true },
+        include: { panelists: true, group: { select: { groupName: true } } },
       })
     })
+
+    try {
+      const groupNameForAudit = (updated as any).group?.groupName ?? `Group ${(schedule as any).groupId ?? scheduleId}`
+      await audit({
+        action: "DEFENSE_SCHEDULE_UPDATE",
+        entity: "DEFENSE_SCHEDULE",
+        entityId: String(schedule.id),
+        entityName: groupNameForAudit,
+        before: beforeSnapshot,
+        after: { ...data, panelists: panelists ?? undefined },
+      })
+    } catch {}
 
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
@@ -842,7 +878,7 @@ export async function deleteDefenseSchedule(id: number) {
   try {
     const schedule = await prisma.defenseSchedule.findFirst({
       where: { id, deletedAt: null },
-      select: { id: true, createdBy: true },
+      select: { id: true, createdBy: true, type: true, groupId: true, group: { select: { groupName: true } } },
     })
     if (!schedule) {
       return { success: false, message: 'Defense schedule not found.' }
@@ -850,6 +886,9 @@ export async function deleteDefenseSchedule(id: number) {
     if (schedule.createdBy !== +session.user.id) {
       return unauthorized
     }
+
+    const beforeForAudit = { id: schedule.id, type: (schedule as any).type, groupId: (schedule as any).groupId, groupName: (schedule as any).group?.groupName ?? null }
+    const entityNameForAudit = (schedule as any).group?.groupName ?? `Group ${(schedule as any).groupId ?? id} - ${(schedule as any).type ?? 'Defense'}`
 
     const now = new Date()
     await prisma.$transaction([
@@ -862,6 +901,17 @@ export async function deleteDefenseSchedule(id: number) {
         data: { deletedAt: now },
       }),
     ])
+
+    try {
+      await audit({
+        action: "DEFENSE_SCHEDULE_DELETE",
+        entity: "DEFENSE_SCHEDULE",
+        entityId: String(schedule.id),
+        entityName: entityNameForAudit,
+        before: beforeForAudit,
+        after: { deletedAt: now.toISOString() },
+      })
+    } catch {}
 
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
@@ -922,10 +972,28 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
     }
 
     const now = new Date()
+    const beforeVerdict = schedule.verdict
     const updated = await prisma.defenseSchedule.update({
       where: { id: scheduleId },
       data: { verdict: verdict as DefenseVerdict, verdictSubmittedAt: now },
     })
+
+    try {
+      // Resolve group name for human-readable entityName (best-effort).
+      let groupNameForVerdict: string | null = null
+      try {
+        const s = await prisma.defenseSchedule.findFirst({ where: { id: scheduleId }, select: { group: { select: { groupName: true } } } })
+        groupNameForVerdict = (s as any)?.group?.groupName ?? null
+      } catch {}
+      await audit({
+        action: "DEFENSE_VERDICT",
+        entity: "DEFENSE_SCHEDULE",
+        entityId: String(scheduleId),
+        entityName: groupNameForVerdict ?? `Schedule ${scheduleId}`,
+        before: { verdict: beforeVerdict },
+        after: { verdict, verdictSubmittedAt: now.toISOString() },
+      })
+    } catch {}
 
     revalidateTag('defense', 'max')
     revalidateFeature('defense')

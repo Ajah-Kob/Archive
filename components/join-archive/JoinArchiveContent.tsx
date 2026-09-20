@@ -25,11 +25,16 @@ export default function JoinArchiveContent() {
     setActiveModal(null)
   }
 
-  function handleSuccess(description: string, path = '/faculty') {
+  async function handleSuccess(description: string, path = '/faculty') {
     setActiveModal(null)
     toast.success("You've joined successfully!", { description })
-    update()
-    router.push(path)
+    // Await the session refresh so the JWT carries the new role before
+    // navigating — otherwise proxy.ts still sees GUEST and bounces back.
+    try {
+      await update()
+    } finally {
+      router.push(path)
+    }
   }
 
   return (

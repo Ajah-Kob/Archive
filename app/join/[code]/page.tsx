@@ -8,6 +8,7 @@ import prisma from '@/lib/prisma'
 import { roleHome } from '@/lib/helper'
 import { joinSectionWithCode } from '@/lib/actions/sections'
 import { joinFacultyWithCode } from '@/lib/actions/faculty'
+import { JoinRedirect } from '@/components/join-archive/JoinRedirect'
 
 export const metadata: Metadata = {
   title: 'Join Archive',
@@ -68,7 +69,16 @@ export default async function JoinPage({
       : await joinFacultyWithCode(userId, code)
   if (!result.success) return <ExpiredInvite message={result.message} />
 
-  redirect(
-    record.type === 'STUDENT' ? '/student/milestone?joined=1' : '/faculty?joined=1',
+  // Client-settled redirect: the JWT cookie still carries the old GUEST role
+  // until the session refreshes, so JoinRedirect awaits update() first —
+  // otherwise proxy.ts bounces the user back to /guest.
+  return (
+    <JoinRedirect
+      to={
+        record.type === 'STUDENT'
+          ? '/student/milestone?joined=1'
+          : '/faculty?joined=1'
+      }
+    />
   )
 }

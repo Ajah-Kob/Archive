@@ -80,7 +80,9 @@ export function blobUrlToPathname(blobUrl: string | null | undefined): string {
 export function toSignedBlobPath(blobUrl: string | null | undefined): string {
   const pathname = blobUrlToPathname(blobUrl)
   if (!pathname) return ''
-  return `/api/blob/${pathname}`
+  // Encode each segment so spaces and special chars (e.g. "CASE STUDY 2.pdf")
+  // survive as a valid fetch URL; the route decodes via decodeURIComponent.
+  return `/api/blob/${pathname.split('/').map(encodeURIComponent).join('/')}`
 }
 
 /** Alias for defense card compat — same as toSignedBlobPath */

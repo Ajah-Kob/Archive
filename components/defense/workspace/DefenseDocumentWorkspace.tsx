@@ -167,23 +167,112 @@ export function DefenseDocumentWorkspace({
   const annotationAuthor = session?.user?.name ?? 'Panelist'
 
   // Private defense/chapter/archiving blobs must be fetched via the
-  // auth-gated route /api/blob/defense/... (single private store).
-  // isPrivateBlobUrl checks the pathname prefix; signed route handles
-  // head+auth and streams the blob so no raw private URL is ever put in
-  // the DOM or handed to PDF.js directly. Public user/* avatars stay direct.
-  const effectiveBlobUrl = useMemo(() => {
-    if (!blobUrl) return blobUrl
-    if (!isPrivateBlobUrl(blobUrl)) return blobUrl
-    const signed = toSignedBlobPath(blobUrl)
-    // Defensive: if pathname extraction failed, fall back to raw (will 404)
-    // but keep old public URLs working via the same signed extraction.
-    return signed || blobUrl
+  // auth-gated route /api/blob/... — never put the raw blobUrl in the DOM.
+  // The viewer fetches via signed route and creates an object URL; until then
+  // no document is loaded (avoids exposing the raw private URL in inspect).
+  const [privateObjectUrl, setPrivateObjectUrl] = useState<string | null>(null)
+  const [privateFetching, setPrivateFetching] = useState(true)
+  const [privateError, setPrivateError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let current: string | null = null
+    async function loadPrivate() {
+      if (!blobUrl || !isPrivateBlobUrl(blobUrl)) {
+        if (!cancelled) {
+          setPrivateObjectUrl(null)
+          setPrivateFetching(false)
+        }
+        return
+      }
+      const signed = toSignedBlobPath(blobUrl)
+      if (!signed) {
+        if (!cancelled) {
+          setPrivateError('Invalid document link.')
+          setPrivateFetching(false)
+        }
+        return
+      }
+      if (!cancelled) {
+        setPrivateFetching(true)
+        setPrivateError(null)
+      }
+      try {
+        const res = await fetch(signed, { credentials: 'include', headers: { Accept: 'application/pdf' } })
+        if (cancelled) return
+        if (res.status === 401) {
+          setPrivateError('Please sign in to view this document.')
+          return
+        }
+        if (res.status === 403) {
+          setPrivateError('You do not have access to this document.')
+          return
+        }
+        if (!res.ok) {
+          if (res.status === 404) {
+            try {
+              const direct = await fetch(blobUrl, { credentials: 'include' })
+              if (direct.ok) {
+                const b = await direct.blob()
+                const u = URL.createObjectURL(b)
+                if (cancelled) { URL.revokeObjectURL(u); return }
+                current = u
+                setPrivateObjectUrl(u)
+                return
+              }
+            } catch {}
+          }
+          setPrivateError(`Failed to load document. (signed fetch ${res.status})`)
+          return
+        }
+        const blob = await res.blob()
+        const u = URL.createObjectURL(blob)
+        if (cancelled) { URL.revokeObjectURL(u); return }
+        current = u
+        setPrivateObjectUrl(u)
+      } catch {
+        if (!cancelled) setPrivateError('Failed to load document. Please try again.')
+      } finally {
+        if (!cancelled) setPrivateFetching(false)
+      }
+    }
+    void loadPrivate()
+    return () => {
+      cancelled = true
+      if (current) URL.revokeObjectURL(current)
+    }
   }, [blobUrl])
+
+  useEffect(() => {
+    return () => {
+      if (privateObjectUrl) URL.revokeObjectURL(privateObjectUrl)
+    }
+  }, [privateObjectUrl])
+
+  const effectiveBlobUrl = privateObjectUrl ?? (isPrivateBlobUrl(blobUrl) ? null : blobUrl)
+  const isPrivatePending = isPrivateBlobUrl(blobUrl) && privateFetching
+
+  if (privateError) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff] px-6 text-center">
+        <TriangleAlert className="size-6 text-[#d97706]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">{privateError}</p>
+      </div>
+    )
+  }
+  if (isPrivatePending) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <Loader2 className="size-6 animate-spin text-[#707dff]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading document…</p>
+      </div>
+    )
+  }
 
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url: effectiveBlobUrl, documentId: CURRENT_DOCUMENT_ID }],
+        initialDocuments: effectiveBlobUrl ? [{ url: effectiveBlobUrl, documentId: CURRENT_DOCUMENT_ID }] : [],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),

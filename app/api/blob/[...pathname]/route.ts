@@ -238,7 +238,7 @@ async function verifyBlobPathname(pathname: string): Promise<{ blobUrl: string; 
 
     // Head+pathname verification — ensures the blob's server pathname matches requested pathname.
     try {
-      const meta = await head(matched.url, token ? { token } as unknown as never : undefined)
+      const meta = await head(matched.url, token ? ({ token } as unknown as never) : undefined)
       if (meta?.pathname !== pathname) return null
       // Prefer head's downloadUrl if provided (signed), otherwise use list's.
       return {
@@ -258,36 +258,36 @@ async function verifyBlobPathname(pathname: string): Promise<{ blobUrl: string; 
 }
 
 async function serveBlob(blobUrl: string, downloadUrl: string, req: NextRequest) {
-  // On success: 302 to signed downloadUrl (spec allows 200 stream or 302 signed URL).
-  // Prefer redirect so the browser/pdf engine fetches directly with a time-limited signed URL
-  // and we don't buffer large PDFs in the route. Use BLOB_READ_WRITE_TOKEN server-side only.
-  //
-  // If the client requested JSON (e.g. viewers doing fetch with credentials that expect JSON),
-  // we return JSON; but for PDF loads we redirect. The viewer handles both shapes.
-  // For simplicity always redirect — viewers that fetch will follow redirect (fetch with redirect:follow)
-  // or can handle 302. Alternatively we could stream:
-  //   const res = await fetch(downloadUrl || blobUrl)
-  //   return new NextResponse(res.body, { headers: { 'content-type': res.headers.get('content-type') ?? 'application/pdf' } })
-  //
-  // Use redirect for large-file efficiency; clients that `fetch` will follow.
   const urlToServe = downloadUrl || blobUrl
 
-  // If HEAD request, just verify and return 200 without body
   if (req.method === 'HEAD') {
     return new NextResponse(null, { status: 200 })
   }
 
-  // Check if caller expects JSON (via Accept header) — if so return JSON payload with URL,
-  // otherwise redirect. Viewers handle both.
   const accept = req.headers.get('accept') ?? ''
   if (accept.includes('application/json')) {
     return NextResponse.json({ url: urlToServe, downloadUrl: urlToServe })
   }
 
-  // For PDF viewers that set initialDocuments [{url}], they can use this redirect URL directly as src
-  // if they use the signed route URL as src. But fetching via signed route as stream is also valid.
-  // Return redirect.
-  return NextResponse.redirect(urlToServe, 302)
+  // Stream the blob same-origin to avoid cross-origin redirect + CORS issues
+  // with fetch(redirect) from the viewer. The route is the single private gate;
+  // the browser never sees the raw blobUrl.
+  try {
+    const upstream = await fetch(urlToServe)
+    if (!upstream.ok || !upstream.body) {
+      return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+    const headers = new Headers()
+    const ct = upstream.headers.get('content-type')
+    if (ct) headers.set('content-type', ct)
+    const cl = upstream.headers.get('content-length')
+    if (cl) headers.set('content-length', cl)
+    headers.set('cache-control', 'private, max-age=60')
+    return new NextResponse(upstream.body, { status: 200, headers })
+  } catch (err) {
+    console.error('[blob route | stream error]:', err)
+    return NextResponse.json({ message: 'Not found' }, { status: 404 })
+  }
 }
 
 export async function GET(req: NextRequest, context: { params: Promise<{ pathname: string[] }> }) {

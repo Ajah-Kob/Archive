@@ -230,7 +230,25 @@ export function DocumentWorkspace({
           return
         }
         if (!res.ok) {
-          const msg = 'Failed to load document.'
+          // Legacy public blobs (pre-private migration) will 404 on the signed route
+          // because they are not private — fall back to direct URL once.
+          if (res.status === 404 && blobUrl) {
+            try {
+              const directRes = await fetch(blobUrl, { credentials: 'include' })
+              if (directRes.ok) {
+                const directBlob = await directRes.blob()
+                const urlObj = URL.createObjectURL(directBlob)
+                if (cancelled) {
+                  URL.revokeObjectURL(urlObj)
+                  return
+                }
+                currentUrl = urlObj
+                setPdfObjectUrl(urlObj)
+                return
+              }
+            } catch {}
+          }
+          const msg = `Failed to load document. (signed fetch ${res.status})`
           setPdfError(msg)
           toast.error(msg)
           return
@@ -324,12 +342,13 @@ export function DocumentWorkspace({
   // overrides that disable drag/resize/rotate — otherwise a selected ink or
   // sticky-note annotation can still be moved through the plugin's own
   // drag surface even though our custom drag surfaces never mount.
-  // Render PDF from fetched signed-route object URL, not raw blobUrl (private).
-  const effectivePdfUrl = pdfObjectUrl ?? blobUrl
+  // Render PDF only from the signed-route object URL — never the raw blobUrl
+  // (private blobs must not be exposed in the DOM, even briefly).
+  const effectivePdfUrl = pdfObjectUrl
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url: effectivePdfUrl, documentId: CURRENT_DOCUMENT_ID }],
+        initialDocuments: effectivePdfUrl ? [{ url: effectivePdfUrl, documentId: CURRENT_DOCUMENT_ID }] : [],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),

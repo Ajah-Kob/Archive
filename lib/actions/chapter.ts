@@ -348,13 +348,7 @@ export async function requestChapterUploadToken(
       allowedContentTypes: ['application/pdf'],
       maximumSizeInBytes: MAX_SIZE_BYTES,
       addRandomSuffix: true,
-      // Constrain the issued token to private blobs under chapter/{groupId}/{chapter}/
-      // — the client Put will create a private blob (single store, per-upload access).
-      // Vercel Blob encodes this payload into the signed client token; the store itself is shared.
-      // We include `access: 'private'` if the SDK supports it; pathname prefix alone scopes the token.
-      // See: https://vercel.com/docs/vercel-blob/using-blob-sdk#client-uploads
-      access: 'private',
-    } as any)
+    })
     return { success: true, message: '', payload: { token, pathname } }
   } catch (error) {
     console.error('[requestChapterUploadToken | Error]:', error)

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Copy, TriangleAlert } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ActionMenu } from '@/components/ui/ActionMenu'
@@ -166,30 +166,7 @@ export function SectionCard({ section }: SectionCardProps) {
                 </span>
               </div>
 
-              {/* Topic review anchor — button to avoid nested <a> inside outer <Link> */}
-              <div className="flex items-center">
-                {section.pendingTopics > 0 ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      router.push(
-                        `/faculty/my-sections/${section.id}?tab=topics`,
-                      )
-                    }}
-                    className="inline-flex items-center gap-[5px] h-[22px] px-[9px] rounded-full bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[11px] leading-[16px] text-[#d97706] hover:bg-[rgba(245,158,11,0.18)] transition-colors"
-                  >
-                    <TriangleAlert className="size-[11px] shrink-0" />
-                    {section.pendingTopics}{' '}
-                    {section.pendingTopics === 1 ? 'topic' : 'topics'} to review
-                  </button>
-                ) : (
-                  <span className="inline-flex items-center h-[22px] px-[9px] rounded-full bg-[#f4f5fc] border border-[#e8ebf8] font-sans font-medium text-[11px] leading-[16px] text-[#8a93b4]">
-                    No pending topics
-                  </span>
-                )}
-              </div>
+
             </div>
 
             {/* Footer — left bottom Capstone phase + right action menu */}

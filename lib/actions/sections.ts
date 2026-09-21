@@ -12,10 +12,7 @@ import { requireCoordinator } from '@/lib/actions/guard'
 import { audit } from '@/lib/actions/audit'
 import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
 import { CAPSTONE1_KEYS, CAPSTONE2_KEYS, keysForPhase } from '@/lib/milestones/phase'
-import type {
-  JourneyRow,
-  TopicSubmissionStatus,
-} from '@/types/milestones'
+import type { JourneyRow } from '@/types/milestones'
 import type { MilestoneKey } from '@prisma/client'
 
 const table = 'section'
@@ -85,27 +82,7 @@ export interface SectionGroupProgress {
   name: string
   memberCount: number
   adviser: { name: string; email: string; image: string | null } | null
-  topicStatus: 'NONE' | 'PENDING' | 'APPROVED' | 'NEEDS_REVISION'
   journey: JourneyRow[]
-}
-
-export interface PendingTopicMember {
-  id: number
-  name: string
-  email: string
-  isLeader: boolean
-}
-
-export interface PendingTopic {
-  id: number
-  groupId: number
-  groupName: string
-  members: PendingTopicMember[]
-  title: string
-  background: string
-  submittedBy: string
-  createdAt: string
-  status: TopicSubmissionStatus
 }
 
 export interface SectionDetailData {
@@ -119,7 +96,6 @@ export interface SectionDetailData {
   }
   students: StudentData[]
   groups: SectionGroupProgress[]
-  pendingTopics: PendingTopic[]
 }
 
 async function getSectionDetailData(id: number) {
@@ -395,7 +371,6 @@ export interface MySectionCardData {
   joinCode: string | null
   joinCodeExpiresAt: string | null
   dateCreated: string
-  pendingTopics: number
   capstone2OpenedAt: string | null
   previewAvatars: { initials: string; gradient: string }[]
   headerColor: string | null
@@ -425,15 +400,7 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
         orderBy: { user: { name: 'asc' } },
       },
       joinCode: true,
-      groups: {
-        where: { deletedAt: null },
-        include: {
-          topics: {
-            where: { status: 'PENDING', deletedAt: null },
-            select: { id: true },
-          },
-        },
-      },
+      groups: { where: { deletedAt: null }, select: { id: true } },
     },
     orderBy: { section: 'asc' },
   })
@@ -455,7 +422,6 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
           day: 'numeric',
           year: 'numeric',
         }),
-        pendingTopics: s.groups.reduce((n, g) => n + g.topics.length, 0),
         capstone2OpenedAt: s.capstone2OpenedAt?.toISOString() ?? null,
         previewAvatars: s.students.slice(0, 3).map((st) => ({
           initials: getInitials(st.user.name),
@@ -520,12 +486,6 @@ async function getCoordinatorSectionData(sectionId: number) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
-          topics: {
-            where: { deletedAt: null },
-            include: {
-              uploadedBy: { include: { user: { select: { name: true } } } },
-            },
-          },
           capstone: { select: { topicId: true } },
           milestones: {
             where: { deletedAt: null },
@@ -570,16 +530,6 @@ async function getCoordinatorSectionData(sectionId: number) {
   )
 
   const groups: SectionGroupProgress[] = section.groups.map((g) => {
-    const activeTopics = g.topics.filter((t) => !t.deletedAt)
-    let topicStatus: SectionGroupProgress['topicStatus'] = 'NONE'
-    if (activeTopics.some((t) => t.status === 'PENDING')) {
-      topicStatus = 'PENDING'
-    } else if (activeTopics.some((t) => t.status === 'NEED_REVISION')) {
-      topicStatus = 'NEEDS_REVISION'
-    } else if (activeTopics.some((t) => t.status === 'APPROVED')) {
-      topicStatus = 'APPROVED'
-    }
-
     return {
       id: g.id,
       name: g.groupName,
@@ -591,13 +541,8 @@ async function getCoordinatorSectionData(sectionId: number) {
             image: g.adviser.faculty.user.image,
           }
         : null,
-      topicStatus,
       journey: buildJourneyRows(
         {
-          topics: activeTopics.map((t) => ({
-            status: t.status,
-            deletedAt: t.deletedAt,
-          })),
           capstone: g.capstone ? { topicId: g.capstone.topicId } : null,
           milestones: g.milestones.map((m) => ({
             chapter: m.chapter,
@@ -610,30 +555,6 @@ async function getCoordinatorSectionData(sectionId: number) {
       ),
     }
   })
-
-  const pendingTopics: PendingTopic[] = section.groups
-    .flatMap((g) =>
-      g.topics
-        .filter((t) => t.status === 'PENDING' && !t.deletedAt)
-        .map((t) => ({ topic: t, group: g })),
-    )
-    .sort((a, b) => b.topic.createdAt.getTime() - a.topic.createdAt.getTime())
-    .map(({ topic, group }) => ({
-      id: topic.id,
-      groupId: group.id,
-      groupName: group.groupName,
-      members: group.students.map((s) => ({
-        id: s.id,
-        name: s.user.name,
-        email: s.user.email,
-        isLeader: group.leaderStudentId === s.id,
-      })),
-      title: topic.title,
-      background: topic.background,
-      submittedBy: topic.uploadedBy?.user.name ?? '',
-      createdAt: topic.createdAt.toISOString(),
-      status: topic.status,
-    }))
 
   return {
     section: {
@@ -658,7 +579,6 @@ async function getCoordinatorSectionData(sectionId: number) {
     },
     students,
     groups,
-    pendingTopics,
     milestones: buildMilestoneAvailability(section as any),
   }
 }
@@ -716,93 +636,6 @@ export async function getCoordinatorSectionById(id: number) {
   }
 }
 
-// ───────────────────────────── Topic versions ─────────────────────────────
-
-export interface TopicVersionInfo {
-  id: number
-  topicNumber: number
-  version: number
-  title: string
-  background: string
-  submittedBy: string
-  createdAt: string
-  status: TopicSubmissionStatus
-  isCurrent: boolean
-  reviewNote: string | null
-}
-
-// All versions of a topic's revision chain (topicGroupKey). Version numbers
-// mirror the student-side derivation: position in the chain + 1, ordered by
-// createdAt. Previous versions are the soft-deleted rows in the chain.
-export async function getTopicVersions(topicId: number) {
-  const coordinator = await requireCoordinatorRow()
-  if (!coordinator) {
-    return { success: false, message: 'Not authorized', payload: null }
-  }
-
-  try {
-    const topic = await prisma.topic.findFirst({
-      where: { id: topicId, deletedAt: null },
-      include: {
-        group: {
-          include: { section: { select: { coordinatorId: true } } },
-        },
-      },
-    })
-    if (!topic || topic.group.section.coordinatorId !== coordinator.id) {
-      return { success: false, message: 'Topic not found.', payload: null }
-    }
-
-    const groupTopics = await prisma.topic.findMany({
-      where: { groupId: topic.groupId },
-      orderBy: { createdAt: 'asc' },
-      include: { uploadedBy: { include: { user: { select: { name: true } } } } },
-    })
-
-    // Group topics into revision chains (topicGroupKey), then order the chains
-    // by their first submission. The chain's position in that order is the
-    // topic number (1, 2, 3…) the student submitted — shared by every version
-    // in the chain. Mirrors the student-side derivation in getTopicSubmissionData.
-    const chains = new Map<string, typeof groupTopics>()
-    for (const t of groupTopics) {
-      const key = t.topicGroupKey ?? `legacy-${t.id}`
-      const chain = chains.get(key) ?? []
-      chain.push(t)
-      chains.set(key, chain)
-    }
-    const orderedChains = [...chains.values()].sort(
-      (a, b) => a[0].createdAt.getTime() - b[0].createdAt.getTime(),
-    )
-    const chainIndex = orderedChains.findIndex((chain) =>
-      chain.some((t) => t.id === topic.id),
-    )
-    const chain = orderedChains[chainIndex] ?? []
-    const topicNumber = chainIndex + 1
-
-    const versions: TopicVersionInfo[] = chain.map((t, index) => ({
-      id: t.id,
-      topicNumber,
-      version: index + 1,
-      title: t.title,
-      background: t.background,
-      submittedBy: t.uploadedBy?.user.name ?? '',
-      createdAt: t.createdAt.toISOString(),
-      status: t.status,
-      isCurrent: t.id === topic.id && !t.deletedAt,
-      reviewNote: t.reviewNote,
-    }))
-
-    return { success: true, message: '', payload: { versions } }
-  } catch (error) {
-    console.error('[getTopicVersions | Error]:', error)
-    return {
-      success: false,
-      message: 'Failed to load topic versions.',
-      payload: null,
-    }
-  }
-}
-
 // ───────────────────────────── Milestone availability ─────────────────────────────
 
 export interface MilestoneAvailabilityItem {
@@ -820,8 +653,6 @@ const MILESTONE_DEFS: ReadonlyArray<{
   label: string
   phase: 'CAPSTONE 1' | 'CAPSTONE 2'
 }> = [
-  { key: 'TOPIC_SUBMISSION', label: 'Topic Submission', phase: 'CAPSTONE 1' },
-  { key: 'TOPIC_SELECTION', label: 'Topic Selection', phase: 'CAPSTONE 1' },
   { key: 'CHAPTER_1', label: 'Chapter 1', phase: 'CAPSTONE 1' },
   { key: 'CHAPTER_2', label: 'Chapter 2', phase: 'CAPSTONE 1' },
   { key: 'CHAPTER_3', label: 'Chapter 3', phase: 'CAPSTONE 1' },
@@ -833,9 +664,9 @@ const MILESTONE_DEFS: ReadonlyArray<{
 ]
 
 // Resolves each milestone's availability for a section. Explicit rows win;
-// missing rows fall back to: Topic Submission open by default, Capstone 2
-// milestones following the legacy capstone2OpenedAt phase gate, everything
-// else locked. Shares the same resolution as the student journey
+// missing rows fall back to: Capstone 2 milestones following the legacy
+// capstone2OpenedAt phase gate, everything else locked. Shares the same
+// resolution as the student journey
 // (resolveSectionAvailability).
 function buildMilestoneAvailability(section: {
   capstone1OpenedAt: Date | null
@@ -1552,78 +1383,6 @@ export async function copySectionJoinCode(sectionId: number) {
   }
 }
 
-// ───────────────────────────── Milestone phases & topic review ─────────────────────────────
-
-// Coordinator reviews a pending topic proposal from a group in their section.
-// Approving unlocks the group's Topic Selection step (see buildJourneyRows).
-export async function reviewTopic(
-  topicId: number,
-  decision: 'APPROVED' | 'NEED_REVISION',
-  note?: string,
-) {
-  const coordinator = await requireCoordinatorRow()
-  if (!coordinator) {
-    return { success: false, message: 'You are not authorized to perform this action.' }
-  }
-
-  try {
-    const topic = await prisma.topic.findFirst({
-      where: {
-        id: topicId,
-        status: 'PENDING',
-        deletedAt: null,
-        group: {
-          deletedAt: null,
-          section: { coordinatorId: coordinator.id, deletedAt: null },
-        },
-      },
-      include: {
-        group: {
-          select: {
-            id: true,
-            sectionId: true,
-            students: {
-              where: { deletedAt: null },
-              select: { userId: true },
-            },
-          },
-        },
-      },
-    })
-    if (!topic) {
-      return { success: false, message: 'Topic not found in your sections.' }
-    }
-
-    await prisma.topic.update({
-      where: { id: topic.id },
-      data: {
-        status: decision,
-        reviewNote: note?.trim() || null,
-        reviewedById: coordinator.faculty.userId,
-        reviewedAt: new Date(),
-      },
-    })
-
-    revalidateTag('my-sections', { expire: 0 })
-    revalidateTag(`my-section-${topic.group.sectionId}`, { expire: 0 })
-    revalidateTag(`journey-${topic.group.id}`, { expire: 0 })
-    for (const student of topic.group.students) {
-      revalidateTag(`workspace-${student.userId}`, { expire: 0 })
-    }
-
-    return {
-      success: true,
-      message:
-        decision === 'APPROVED'
-          ? 'Topic approved.'
-          : 'Revision requested for this topic.',
-    }
-  } catch (error) {
-    console.error('[reviewTopic | Error]:', error)
-    return { success: false, message: 'Failed to review the topic.' }
-  }
-}
-
 export interface SectionGroupMember {
   id: number
   name: string
@@ -1779,10 +1538,6 @@ export async function getCoordinatorGroupDetail(groupId: number) {
 
     const journey = buildJourneyRows(
       {
-        topics: group.topics.map((t) => ({
-          status: t.status,
-          deletedAt: t.deletedAt,
-        })),
         capstone: group.capstone ? { topicId: group.capstone.topicId } : null,
         milestones: group.milestones.map((m) => ({
           chapter: m.chapter,
@@ -1889,7 +1644,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
               id: group.capstone.topic.id,
               title: group.capstone.topic.title,
               status: group.capstone.topic.status as 'PENDING' | 'APPROVED' | 'NEED_REVISION',
-              note: group.capstone.topic.reviewNote,
+              note: null,
               submittedBy: group.capstone.topic.uploadedBy?.user.name ?? '',
               createdAt: group.capstone.topic.createdAt.toISOString(),
             }

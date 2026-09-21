@@ -3,14 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { ChevronLeft, TriangleAlert } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 
-export type SectionTabKey = 'overview' | 'students' | 'progress' | 'milestones' | 'topics'
+export type SectionTabKey = 'overview' | 'students' | 'progress' | 'milestones'
 
 interface SectionTabsProps {
   sectionId: string
-  pendingTopics: number
   actions?: ReactNode
   children: ReactNode
 }
@@ -20,13 +19,11 @@ const TABS: { key: SectionTabKey; label: string; segment: string }[] = [
   { key: 'students', label: 'Students', segment: 'students' },
   { key: 'progress', label: 'Progress', segment: 'progress' },
   { key: 'milestones', label: 'Milestones', segment: 'milestones' },
-  { key: 'topics', label: 'Topic Reviews', segment: 'topics' },
 ]
 
 function getActiveKey(pathname: string): SectionTabKey {
   if (pathname.includes('/milestones')) return 'milestones'
   if (pathname.includes('/progress')) return 'progress'
-  if (pathname.includes('/topics')) return 'topics'
   if (pathname.includes('/students')) return 'students'
   if (pathname.includes('/overview')) return 'overview'
   // Bare /faculty/my-sections/[sectionId] (no segment) defaults to Overview.
@@ -35,7 +32,7 @@ function getActiveKey(pathname: string): SectionTabKey {
   return 'overview'
 }
 
-export function SectionTabs({ sectionId, pendingTopics, actions, children }: SectionTabsProps) {
+export function SectionTabs({ sectionId, actions, children }: SectionTabsProps) {
   const pathname = usePathname()
   const activeKey = getActiveKey(pathname)
   const base = `/faculty/my-sections/${sectionId}`
@@ -64,12 +61,6 @@ export function SectionTabs({ sectionId, pendingTopics, actions, children }: Sec
               }`}
             >
               {t.label}
-              {t.key === 'topics' && pendingTopics > 0 && (
-                <span className="flex items-center gap-[4px] h-[18px] px-[6px] rounded-full bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[10.5px] leading-[18px] text-[#f59e0b]">
-                  <TriangleAlert className="size-[10px]" />
-                  {pendingTopics}
-                </span>
-              )}
               {isActive && <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />}
             </Link>
           )

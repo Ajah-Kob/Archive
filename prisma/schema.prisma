@@ -43,7 +43,6 @@ model User {
   submissionAnnotations        SubmissionAnnotation[]
   defenseSubmissionAnnotations DefenseSubmissionAnnotation[]
   invitationsSent              Invitation[]                  @relation("InvitationSender")
-  topicReviews                 Topic[]                       @relation("TopicReviewer")
   milestoneSubmissionsReviewed MilestoneSubmission[]         @relation("MilestoneSubmissionReviewer")
   defenseSchedules             DefenseSchedule[]             @relation("DefenseCreatedBy")
   defensePanelists             DefensePanelist[]
@@ -274,17 +273,11 @@ model Topic {
   id            Int         @id @default(autoincrement())
   groupId       Int
   group         Group       @relation(fields: [groupId], references: [id])
-  topicGroupKey String?
   title         String
   background    String
   uploadedById  Int?
   uploadedBy    Student?    @relation(fields: [uploadedById], references: [id])
   status        TopicStatus @default(PENDING)
-  reviewNote    String?
-  reviewedById  Int?
-  reviewedBy    User?       @relation("TopicReviewer", fields: [reviewedById], references: [id])
-  reviewedAt    DateTime?
-  selectedAt    DateTime?
   capstone      Capstone?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

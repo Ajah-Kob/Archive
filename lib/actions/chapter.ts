@@ -206,10 +206,6 @@ export async function getChapterData(
         where: { deletedAt: null },
         include: {
           students: { where: { deletedAt: null }, select: { id: true } },
-          topics: {
-            where: { deletedAt: null },
-            select: { status: true, deletedAt: true },
-          },
           capstone: { select: { topicId: true } },
           milestones: {
             where: { deletedAt: null },
@@ -238,7 +234,6 @@ export async function getChapterData(
   const journey = buildJourneyRows(
     effectiveGroup
       ? {
-          topics: effectiveGroup.topics,
           capstone: effectiveGroup.capstone,
           milestones: effectiveGroup.milestones.map((m) => ({
             chapter: m.chapter,

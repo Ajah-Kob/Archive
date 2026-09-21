@@ -4,7 +4,6 @@
 // functions — value exports must live here.
 
 export const GROUP_CAP = 5
-export const TOPIC_CAP = 3
 export const ADVISER_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 export type JourneyState =
@@ -32,8 +31,6 @@ export interface JourneyRow {
 
 export const JOURNEY_ROWS: ReadonlyArray<Omit<JourneyRow, 'state' | 'sublabel'>> =
   [
-    { slug: 'topic-submission', label: 'Topic Submission', header: 'CAPSTONE 1' },
-    { slug: 'topic-selection', label: 'Topic Selection', header: 'CAPSTONE 1' },
     { slug: 'chapter-1', label: 'Chapter 1', header: 'CAPSTONE 1' },
     { slug: 'chapter-2', label: 'Chapter 2', header: 'CAPSTONE 1' },
     { slug: 'chapter-3', label: 'Chapter 3', header: 'CAPSTONE 1' },
@@ -90,6 +87,12 @@ export interface WorkspaceInvite {
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED'
 }
 
+export interface WorkspaceFinalTopic {
+  id: number
+  title: string
+  updatedAt: string
+}
+
 export interface WorkspaceGroup {
   id: number
   name: string
@@ -99,6 +102,7 @@ export interface WorkspaceGroup {
   members: WorkspaceMember[]
   adviser: AdviserState
   invitations: WorkspaceInvite[]
+  finalTopic: WorkspaceFinalTopic | null
 }
 
 export interface WorkspaceData {
@@ -131,54 +135,6 @@ export interface AdviserOption {
   image: string | null
   workload: number
   atCap: boolean
-}
-
-export type TopicSubmissionStatus = 'PENDING' | 'APPROVED' | 'NEED_REVISION'
-
-export interface TopicActionResult {
-  success: boolean
-  message: string
-}
-
-export interface TopicSubmissionItem {
-  id: number
-  title: string
-  background: string
-  status: TopicSubmissionStatus
-  version: number
-  index: number
-  createdAt: string
-  updatedAt: string
-  reviewNote: string | null
-  reviewedAt: string | null
-  submittedBy: string | null
-  selectedAt?: string | null
-}
-
-export interface TopicSelectionPayload {
-  group: {
-    id: number
-    groupName: string
-    sectionId: number
-  } | null
-  journey: JourneyRow[]
-  topics: TopicSubmissionItem[]
-  confirmedTopicId: number | null
-}
-
-export interface TopicSubmissionPayload {
-  group: {
-    id: number
-    groupName: string
-    sectionId: number
-  } | null
-  journey: JourneyRow[]
-  topics: TopicSubmissionItem[]
-  history: TopicSubmissionItem[]
-  count: number
-  cap: number
-  hasApproved: boolean
-  canSubmit: boolean
 }
 
 export type ChapterKey =

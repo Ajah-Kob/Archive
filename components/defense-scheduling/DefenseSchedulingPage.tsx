@@ -13,7 +13,10 @@ import {
   ConfirmDeleteModal,
   type DefenseScheduleSummary,
 } from '@/components/defense-scheduling/ConfirmDeleteModal'
-import { createDefenseSchedule } from '@/lib/actions/defense'
+import {
+  createDefenseSchedule,
+  rescheduleForRedefense,
+} from '@/lib/actions/defense'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 import type {
   DefenseWizardGroup,
@@ -63,6 +66,8 @@ export function DefenseSchedulingPage({
   const [selectedSchedule, setSelectedSchedule] =
     useState<DefenseSchedulePayload | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [reschedulingSchedule, setReschedulingSchedule] =
+    useState<DefenseSchedulePayload | null>(null)
   const [deletingSchedule, setDeletingSchedule] =
     useState<DefenseScheduleSummary | null>(null)
 
@@ -144,11 +149,13 @@ export function DefenseSchedulingPage({
   }, [filtered, sortField, sortDir])
 
   function openCreateWizard() {
+    setReschedulingSchedule(null)
     setWizardOpen(true)
   }
 
   function closeWizard() {
     setWizardOpen(false)
+    setReschedulingSchedule(null)
   }
 
   function handleView(schedule: DefenseSchedulePayload) {
@@ -164,9 +171,19 @@ export function DefenseSchedulingPage({
     })
   }
 
+  function handleReschedule(schedule: DefenseSchedulePayload) {
+    setReschedulingSchedule(schedule)
+    setWizardOpen(true)
+  }
+
   async function handleWizardSubmit(_prevState: any, formData: FormData) {
-    const result = await createDefenseSchedule(_prevState, formData)
-    if (result.success) router.refresh()
+    const result = reschedulingSchedule
+      ? await rescheduleForRedefense(_prevState, formData)
+      : await createDefenseSchedule(_prevState, formData)
+    if (result.success) {
+      setReschedulingSchedule(null)
+      router.refresh()
+    }
     return result
   }
 
@@ -254,6 +271,7 @@ export function DefenseSchedulingPage({
           currentUserId={currentUserId}
           onView={handleView}
           onDelete={handleDelete}
+          onReschedule={handleReschedule}
           hasAnySchedules={hasAnySchedules}
           sortField={sortField}
           sortDir={sortDir}
@@ -276,7 +294,10 @@ export function DefenseSchedulingPage({
         faculty={faculty}
         existingScheduleDates={existingScheduleDates}
         existingSchedules={existingSchedules}
-        editingSchedule={null}
+        editingSchedule={reschedulingSchedule}
+        title={
+          reschedulingSchedule ? 'Reschedule for Redefense' : undefined
+        }
         onSubmit={handleWizardSubmit}
       />
 

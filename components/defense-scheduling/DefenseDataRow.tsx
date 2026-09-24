@@ -1,6 +1,6 @@
 'use client'
 
-import { Eye, Trash2 } from 'lucide-react'
+import { CalendarClock, Eye, Trash2 } from 'lucide-react'
 import type { DefenseType, DefenseVerdict } from '@prisma/client'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 
@@ -95,6 +95,7 @@ interface DefenseDataRowProps {
   currentUserId: number
   onView: (schedule: DefenseSchedulePayload) => void
   onDelete: (schedule: DefenseSchedulePayload) => void
+  onReschedule: (schedule: DefenseSchedulePayload) => void
 }
 
 export function DefenseDataRow({
@@ -102,6 +103,7 @@ export function DefenseDataRow({
   currentUserId,
   onView,
   onDelete,
+  onReschedule,
 }: DefenseDataRowProps) {
   // Namespace-safe comparison: session ids can arrive as strings, payload
   // ids are numbers, so coerce both sides before checking ownership.
@@ -175,6 +177,17 @@ export function DefenseDataRow({
         >
           <Eye className="size-[16px]" strokeWidth={2} />
         </button>
+        {isOwner && schedule.verdict === 'REDEFENSE' && (
+          <button
+            type="button"
+            title="Reschedule for Redefense"
+            aria-label={`Reschedule redefense for ${schedule.groupName}`}
+            onClick={() => onReschedule(schedule)}
+            className={actionButtonClass}
+          >
+            <CalendarClock className="size-[16px]" strokeWidth={2} />
+          </button>
+        )}
         {isOwner && (
           <button
             type="button"

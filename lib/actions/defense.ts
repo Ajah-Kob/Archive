@@ -528,6 +528,8 @@ export interface DefenseWizardGroup {
   id: number
   name: string
   sectionId: number
+  /** Defense types with a live schedule — drives per-type eligibility. */
+  scheduledTypes: DefenseType[]
   hasSchedule: boolean
 }
 
@@ -556,7 +558,10 @@ async function getDefenseWizardOptionsData(
         select: {
           id: true,
           groupName: true,
-          defenseSchedules: { where: { deletedAt: null }, select: { id: true } },
+          defenseSchedules: {
+            where: { deletedAt: null },
+            select: { id: true, type: true },
+          },
         },
       },
     },
@@ -569,6 +574,9 @@ async function getDefenseWizardOptionsData(
       s.groups.map((g) => ({
         id: g.id,
         name: g.groupName,
+        scheduledTypes: Array.from(
+          new Set(g.defenseSchedules.map((d) => d.type)),
+        ),
         sectionId: s.id,
         hasSchedule: g.defenseSchedules.length > 0,
       })),
@@ -631,21 +639,21 @@ export async function createDefenseSchedule(
   if (!group) {
     return { success: false, message: 'Group not found.' }
   }
+  const type = formData.get('type')?.toString() ?? ''
+  if (!DEFENSE_TYPES.includes(type as DefenseType)) {
+    return { success: false, message: 'Invalid defense type.' }
+  }
+
 
   const existing = await prisma.defenseSchedule.findFirst({
-    where: { groupId, deletedAt: null },
+    where: { groupId, type: type as DefenseType, deletedAt: null },
     select: { id: true },
   })
   if (existing) {
     return {
       success: false,
-      message: 'This group already has a defense schedule.',
+      message: 'This group already has a defense schedule of this type.',
     }
-  }
-
-  const type = formData.get('type')?.toString() ?? ''
-  if (!DEFENSE_TYPES.includes(type as DefenseType)) {
-    return { success: false, message: 'Invalid defense type.' }
   }
 
   const dateRaw = formData.get('date')?.toString().trim() ?? ''
@@ -920,6 +928,180 @@ export async function deleteDefenseSchedule(id: number) {
   } catch (error) {
     console.error('[deleteDefenseSchedule | Error]:', error)
     return { success: false, message: 'Failed to delete defense schedule.' }
+  }
+}
+
+// ───────────────────────────── Redefense reschedule ────────────────────────────
+
+/**
+ * Coordinator creates a fresh defense schedule for a REDEFENSE verdict.
+ * - Authenticates via requireCoordinatorAccess; only the schedule owner,
+ *   an admin, or the program chair may reschedule (same rule as update).
+ * - Requires the source schedule to be live with verdict REDEFENSE.
+ * - Soft-deletes the old schedule as history (submissions + reviews stay
+ *   attached to it, read-only) and creates a new PENDING schedule of the
+ *   same type. The group uploads a fresh document for the new cycle.
+ * - Panelists come from the form when provided, otherwise carried over
+ *   from the old schedule.
+ * Returns { success, message, payload } — never throws.
+ */
+export async function rescheduleForRedefense(
+  _prevState: any,
+  formData: FormData,
+) {
+  const session = await requireCoordinatorAccess()
+  if (!session) return unauthorized
+
+  const scheduleId = parseInt(formData.get('scheduleId')?.toString() ?? '')
+  if (Number.isNaN(scheduleId)) {
+    return { success: false, message: 'Invalid defense schedule.' }
+  }
+
+  try {
+    const schedule = await prisma.defenseSchedule.findFirst({
+      where: { id: scheduleId, deletedAt: null },
+      include: {
+        panelists: {
+          where: { deletedAt: null },
+          select: { userId: true, role: true },
+        },
+        group: { select: { id: true, groupName: true } },
+      },
+    })
+    if (!schedule) {
+      return { success: false, message: 'Defense schedule not found.' }
+    }
+    if (schedule.verdict !== 'REDEFENSE') {
+      return {
+        success: false,
+        message: 'Only schedules with a Redefense verdict can be rescheduled this way.',
+      }
+    }
+
+    const isOwner = schedule.createdBy === +session.user.id
+    if (!isOwner && !(await requireAdminOrProgramChair())) {
+      return unauthorized
+    }
+
+    const dateRaw = formData.get('date')?.toString().trim() ?? ''
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
+      return { success: false, message: 'Invalid defense date.' }
+    }
+    const date = new Date(dateRaw)
+    if (Number.isNaN(date.getTime())) {
+      return { success: false, message: 'Invalid defense date.' }
+    }
+    const startTime = formData.get('startTime')?.toString().trim() ?? ''
+    if (!startTime) {
+      return { success: false, message: 'Start time is required.' }
+    }
+    const endTime = formData.get('endTime')?.toString().trim() ?? ''
+    if (!endTime) {
+      return { success: false, message: 'End time is required.' }
+    }
+    const venue = formData.get('venue')?.toString().trim() ?? ''
+    if (!venue) {
+      return { success: false, message: 'Venue is required.' }
+    }
+
+    // Panelists: explicit form value wins, otherwise carry over the old panel.
+    let panelists: PanelistInput[]
+    const panelistsRaw = formData.get('panelists')?.toString()
+    if (panelistsRaw) {
+      const parsed = parsePanelists(panelistsRaw)
+      if ('error' in parsed) {
+        return { success: false, message: parsed.error }
+      }
+      panelists = parsed.panelists
+    } else {
+      panelists = schedule.panelists.map((p) => ({
+        userId: p.userId,
+        role: p.role,
+      }))
+    }
+    if (panelists.length === 0) {
+      return { success: false, message: 'At least one panelist is required.' }
+    }
+
+    const now = new Date()
+    const created = await prisma.$transaction(async (tx) => {
+      await tx.defenseSchedule.update({
+        where: { id: schedule.id },
+        data: { deletedAt: now },
+      })
+      return tx.defenseSchedule.create({
+        data: {
+          groupId: schedule.groupId,
+          type: schedule.type,
+          date,
+          startTime,
+          endTime,
+          venue,
+          createdBy: +session.user.id,
+          panelists: {
+            create: panelists.map((p) => ({
+              userId: p.userId,
+              role: p.role,
+            })),
+          },
+        },
+        include: { panelists: true },
+      })
+    })
+
+    const groupName = schedule.group?.groupName ?? `Group ${schedule.groupId} - ${schedule.type}`
+    try {
+      await audit({
+        action: 'DEFENSE_RESCHEDULE',
+        entity: 'DEFENSE_SCHEDULE',
+        entityId: String(created.id),
+        entityName: groupName,
+        before: { rescheduledFromId: schedule.id, verdict: schedule.verdict },
+        after: {
+          groupId: schedule.groupId,
+          type: schedule.type,
+          date: date.toISOString(),
+          startTime,
+          endTime,
+          venue,
+          panelists,
+        },
+      })
+    } catch {}
+
+    // Notify every group member so they learn the new date/venue.
+    try {
+      const members = await prisma.student.findMany({
+        where: { groupId: schedule.groupId, deletedAt: null },
+        select: { userId: true },
+      })
+      const milestoneSlug =
+        schedule.type === 'FINAL' ? 'final-defense' : 'proposal-defense'
+      if (members.length > 0) {
+        await prisma.notification.createMany({
+          data: members.map((m) => ({
+            userId: m.userId,
+            title: 'Defense rescheduled',
+            body: `${groupName} has a new ${schedule.type === 'FINAL' ? 'final' : 'proposal'} defense on ${dateRaw} at ${venue}.`,
+            href: `/student/milestone/${milestoneSlug}`,
+          })),
+        })
+      }
+    } catch (notifyError) {
+      console.error('[rescheduleForRedefense | notify Error]:', notifyError)
+    }
+
+    revalidateTag('defense', 'max')
+    revalidateFeature('defense')
+
+    return {
+      success: true,
+      message: 'Redefense rescheduled successfully.',
+      payload: created,
+    }
+  } catch (error) {
+    console.error('[rescheduleForRedefense | Error]:', error)
+    return { success: false, message: 'Failed to reschedule defense.' }
   }
 }
 

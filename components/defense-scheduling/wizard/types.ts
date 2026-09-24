@@ -10,6 +10,8 @@ export interface GroupOption {
   name: string
   sectionId: number
   hasSchedule: boolean
+  /** Defense types with a live schedule — drives per-type eligibility. */
+  scheduledTypes: DefenseType[]
 }
 
 export interface FacultyMember {

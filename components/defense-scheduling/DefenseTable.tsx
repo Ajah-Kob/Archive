@@ -62,6 +62,7 @@ interface DefenseTableProps {
   currentUserId: number
   onView: (schedule: DefenseSchedulePayload) => void
   onDelete: (schedule: DefenseSchedulePayload) => void
+  onReschedule: (schedule: DefenseSchedulePayload) => void
   /** Whether any schedules exist at all (before filtering) — drives the empty message. */
   hasAnySchedules: boolean
   sortField?: SortKey
@@ -74,6 +75,7 @@ export function DefenseTable({
   currentUserId,
   onView,
   onDelete,
+  onReschedule,
   hasAnySchedules,
   sortField,
   sortDir,
@@ -126,6 +128,7 @@ export function DefenseTable({
                 currentUserId={currentUserId}
                 onView={onView}
                 onDelete={onDelete}
+                onReschedule={onReschedule}
               />
             ))
           )}

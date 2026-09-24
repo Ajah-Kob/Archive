@@ -410,9 +410,12 @@ async function verifyDefenseUpload(
 // ───────────────────────────── submitDefenseDocument ─────────────────────────────
 
 /**
- * Creates the initial defense document submission (isInitial: true, version: 1).
+ * Creates the initial defense document submission (isInitial: true).
+ * The version continues the group's chain across reschedules: max version
+ * over ALL of the group's schedules (including soft-deleted history) + 1,
+ * so a Redefense re-upload lands as v2/v3 instead of restarting at v1.
  * Validates: student is in a group with a defense schedule, no prior initial
- * submission exists, and the uploaded blob is valid.
+ * submission exists on this schedule, and the uploaded blob is valid.
  */
 export async function submitDefenseDocument(
   upload: DefenseDocumentUpload,
@@ -435,7 +438,7 @@ export async function submitDefenseDocument(
         },
       },
     },
-    select: { id: true },
+    select: { id: true, groupId: true },
   })
   if (!schedule) {
     return {
@@ -464,13 +467,24 @@ export async function submitDefenseDocument(
   const uploadError = await verifyDefenseUpload(schedule.id, upload)
   if (uploadError) return { success: false, message: uploadError }
 
+  // Group-wide version chain: continue past any prior schedules (e.g. a
+  // Redefense schedule's v1) instead of restarting at 1.
+  const latestAnywhere = await prisma.defenseSubmission.findFirst({
+    where: {
+      deletedAt: null,
+      schedule: { groupId: schedule.groupId },
+    },
+    orderBy: { version: 'desc' },
+    select: { version: true },
+  })
+
   try {
     const submission = await prisma.defenseSubmission.create({
       data: {
         scheduleId: schedule.id,
         submittedBy: +session.user.id,
         isInitial: true,
-        version: 1,
+        version: (latestAnywhere?.version ?? 0) + 1,
         fileName: upload.fileName,
         blobUrl: upload.blobUrl,
         mimeType: upload.mimeType,

@@ -178,8 +178,24 @@ export function StepSectionGroup({
   onGroupChange,
   onTypeChange,
 }: StepSectionGroupProps) {
+  // Groups already holding a live schedule for the SELECTED defense type
+  // (scheduled or finished) are ineligible — unless it's the group being
+  // edited/rescheduled.
+  function isGroupTaken(group: (typeof sectionGroups)[number]): boolean {
+    if (!defenseType) return false
+    return (
+      group.scheduledTypes.includes(defenseType) &&
+      !(isEdit && group.id === groupId)
+    )
+  }
+
+  const eligibleGroups = defenseType
+    ? sectionGroups.filter((g) => !isGroupTaken(g))
+    : []
   const allScheduled =
-    sectionGroups.length > 0 && sectionGroups.every((g) => g.hasSchedule)
+    !!defenseType &&
+    sectionGroups.length > 0 &&
+    eligibleGroups.length === 0
 
   const sectionOptions: DropdownOption[] = sections.map((section) => ({
     value: String(section.id),
@@ -190,10 +206,8 @@ export function StepSectionGroup({
     value: String(group.id),
     label:
       group.name +
-      (group.hasSchedule && !(isEdit && group.id === groupId)
-        ? ' — already scheduled'
-        : ''),
-    disabled: group.hasSchedule && !(isEdit && group.id === groupId),
+      (isGroupTaken(group) ? ' — already scheduled' : ''),
+    disabled: isGroupTaken(group),
   }))
 
   const typeOptions: Array<{
@@ -249,37 +263,7 @@ export function StepSectionGroup({
         />
       </div>
 
-      {/*Group Dropdown Menu */}
-      <div className="flex flex-col gap-[6px]">
-        <label className={LABEL_CLASS}>
-          Group <span className="text-[#ef4444]">*</span>
-        </label>
-        <Dropdown
-          value={groupId ? String(groupId) : ''}
-          options={groupOptions}
-          onChange={(v) => onGroupChange(v ? Number(v) : null)}
-          placeholder={sectionId ? 'Select a group…' : 'Select a section first'}
-          disabled={!sectionId || isEdit}
-          ariaLabel="Group"
-        />
-        {isEdit ? (
-          <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
-            The section and group cannot be changed after the schedule is
-            created.
-          </p>
-        ) : sectionId && sectionGroups.length === 0 ? (
-          <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
-            No groups available in this section.
-          </p>
-        ) : null}
-        {!isEdit && allScheduled ? (
-          <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
-            All groups in this section already have a defense schedule.
-          </p>
-        ) : null}
-      </div>
-
-      {/*Defense Type radio options (bottom; enabled once a section is picked) */}
+      {/*Defense Type radio options (middle; enabled once a section is picked) */}
       <div className="flex flex-col gap-[6px]">
         <span className={LABEL_CLASS} id="defense-type-label">
           Defense Type <span className="text-[#ef4444]">*</span>
@@ -331,6 +315,43 @@ export function StepSectionGroup({
         {!sectionId ? (
           <p className="font-sans font-medium text-[11px] leading-[15px] text-[#8a93b4]">
             Select a section first to choose a defense type.
+          </p>
+        ) : null}
+      </div>
+
+      {/*Group Dropdown Menu (bottom; filtered by the selected defense type) */}
+      <div className="flex flex-col gap-[6px]">
+        <label className={LABEL_CLASS}>
+          Group <span className="text-[#ef4444]">*</span>
+        </label>
+        <Dropdown
+          value={groupId ? String(groupId) : ''}
+          options={groupOptions}
+          onChange={(v) => onGroupChange(v ? Number(v) : null)}
+          placeholder={
+            !sectionId
+              ? 'Select a section first'
+              : !defenseType
+                ? 'Select a defense type first'
+                : 'Select a group…'
+          }
+          disabled={!sectionId || !defenseType || isEdit}
+          ariaLabel="Group"
+        />
+        {isEdit ? (
+          <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
+            The section and group cannot be changed after the schedule is
+            created.
+          </p>
+        ) : sectionId && sectionGroups.length === 0 ? (
+          <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
+            No groups available in this section.
+          </p>
+        ) : null}
+        {!isEdit && allScheduled ? (
+          <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
+            All groups in this section already have this defense scheduled or
+            finished.
           </p>
         ) : null}
       </div>

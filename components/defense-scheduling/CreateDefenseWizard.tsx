@@ -67,6 +67,8 @@ interface CreateDefenseWizardProps {
    * scheduleId so the parent can route it to updateDefenseSchedule.
    */
   editingSchedule?: DefenseSchedulePayload | null
+  /** Overrides the dialog title (e.g. reschedule flows). */
+  title?: string
   onSubmit: (
     _prevState: any,
     formData: FormData,
@@ -128,6 +130,7 @@ export function CreateDefenseWizard({
   existingScheduleDates,
   existingSchedules,
   editingSchedule,
+  title,
   onSubmit,
 }: CreateDefenseWizardProps) {
   const [step, setStep] = useState(0)
@@ -213,7 +216,8 @@ export function CreateDefenseWizard({
     !!groupId &&
     !!selectedGroup &&
     !!defenseType &&
-    (isEdit || !selectedGroup.hasSchedule)
+    (isEdit ||
+      !selectedGroup.scheduledTypes.includes(defenseType))
   const timeError = timeErrorFor(startTime, endTime)
   const step2Valid =
     !!selectedDate &&
@@ -304,7 +308,7 @@ export function CreateDefenseWizard({
               <Calendar className="size-[14px] text-[#707dff]" />
             </div>
             <h2 className="font-['Sora',sans-serif] font-bold text-[14px] leading-[21px] text-[#1e3a8a] tracking-[-0.14px]">
-              {isEdit ? 'Edit Defense Schedule' : 'Create Defense Schedule'}
+              {title ?? (isEdit ? 'Edit Defense Schedule' : 'Create Defense Schedule')}
             </h2>
           </div>
           <button
@@ -331,7 +335,12 @@ export function CreateDefenseWizard({
                 setGroupId(null)
               }}
               onGroupChange={setGroupId}
-              onTypeChange={setDefenseType}
+              onTypeChange={(type) => {
+                setDefenseType(type)
+                // Group eligibility depends on the type — drop a group that
+                // the newly selected type disqualifies (create mode only).
+                if (!isEdit) setGroupId(null)
+              }}
             />
           ) : null}
           {step === 1 ? (

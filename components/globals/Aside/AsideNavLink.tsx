@@ -83,6 +83,7 @@ export function NavLinks({
       label: 'CAPSTONE',
       items: [
         { label: 'Milestones', href: '/student/milestone', icon: Flag, show: isStudent },
+        { label: 'My Team', href: '/student/my-team', icon: Users, show: isStudent },
         { label: 'My Sections', href: '/faculty/my-sections', icon: Layers, show: isCoordinator },
         { label: 'Document Review', href: '/faculty/document-review', icon: ClipboardCheck, show: isAdviser },
         { label: 'Defense', href: '/faculty/defense', icon: Shield, show: isFaculty },

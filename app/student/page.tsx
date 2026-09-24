@@ -1,4 +1,4 @@
-import { Flag } from 'lucide-react'
+import { Flag, Users } from 'lucide-react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import Link from 'next/link'
@@ -27,6 +27,17 @@ export default async function StudentHomePage() {
           </div>
           <span className="font-sans font-semibold text-[14px] text-[#12143a]">
             Milestones
+          </span>
+        </Link>
+        <Link
+          href="/student/my-team"
+          className="bg-white border border-[#eceef8] rounded-[14px] p-5 flex flex-col gap-3 shadow-[0_2px_12px_rgba(30,58,138,0.06)] hover:border-[#707dff] transition-colors"
+        >
+          <div className="size-9 bg-indigo-500/10 rounded-lg inline-flex justify-center items-center">
+            <Users className="size-4 text-indigo-500" />
+          </div>
+          <span className="font-sans font-semibold text-[14px] text-[#12143a]">
+            My Team
           </span>
         </Link>
       </div>

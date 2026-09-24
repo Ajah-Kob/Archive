@@ -23,11 +23,25 @@ export default function FormSignup({ className }: { className?: string }) {
   const [state, handleSubmit, pending] = useActionState(signupUser, {})
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  // Name/email are controlled so a failed submit (e.g. duplicate email)
+  // never wipes them. Passwords stay uncontrolled and clear as usual.
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const { isFormValid, checkFormValidity } = useAuthFormValidity(formRef)
+
+  // Restore server-returned input after a failed submit.
+  useEffect(() => {
+    const input = (state as { input?: { name?: string; email?: string } })
+      ?.input
+    if (input?.name != null) setName(input.name)
+    if (input?.email != null) setEmail(input.email)
+  }, [state])
 
   useEffect(() => {
     if (state?.success && formRef.current) {
       formRef.current.reset()
+      setName('')
+      setEmail('')
       // Use delay 1000 to show form message before redirect
       setTimeout(() => {
         redirect(next ? `/login?next=${encodeURIComponent(next)}` : '/login')
@@ -73,6 +87,8 @@ export default function FormSignup({ className }: { className?: string }) {
           placeholder="John Thomas"
           error={state?.errors?.name}
           required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
         />
 
         {/* Email Address Field */}
@@ -83,6 +99,8 @@ export default function FormSignup({ className }: { className?: string }) {
           placeholder="johnthomas@email.com"
           error={state?.errors?.email}
           required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
         />
 
         {/* Password Field */}
@@ -118,7 +136,7 @@ export default function FormSignup({ className }: { className?: string }) {
         {/* Submit Button */}
         <AuthSubmitButton
           pending={pending}
-          label="Signup →"
+          label="Signup"
           disabled={!isFormValid}
         />
       </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight, LoaderCircle } from 'lucide-react'
+import { ChevronRight, LoaderCircle } from 'lucide-react'
 
 interface AuthSubmitButtonProps {
   pending?: boolean
@@ -31,7 +31,7 @@ export function AuthSubmitButton({
       {pending ? (
         <LoaderCircle className="size-4 text-white animate-spin" />
       ) : (
-        <ArrowRight className="size-3.5 text-white" />
+        <ChevronRight className="size-3.5 text-white" />
       )}
     </button>
   )

@@ -191,7 +191,7 @@ export default function FormLogin({ className }: { className?: string }) {
 
         <AuthSubmitButton
           pending={pending}
-          label="Sign in →"
+          label="Login"
           disabled={!isFormValid}
         />
       </div>

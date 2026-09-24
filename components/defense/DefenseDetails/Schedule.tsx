@@ -76,8 +76,9 @@ function DetailsCard({
 
   return (
     <div className="bg-white border border-[#eceef8] rounded-[14px] drop-shadow-[0px_2px_6px_rgba(112,125,255,0.05)] flex items-start px-[16px] py-[8px] w-full flex-col lg:flex-row gap-0">
-      <div className="w-[197px] p-[10px] max-lg:w-full lg:w-[197px] shrink-0 flex flex-col gap-[2px]">
-        <p className="font-['Sora',sans-serif] font-extrabold text-[20px] leading-[normal] tracking-[-0.44px] text-[#10133a] whitespace-nowrap truncate">
+      {/* Group and Section Info — hugs content, extends with the name */}
+      <div className="w-fit max-w-full p-[10px] shrink-0 flex flex-col gap-[2px]">
+        <p className="font-['Sora',sans-serif] font-extrabold text-[20px] leading-[normal] tracking-[-0.44px] text-[#10133a] whitespace-nowrap">
           {groupName}
         </p>
         <p className="font-['Plus_Jakarta_Sans',sans-serif] font-semibold text-[12.5px] leading-[normal] text-[#8a93b4]">
@@ -85,6 +86,7 @@ function DetailsCard({
         </p>
       </div>
 
+      {/* Schedule Info */}
       <div className="flex-1 gap-[15px] h-full items-center p-[10px] flex flex-wrap min-w-0">
         <DetailItem
           icon={
@@ -118,6 +120,7 @@ function DetailsCard({
         </DetailItem>
       </div>
 
+      {/* Defense Type */}
       <div className="w-full h-full max-lg:w-full lg:w-[162px] shrink-0 flex flex-col items-end justify-center">
         <div className="inline-flex items-center gap-[6px] px-[11px] py-[5px] rounded-[8px] bg-[rgba(59,130,246,0.07)] border border-[rgba(59,130,246,0.18)]">
           <Shield

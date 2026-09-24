@@ -35,7 +35,7 @@ export function UserProfile({
             'linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)',
         }}
       >
-        <span className="relative font-heading text-[11.5px] font-bold leading-none text-white">
+        <span className="font-heading text-[11.5px] font-bold leading-none text-white translate-y-[1px]">
           {initials}
         </span>
       </div>

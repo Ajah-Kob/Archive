@@ -21,15 +21,16 @@ function resolveMembers(
 /**
  * DefenseDetailsCard for student milestone + panelist workspace.
  * Composes shared DefenseDetails primitives (Root / Header / Grid / Schedule / Panelists / Members)
- * — composition-first, no role branching. Scrollable container per Figma 1493:7980 (max-h 520 + overflow-auto).
+ * — composition-first, no role branching. The card extends to fit its
+ * contents; only the session page itself scrolls.
  * All Figma-precise styling lives in the primitives under components/defense/DefenseDetails/*.
  */
 export function DefenseDetailsCard({ schedule }: DefenseDetailsCardProps) {
   const members = resolveMembers(schedule)
   return (
-    <DefenseDetails.Root scrollable>
+    <DefenseDetails.Root>
       <DefenseDetails.Header>Session Details</DefenseDetails.Header>
-      <DefenseDetails.Grid scrollable>
+      <DefenseDetails.Grid>
         <DefenseDetails.Schedule schedule={schedule} />
         <DefenseDetails.Panelists
           panelists={schedule?.panelists ?? []}

@@ -91,7 +91,7 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
           initials={getInitials(panelist.name)}
           name={panelist.name}
           email={panelist.email}
-          gradient={PANELIST_AVATAR_GRADIENT}
+          gradient={panelist.avatarGradient ?? PANELIST_AVATAR_GRADIENT}
           avatarClassName="size-[35px]"
         />
         {isMe ? <MeBadge /> : null}

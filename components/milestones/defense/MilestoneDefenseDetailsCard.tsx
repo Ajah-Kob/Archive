@@ -4,7 +4,10 @@ import { Calendar, Clock, Crown, MapPin, User } from 'lucide-react'
 import type { DefenseVerdict, PanelistRole } from '@prisma/client'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 import { getInitials } from '@/lib/helper'
-import { PANELIST_AVATAR_GRADIENT } from '@/components/ui/UserProfile'
+import {
+  UserProfile,
+  PANELIST_AVATAR_GRADIENT,
+} from '@/components/ui/UserProfile'
 import { deriveFeedbackText as deriveFeedbackTextHelper } from '@/lib/defense/session-helpers'
 
 interface MilestoneDefenseDetailsCardProps {
@@ -213,19 +216,6 @@ function PanelPill({ role }: { role: PanelistRole }) {
   )
 }
 
-function PanelistAvatar({ name }: { name: string }) {
-  return (
-    <div
-      className="size-[35px] rounded-[20px] flex items-center justify-center shrink-0"
-      style={{ backgroundImage: PANELIST_AVATAR_GRADIENT }}
-    >
-      <span className="font-['Sora',sans-serif] font-bold text-[12.8px] leading-none text-white">
-        {getInitials(name)}
-      </span>
-    </div>
-  )
-}
-
 type PanelistRowProps = {
   panelist: DefenseSchedulePayload['panelists'][number]
   verdict: string
@@ -254,15 +244,13 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
       className={`bg-white ${border} ${radius} grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)] max-sm:grid-cols-1 max-sm:gap-2 items-center px-[17px] py-[6px] min-h-[61px] gap-2`}
     >
       <div className="flex items-center gap-2.5 min-w-0 sm:h-[50px] w-full">
-        <PanelistAvatar name={panelist.name} />
-        <div className="flex flex-col min-w-0">
-          <p className="font-['Sora',sans-serif] font-bold text-[12.5px] leading-[normal] tracking-[-0.125px] text-[#1e3a8a] truncate">
-            {panelist.name}
-          </p>
-          <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[11px] leading-[normal] text-[#9ea8c6] truncate">
-            {panelist.email}
-          </p>
-        </div>
+        <UserProfile
+          initials={getInitials(panelist.name)}
+          name={panelist.name}
+          email={panelist.email}
+          gradient={panelist.avatarGradient ?? PANELIST_AVATAR_GRADIENT}
+          avatarClassName="size-[35px]"
+        />
       </div>
       <div className="flex items-center justify-center sm:h-[50px] sm:px-2 min-w-0 w-full">
         <p

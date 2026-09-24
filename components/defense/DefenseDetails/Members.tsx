@@ -4,8 +4,10 @@ import { Crown } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import type { DefenseMemberPayload } from '@/lib/actions/defense'
 import { getInitials } from '@/lib/helper'
-
-const AVATAR_GRADIENT = 'linear-gradient(135deg, #1e3a8a 0%, #2d52b8 100%)'
+import {
+  UserProfile,
+  PANELIST_AVATAR_GRADIENT,
+} from '@/components/ui/UserProfile'
 
 function LeaderPill() {
   return (
@@ -16,39 +18,7 @@ function LeaderPill() {
   )
 }
 
-function MemberAvatar({ name }: { name: string }) {
-  return (
-    <div
-      className="size-[35px] rounded-[20px] flex items-center justify-center shrink-0"
-      style={{ backgroundImage: AVATAR_GRADIENT }}
-    >
-      <span className="font-['Sora',sans-serif] font-bold text-[12.8px] leading-none text-white">
-        {getInitials(name)}
-      </span>
-    </div>
-  )
-}
 
-function MeBadge() {
-  return (
-    <span className="inline-flex items-center gap-[4px] rounded-full bg-[#eef2ff] border border-[#c7d2fe] px-[7px] py-[2px] font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[10px] leading-[14px] text-[#4f46e5] whitespace-nowrap shrink-0">
-      Me
-    </span>
-  )
-}
-
-function MemberInfo({ member }: { member: DefenseMemberPayload }) {
-  return (
-    <div className="flex flex-col min-w-0">
-      <p className="font-['Sora',sans-serif] font-bold text-[12.5px] leading-[normal] tracking-[-0.125px] text-[#1e3a8a] truncate">
-        {member.name}
-      </p>
-      <p className="font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[11px] leading-[normal] text-[#9ea8c6] truncate">
-        {member.email}
-      </p>
-    </div>
-  )
-}
 
 type MemberRowProps = {
   member: DefenseMemberPayload
@@ -73,10 +43,15 @@ function MemberRow({ member, isFirst, isLast }: MemberRowProps) {
   const isMe = session?.user?.id != null && String(session.user.id) === String(member.userId)
   return (
     <div className={buildRowClass(isFirst, isLast)}>
-      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        <MemberAvatar name={member.name} />
-        <MemberInfo member={member} />
-        {isMe ? <MeBadge /> : null}
+      <div className="min-w-0 flex-1">
+        <UserProfile
+          initials={getInitials(member.name)}
+          name={member.name}
+          email={member.email}
+          gradient={member.avatarGradient ?? PANELIST_AVATAR_GRADIENT}
+          avatarClassName="size-[35px]"
+          badge={isMe ? 'Me' : undefined}
+        />
       </div>
       <div className="flex items-center justify-end shrink-0">
         {member.isLeader ? <LeaderPill /> : null}

@@ -18,7 +18,7 @@ function buildGridClassName(className: string | undefined, scrollable: boolean):
 export function DefenseDetailsGrid({
   children,
   className,
-  scrollable = true,
+  scrollable = false,
 }: DefenseDetailsGridProps) {
   return <div className={buildGridClassName(className, scrollable)}>{children}</div>
 }

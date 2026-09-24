@@ -117,7 +117,11 @@ export function DefenseTabPanel({ data, defenseType }: DefenseTabPanelProps) {
   if (!data) {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto px-8 py-[30px] flex flex-col">
-        <DefenseEmptyState type={defenseType as DefenseType} />
+        <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+            <DefenseEmptyState type={defenseType as DefenseType} />
+          </div>
+        </div>
       </div>
     )
   }

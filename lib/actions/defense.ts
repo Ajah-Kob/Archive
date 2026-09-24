@@ -26,7 +26,7 @@ const DEFENSE_VERDICTS: DefenseVerdict[] = [
   'APPROVED',
   'MINOR_REVISION',
   'MAJOR_REVISION',
-  'REJECTED',
+  'REDEFENSE',
 ]
 const PANELIST_ROLES: PanelistRole[] = ['CHAIR', 'PANEL_MEMBER']
 
@@ -925,7 +925,7 @@ export async function deleteDefenseSchedule(id: number) {
 
 // ───────────────────────────── Chair verdict (awaiting-chair callout) ───────────
 
-const CHAIR_VERDICTS: DefenseVerdict[] = ['APPROVED', 'MINOR_REVISION', 'MAJOR_REVISION', 'REJECTED']
+const CHAIR_VERDICTS: DefenseVerdict[] = ['APPROVED', 'MINOR_REVISION', 'MAJOR_REVISION', 'REDEFENSE']
 
 function isChairVerdict(value: string): value is DefenseVerdict {
   return (CHAIR_VERDICTS as string[]).includes(value)
@@ -935,7 +935,7 @@ function isChairVerdict(value: string): value is DefenseVerdict {
  * Panel Chair submits the final defense verdict.
  * - Authenticates via requirePanelist (any panelist may reach this action)
  * - Authorizes only the CHAIR for the given schedule (DefensePanelist role === CHAIR)
- * - Validates verdict is one of APPROVED / MINOR_REVISION / MAJOR_REVISION / REJECTED
+ * - Validates verdict is one of APPROVED / MINOR_REVISION / MAJOR_REVISION / REDEFENSE
  * - Allows submit only when current verdict is PENDING (no overwrite)
  * Returns { success, message, payload } — never throws.
  */
@@ -1064,20 +1064,20 @@ export async function submitPanelistVerdictAction(_prevState: any, formData: For
  * - Authenticates via requirePanelist (any panelist on the schedule)
  * - Authorizes that the submission is a resubmission and the panelist has a PENDING review row
  * - Enforces read-only: a panelist who already APPROVED the initial version cannot re-review future resubmissions (carry-forward)
- * - On success updates DefenseSubmissionReview to APPROVED or REJECTED and commits annotations (if provided)
+ * - On success updates DefenseSubmissionReview to APPROVED or REDEFENSE and commits annotations (if provided)
  * Returns { success, message } — never throws.
  */
 export async function reviewDefenseResubmission(
   submissionId: number,
-  decision: 'APPROVED' | 'REJECTED' | 'NEED_REVISION',
+  decision: 'APPROVED' | 'REDEFENSE' | 'NEED_REVISION',
   annotationData: unknown = null,
 ) {
   const session = await requirePanelist()
   if (!session) return unauthorized
 
   const panelistId = +session.user.id
-  const normalizedDecision = decision === 'NEED_REVISION' ? 'REJECTED' : decision
-  if (normalizedDecision !== 'APPROVED' && normalizedDecision !== 'REJECTED') {
+  const normalizedDecision = decision === 'NEED_REVISION' ? 'REDEFENSE' : decision
+  if (normalizedDecision !== 'APPROVED' && normalizedDecision !== 'REDEFENSE') {
     return { success: false, message: 'Invalid decision.' }
   }
 

@@ -47,7 +47,7 @@ export interface DefenseSubmissionDetail {
   size: number
   dateSubmitted: string
   submittedBy: string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING' | 'APPROVED' | 'REDEFENSE'
   isCurrent: boolean
   reviewedAt: string | null
 }
@@ -55,10 +55,10 @@ export interface DefenseSubmissionDetail {
 function resolvePanelistStatus(
   reviews: { panelistId: number; status: string }[],
   authorId: number,
-): 'PENDING' | 'APPROVED' | 'REJECTED' {
+): 'PENDING' | 'APPROVED' | 'REDEFENSE' {
   const myReview = reviews.find((r) => r.panelistId === authorId)
   if (myReview?.status === 'APPROVED') return 'APPROVED'
-  if (myReview?.status === 'REJECTED') return 'REJECTED'
+  if (myReview?.status === 'REDEFENSE') return 'REDEFENSE'
   return 'PENDING'
 }
 

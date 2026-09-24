@@ -102,14 +102,14 @@ function sanitizeBlobFilename(fileName: string): string {
  * Rules (from docs/context/lookup/submission-statuses.md):
  *   - all APPROVED  → 'Approved'
  *   - any PENDING   → 'In Review'
- *   - any REJECTED  → 'Rejected'
+ *   - any REDEFENSE → 'Redefense'
  */
 function deriveResubmissionStatus(
   reviews: { status: DefenseReviewStatus }[],
 ): string {
   if (reviews.length === 0) return 'In Review'
   if (reviews.every((r) => r.status === 'APPROVED')) return 'Approved'
-  if (reviews.some((r) => r.status === 'REJECTED')) return 'Rejected'
+  if (reviews.some((r) => r.status === 'REDEFENSE')) return 'Redefense'
   return 'In Review'
 }
 
@@ -545,7 +545,7 @@ export async function resubmitDefenseDocument(
   if (
     schedule.verdict !== 'MINOR_REVISION' &&
     schedule.verdict !== 'MAJOR_REVISION' &&
-    schedule.verdict !== 'REJECTED'
+    schedule.verdict !== 'REDEFENSE'
   ) {
     return {
       success: false,
@@ -572,8 +572,8 @@ export async function resubmitDefenseDocument(
         message: 'All panelists must finish reviewing before you can resubmit.',
       }
     }
-    const hasRejected = reviews.some((r) => r.status === 'REJECTED')
-    if (!hasRejected) {
+    const hasRedefense = reviews.some((r) => r.status === 'REDEFENSE')
+    if (!hasRedefense) {
       return {
         success: false,
         message: 'Resubmission is only allowed when a revision is requested.',
@@ -599,7 +599,7 @@ export async function resubmitDefenseDocument(
     select: { userId: true },
   })
 
-  // Carry-forward: APPROVED stays approved, REJECTED resets to PENDING
+  // Carry-forward: APPROVED stays approved, REDEFENSE resets to PENDING
   // Build map of previous resubmission reviews if exists (from B-strict guard)
   let prevReviewStatusByPanelist = new Map<number, string>()
   if (existingResubmission) {
@@ -625,12 +625,12 @@ export async function resubmitDefenseDocument(
           mimeType: upload.mimeType,
           size: upload.size,
           reviews: {
-            create: panelists.map((p) => {
-              const prevStatus = prevReviewStatusByPanelist.get(p.userId) as 'PENDING' | 'APPROVED' | 'REJECTED' | undefined
-              // First resubmission: all PENDING. Subsequent: APPROVED carries forward, REJECTED -> PENDING
+            create:           panelists.map((p) => {
+              const prevStatus = prevReviewStatusByPanelist.get(p.userId) as 'PENDING' | 'APPROVED' | 'REDEFENSE' | undefined
+              // First resubmission: all PENDING. Subsequent: APPROVED carries forward, REDEFENSE -> PENDING
               if (!existingResubmission) return { panelistId: p.userId, status: 'PENDING' as const }
               if (prevStatus === 'APPROVED') return { panelistId: p.userId, status: 'APPROVED' as const }
-              // REJECTED or PENDING or missing -> reset to PENDING for next version
+              // REDEFENSE or PENDING or missing -> reset to PENDING for next version
               return { panelistId: p.userId, status: 'PENDING' as const }
             }),
           },
@@ -864,7 +864,7 @@ function deriveDefenseSubmissionStatus(
   if (isInitial) return scheduleVerdict
   if (reviews.length === 0) return 'In Review'
   if (reviews.every((r) => r.status === 'APPROVED')) return 'Approved'
-  if (reviews.some((r) => r.status === 'REJECTED')) return 'Rejected'
+  if (reviews.some((r) => r.status === 'REDEFENSE')) return 'Redefense'
   return 'In Review'
 }
 

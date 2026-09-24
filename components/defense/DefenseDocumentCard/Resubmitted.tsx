@@ -11,7 +11,7 @@ export interface ResubmittedDocumentInfo {
   dateSubmitted?: string
   submittedByName: string
   version: number
-  status: 'FOR_REVIEW' | 'APPROVED' | 'NEED_REVISION' | 'REJECTED'
+  status: 'FOR_REVIEW' | 'APPROVED' | 'NEED_REVISION' | 'REDEFENSE'
   approvedCount: number
   totalPanelists?: number
   comments?: number
@@ -56,10 +56,10 @@ export function LatestDocumentCardResubmitted({
   const total = document.totalPanelists ?? 3
   const isForReview = document.status === 'FOR_REVIEW'
   const isApproved = document.status === 'APPROVED'
-  const isNeedRevision = document.status === 'NEED_REVISION' || document.status === 'REJECTED'
+  const isNeedRevision = document.status === 'NEED_REVISION' || document.status === 'REDEFENSE'
 
   // Pill state mapping for Figma
-  const pillState = isApproved ? 'Approved' : isNeedRevision ? 'Rejected' : 'For Review'
+  const pillState = isApproved ? 'Approved' : isNeedRevision ? 'Redefense' : 'For Review'
   const circleState = isForReview ? 'In Review' : isNeedRevision ? 'Need Revision' : 'Approved'
 
   const approvedLabel = `${document.approvedCount}/${total} approve`

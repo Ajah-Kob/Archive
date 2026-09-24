@@ -55,7 +55,7 @@ export function deriveVerdictCalloutState(
       return 'minor_revision'
     case 'MAJOR_REVISION':
       return 'major_revision'
-    case 'REJECTED':
+    case 'REDEFENSE':
       return 'rejected'
     default:
       return isChairValue ? 'awaiting-chair' : 'awaiting-non-chair'
@@ -156,7 +156,7 @@ export type ResubmissionCalloutState = ResubmissionStatus
 /**
  * Derives resubmission status from per-panelist reviews.
  * - empty -> FOR_REVIEW
- * - any REJECTED -> NEED_REVISION
+ * - any REDEFENSE -> NEED_REVISION
  * - all APPROVED -> APPROVED
  * - else -> FOR_REVIEW (any PENDING)
  * Pure, no throws.
@@ -165,8 +165,8 @@ export function deriveResubmissionStatus(
   reviews: Array<{ status: DefenseReviewStatus | string }> | null | undefined,
 ): ResubmissionStatus {
   if (!reviews || reviews.length === 0) return 'FOR_REVIEW'
-  const hasRejected = reviews.some((r) => r.status === 'REJECTED')
-  if (hasRejected) return 'NEED_REVISION'
+  const hasRedefense = reviews.some((r) => r.status === 'REDEFENSE')
+  if (hasRedefense) return 'NEED_REVISION'
   const allApproved = reviews.every((r) => r.status === 'APPROVED')
   if (allApproved) return 'APPROVED'
   return 'FOR_REVIEW'
@@ -219,7 +219,7 @@ export function isPanelistReadOnly(
 
 /**
  * Whether a review should reset to PENDING on new version creation.
- * - REJECTED -> true (reset to PENDING)
+ * - REDEFENSE -> true (reset to PENDING)
  * - APPROVED -> false (carry-forward, stays APPROVED)
  * - PENDING/other -> false (already pending)
  * Carry-forward only unresolved.
@@ -231,7 +231,7 @@ export function shouldResetOnResubmission(
     typeof statusOrReview === 'object' && statusOrReview !== null && 'status' in statusOrReview
       ? (statusOrReview as { status: DefenseReviewStatus | string }).status
       : (statusOrReview as DefenseReviewStatus | string)
-  return status === 'REJECTED'
+  return status === 'REDEFENSE'
 }
 
 // Alias for carry-forward prose.
@@ -251,7 +251,7 @@ export interface ApprovalChecklistItem {
 /**
  * Builds per-panelist checklist for latest resubmission version.
  * Maps each review to displayStatus + feedback counts.
- * Approved -> Approved (read-only), Rejected -> Need Revision, else Pending.
+ * Approved -> Approved (read-only), Redefense -> Need Revision, else Pending.
  * Pure, no throws.
  */
 export function deriveApprovalChecklist(
@@ -275,7 +275,7 @@ export function deriveApprovalChecklist(
     const name = r.name ?? r.panelistName ?? undefined
     const status = r.status
     const displayStatus =
-      status === 'APPROVED' ? 'Approved' : status === 'REJECTED' ? 'Need Revision' : 'Pending'
+      status === 'APPROVED' ? 'Approved' : status === 'REDEFENSE' ? 'Need Revision' : 'Pending'
     const fb = r.feedback
     const comments =
       fb && typeof fb.comments === 'number'

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { DefenseType, DefenseVerdict } from '@prisma/client'
 import type { DefenseSessionPayload } from '@/lib/actions/defense'
+import { UserProfile } from '@/components/ui/UserProfile'
 import { getInitials } from '@/lib/helper'
 
 // ── Pure helpers (mirror DefenseDetailsDrawer / DefenseCard) ─────────────────
@@ -41,8 +42,8 @@ const VERDICT_META: Record<DefenseVerdict, { label: string; className: string }>
       className:
         'bg-[rgba(249,115,22,0.08)] border border-[rgba(249,115,22,0.25)] text-[#f97316]',
     },
-    REJECTED: {
-      label: 'Rejected',
+    REDEFENSE: {
+      label: 'Redefense',
       className:
         'bg-[rgba(244,63,94,0.08)] border border-[rgba(244,63,94,0.25)] text-[#f43f5e]',
     },
@@ -209,17 +210,14 @@ function PanelistCard({
 }) {
   return (
     <div className="flex items-center gap-3 bg-[#fafbff] border border-[#e8ebf8] rounded-lg px-3 py-2.5">
-      <div
-        className="size-[28px] rounded-full flex items-center justify-center shrink-0"
-        style={{ backgroundImage: gradientFor(panelist.userId) }}
-      >
-        <span className="font-sans font-bold text-[10.5px] text-white">
-          {getInitials(panelist.name)}
-        </span>
+      <div className="min-w-0 flex-1">
+        <UserProfile
+          initials={getInitials(panelist.name)}
+          name={panelist.name}
+          email={panelist.email}
+          gradient={panelist.avatarGradient ?? gradientFor(panelist.userId)}
+        />
       </div>
-      <p className="min-w-0 flex-1 truncate font-sans font-semibold text-[13px] leading-[19.5px] text-[#1e2145]">
-        {panelist.name}
-      </p>
       <PanelistBadge role={panelist.role} memberIndex={memberIndex} />
     </div>
   )
@@ -230,7 +228,7 @@ function PanelistCard({
 function ReviewStatus({
   status,
 }: {
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING' | 'APPROVED' | 'REDEFENSE'
 }) {
   if (status === 'APPROVED') {
     return (
@@ -240,10 +238,10 @@ function ReviewStatus({
       </span>
     )
   }
-  if (status === 'REJECTED') {
+  if (status === 'REDEFENSE') {
     return (
       <span className="inline-flex items-center gap-[4px] rounded-full bg-[rgba(244,63,94,0.08)] border border-[rgba(244,63,94,0.25)] px-[8px] py-[2px] text-[10.5px] font-bold leading-[15.75px] text-[#f43f5e] whitespace-nowrap">
-        Rejected
+        Redefense
       </span>
     )
   }
@@ -321,7 +319,7 @@ export function DefenseSessionView({
         <div className="flex items-center gap-[12px] min-w-0">
           <DefenseTypeBadge type={session.type} />
           <div className="min-w-0">
-            <h2 className="truncate font-heading font-bold text-[16px] leading-[24px] text-[#10133a]">
+            <h2 className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] break-words">
               {session.groupName}
             </h2>
             <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
@@ -450,6 +448,7 @@ export function DefenseSessionView({
               </div>
             )}
           </div>
+
         </div>
       </div>
     </div>

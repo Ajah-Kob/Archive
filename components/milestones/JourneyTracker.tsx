@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<JourneyRow['state'], string> = {
   NO_VERDICT: 'No verdict',
   MINOR_REVISION: 'Minor revisions',
   MAJOR_REVISION: 'Major revisions',
-  REJECTED: 'Rejected',
+  REDEFENSE: 'Redefense',
 }
 
 const SIZES = {

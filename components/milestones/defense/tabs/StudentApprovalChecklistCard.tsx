@@ -85,9 +85,9 @@ function getStatusColor(
 }
 
 /**
- * Whether a REJECTED review resets to PENDING on new version creation.
+ * Whether a REDEFENSE review resets to PENDING on new version creation.
  * Delegates to shared helper so carry-forward stays in one place.
- * APPROVED stays (carry-forward), REJECTED → PENDING, PENDING → PENDING.
+ * APPROVED stays (carry-forward), REDEFENSE → PENDING, PENDING → PENDING.
  */
 function willResetOnNewVersion(status: string): boolean {
   return shouldResetOnResubmission(status as DefenseReviewStatus)
@@ -162,7 +162,7 @@ function ChecklistRow({ panelist, isFirst, isLast }: ChecklistRowProps) {
   const review = reviewsById.get(panelist.userId)
   const item = checklistById.get(panelist.userId)
   const rawStatus = (review?.status as string) ?? item?.status ?? 'PENDING'
-  // Carry-forward guard — REJECTED resets to PENDING on next version, APPROVED stays.
+  // Carry-forward guard — REDEFENSE resets to PENDING on next version, APPROVED stays.
   // Card shows stored status; version creation resets via willResetOnNewVersion.
   void willResetOnNewVersion(rawStatus)
   const display = (item?.displayStatus ?? 'Pending') as
@@ -271,7 +271,7 @@ function ChecklistGrid({ children }: { children: React.ReactNode }) {
  * No faculty actions (no Review/Approve controls); read-only display only.
  * - Per-panelist status via deriveApprovalChecklist → Approved / Need Revision / Pending
  * - Annotation counts/pages from latest resubmission annotationStats (fallback when per-panelist feedback absent) — updates on new version via prop
- * - Carry-forward: APPROVED stays, REJECTED resets via shouldResetOnResubmission (willResetOnNewVersion)
+  * - Carry-forward: APPROVED stays, REDEFENSE resets via shouldResetOnResubmission (willResetOnNewVersion)
  * - isPanelistReadOnly guard — Approved rows show Read-only, no Review action leakage
  * - Visual parity: 35px avatar gradient #1e3a8a->#2d52b8, 2fr 2fr 1fr grid, 12px rounded shadow
  */

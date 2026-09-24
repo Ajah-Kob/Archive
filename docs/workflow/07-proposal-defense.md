@@ -63,7 +63,7 @@ Before this workflow begins:
 * Approved
 * Approved with Minor Revisions
 * Approved with Major Revisions
-* Rejected
+* Redefense
 
 4. The system records the verdict and notifies the capstone group.
 
@@ -131,9 +131,9 @@ After successful completion:
 
 # Alternate Flows
 
-## AF-01: Proposal Rejected
+## AF-01: Proposal Redefense
 
-If the panel issues a **Rejected** verdict, the Proposal Defense is marked as unsuccessful.
+If the panel issues a **Redefense** verdict, the Proposal Defense is marked as unsuccessful and the coordinator may schedule a new defense for the group.
 
 The succeeding actions shall follow the academic policies established by the institution.
 

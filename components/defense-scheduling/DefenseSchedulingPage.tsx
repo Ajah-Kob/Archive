@@ -184,7 +184,7 @@ export function DefenseSchedulingPage({
     { value: 'APPROVED', label: 'Approved' },
     { value: 'MINOR_REVISION', label: 'Minor Revisions' },
     { value: 'MAJOR_REVISION', label: 'Major Revisions' },
-    { value: 'REJECTED', label: 'Rejected' },
+    { value: 'REDEFENSE', label: 'Redefense' },
   ]
 
   return (

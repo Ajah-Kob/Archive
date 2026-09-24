@@ -30,7 +30,7 @@ export type VerdictCalloutState =
   | 'APPROVED'
   | 'MINOR_REVISION'
   | 'MAJOR_REVISION'
-  | 'REJECTED'
+  | 'REDEFENSE'
 
 interface VerdictCalloutProps {
   state: VerdictCalloutState
@@ -48,6 +48,8 @@ export type PanelistVerdictCalloutProps = {
   isChair: boolean
   /** When provided + isChair + PENDING, enables the Submit Verdict flow */
   scheduleId?: number
+  /** Submit Verdict is disabled without a submitted document (default true). */
+  hasDocument?: boolean
   /** Optional callback when Review feedback is clicked (verdict states) */
   onReviewFeedback?: () => void
   /** Fired after a successful verdict submit (allows parent to refresh/navigate) */
@@ -83,7 +85,7 @@ const VERDICT_OPTIONS: ReadonlyArray<{
   { value: 'APPROVED', label: 'Approved', description: 'Capstone is approved as-is.' },
   { value: 'MINOR_REVISION', label: 'Minor Revision', description: 'Small corrections required.' },
   { value: 'MAJOR_REVISION', label: 'Major Revision', description: 'Significant changes required.' },
-  { value: 'REJECTED', label: 'Rejected', description: 'Capstone did not pass.' },
+  { value: 'REDEFENSE', label: 'Redefense', description: 'Capstone must be defended again.' },
 ]
 
 // ── Helpers for dynamic verdict context ──────────────────────────────────────
@@ -159,13 +161,13 @@ const STATES: Record<VerdictCalloutState, CalloutMeta> = {
       shadow: 'drop-shadow-[0px_3px_4px_rgba(225,104,29,0.22)]',
     },
   },
-  REJECTED: {
+  REDEFENSE: {
     Icon: TriangleAlert,
     boxClass: 'bg-[rgba(225,29,72,0.07)] border-[rgba(225,29,72,0.2)]',
     iconTileClass: 'bg-[rgba(225,29,72,0.08)] border-[rgba(225,29,72,0.19)]',
     headlineClass: 'text-[#e11d48]',
-    headline: 'Rejected',
-    context: '4 comments on 3 pages · Reviewed May 31, 2026.',
+    headline: 'Redefense',
+    context: 'A redefense is required. Please wait for your new defense schedule to be posted.',
     button: {
       backgroundImage: 'linear-gradient(115.15deg, rgb(225, 29, 72) 44.98%, rgb(200, 26, 64) 99.87%)',
       shadow: 'drop-shadow-[0px_3px_4px_rgba(225,29,72,0.22)]',
@@ -183,14 +185,20 @@ const STATES: Record<VerdictCalloutState, CalloutMeta> = {
 function CalloutShell({
   meta,
   onButtonClick,
+  buttonDisabled = false,
+  buttonDisabledLabel,
 }: {
   meta: CalloutMeta | CalloutVariantMeta
   onButtonClick?: () => void
+  buttonDisabled?: boolean
+  buttonDisabledLabel?: string
 }) {
   const Icon = meta.Icon
   const button = meta.button
   const ButtonIcon = button?.icon ?? MessageSquareText
-  const label = button?.label ?? 'Review feedback'
+  const label = buttonDisabled
+    ? (buttonDisabledLabel ?? button?.label ?? 'Review feedback')
+    : (button?.label ?? 'Review feedback')
   return (
     <section
       aria-live="polite"
@@ -216,8 +224,10 @@ function CalloutShell({
       {button ? (
         <button
           type="button"
-          onClick={onButtonClick}
-          className={`flex w-full sm:w-auto shrink-0 items-center justify-center gap-[7px] rounded-[9px] border px-[18px] py-[9px] font-sans font-bold text-[12.5px] leading-[18.75px] text-white transition-all duration-150 ease-out hover:brightness-110 hover:-translate-y-px hover:shadow-[0_6px_16px_rgba(0,0,0,0.12)] hover:scale-[1.015] active:translate-y-0 active:scale-100 active:brightness-100 ${button.shadow}`}
+          onClick={buttonDisabled ? undefined : onButtonClick}
+          disabled={buttonDisabled}
+          title={buttonDisabled ? 'Waiting for the group to submit a document' : undefined}
+          className={`flex w-full sm:w-auto shrink-0 items-center justify-center gap-[7px] rounded-[9px] border px-[18px] py-[9px] font-sans font-bold text-[12.5px] leading-[18.75px] text-white transition-all duration-150 ease-out hover:brightness-110 hover:-translate-y-px hover:shadow-[0_6px_16px_rgba(0,0,0,0.12)] hover:scale-[1.015] active:translate-y-0 active:scale-100 active:brightness-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100 disabled:hover:translate-y-0 disabled:hover:scale-100 disabled:hover:shadow-none ${button.shadow}`}
           style={{
             backgroundImage: button.backgroundImage,
             borderColor: 'rgba(255,255,255,0.4)',
@@ -369,7 +379,7 @@ function getVerdictAccent(verdict: DefenseVerdict) {
         circleBorder: 'border-[#e1681d]',
         circleBg: 'bg-[#e1681d]',
       }
-    case 'REJECTED':
+    case 'REDEFENSE':
       return {
         border: 'border-[#e11d48]',
         bg: 'bg-[rgba(225,29,72,0.08)]',
@@ -440,7 +450,7 @@ function getVerdictButtonStyle(verdict: DefenseVerdict | null) {
         backgroundImage: 'linear-gradient(103.38deg, rgb(225, 104, 29) 0%, rgb(184, 82, 19) 99.93%)',
         shadow: 'drop-shadow-[0px_3px_4px_rgba(225,104,29,0.22)]',
       }
-    case 'REJECTED':
+    case 'REDEFENSE':
       return {
         backgroundImage: 'linear-gradient(115.15deg, rgb(225, 29, 72) 44.98%, rgb(200, 26, 64) 99.87%)',
         shadow: 'drop-shadow-[0px_3px_4px_rgba(225,29,72,0.22)]',
@@ -510,9 +520,22 @@ function SubmitVerdictDialog() {
   )
 }
 
-function AwaitingChairCallout({ meta }: { meta: CalloutVariantMeta }) {
+function AwaitingChairCallout({
+  meta,
+  disabled = false,
+}: {
+  meta: CalloutVariantMeta
+  disabled?: boolean
+}) {
   const { open } = useSubmitVerdict()
-  return <CalloutShell meta={meta} onButtonClick={open} />
+  return (
+    <CalloutShell
+      meta={meta}
+      onButtonClick={open}
+      buttonDisabled={disabled}
+      buttonDisabledLabel="Awaiting document"
+    />
+  )
 }
 
 // ── Student component (wired to true date) ─────────────────────────────────
@@ -522,7 +545,7 @@ export function VerdictCallout({ state, reviewedAt, comments, pages, workspaceHr
   const base = STATES[state]
   const dynamic = buildVerdictContext(reviewedAt, comments, pages)
   const meta =
-    dynamic && (state === 'APPROVED' || state === 'MINOR_REVISION' || state === 'MAJOR_REVISION' || state === 'REJECTED')
+    dynamic && (state === 'APPROVED' || state === 'MINOR_REVISION' || state === 'MAJOR_REVISION')
       ? { ...base, context: dynamic }
       : base
   function handleReviewFeedback() {
@@ -541,6 +564,7 @@ export function PanelistVerdictCallout({
   state,
   isChair,
   scheduleId,
+  hasDocument = true,
   onReviewFeedback,
   onVerdictSubmitted,
 }: PanelistVerdictCalloutProps) {
@@ -550,7 +574,7 @@ export function PanelistVerdictCallout({
   if (visual === 'awaiting-chair' && typeof scheduleId === 'number') {
     return (
       <SubmitVerdictProvider scheduleId={scheduleId} onSubmitted={onVerdictSubmitted}>
-        <AwaitingChairCallout meta={meta} />
+        <AwaitingChairCallout meta={meta} disabled={!hasDocument} />
         <SubmitVerdictDialog />
       </SubmitVerdictProvider>
     )

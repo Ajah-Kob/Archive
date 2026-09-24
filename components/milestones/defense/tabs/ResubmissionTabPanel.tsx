@@ -144,7 +144,7 @@ function EmptyResubmissionPlaceholder() {
  * - Latest resubmission resolved as submissions.filter(!isInitial).at(-1) (or resubmissions[resubmissions.length-1])
  * - Status/progress/checklist derived via session-helpers (deriveResubmissionStatus, deriveApprovalProgress, deriveApprovalChecklist)
  * - Annotation comments/pages resolve per version via latest.annotationStats and update when a new version lands
- * - Carry-forward honored: APPROVED preserved (isPanelistReadOnly), REJECTED->PENDING via shouldResetOnResubmission
+  * - Carry-forward honored: APPROVED preserved (isPanelistReadOnly), REDEFENSE->PENDING via shouldResetOnResubmission
  * - Empty placeholder when no resubmission without breaking layout
  * - Generic via defenseType / milestone / payload.type — same component for PROPOSAL and FINAL
  */
@@ -231,7 +231,7 @@ export function ResubmissionTabPanel({
     })) as never,
   )
 
-  // Carry-forward: REJECTED resets to PENDING on new version, APPROVED stays (preserved)
+  // Carry-forward: REDEFENSE resets to PENDING on new version, APPROVED stays (preserved)
   // Checklist already reflects stored status; next version creation will reset via shouldResetOnResubmission
   const resetCandidates = reviews.filter((r) => shouldResetOnResubmission(r.status as never))
   void resetCandidates
@@ -253,7 +253,7 @@ export function ResubmissionTabPanel({
 
   // Map reviews to StudentApprovalChecklistCard shape
   // When there's no resubmission yet, show checklist for the *next* resubmission version
-  // using carry-forward: APPROVED stays, REJECTED → PENDING, PENDING stays. We derive from
+  // using carry-forward: APPROVED stays, REDEFENSE → PENDING, PENDING stays. We derive from
   // the initial submission's reviews to preview who will need to review the resubmission.
   const checklistReviews = (() => {
     if (latest) {
@@ -295,7 +295,7 @@ export function ResubmissionTabPanel({
   // Initial upload (!latest) allowed immediately after revision verdict.
   // Subsequent uploads allowed only when status is NEED_REVISION and no PENDING left.
   const canResubmitOnTab =
-    (verdict === 'MINOR_REVISION' || verdict === 'MAJOR_REVISION' || verdict === 'REJECTED') &&
+    (verdict === 'MINOR_REVISION' || verdict === 'MAJOR_REVISION' || verdict === 'REDEFENSE') &&
     (!latest || (!hasPending && status === 'NEED_REVISION'))
 
   return (

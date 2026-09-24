@@ -16,7 +16,7 @@ export type JourneyState =
   | 'NO_VERDICT'
   | 'MINOR_REVISION'
   | 'MAJOR_REVISION'
-  | 'REJECTED'
+  | 'REDEFENSE'
 
 export interface JourneyRow {
   slug: string

@@ -529,7 +529,7 @@ enum DefenseVerdict {
   APPROVED
   MINOR_REVISION
   MAJOR_REVISION
-  REJECTED
+  REDEFENSE
 }
 
 enum PanelistRole {
@@ -580,7 +580,7 @@ model DefensePanelist {
 enum DefenseReviewStatus {
   PENDING
   APPROVED
-  REJECTED
+  REDEFENSE
 }
 
 // A document submitted for a defense. The initial manuscript (isInitial: true,
@@ -588,7 +588,7 @@ enum DefenseReviewStatus {
 // are all stored here. Status is DERIVED, not stored: the initial submission's
 // status comes from DefenseSchedule.verdict; a resubmission's status is
 // computed from its DefenseSubmissionReview rows (all APPROVED → Approved,
-// any PENDING → In Review, any REJECTED → Rejected).
+// any PENDING → In Review, any REDEFENSE → Redefense).
 model DefenseSubmission {
   id          Int                           @id @default(autoincrement())
   scheduleId  Int

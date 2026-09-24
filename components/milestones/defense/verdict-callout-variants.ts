@@ -176,8 +176,8 @@ export const PANELIST_VERDICT_VARIANTS: Record<
     boxClass: 'bg-[rgba(225,29,72,0.07)] border-[rgba(225,29,72,0.2)]',
     iconTileClass: 'bg-[rgba(225,29,72,0.08)] border-[rgba(225,29,72,0.19)]',
     headlineClass: 'text-[#e11d48]',
-    headline: 'Rejected',
-    context: 'Rejected. Check Submission History for the latest resubmission.',
+    headline: 'Redefense',
+    context: 'A redefense is required. Please wait for a new defense schedule to be created for this group.',
     button: {
       backgroundImage:
         'linear-gradient(115.15deg, rgb(225, 29, 72) 44.98%, rgb(200, 26, 64) 99.87%)',

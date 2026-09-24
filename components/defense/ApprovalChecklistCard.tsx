@@ -76,7 +76,7 @@ function getDisplayStatus(
   status: string,
 ): 'Approved' | 'Need Revision' | 'Pending' {
   if (status === 'APPROVED') return 'Approved'
-  if (status === 'REJECTED') return 'Need Revision'
+  if (status === 'REDEFENSE') return 'Need Revision'
   return 'Pending'
 }
 
@@ -108,7 +108,7 @@ function resolveReviewedAt(
 }
 
 /**
- * Whether a REJECTED review should reset to PENDING on new version creation.
+ * Whether a REDEFENSE review should reset to PENDING on new version creation.
  * Delegates to shared helper so carry-forward logic stays in one place.
  */
 function willResetOnNewVersion(status: string): boolean {
@@ -171,9 +171,9 @@ function ChecklistRow({ panelist, isFirst, isLast }: ChecklistRowProps) {
   const rawStatus = (review?.status as string) ?? 'PENDING'
   const display = getDisplayStatus(rawStatus)
   const isReadOnly = isPanelistReadOnly(rawStatus)
-  // Demonstrate carry-forward guard: REJECTED resets to PENDING on new version.
+  // Demonstrate carry-forward guard: REDEFENSE resets to PENDING on new version.
   // Card shows current stored status; creation of the next version will reset
-  // REJECTED via willResetOnNewVersion — keep the helper reachable for callers.
+  // REDEFENSE via willResetOnNewVersion — keep the helper reachable for callers.
   void willResetOnNewVersion(rawStatus)
   const feedback = resolveFeedbackCounts(review)
   const reviewedAt = resolveReviewedAt(review)

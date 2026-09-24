@@ -27,7 +27,7 @@ export type InitialDocumentStatus =
   | 'APPROVED'
   | 'MINOR_REVISION'
   | 'MAJOR_REVISION'
-  | 'REJECTED'
+  | 'REDEFENSE'
   | 'IN_REVIEW'
 
 type LatestDocumentCardInitialProps = {

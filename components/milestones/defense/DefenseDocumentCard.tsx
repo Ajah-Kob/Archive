@@ -25,10 +25,10 @@ export type InitialDocumentStatus =
   | 'APPROVED'
   | 'MINOR_REVISION'
   | 'MAJOR_REVISION'
-  | 'REJECTED'
+  | 'REDEFENSE'
 
 /** Review-derived status on a resubmitted document. */
-export type ResubmissionStatus = 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
+export type ResubmissionStatus = 'IN_REVIEW' | 'APPROVED' | 'REDEFENSE'
 
 export interface DefenseDocumentInfo {
   id?: number
@@ -125,7 +125,7 @@ const CIRCLE_STYLES: Record<string, string> = {
   APPROVED: 'bg-[#16a34a] border-[#cfebd6] rounded-[25px]',
   MINOR_REVISION: 'bg-[#f59e0b] border-[#f2ddba] rounded-[50px]',
   MAJOR_REVISION: 'bg-[#e1681d] border-[#ffd1b4] rounded-[50px]',
-  REJECTED: 'bg-[#e11d48] border-[#efd5da] rounded-[25px]',
+  REDEFENSE: 'bg-[#e11d48] border-[#efd5da] rounded-[25px]',
   IN_REVIEW: 'bg-[#f59e0b] border-[#f2ddba] rounded-[50px]',
   NEED_REVISION: 'bg-[#e11d48] border-[#efd5da] rounded-[25px]',
   FOR_REVIEW: 'bg-[#f59e0b] border-[#f2ddba] rounded-[50px]',
@@ -148,8 +148,8 @@ const PILL_STYLES: Record<string, { label: string; className: string }> = {
     className:
       'bg-[rgba(225,104,29,0.07)] border-[rgba(225,104,29,0.2)] text-[#e1681d]',
   },
-  REJECTED: {
-    label: 'Rejected',
+  REDEFENSE: {
+    label: 'Redefense',
     className:
       'bg-[rgba(225,29,72,0.07)] border-[rgba(225,29,72,0.2)] text-[#e11d48]',
   },

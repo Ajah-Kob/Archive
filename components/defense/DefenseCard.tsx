@@ -137,7 +137,7 @@ function verdictDotColor(verdict: MyDefenseSchedulePayload['verdict']): string {
       return '#f59e0b'
     case 'MAJOR_REVISION':
       return '#e1681d'
-    case 'REJECTED':
+    case 'REDEFENSE':
       return '#e11d48'
     default:
       return '#9fa5b7'
@@ -152,8 +152,8 @@ function verdictLabel(verdict: MyDefenseSchedulePayload['verdict']): string {
       return 'Minor Revision'
     case 'MAJOR_REVISION':
       return 'Major Revision'
-    case 'REJECTED':
-      return 'Rejected'
+    case 'REDEFENSE':
+      return 'Redefense'
     default:
       return 'No Verdict'
   }

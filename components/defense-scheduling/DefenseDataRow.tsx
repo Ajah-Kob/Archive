@@ -37,8 +37,8 @@ const VERDICT_META: Record<
     className:
       'bg-[rgba(225,104,29,0.07)] border border-[rgba(225,104,29,0.2)] text-[#e1681d]',
   },
-  REJECTED: {
-    label: 'Rejected',
+  REDEFENSE: {
+    label: 'Redefense',
     className:
       'bg-[rgba(225,29,72,0.07)] border border-[rgba(225,29,72,0.2)] text-[#e11d48]',
   },

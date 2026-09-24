@@ -12,13 +12,13 @@ import type { SubmissionViewStatus } from '@/types/milestones'
 
 function toViewStatus(status: string): SubmissionViewStatus {
   if (status === 'APPROVED') return 'APPROVED'
-  if (status === 'REJECTED') return 'NEEDS_REVISION'
+  if (status === 'REJECTED' || status === 'REDEFENSE') return 'NEEDS_REVISION'
   return 'IN_REVIEW'
 }
 
 function toVerdictViewStatus(verdict: string): SubmissionViewStatus {
   if (verdict === 'APPROVED') return 'APPROVED'
-  if (verdict === 'REJECTED' || verdict === 'MINOR_REVISION' || verdict === 'MAJOR_REVISION') return 'NEEDS_REVISION'
+  if (verdict === 'REJECTED' || verdict === 'REDEFENSE' || verdict === 'MINOR_REVISION' || verdict === 'MAJOR_REVISION') return 'NEEDS_REVISION'
   return 'IN_REVIEW'
 }
 
@@ -101,7 +101,7 @@ export default async function DefensePanelistWorkspacePage({
 
   const isCommitted = draftStatus === 'COMMITTED'
   // Resubmitted documents remain editable while IN_REVIEW even though the schedule verdict is already submitted (MINOR/MAJOR).
-  // isCommitted only finalizes the *initial* document (Save annotation flow); resubmissions finalize solely via viewStatus (APPROVED/REJECTED) so a premature COMMITTED+DRAFT mismatch does not hide the Approve/Request Revision buttons.
+  // isCommitted only finalizes the *initial* document (Save annotation flow); resubmissions finalize solely via viewStatus (APPROVED/REDEFENSE) so a premature COMMITTED+DRAFT mismatch does not hide the Approve/Request Revision buttons.
   const shouldFinalize =
     !detail.isCurrent ||
     viewStatus !== 'IN_REVIEW' ||

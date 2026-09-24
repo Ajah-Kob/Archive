@@ -38,7 +38,7 @@ function RowIcon({
     )
   }
 
-  if (state === 'NEEDS_REVISION' || state === 'REJECTED') {
+  if (state === 'NEEDS_REVISION' || state === 'REDEFENSE') {
     return (
       <div className="bg-[#fef2f2] border border-[rgba(239,68,68,0.3)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
         <TriangleAlert className="size-[12px] text-[#ef4444]" strokeWidth={2.25} />
@@ -86,7 +86,7 @@ function MilestoneRow({ row, isActive }: MilestoneRowProps) {
     NO_VERDICT: 'text-transparent',
     MINOR_REVISION: 'text-[#eab308]',
     MAJOR_REVISION: 'text-[#f97316]',
-    REJECTED: 'text-[#ef4444]',
+    REDEFENSE: 'text-[#ef4444]',
   }
 
   const baseClasses =

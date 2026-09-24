@@ -18,6 +18,7 @@ function toViewStatus(status: string): SubmissionViewStatus {
   if (normalized === 'APPROVED' || normalized === 'APPROVED') return 'APPROVED'
   if (
     normalized === 'REJECTED' ||
+    normalized === 'REDEFENSE' ||
     normalized === 'NEEDS_REVISION' ||
     normalized === 'NEED_REVISION' ||
     normalized === 'MINOR_REVISION' ||
@@ -32,7 +33,7 @@ function toViewStatus(status: string): SubmissionViewStatus {
   )
     return 'IN_REVIEW'
   if (status === 'Approved') return 'APPROVED'
-  if (status === 'Rejected') return 'NEEDS_REVISION'
+  if (status === 'Rejected' || status === 'Redefense') return 'NEEDS_REVISION'
   if (status === 'In Review') return 'IN_REVIEW'
   return 'IN_REVIEW'
 }

@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { JourneyTracker } from '@/components/milestones/JourneyTracker'
 import { UserProfile } from '@/components/ui/UserProfile'
+import { Drawer } from '@/components/ui/Drawer'
 import { getInitials } from '@/lib/helper'
 import { blobUrlToPathname, toSignedBlobPath } from '@/lib/blob'
 import { getCoordinatorGroupDetail, type SectionGroupDetail, type SectionGroupTopic } from '@/lib/actions/sections'
@@ -59,23 +60,48 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 type TabKey = 'overview' | 'chapters' | 'defense' | 'archiving'
 
 export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerProps) {
-  const [detail, setDetail] = useState<SectionGroupDetail | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [requestState, setRequestState] = useState<{
+    requestKey: number | null
+    detail: SectionGroupDetail | null
+  }>({
+    requestKey: null,
+    detail: null,
+  })
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set())
   const [showAllMap, setShowAllMap] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (groupId == null) return
-    setLoading(true)
-    setDetail(null)
-    getCoordinatorGroupDetail(groupId).then((res) => {
-      setDetail(res.success ? (res.payload ?? null) : null)
-      setLoading(false)
-    })
+    let cancelled = false
+    const requestKey = groupId
+
+    void getCoordinatorGroupDetail(requestKey).then(
+      (res) => {
+        if (cancelled) return
+        setRequestState({
+          requestKey,
+          detail: res.success ? (res.payload ?? null) : null,
+        })
+      },
+      () => {
+        if (cancelled) return
+        setRequestState({ requestKey, detail: null })
+      },
+    )
+
+    return () => {
+      cancelled = true
+    }
   }, [groupId])
 
-  const isOpen = groupId != null
+  // Derive the active response so a new request cannot display stale detail.
+  const requestKey = groupId
+  const detail =
+    requestKey != null && requestState.requestKey === requestKey
+      ? requestState.detail
+      : null
+  const loading = requestKey != null && requestState.requestKey !== requestKey
 
   async function handleArchivingOpen(blobUrl: string) {
     const signedHref = toSignedBlobPath(blobUrl)
@@ -149,51 +175,28 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
   }
 
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-40 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] transition-all duration-300 ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
+    <Drawer open={groupId != null} onClose={onClose} size="sm">
+      <Drawer.Header
+        title={detail?.name ?? 'Group Progress'}
+        subtitle="Read-only view of this group's capstone journey."
       />
-      <div
-        className={`fixed top-0 right-0 h-dvh w-[500px] z-50 bg-white border-l border-[#eceef8] shadow-[-8px_0px_40px_rgba(112,125,255,0.14)] transition-transform duration-300 flex flex-col ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="flex items-start justify-between gap-[16px] px-6 py-4 border-b border-[#eceef8] shrink-0">
-          <div>
-            <p className="font-heading font-bold text-[17px] leading-[25.5px] text-[#12143a] tracking-[-0.17px]">
-              {detail?.name ?? 'Group Progress'}
-            </p>
-            <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pt-[4px]">
-              Read-only view of this group&apos;s capstone journey.
-            </p>
-          </div>
+
+      <div className="flex items-center gap-1 px-6 border-b border-[#eceef8] shrink-0 overflow-x-auto">
+        {(['overview', 'chapters', 'defense', 'archiving'] as TabKey[]).map((tab) => (
           <button
-            onClick={onClose}
-            aria-label="Close"
-            className="bg-[#fafbff] border border-[#eceef8] rounded-[14px] size-[28px] flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`relative h-[36px] px-3 font-sans text-[12px] font-semibold whitespace-nowrap transition-colors ${activeTab === tab ? 'text-[#707dff]' : 'text-[#8a93b4] hover:text-[#5a6382]'}`}
           >
-            <X className="size-[13px] text-[#8a93b4]" />
+            {tab === 'overview' ? 'Overview' : tab === 'chapters' ? 'Chapters' : tab === 'defense' ? 'Defense' : 'Archiving'}
+            {activeTab === tab && <span className="absolute left-0 right-0 bottom-0 h-[2px] bg-[#707dff] rounded-full" />}
           </button>
-        </div>
+        ))}
+      </div>
 
-        <div className="flex items-center gap-1 px-6 border-b border-[#eceef8] shrink-0 overflow-x-auto">
-          {(['overview', 'chapters', 'defense', 'archiving'] as TabKey[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`relative h-[36px] px-3 font-sans text-[12px] font-semibold whitespace-nowrap transition-colors ${activeTab === tab ? 'text-[#707dff]' : 'text-[#8a93b4] hover:text-[#5a6382]'}`}
-            >
-              {tab === 'overview' ? 'Overview' : tab === 'chapters' ? 'Chapters' : tab === 'defense' ? 'Defense' : 'Archiving'}
-              {activeTab === tab && <span className="absolute left-0 right-0 bottom-0 h-[2px] bg-[#707dff] rounded-full" />}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 min-h-0 px-6 py-4 overflow-y-auto">
+      <Drawer.Body>
+        <div className="px-6 py-4">
           {loading ? (
             <div className="flex items-center justify-center h-[200px]">
               <span className="text-[12.5px] font-medium text-[#9ea8c6]">Loading group…</span>
@@ -308,6 +311,7 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
                                       <div className="flex items-center gap-2 min-w-0">
                                         <button
                                           type="button"
+                                          aria-label={`View chapter document ${sub.fileName} (version ${sub.version})`}
                                           onClick={() => void handleChapterOpen(sub.blobUrl)}
                                           className="font-sans font-semibold text-[11px] leading-[16.5px] text-[#707dff] hover:text-[#5a67ff] hover:underline truncate text-left"
                                         >
@@ -338,6 +342,11 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
                                 <div className="px-3 py-2 border-t border-[#f0f2fa] flex justify-center">
                                   <button
                                     type="button"
+                                    aria-label={
+                                      showAll
+                                        ? `Show fewer versions for ${ch.label}`
+                                        : `Show ${Math.min(3, ch.submissions.length - 3)} more versions for ${ch.label}`
+                                    }
                                     onClick={() => {
                                       const next = new Set(showAllMap)
                                       if (next.has(key)) next.delete(key)
@@ -390,19 +399,20 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
                     {(detail as unknown as { archiving: { status: string } }).archiving.status}
                   </span>
                   {(detail as unknown as { archiving: { fileName: string | null; blobUrl: string | null } }).archiving.fileName &&
-                    (detail as unknown as { archiving: { blobUrl: string } }).archiving.blobUrl && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void handleArchivingOpen(
-                            (detail as unknown as { archiving: { blobUrl: string } }).archiving.blobUrl,
-                          )
-                        }
-                        className="font-sans text-[11px] text-[#707dff] hover:underline truncate text-left"
-                      >
-                        {(detail as unknown as { archiving: { fileName: string } }).archiving.fileName}
-                      </button>
-                    )}
+                     (detail as unknown as { archiving: { blobUrl: string } }).archiving.blobUrl && (
+                       <button
+                         type="button"
+                         aria-label={`View archive document ${(detail as unknown as { archiving: { fileName: string } }).archiving.fileName}`}
+                         onClick={() =>
+                           void handleArchivingOpen(
+                             (detail as unknown as { archiving: { blobUrl: string } }).archiving.blobUrl,
+                           )
+                         }
+                         className="font-sans text-[11px] text-[#707dff] hover:underline truncate text-left"
+                       >
+                         {(detail as unknown as { archiving: { fileName: string } }).archiving.fileName}
+                       </button>
+                     )}
                 </div>
               ) : (
                 <p className="font-sans text-[12px] italic text-[#c4cadf]">No archiving submission yet.</p>
@@ -410,7 +420,7 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
             </div>
           )}
         </div>
-      </div>
-    </>
+      </Drawer.Body>
+    </Drawer>
   )
 }

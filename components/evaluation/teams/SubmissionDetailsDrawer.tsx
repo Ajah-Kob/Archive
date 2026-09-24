@@ -8,7 +8,6 @@ import {
   FileText,
   History,
   LayoutPanelLeft,
-  X,
 } from 'lucide-react'
 import type {
   EvaluationItem,
@@ -17,6 +16,7 @@ import type {
 } from '@/lib/actions/evaluation'
 import { getEvaluationVersions } from '@/lib/actions/evaluation'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
+import { Drawer } from '@/components/ui/Drawer'
 import type { SubmissionViewStatus } from '@/types/milestones'
 
 interface SubmissionDetailsDrawerProps {
@@ -61,61 +61,62 @@ export function SubmissionDetailsDrawer({
   onClose,
 }: SubmissionDetailsDrawerProps) {
   const router = useRouter()
-  const [detail, setDetail] = useState<EvaluationVersionsPayload | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [requestState, setRequestState] = useState<{
+    requestKey: number | null
+    detail: EvaluationVersionsPayload | null
+  }>({
+    requestKey: null,
+    detail: null,
+  })
 
-  const loadVersions = useCallback(async (submissionId: number) => {
-    const res = await getEvaluationVersions(submissionId)
-    if (res.success) setDetail(res.payload ?? null)
-  }, [])
+  const loadVersions = useCallback(
+    (submissionId: number) => getEvaluationVersions(submissionId),
+    [],
+  )
 
   useEffect(() => {
     if (!submission) return
-    setLoading(true)
-    setDetail(null)
-    loadVersions(submission.id).finally(() => setLoading(false))
+    let cancelled = false
+    const submissionRequestKey = submission.id
+
+    void loadVersions(submissionRequestKey).then(
+      (res) => {
+        if (cancelled) return
+        setRequestState({
+          requestKey: submissionRequestKey,
+          detail: res.success ? (res.payload ?? null) : null,
+        })
+      },
+      () => {
+        if (cancelled) return
+        setRequestState({ requestKey: submissionRequestKey, detail: null })
+      },
+    )
+
+    return () => {
+      cancelled = true
+    }
   }, [submission, loadVersions])
 
-  const isOpen = submission != null
+  // Derive the active response so a new request cannot display stale detail.
+  const requestKey = submission?.id ?? null
+  const detail =
+    requestKey != null && requestState.requestKey === requestKey
+      ? requestState.detail
+      : null
+  const loading = requestKey != null && requestState.requestKey !== requestKey
   const currentVersion = detail?.versions.find((v) => v.isCurrent)
   const previousVersions = (detail?.versions ?? []).filter((v) => !v.isCurrent)
 
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-40 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] transition-all duration-300 ${
-          isOpen
-            ? 'opacity-100 pointer-events-auto'
-            : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
+    <Drawer open={submission != null} onClose={onClose} size="sm">
+      <Drawer.Header
+        title="Submission Details"
+        subtitle="View submission details and version history."
       />
-      <div
-        className={`fixed top-0 right-0 h-dvh w-[500px] z-50 bg-white border-l border-[#eceef8] shadow-[-8px_0px_40px_rgba(112,125,255,0.14)] transition-transform duration-300 flex flex-col ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="flex items-start justify-between gap-[16px] px-6 py-4 border-b border-[#eceef8] shrink-0">
-          <div>
-            <p className="font-heading font-bold text-[17px] leading-[25.5px] text-[#12143a] tracking-[-0.17px]">
-              Submission Details
-            </p>
-            <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pt-[4px]">
-              View submission details and version history.
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="bg-[#fafbff] border border-[#eceef8] rounded-[14px] size-[28px] flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
-          >
-            <X className="size-[13px] text-[#8a93b4]" />
-          </button>
-        </div>
-
-        <div className="flex-1 min-h-0 px-6 py-4 overflow-y-auto">
-          {submission && (
-            <div className="flex flex-col gap-[22px]">
+      <Drawer.Body>
+        {submission ? (
+          <div className="flex flex-col gap-[22px] px-6 py-4">
               <div className="flex flex-col gap-[10px]">
                 <SectionHeading>Current Submission</SectionHeading>
                 <div className="border border-[#eceef8] rounded-[9px] px-[14px] py-[13px]">
@@ -126,6 +127,7 @@ export function SubmissionDetailsDrawer({
                     {currentVersion && (
                       <SubmissionStatusBadge
                         status={toViewStatus(currentVersion)}
+                        inReviewLabel="For Review"
                       />
                     )}
                   </div>
@@ -239,6 +241,7 @@ export function SubmissionDetailsDrawer({
                         <div className="pt-[5px] flex items-center gap-[8px]">
                           <SubmissionStatusBadge
                             status={toViewStatus(version)}
+                            inReviewLabel="For Review"
                           />
                           {version.reviewedAt && (
                             <span className="flex items-center gap-[5px] font-sans font-medium text-[11px] text-[#9ea8c6]">
@@ -260,50 +263,46 @@ export function SubmissionDetailsDrawer({
                 </div>
               </div>
 
-              {/* Primary action — verdicts happen in the workspace only, and
-                  only while the submission is still PENDING. Finalized
-                  submissions get a read-only "View Evaluation" path to the
-                  locked workspace (committed annotations, no editing). */}
-              {currentVersion && (
-                <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-[10px] pb-[4px]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose()
-                      router.push(`/faculty/document-review/${submission.id}`)
-                    }}
-                    title={
-                      currentVersion.status === 'PENDING'
-                        ? 'Evaluate Document'
-                        : 'View Evaluation'
-                    }
-                    className={`flex items-center justify-center gap-[8px] w-full h-[40px] rounded-[10px] font-sans font-bold text-[13px] text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 outline-none ${
-                      currentVersion.status === 'PENDING'
-                        ? 'bg-[#16a34a] hover:bg-[#15803d] focus-visible:ring-[rgba(22,163,74,0.4)]'
-                        : 'bg-[#707dff] hover:bg-[#5565ff] focus-visible:ring-[#707dff]'
-                    }`}
-                  >
-                    {currentVersion.status === 'PENDING' ? (
-                      <ClipboardCheck
-                        className="size-[16px]"
-                        strokeWidth={2.25}
-                      />
-                    ) : (
-                      <LayoutPanelLeft
-                        className="size-[15px]"
-                        strokeWidth={2.25}
-                      />
-                    )}
-                    {currentVersion.status === 'PENDING'
-                      ? 'Evaluate Document'
-                      : 'View Evaluation'}
-                  </button>
-                </div>
-              )}
             </div>
-          )}
-        </div>
-      </div>
-    </>
+          ) : null}
+        </Drawer.Body>
+
+        {submission && currentVersion ? (
+          <Drawer.Footer>
+            <button
+              type="button"
+              onClick={() => {
+                onClose()
+                router.push(`/faculty/document-review/${submission.id}`)
+              }}
+              title={
+                currentVersion.status === 'PENDING'
+                  ? 'Evaluate Document'
+                  : 'View Evaluation'
+              }
+              className={`flex items-center justify-center gap-[8px] w-full h-[40px] rounded-[10px] font-sans font-bold text-[13px] text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 outline-none ${
+                currentVersion.status === 'PENDING'
+                  ? 'bg-[#16a34a] hover:bg-[#15803d] focus-visible:ring-[rgba(22,163,74,0.4)]'
+                  : 'bg-[#707dff] hover:bg-[#5565ff] focus-visible:ring-[#707dff]'
+              }`}
+            >
+              {currentVersion.status === 'PENDING' ? (
+                <ClipboardCheck
+                  className="size-[16px]"
+                  strokeWidth={2.25}
+                />
+              ) : (
+                <LayoutPanelLeft
+                  className="size-[15px]"
+                  strokeWidth={2.25}
+                />
+              )}
+              {currentVersion.status === 'PENDING'
+                ? 'Evaluate Document'
+                : 'View Evaluation'}
+            </button>
+          </Drawer.Footer>
+        ) : null}
+    </Drawer>
   )
 }

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Clock, Eye, FileSearch, Loader2, X } from 'lucide-react'
+import { Clock, Eye, FileSearch, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Drawer } from '@/components/ui/Drawer'
 import { getSignedBlobUrl } from '@/lib/blob'
 import {
   CircleHistoryState,
@@ -22,6 +23,8 @@ export interface DocumentHistoryItem {
   reviews?: Array<{ status: string }>
   approvedCount?: number
   total?: number
+  /** Owning schedule — past-defense rows link to their own schedule, not the current one. */
+  scheduleId?: number
 }
 
 interface DocumentHistoryDrawerProps {
@@ -29,6 +32,10 @@ interface DocumentHistoryDrawerProps {
   onClose: () => void
   /** The group's initial defense document + its verdict status. */
   initial: DocumentHistoryItem | null
+  /** Previous defenses' initial documents (newest attempt first) — appended under the initial row. */
+  pastInitials?: DocumentHistoryItem[]
+  /** True while past initials are being fetched — renders skeleton rows to avoid pop-in. */
+  pastLoading?: boolean
   /** All resubmissions, oldest first (chronological). */
   resubmissions: DocumentHistoryItem[]
   /** Defense schedule id for faculty workspace links (e.g. /faculty/defense/[scheduleId]/[submissionId]). */
@@ -142,6 +149,20 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** Pulsing placeholder matching the InitialDocumentRow layout (circle + lines + button). */
+function InitialDocumentRowSkeleton() {
+  return (
+    <div className="flex items-center gap-[14px]" aria-hidden="true">
+      <div className="size-[32px] rounded-full bg-[#eef0f9] animate-pulse shrink-0" />
+      <div className="min-w-0 flex-1 flex flex-col gap-[6px]">
+        <div className="h-[13px] w-2/3 rounded-[6px] bg-[#eef0f9] animate-pulse" />
+        <div className="h-[12px] w-1/2 rounded-[6px] bg-[#f3f4fa] animate-pulse" />
+      </div>
+      <div className="h-[32px] w-[74px] rounded-[8px] bg-[#eef0f9] animate-pulse shrink-0" />
+    </div>
+  )
+}
+
 // ── Initial document row ─────────────────────────────────────────────────────
 
 /**
@@ -153,20 +174,27 @@ function InitialDocumentRow({
   scheduleId,
   milestoneSlug,
   variant = 'panelist',
+  showConnector = false,
+  dashedConnector = false,
 }: {
   item: DocumentHistoryItem
   scheduleId?: number
   milestoneSlug?: string
   variant?: 'panelist' | 'student'
+  /** Renders a vertical timeline connector below the status circle (linked history). */
+  showConnector?: boolean
+  /** Dashed connector = awaiting verdict; solid = decided. */
+  dashedConnector?: boolean
 }) {
   const { info, status } = item
+  const rowScheduleId = item.scheduleId ?? scheduleId
   const isNoVerdict = status === 'PENDING'
   // Student history: always View grey (per request) — panelist: Review when pending
   const isPanelist = variant === 'panelist'
   const showReview = isPanelist ? status === 'PENDING' || status === 'IN_REVIEW' : false
   const href =
-    info.id && scheduleId
-      ? `/faculty/defense/${scheduleId}/${info.id}`
+    info.id && rowScheduleId
+      ? `/faculty/defense/${rowScheduleId}/${info.id}`
       : info.id && milestoneSlug
         ? `/student/milestone/${milestoneSlug}/${info.id}`
         : undefined
@@ -237,7 +265,19 @@ function InitialDocumentRow({
 
   return (
     <div className="flex items-center gap-[14px]">
-      <CircleHistoryState state={status} />
+      <div className="flex flex-col items-center self-stretch shrink-0">
+        <CircleHistoryState state={status} />
+        {showConnector && (
+          <span
+            className={`w-[2px] flex-1 min-h-[24px] ${
+              dashedConnector
+                ? 'border-l border-dashed border-[#e8ebf8]'
+                : 'bg-[#e8ebf8]'
+            }`}
+            aria-hidden="true"
+          />
+        )}
+      </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-[8px] min-w-0">
@@ -313,7 +353,7 @@ function InitialDocumentRow({
 function normalizeResubStatus(status: string): string {
   const upper = status.toUpperCase().replace(/\s+/g, '_')
   if (upper === 'FOR_REVIEW' || upper === 'IN_REVIEW' || upper === 'PENDING') return 'IN_REVIEW'
-  if (upper === 'NEED_REVISION' || upper === 'REJECTED') return 'NEED_REVISION'
+  if (upper === 'NEED_REVISION' || upper === 'REDEFENSE') return 'NEED_REVISION'
   if (upper === 'APPROVED') return 'APPROVED'
   return upper
 }
@@ -335,7 +375,7 @@ function ResubmissionRow({
   const normalizedStatus = normalizeResubStatus(status as string)
   const isInReview = normalizedStatus === 'IN_REVIEW'
   // Panelist: Review only if the current user’s own review for this version is still PENDING.
-  // Done reviewers (APPROVED/REJECTED) see View grey even while overall doc is In Review.
+  // Done reviewers (APPROVED/REDEFENSE) see View grey even while overall doc is In Review.
   const { data: session } = useSession()
   const currentUserId = session?.user?.id != null ? Number(session.user.id) : null
   const revs = (item as unknown as { reviews?: Array<{ panelistId?: number; status: string }> }).reviews
@@ -514,7 +554,7 @@ function ResubmissionRow({
 /** Empty state when there are no resubmissions yet. */
 function EmptySubmissionHistory() {
   return (
-    <div className="flex flex-col h-full items-center justify-center gap-[10px] rounded-[12px] border border-[#eceef8] bg-[#fafbff] px-[20px] py-[28px] text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-[10px] rounded-[12px] border border-[#eceef8] bg-[#fafbff] px-[20px] py-[28px] text-center">
       <div className="flex size-[40px] items-center justify-center rounded-[20px] bg-[#f4f5fc]">
         <Clock className="size-[18px] text-[#707dff]" strokeWidth={2} />
       </div>
@@ -535,75 +575,58 @@ function EmptySubmissionHistory() {
  * Document History Drawer (Figma 1448-6887).
  *
  * Right-side drawer showing the group's initial defense document and the full
- * submission history (all resubmissions). Reuses the existing drawer pattern
- * (backdrop, Escape-to-close, body scroll lock) and the shared status
- * circle/pill components from DefenseDocumentCard.
+ * submission history (all resubmissions). Uses the shared Drawer primitive and
+ * the shared status circle/pill components from DefenseDocumentCard.
  */
 export function DocumentHistoryDrawer({
   open,
   onClose,
   initial,
+  pastInitials = [],
+  pastLoading = false,
   resubmissions,
   scheduleId,
   milestoneSlug,
   variant = 'panelist',
 }: DocumentHistoryDrawerProps & { variant?: 'panelist' | 'student' }) {
-  // Escape closes; body scroll locks while the drawer is open (matches the
-  // existing faculty/evaluation drawers).
-  useEffect(() => {
-    if (!open) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = ''
-    }
-  }, [open, onClose])
-
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-40 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] transition-all duration-300 ${
-          open
-            ? 'opacity-100 pointer-events-auto'
-            : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
-        aria-hidden="true"
+    <Drawer open={open} onClose={onClose} size="xl">
+      <Drawer.Header
+        title="Document History"
+        subtitle="Initial defense documents and resubmissions."
       />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Document history"
-        className={`fixed top-0 right-0 h-dvh w-[600px] max-w-full z-50 bg-white border-l border-[#eceef8] shadow-[-8px_0px_40px_rgba(112,125,255,0.14),-2px_0px_8px_rgba(0,0,0,0.05)] transition-transform duration-300 flex flex-col ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#f0f2fa] px-[22px] pt-[18px] pb-[17px]">
-          <p className="font-sora font-bold text-[15px] leading-[22.5px] tracking-[-0.15px] text-[#1e3a8a]">
-            Document History
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close document history"
-            className="flex items-center rounded-[7px] p-[5px] text-[#8a93b4] hover:bg-gray-50 transition-colors"
-          >
-            <X className="size-[17px]" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto py-[20px]">
-          {/* Initial Defense Document */}
+      <Drawer.Body>
+        <div className="flex min-h-0 flex-1 flex-col py-[20px]">
+          {/* Initial Defense Document (+ previous defenses' initial documents appended) */}
           <div className="flex flex-col gap-[10px] px-[25px] pb-[22px]">
-            <SectionHeading>Initial Defense Document</SectionHeading>
+            <SectionHeading>Defense</SectionHeading>
             {initial ? (
-              <InitialDocumentRow item={initial} scheduleId={scheduleId} milestoneSlug={milestoneSlug} variant={variant} />
+              <div className="flex flex-col gap-0 h-fit">
+                <InitialDocumentRow
+                  item={initial}
+                  scheduleId={scheduleId}
+                  milestoneSlug={milestoneSlug}
+                  variant={variant}
+                  showConnector={pastInitials.length > 0}
+                  dashedConnector={initial.status === 'PENDING'}
+                />
+                {pastLoading && pastInitials.length === 0 ? (
+                  <>
+                    <InitialDocumentRowSkeleton />
+                    <InitialDocumentRowSkeleton />
+                  </>
+                ) : null}
+                {pastInitials.map((item, index) => (
+                  <InitialDocumentRow
+                    key={`${item.scheduleId}-${item.info.id ?? item.info.blobUrl}`}
+                    item={item}
+                    scheduleId={scheduleId}
+                    milestoneSlug={milestoneSlug}
+                    variant={variant}
+                    showConnector={index < pastInitials.length - 1}
+                  />
+                ))}
+              </div>
             ) : (
               <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
                 No initial document has been submitted yet.
@@ -611,9 +634,9 @@ export function DocumentHistoryDrawer({
             )}
           </div>
 
-          {/* Submission History */}
-          <div className="flex flex-col gap-[10px] px-[25px]">
-            <SectionHeading>Submission History</SectionHeading>
+          {/* Resubmissions — stretches to the drawer bottom when empty */}
+          <div className={`flex flex-col gap-[10px] px-[25px] ${resubmissions.length === 0 ? 'flex-1 min-h-0' : ''}`}>
+            <SectionHeading>Resubmissions</SectionHeading>
             {resubmissions.length === 0 ? (
               <EmptySubmissionHistory />
             ) : (
@@ -632,7 +655,7 @@ export function DocumentHistoryDrawer({
             )}
           </div>
         </div>
-      </div>
-    </>
+      </Drawer.Body>
+    </Drawer>
   )
 }

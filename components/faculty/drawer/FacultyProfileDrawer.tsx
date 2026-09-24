@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Users, CalendarClock } from 'lucide-react'
+import { Users, CalendarClock } from 'lucide-react'
 import { toast } from 'sonner'
 import { DrawerSkeleton } from '@/components/faculty/drawer/DrawerSkeleton'
 import { ActivityStatus } from '@/components/ui/ActivityStatus'
+import { Drawer } from '@/components/ui/Drawer'
 import { useFacultyDrawer } from '@/store/useFacultyDrawer'
 import { getInitials } from '@/lib/helper'
 import { getFacultyMemberDetail } from '@/lib/actions/faculty'
@@ -35,68 +36,43 @@ const groupGradients = [
 
 export function FacultyProfileDrawer() {
   const { isOpen, facultyId, close } = useFacultyDrawer()
-  const [detail, setDetail] = useState<FacultyDetail | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [requestState, setRequestState] = useState<{
+    requestKey: number | null
+    detail: FacultyDetail | null
+  }>({
+    requestKey: null,
+    detail: null,
+  })
 
   useEffect(() => {
     if (!isOpen || !facultyId) return
-    setLoading(true)
-    setDetail(null)
-    getFacultyMemberDetail(facultyId).then((res) => {
+    const requestKey = facultyId
+
+    void getFacultyMemberDetail(requestKey).then((res) => {
       if (!res.success) toast.error(res.message)
-      setDetail(res.payload ?? null)
-      setLoading(false)
+      setRequestState({
+        requestKey,
+        detail: res.payload ?? null,
+      })
     })
   }, [isOpen, facultyId])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
-    }
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = ''
-    }
-  }, [isOpen, close])
+  // Derive the active response so a new request starts in the loading state.
+  const requestKey = facultyId
+  const detail =
+    requestKey != null && requestState.requestKey === requestKey
+      ? requestState.detail
+      : null
+  const loading = requestKey != null && requestState.requestKey !== requestKey
 
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-40 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] transition-all duration-300 ${
-          isOpen
-            ? 'opacity-100 pointer-events-auto'
-            : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={close}
+    <Drawer open={isOpen} onClose={close} size="sm">
+      <Drawer.Header
+        title="Faculty Profile"
+        subtitle="Faculty roles, assigned groups, and upcoming defenses."
       />
-      <div
-        className={`fixed top-0 right-0 h-dvh w-[500px] z-50 bg-white border-l border-[#eceef8] shadow-[-8px_0px_40px_rgba(112,125,255,0.14)] transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#eceef8]">
-          <div className="flex items-center gap-2.5">
-            <div className="size-10 bg-[#f4f6ff] rounded-lg flex justify-center items-center text-[#707dff]">
-              <Users className="size-4" />
-            </div>
-            <span className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a]">
-              Faculty Profile
-            </span>
-          </div>
-          <button
-            onClick={close}
-            className="flex justify-center items-center size-7 bg-violet-50 rounded-lg outline outline-1 outline-offset-[-1px] outline-violet-100"
-          >
-            <X className="size-4 text-slate-400" />
-          </button>
-        </div>
-
-        <div className="flex flex-col px-6 overflow-y-auto h-[calc(100dvh-73px)]">
+      <Drawer.Body>
+        <div className="flex flex-col px-6">
           {loading || !detail ? (
             <DrawerSkeleton />
           ) : (
@@ -190,7 +166,7 @@ export function FacultyProfileDrawer() {
             </>
           )}
         </div>
-      </div>
-    </>
+      </Drawer.Body>
+    </Drawer>
   )
 }

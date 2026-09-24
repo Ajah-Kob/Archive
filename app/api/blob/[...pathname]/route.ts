@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import prisma from '@/lib/prisma'
-import { head, list } from '@vercel/blob'
+import { get, head, list } from '@vercel/blob'
 
 const ADMIN_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
 
@@ -19,7 +19,7 @@ const ADMIN_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
  *   invalid prefix → 404
  *
  * Anonymous → 401, deleted user → 401, cross-section coordinator → 403.
- * On success returns 302 to the signed downloadUrl or 200 stream.
+ * On success streams the bytes (200) via an authenticated SDK download.
  */
 
 function isAdmin(role?: string | null): boolean {
@@ -151,7 +151,7 @@ async function handleRequest(
     if (!verified) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
-    return await serveBlob(verified.blobUrl, verified.downloadUrl, req)
+    return await serveBlob(pathname, req)
   }
 
   // Archiving → archiving/{groupId}/...
@@ -169,7 +169,7 @@ async function handleRequest(
     if (!verified) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
-    return await serveBlob(verified.blobUrl, verified.downloadUrl, req)
+    return await serveBlob(pathname, req)
   }
 
   // Chapter → chapter/{groupId}/{chapter}/...
@@ -188,7 +188,7 @@ async function handleRequest(
     if (!verified) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
-    return await serveBlob(verified.blobUrl, verified.downloadUrl, req)
+    return await serveBlob(pathname, req)
   }
 
   // Defense → defense/{scheduleId}/...
@@ -214,11 +214,27 @@ async function handleRequest(
     if (!verified) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
-    return await serveBlob(verified.blobUrl, verified.downloadUrl, req)
+    return await serveBlob(pathname, req)
   }
 
   // Invalid prefix → 404
   return NextResponse.json({ message: 'Not found' }, { status: 404 })
+}
+
+function decodeOnce(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+// Encoding-agnostic pathname comparison. Keys with spaces/special chars may
+// come back from list()/head() percent-encoded while the request path is
+// already decoded (or vice versa) — strict === would 404 on existing blobs.
+function sameBlobPath(a: string, b: string): boolean {
+  if (a === b) return true
+  return decodeOnce(a) === decodeOnce(b)
 }
 
 async function verifyBlobPathname(pathname: string): Promise<{ blobUrl: string; downloadUrl: string; pathname: string } | null> {
@@ -233,13 +249,18 @@ async function verifyBlobPathname(pathname: string): Promise<{ blobUrl: string; 
       limit: 100,
     })) as unknown as { blobs: Array<{ pathname: string; url: string; downloadUrl?: string }> }
 
-    const matched = result.blobs?.find((b) => b.pathname === pathname)
-    if (!matched) return null
+    const matched = result.blobs?.find((b) => sameBlobPath(b.pathname, pathname))
+    if (!matched) {
+      console.error(
+        `[blob route | no match]: want=${pathname} candidates=${JSON.stringify((result.blobs ?? []).map((b) => b.pathname))}`,
+      )
+      return null
+    }
 
     // Head+pathname verification — ensures the blob's server pathname matches requested pathname.
     try {
       const meta = await head(matched.url, token ? ({ token } as unknown as never) : undefined)
-      if (meta?.pathname !== pathname) return null
+      if (!meta || !sameBlobPath(meta.pathname, pathname)) return null
       // Prefer head's downloadUrl if provided (signed), otherwise use list's.
       return {
         blobUrl: matched.url,
@@ -257,35 +278,45 @@ async function verifyBlobPathname(pathname: string): Promise<{ blobUrl: string; 
   }
 }
 
-async function serveBlob(blobUrl: string, downloadUrl: string, req: NextRequest) {
-  const urlToServe = downloadUrl || blobUrl
-
+async function serveBlob(pathname: string, req: NextRequest) {
   if (req.method === 'HEAD') {
     return new NextResponse(null, { status: 200 })
   }
 
-  const accept = req.headers.get('accept') ?? ''
-  if (accept.includes('application/json')) {
-    return NextResponse.json({ url: urlToServe, downloadUrl: urlToServe })
+  // Authenticated server-side download: private blobs have no usable
+  // tokenless URL (downloadUrl is just ?download=1 and 403s), so fetch via
+  // the SDK get() with a Bearer token and stream the bytes same-origin.
+  // The route stays the single private gate; the browser never sees blob URLs.
+  const token = process.env.BLOB_READ_WRITE_TOKEN
+  if (!token) {
+    console.error('[blob route | missing BLOB_READ_WRITE_TOKEN]')
+    return NextResponse.json({ message: 'Not found' }, { status: 404 })
   }
-
-  // Stream the blob same-origin to avoid cross-origin redirect + CORS issues
-  // with fetch(redirect) from the viewer. The route is the single private gate;
-  // the browser never sees the raw blobUrl.
   try {
-    const upstream = await fetch(urlToServe)
-    if (!upstream.ok || !upstream.body) {
+    const result = await (get as unknown as (
+      p: string,
+      o: unknown,
+    ) => Promise<{
+      statusCode: number
+      stream: ReadableStream | null
+      headers: Headers
+      blob: { contentType: string }
+    } | null>)(pathname, { access: 'private', token })
+    if (!result || result.statusCode !== 200 || !result.stream) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
     const headers = new Headers()
-    const ct = upstream.headers.get('content-type')
+    const ct = result.blob?.contentType || result.headers.get('content-type')
     if (ct) headers.set('content-type', ct)
-    const cl = upstream.headers.get('content-length')
+    const cl = result.headers.get('content-length')
     if (cl) headers.set('content-length', cl)
     headers.set('cache-control', 'private, max-age=60')
-    return new NextResponse(upstream.body, { status: 200, headers })
+    return new NextResponse(result.stream as unknown as BodyInit, {
+      status: 200,
+      headers,
+    })
   } catch (err) {
-    console.error('[blob route | stream error]:', err)
+    console.error('[blob route | get error]:', err)
     return NextResponse.json({ message: 'Not found' }, { status: 404 })
   }
 }

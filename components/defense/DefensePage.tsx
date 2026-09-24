@@ -33,7 +33,7 @@ export function DefensePage({ schedules, resubmissions }: DefensePageProps) {
 
   // Upcoming = verdict still pending (the defense has not been decided yet).
   const upcoming = schedules.filter((s) => s.verdict === 'PENDING')
-  // Completed = verdict has been submitted (APPROVED, MINOR/MAJOR, REJECTED)
+  // Completed = verdict has been submitted (APPROVED, MINOR/MAJOR, REDEFENSE)
   const completed = schedules.filter((s) => s.verdict !== 'PENDING')
 
   return (

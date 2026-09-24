@@ -27,7 +27,7 @@ import type { DefenseSchedulePayload } from '@/lib/actions/defense'
  * Maps the session payload to a VerdictCallout state.
  * - No submissions → NO_DOCUMENT
  * - Verdict PENDING → WAITING_FOR_SCHEDULE
- * - Otherwise → the verdict maps 1:1 (APPROVED, MINOR_REVISION, MAJOR_REVISION, REJECTED)
+ * - Otherwise → the verdict maps 1:1 (APPROVED, MINOR_REVISION, MAJOR_REVISION, REDEFENSE)
  */
 function deriveVerdictState(
   data: StudentDefenseSessionPayload,

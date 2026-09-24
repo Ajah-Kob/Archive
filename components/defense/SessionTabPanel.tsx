@@ -154,13 +154,14 @@ export function SessionTabPanel({ session }: SessionTabPanelProps) {
         state={verdictState as unknown as PanelistVerdictState}
         isChair={chair}
         scheduleId={session.id}
+        hasDocument={!!initialSubmission}
         reviewedAt={reviewedAt}
         comments={annotationStats?.comments ?? null}
         pages={annotationStats?.pages ?? null}
       />
 
       <LatestDocumentCard.Root>
-        <LatestDocumentCard.Header>Latest Document</LatestDocumentCard.Header>
+        <LatestDocumentCard.Header>Defense Document</LatestDocumentCard.Header>
         <LatestDocumentCard.Body>
           {initialDoc ? (
             <LatestDocumentCard.Initial

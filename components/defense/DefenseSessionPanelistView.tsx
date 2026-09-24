@@ -33,13 +33,13 @@ export function DefenseSessionPanelistView({
   const totalPanelists = session.panelists.length || 3
 
   // Map resubmission status to Latest card status: use first review status or derive from verdict? For now map reviews
-  // PENDING reviews → FOR_REVIEW, all APPROVED → APPROVED, any REJECTED → NEED_REVISION
+  // PENDING reviews → FOR_REVIEW, all APPROVED → APPROVED, any REDEFENSE → NEED_REVISION
   function deriveResubStatus(
     reviews: { status: string }[],
   ): 'FOR_REVIEW' | 'APPROVED' | 'NEED_REVISION' {
     if (reviews.length === 0) return 'FOR_REVIEW'
     if (reviews.every((r) => r.status === 'APPROVED')) return 'APPROVED'
-    if (reviews.some((r) => r.status === 'REJECTED')) return 'NEED_REVISION'
+    if (reviews.some((r) => r.status === 'REDEFENSE')) return 'NEED_REVISION'
     return 'FOR_REVIEW'
   }
 
@@ -93,6 +93,7 @@ export function DefenseSessionPanelistView({
         state={verdictState as any}
         isChair={chair}
         scheduleId={session.id}
+        hasDocument={hasDocument}
         reviewedAt={reviewedAt}
         comments={annotationStats?.comments ?? null}
         pages={annotationStats?.pages ?? null}

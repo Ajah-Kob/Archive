@@ -179,7 +179,7 @@ function NoVerdictPlaceholder() {
  * - ResubmittedDocumentCard (latest !isInitial, resubmissions[resubmissions.length-1]) with empty placeholder
  * - ApprovalChecklistCard (per-panelist Approved / Need Revision / Pending via deriveApprovalChecklist, feedback counts)
  * - isPanelistReadOnly guard: Approved panelists are read-only on future versions (no Review action)
- * - shouldResetOnResubmission: REJECTED -> PENDING on new version, APPROVED carry-forward
+  * - shouldResetOnResubmission: REDEFENSE -> PENDING on new version, APPROVED carry-forward
  * gap-[16px], responsive, pure helpers.
  */
 export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
@@ -212,7 +212,7 @@ export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
     })),
   )
 
-  // Demonstrate carry-forward: REJECTED resets to PENDING on new version, APPROVED stays
+  // Demonstrate carry-forward: REDEFENSE resets to PENDING on new version, APPROVED stays
   const resetCandidates = reviews.filter((r) => shouldResetOnResubmission(r.status as DefenseReviewStatus))
   void resetCandidates
   void checklistItems

@@ -11,8 +11,8 @@ import {
   History,
   Loader2,
   MessageSquareText,
-  RotateCcw,
   Save,
+  Send,
   TriangleAlert,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -88,6 +88,11 @@ export interface DefenseDocumentWorkspaceProps {
   backHref?: string
   /** Defense schedule id for post-save redirect. Falls back to submission.scheduleId. */
   scheduleId?: number
+  /**
+   * History mode — hides every mutation affordance (toolbar actions, tools,
+   * drafts) and forces annotation layers read-only. Viewing UI is unchanged.
+   */
+  readOnly?: boolean
 }
 
 /** Which right slide-over panel is open (if any). */
@@ -99,9 +104,9 @@ interface SaveState {
   data: unknown | null
 }
 
-/** Resubmission verdict payload captured at Approve/Request click time. */
+/** Resubmission review payload captured at Submit Review click time. */
 interface ResubmissionVerdictState {
-  decision: 'APPROVED' | 'REJECTED'
+  decision: 'APPROVED' | 'REDEFENSE' | null
   summary: AnnotationSummary
   data: unknown | null
 }
@@ -159,8 +164,10 @@ export function DefenseDocumentWorkspace({
   versions,
   backHref,
   scheduleId,
+  readOnly = false,
 }: DefenseDocumentWorkspaceProps) {
   const isStudent = mode === 'student'
+  const editable = !isStudent && !readOnly
   const { engine, isLoading, error } = usePdfiumEngine()
   const { data: session } = useSession()
 
@@ -252,23 +259,7 @@ export function DefenseDocumentWorkspace({
   const effectiveBlobUrl = privateObjectUrl ?? (isPrivateBlobUrl(blobUrl) ? null : blobUrl)
   const isPrivatePending = isPrivateBlobUrl(blobUrl) && privateFetching
 
-  if (privateError) {
-    return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff] px-6 text-center">
-        <TriangleAlert className="size-6 text-[#d97706]" />
-        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">{privateError}</p>
-      </div>
-    )
-  }
-  if (isPrivatePending) {
-    return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
-        <Loader2 className="size-6 animate-spin text-[#707dff]" />
-        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading document…</p>
-      </div>
-    )
-  }
-
+  // All hooks must run unconditionally above the early returns (Rules of Hooks).
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
@@ -286,12 +277,12 @@ export function DefenseDocumentWorkspace({
           {
             id: 'highlight',
             behavior: { useAppearanceStream: false, selectAfterCreate: true },
-            interaction: { exclusive: false, isDraggable: !isStudent },
+            interaction: { exclusive: false, isDraggable: editable },
           },
           {
             id: 'strikeout',
             behavior: { useAppearanceStream: false, selectAfterCreate: true },
-            interaction: { exclusive: false, isDraggable: !isStudent },
+            interaction: { exclusive: false, isDraggable: editable },
           },
           {
             id: 'freeText',
@@ -299,8 +290,8 @@ export function DefenseDocumentWorkspace({
             clickBehavior: { enabled: false } as FreeTextClickBehavior,
             interaction: {
               exclusive: false,
-              isDraggable: !isStudent,
-              isResizable: !isStudent,
+              isDraggable: editable,
+              isResizable: editable,
               isRotatable: false,
             },
           },
@@ -321,6 +312,7 @@ export function DefenseDocumentWorkspace({
                     exclusive: false,
                     isDraggable: false,
                     isResizable: false,
+                    isRotatable: false,
                   },
                 },
               ]
@@ -328,8 +320,25 @@ export function DefenseDocumentWorkspace({
         ],
       }),
     ],
-    [effectiveBlobUrl, annotationAuthor, isStudent],
+    [effectiveBlobUrl, annotationAuthor, isStudent, editable],
   )
+
+  if (privateError) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff] px-6 text-center">
+        <TriangleAlert className="size-6 text-[#d97706]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">{privateError}</p>
+      </div>
+    )
+  }
+  if (isPrivatePending) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <Loader2 className="size-6 animate-spin text-[#707dff]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading document…</p>
+      </div>
+    )
+  }
 
   if (error) {
     return (
@@ -366,6 +375,7 @@ export function DefenseDocumentWorkspace({
             versions={versions}
             backHref={backHref}
             scheduleId={scheduleId}
+            readOnly={readOnly}
           />
         )}
       </EmbedPDF>
@@ -382,6 +392,7 @@ function DefenseWorkspaceLayout({
   versions,
   backHref,
   scheduleId,
+  readOnly = false,
 }: {
   mode?: DefenseWorkspaceMode
   activeDocumentId: string | null
@@ -391,8 +402,10 @@ function DefenseWorkspaceLayout({
   versions?: StudentVersionListItem[]
   backHref?: string
   scheduleId?: number
+  readOnly?: boolean
 }) {
   const isStudent = mode === 'student'
+  const editable = !isStudent && !readOnly
   const router = useRouter()
   const viewerRef = useRef<HTMLDivElement>(null)
 
@@ -402,7 +415,7 @@ function DefenseWorkspaceLayout({
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
     excludeIdsRef: pendingCommentIdsRef,
-    enabled: !isStudent,
+    enabled: editable,
   })
 
   const { state: annotationState, provides: annotationApi } = useAnnotation(
@@ -548,7 +561,7 @@ function DefenseWorkspaceLayout({
     setSaveState({ summary, data })
   }
 
-  async function openResubmissionVerdict(decision: 'APPROVED' | 'REJECTED') {
+  async function openSubmitResubmissionReview() {
     const cap = annotationCapabilityRef.current
     let data: unknown = null
     let summary: AnnotationSummary = {}
@@ -566,7 +579,7 @@ function DefenseWorkspaceLayout({
         },
       )
     }
-    setResubmissionVerdict({ decision, summary, data })
+    setResubmissionVerdict({ decision: null, summary, data })
   }
 
   function handleViewerPointerDown(e: React.PointerEvent) {
@@ -587,7 +600,7 @@ function DefenseWorkspaceLayout({
     <div className="flex h-full w-full min-h-0 flex-col">
       {activeDocumentId && <AnnotationDedupe documentId={activeDocumentId} />}
 
-      {!isStudent && activeDocumentId && (
+      {editable && activeDocumentId && (
         <>
           <AnnotationEmptyGuard documentId={activeDocumentId} />
           <AnnotationDeleteKey documentId={activeDocumentId} />
@@ -623,9 +636,14 @@ function DefenseWorkspaceLayout({
           ) : (
             <SubmissionStatusBadge status={submission.status} />
           )}
+          {readOnly && (
+            <span className="inline-flex items-center rounded-[7px] border border-[#e0e3f0] bg-[#f4f5fc] px-[9px] py-[2px] font-sans font-bold text-[11px] leading-[16px] text-[#8a93b4] whitespace-nowrap">
+              History
+            </span>
+          )}
         </div>
 
-        {!isStudent && (
+        {editable && (
           <div className="flex items-center gap-[7px] min-w-0 shrink-0">
             {draftSaveStatus === 'saving' ? (
               <>
@@ -660,7 +678,7 @@ function DefenseWorkspaceLayout({
 
         <div className="flex-1" />
 
-        {!isStudent && activeDocumentId && (
+        {editable && activeDocumentId && (
           <AnnotationToolbar
             documentId={activeDocumentId}
             activeTool={activeTool}
@@ -668,11 +686,11 @@ function DefenseWorkspaceLayout({
           />
         )}
 
-        {!isStudent && <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />}
+        {editable && <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />}
 
         {activeDocumentId && <ZoomControl documentId={activeDocumentId} />}
 
-        {!isStudent && <UndoRedo />}
+        {editable && <UndoRedo />}
 
         <div className="flex-1" />
 
@@ -709,35 +727,25 @@ function DefenseWorkspaceLayout({
             </>
           )}
 
-          {!isStudent && isResubmission ? (
+          {editable && isResubmission ? (
             <>
               <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
               <button
                 type="button"
-                onClick={() => openResubmissionVerdict('REJECTED')}
-                disabled={!hasAnnotations}
-                title={
-                  hasAnnotations
-                    ? 'Request revisions for this resubmission'
-                    : 'Add annotations before requesting revisions'
-                }
-                className="flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[8px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[11.5px] leading-[17px] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(245,158,11,0.4)] outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[rgba(245,158,11,0.08)]"
+                onClick={() => openSubmitResubmissionReview()}
+                title="Review annotations and submit the resubmission verdict"
+                className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] font-sans font-bold text-[11.5px] leading-[17px] text-white shadow-[0px_4px_7px_rgba(112,125,255,0.32)] hover:opacity-95 transition-opacity focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(165deg, #707dff 0%, #5565ff 100%)',
+                }}
               >
-                <RotateCcw className="size-[13px]" />
-                Request Revision
-              </button>
-              <button
-                type="button"
-                onClick={() => openResubmissionVerdict('APPROVED')}
-                title="Approve this resubmission"
-                className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#16a34a] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#15803d] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(22,163,74,0.4)] outline-none"
-              >
-                <Check className="size-[13px]" strokeWidth={2.5} />
-                Approve
+                <Send className="size-[13px]" />
+                Submit Review
               </button>
             </>
           ) : (
-            !isStudent && (
+            editable && (
               <>
                 <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
                 <button
@@ -760,7 +768,7 @@ function DefenseWorkspaceLayout({
         </div>
       </header>
 
-      {!isStudent && activeDocumentId && (
+      {editable && activeDocumentId && (
         <ToolSettingsPanel documentId={activeDocumentId} activeTool={activeTool} />
       )}
 
@@ -816,7 +824,7 @@ function DefenseWorkspaceLayout({
                               <AnnotationLayerWithDrag
                                 documentId={activeDocumentId}
                                 pageIndex={pageIndex}
-                                readOnly={isStudent}
+                                readOnly={!editable}
                                 visibleAuthorName={visibleAuthor}
                               />
                             </PagePointerProvider>
@@ -836,7 +844,7 @@ function DefenseWorkspaceLayout({
             <AnnotationHover
               documentId={activeDocumentId}
               viewerRef={viewerRef}
-              readOnly={isStudent}
+              readOnly={!editable}
               onSelectAnnotation={handleSelectAnnotation}
               onDeselectAnnotation={handleDeselectAnnotation}
               initialMenuId={openMenuId}
@@ -848,7 +856,7 @@ function DefenseWorkspaceLayout({
         {panel === 'comments' && activeDocumentId && (
           <DefenseCommentsPanel
             documentId={activeDocumentId}
-            readOnly={isStudent}
+            readOnly={!editable}
             isStudent={isStudent}
             submissionId={submission.id}
             initialAnnotations={initialAnnotations as unknown[] | null}

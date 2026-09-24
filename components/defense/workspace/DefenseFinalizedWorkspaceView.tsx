@@ -206,7 +206,7 @@ function AnnotationHydrator({
  * Gating (route layer): `!isCurrent || status !== 'PENDING'` routes to this
  * view — mirrors evaluation page gating. Superseded versions are always
  * read-only; the current version is read-only once status is not PENDING
- * (e.g. APPROVED / REJECTED / COMMITTED).
+  * (e.g. APPROVED / REDEFENSE / COMMITTED).
  *
  * Re-edit flow: when the panelist has a COMMITTED annotation on the current
  * version (`!isSuperseded && draftStatus === 'COMMITTED' && status === 'IN_REVIEW'`)

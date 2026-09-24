@@ -58,7 +58,7 @@ export function FinalTopicModal({
           <p className="font-sans font-bold text-[12.5px] leading-[18.75px] text-[#3c4268] tracking-[0.125px] pb-[7px]">
             Topic Title
           </p>
-          <input
+          <textarea
             value={title}
             onChange={(e) => {
               setTitle(e.target.value)
@@ -66,7 +66,8 @@ export function FinalTopicModal({
             }}
             placeholder="e.g. Archive: Capstone Management System"
             maxLength={200}
-            className="w-full h-[42.25px] bg-white border border-[#dddff0] rounded-[9px] px-[15px] text-[13.5px] font-medium text-[#12143a] placeholder:text-[rgba(18,20,58,0.5)] outline-none focus:border-[#707dff] transition-colors"
+            rows={3}
+            className="w-full min-h-[84px] bg-white border border-[#dddff0] rounded-[9px] px-[15px] py-[11px] text-[13.5px] font-medium leading-[20px] text-[#12143a] placeholder:text-[rgba(18,20,58,0.5)] outline-none focus:border-[#707dff] transition-colors resize-y"
           />
           {error && (
             <div className="flex gap-[6px] items-start pt-[8px] w-full">

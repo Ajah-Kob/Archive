@@ -72,10 +72,9 @@ export function PhaseGatePills({
     // The resolver already enforces: if !gateOpen then every key in that phase is false.
     c1Open = c1GateOpen && CAPSTONE1_KEYS.some((k) => availability[k])
     c2Open = c2GateOpen && CAPSTONE2_KEYS.some((k) => availability[k])
-    // Fallback: if gate is open but resolver says no keys are open (e.g. no rows
-    // and fallback logic would still treat TOPIC_SUBMISSION as open), preserve
-    // the gate value so the pill doesn't flicker Locked when the section was
-    // just unlocked and no milestone rows exist yet.
+    // Fallback: if gate is open but resolver says no keys are open (e.g. no
+    // milestone rows exist yet), preserve the gate value so the pill doesn't
+    // flicker Locked when the section was just unlocked.
     if (c1GateOpen && !c1Open) c1Open = true
     if (c2GateOpen && !c2Open) c2Open = true
   }

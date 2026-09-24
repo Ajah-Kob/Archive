@@ -95,7 +95,15 @@ export async function getMyWorkspace(userId: number): Promise<{
           },
           topics: {
             where: { deletedAt: null },
-            select: { status: true, deletedAt: true },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              deletedAt: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
           },
           capstone: { select: { topicId: true } },
           milestones: {
@@ -218,6 +226,23 @@ export async function getMyWorkspace(userId: number): Promise<{
     }))
   const pendingCount = invitations.filter((i) => i.status === 'PENDING').length
 
+  // Single final topic: the confirmed capstone topic wins; otherwise the
+  // most recently created active topic (covers pre-confirmation groups).
+  const confirmedTopic = group.capstone
+    ? group.topics.find((t) => t.id === group.capstone.topicId) ?? null
+    : null
+  const latestTopic = [...group.topics].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+  )[0] ?? null
+  const finalTopicRow = confirmedTopic ?? latestTopic
+  const finalTopic = finalTopicRow
+    ? {
+        id: finalTopicRow.id,
+        title: finalTopicRow.title,
+        updatedAt: finalTopicRow.updatedAt.toISOString(),
+      }
+    : null
+
   const payload: WorkspaceData & { phaseLocks: Record<string, boolean> } = {
     ...base,
     group: {
@@ -229,6 +254,7 @@ export async function getMyWorkspace(userId: number): Promise<{
       members,
       adviser,
       invitations,
+      finalTopic,
     },
     journey: buildJourneyRows(group, availability),
     phaseLocks,
@@ -261,7 +287,7 @@ export async function getGroupContext(groupId: number): Promise<{
             where: { deletedAt: null, status: 'APPROVED' },
             select: { title: true },
             take: 1,
-            orderBy: { reviewedAt: 'desc' },
+            orderBy: { updatedAt: 'desc' },
           },
         },
       },

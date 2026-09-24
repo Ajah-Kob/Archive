@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@/components/milestones/ConfirmDialog'
 import { RenameGroupModal } from '@/components/milestones/RenameGroupModal'
 import { AdviserModal } from '@/components/milestones/AdviserModal'
 import { InviteMembersModal } from '@/components/milestones/InviteMembersModal'
+import { FinalTopicModal } from '@/components/milestones/FinalTopicModal'
 
 interface ConfirmState {
   title: string
@@ -35,6 +36,7 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
   const [renameOpen, setRenameOpen] = useState(false)
   const [adviserOpen, setAdviserOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [topicOpen, setTopicOpen] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -121,6 +123,51 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
               <Pencil className="size-[14px]" strokeWidth={2} />
             </button>
           ) : null}
+        </div>
+      </div>
+
+      {/* Topic */}
+      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(112,125,255,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] p-[20px] shrink-0">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
+            Topic
+          </p>
+          {isLeader && group.finalTopic && (
+            <button
+              type="button"
+              onClick={() => setTopicOpen(true)}
+              aria-label="Edit final topic"
+              title="Edit final topic"
+              className="flex items-center justify-center size-[30px] rounded-[8px] bg-[#fafbff] border border-[#eceef8] text-[#8a93b4] hover:bg-[#f4f6ff] hover:text-[#707dff] hover:border-[#d5dbff] transition-colors shrink-0"
+            >
+              <Pencil className="size-[14px]" strokeWidth={2} />
+            </button>
+          )}
+        </div>
+
+        <div className="pt-[6px]">
+          {group.finalTopic ? (
+            <p className="font-sans font-bold text-[14px] leading-[21px] text-[#1e2145] break-words">
+              {group.finalTopic.title}
+            </p>
+          ) : (
+            <div className="flex flex-col items-center gap-[12px] py-[10px]">
+              <p className="font-sans text-[12.5px] text-[#8a93b4] text-center">
+                No final topic yet. Set your group&apos;s capstone topic to
+                unlock the next steps.
+              </p>
+              {isLeader && (
+                <button
+                  type="button"
+                  onClick={() => setTopicOpen(true)}
+                  className="flex w-full h-[38px] items-center justify-center gap-[7px] rounded-[10px] border border-dashed border-[#d4d8f0] bg-white font-sans font-bold text-[12.5px] leading-[18px] text-[#707dff] hover:bg-[#f8f9ff] hover:border-[#707dff] active:bg-[#f4f6ff] transition-colors"
+                >
+                  <Pencil className="size-[14px]" strokeWidth={2.5} />
+                  Add Topic
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -307,6 +354,17 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
       </div>
 
       {/* Modals */}
+      {topicOpen && (
+        <FinalTopicModal
+          currentTitle={group.finalTopic?.title ?? null}
+          onClose={() => setTopicOpen(false)}
+          onSaved={() => {
+            setTopicOpen(false)
+            router.refresh()
+          }}
+        />
+      )}
+
       {renameOpen && (
         <RenameGroupModal
           groupId={group.id}

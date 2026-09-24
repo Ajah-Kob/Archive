@@ -7,14 +7,10 @@ import { authOptions } from '@/lib/authOptions'
 import { ComingSoon } from '@/components/workspace/ComingSoon'
 import { getMyWorkspace } from '@/lib/actions/groups'
 import { getChapterData } from '@/lib/actions/chapter'
-import { getTopicSelectionData, getTopicSubmissionData } from '@/lib/actions/topic'
 import { getMyArchivingStatus } from '@/lib/actions/archiving'
 import { GroupContext } from '@/components/milestones/GroupContext'
 import { CapstoneJourney } from '@/components/milestones/CapstoneJourney'
 import { JOURNEY_ROWS, SLUG_TO_CHAPTER, WORKSPACE_SLUGS } from '@/types/milestones'
-import { LockedGroupPlaceholder } from '@/components/milestones/topic-submission/LockedGroupPlaceholder'
-import { TopicSelectionView } from '@/components/milestones/topic-selection/TopicSelectionView'
-import { TopicSubmissionView } from '@/components/milestones/topic-submission/TopicSubmissionView'
 import { ChapterSubmissionView } from '@/components/milestones/chapter/ChapterSubmissionView'
 import { LockedChapterPlaceholder } from '@/components/milestones/chapter/LockedChapterPlaceholder'
 import { ArchivingView } from '@/components/milestones/archiving/ArchivingView'
@@ -37,6 +33,11 @@ export default async function MilestoneDetailPage({
   const session = await getServerSession(authOptions)
 
   const { milestone } = await params
+  // Topic submission/selection retired — single final topic lives on the
+  // group card. Legacy topic URLs redirect to the milestones home.
+  if (milestone === 'topic-submission' || milestone === 'topic-selection') {
+    redirect('/student/milestone')
+  }
   if (!WORKSPACE_SLUGS.includes(milestone)) notFound()
 
   if ((DEFENSE_SLUGS as readonly string[]).includes(milestone)) {
@@ -45,13 +46,8 @@ export default async function MilestoneDetailPage({
 
   const userId = +session.user.id
   const chapter = SLUG_TO_CHAPTER[milestone]
-  const [workspaceRes, topicRes, chapterRes, archivingRes] = await Promise.all([
+  const [workspaceRes, chapterRes, archivingRes] = await Promise.all([
     getMyWorkspace(userId),
-    milestone === 'topic-submission'
-      ? getTopicSubmissionData(userId)
-      : milestone === 'topic-selection'
-        ? getTopicSelectionData(userId)
-        : Promise.resolve(null),
     chapter ? getChapterData(chapter) : Promise.resolve(null),
     milestone === 'archiving' ? getMyArchivingStatus() : Promise.resolve(null),
   ])
@@ -126,58 +122,6 @@ export default async function MilestoneDetailPage({
   }
 
   if (!workspace?.group) notFound()
-
-  if (milestone === 'topic-submission') {
-    const data = topicRes?.success && topicRes.payload ? topicRes.payload : null
-    if (!data?.group) notFound()
-    const isLocked = (data as any).journey?.find((r: any) => r.slug === 'topic-submission')?.state === 'LOCKED'
-    if (isLocked) redirect('/student/milestone')
-
-    return (
-      <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={data.journey} activeSlug="topic-submission" phaseLocks={(data as any).phaseLocks} />
-
-        <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <GroupContext />
-          <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
-            {isLocked ? (
-              <LockedChapterPlaceholder chapterLabel="Topic Submission" />
-            ) : data.group ? (
-              <TopicSubmissionView data={data} />
-            ) : (
-              <LockedGroupPlaceholder />
-            )}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  if (milestone === 'topic-selection') {
-    const data = topicRes?.success && topicRes.payload ? topicRes.payload : null
-    if (!data?.group) notFound()
-    const isLocked = (data as any).journey?.find((r: any) => r.slug === 'topic-selection')?.state === 'LOCKED'
-    if (isLocked) redirect('/student/milestone')
-
-    return (
-      <section className="h-full flex min-h-0">
-        <CapstoneJourney journey={data.journey} activeSlug="topic-selection" phaseLocks={(data as any).phaseLocks} />
-
-        <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <GroupContext />
-          <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
-            {isLocked ? (
-              <LockedChapterPlaceholder chapterLabel="Topic Selection" />
-            ) : data.group ? (
-              <TopicSelectionView data={data} />
-            ) : (
-              <LockedGroupPlaceholder />
-            )}
-          </div>
-        </div>
-      </section>
-    )
-  }
 
   if (chapter) {
     const data = chapterRes?.success && chapterRes.payload ? chapterRes.payload : null

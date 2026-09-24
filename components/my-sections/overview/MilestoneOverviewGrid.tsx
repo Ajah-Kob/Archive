@@ -5,8 +5,6 @@ import type { MilestoneAvailabilityItem, SectionGroupProgress } from '@/lib/acti
 // milestone when its journey row for that slug is not LOCKED — i.e. the
 // milestone is available to that group via resolveSectionAvailability.
 const KEY_TO_SLUG: Record<string, string> = {
-  TOPIC_SUBMISSION: 'topic-submission',
-  TOPIC_SELECTION: 'topic-selection',
   CHAPTER_1: 'chapter-1',
   CHAPTER_2: 'chapter-2',
   CHAPTER_3: 'chapter-3',

@@ -5,7 +5,7 @@
 // (coordinator progress) import. 'use server' files can only export async
 // functions, so this logic lives outside of lib/actions/.
 
-import { TOPIC_CAP, type JourneyRow } from '@/types/milestones'
+import type { JourneyRow } from '@/types/milestones'
 import { CAPSTONE1_KEYS, CAPSTONE2_KEYS } from '@/lib/milestones/phase'
 
 const CHAPTER_SLUG: Record<string, string> = {
@@ -25,7 +25,6 @@ const CHAPTER_KEYS = [
 ] as const
 
 export type JourneySource = {
-  topics: { status: string; deletedAt: Date | null }[]
   capstone: { topicId: number } | null
   milestones: {
     chapter: string
@@ -37,8 +36,6 @@ export type JourneySource = {
 
 // Statically built groupless journey (all locked) so we never allocate it per request.
 const JOURNEY_ROWS_EMPTY: JourneyRow[] = [
-  { slug: 'topic-submission', label: 'Topic Submission', header: 'CAPSTONE 1', state: 'LOCKED' },
-  { slug: 'topic-selection', label: 'Topic Selection', header: 'CAPSTONE 1', state: 'LOCKED' },
   { slug: 'chapter-1', label: 'Chapter 1', header: 'CAPSTONE 1', state: 'LOCKED' },
   { slug: 'chapter-2', label: 'Chapter 2', header: 'CAPSTONE 1', state: 'LOCKED' },
   { slug: 'chapter-3', label: 'Chapter 3', header: 'CAPSTONE 1', state: 'LOCKED' },
@@ -56,9 +53,8 @@ export type SectionAvailabilityRow = { key: string; openedAt: Date | null }
 // (capstone1/2) take precedence over explicit rows — when a phase is locked,
 // every milestone in that phase is considered locked even if its row says
 // open. This powers the coordinator's "Capstone X locked" overlay and the
-// student's journey lock state. Missing rows fall back to: Topic Submission
-// open by default (unless its phase is locked), Capstone 2 keys following
-// capstone2OpenedAt, everything else locked.
+// student's journey lock state. Missing rows fall back to: Capstone 2 keys
+// following capstone2OpenedAt, everything else locked.
 export function resolveSectionAvailability(
   capstone1Open: boolean,
   capstone2Open: boolean,
@@ -89,8 +85,6 @@ export function resolveSectionAvailability(
 
   const explicit = new Map(rows.map((r) => [r.key, r.openedAt != null]))
   const keys = [
-    'TOPIC_SUBMISSION',
-    'TOPIC_SELECTION',
     ...CHAPTER_KEYS,
     'PROPOSAL_DEFENSE',
     'FINAL_DEFENSE',
@@ -110,8 +104,6 @@ export function resolveSectionAvailability(
     }
     if (explicit.has(key)) {
       out[key] = explicit.get(key)!
-    } else if (key === 'TOPIC_SUBMISSION') {
-      out[key] = true
     } else if ((CAPSTONE2_KEYS as string[]).includes(key)) {
       out[key] = capstone2Open
     } else {
@@ -134,55 +126,9 @@ export function buildJourneyRows(
     return JOURNEY_ROWS_EMPTY
   }
 
-  const isOpen = (key: string) => availability[key] ?? key === 'TOPIC_SUBMISSION'
-
-  const topics = group.topics.filter((t) => !t.deletedAt)
-  const approved = topics.filter((t) => t.status === 'APPROVED')
+  const isOpen = (key: string) => availability[key] ?? false
 
   const rows: JourneyRow[] = []
-
-  // Topic Submission — gated by availability. The node only turns APPROVED
-  // once ALL topic slots are approved (TOPIC_CAP); any unapproved slot keeps
-  // it in the default state. Hover shows the running approved count.
-  const topicsApproved = approved.length
-  const topicDetail = `${topicsApproved} of ${TOPIC_CAP} topics approved`
-  const topicSubmission: JourneyRow = {
-    slug: 'topic-submission',
-    label: 'Topic Submission',
-    header: 'CAPSTONE 1',
-    state: 'LOCKED',
-  }
-  if (isOpen('TOPIC_SUBMISSION')) {
-    if (topicsApproved >= TOPIC_CAP) {
-      topicSubmission.state = 'APPROVED'
-      topicSubmission.sublabel = 'All topics approved'
-    } else {
-      topicSubmission.state = 'DEFAULT'
-    }
-    topicSubmission.tooltipDetail = topicDetail
-  }
-  rows.push(topicSubmission)
-
-  // Topic Selection — gated by the coordinator's availability. Green check
-  // labeled "Selected" (not "Approved") once a topic has been confirmed via
-  // the capstone link; hover carries the same approved-topics count.
-  const topicSelection: JourneyRow = {
-    slug: 'topic-selection',
-    label: 'Topic Selection',
-    header: 'CAPSTONE 1',
-    state: 'LOCKED',
-  }
-  if (isOpen('TOPIC_SELECTION')) {
-    if (group.capstone?.topicId) {
-      topicSelection.state = 'APPROVED'
-      topicSelection.sublabel = 'Selected'
-      topicSelection.stateLabel = 'Selected'
-    } else {
-      topicSelection.state = 'DEFAULT'
-    }
-    topicSelection.tooltipDetail = topicDetail
-  }
-  rows.push(topicSelection)
 
   // Chapters — render from Milestone rows when they exist (created by the
   // capstone workspace); otherwise the coordinator gate keeps them locked.

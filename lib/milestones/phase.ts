@@ -1,8 +1,6 @@
 import type { MilestoneKey } from '@prisma/client'
 
 export const CAPSTONE1_KEYS: MilestoneKey[] = [
-  'TOPIC_SUBMISSION',
-  'TOPIC_SELECTION',
   'CHAPTER_1',
   'CHAPTER_2',
   'CHAPTER_3',

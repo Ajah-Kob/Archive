@@ -15,13 +15,13 @@ export default async function MySectionLayout({
   const payload = res.success && res.payload ? res.payload : null
   if (!payload) notFound()
 
-  const { section, pendingTopics } = payload
+  const { section } = payload
 
   return (
     <section className="min-h-full flex flex-col">
       <PageLabel label={section.name} />
       <div className="flex-1 pb-[30px] flex flex-col min-h-0">
-        <SectionTabs sectionId={sectionId} pendingTopics={pendingTopics.length}>
+        <SectionTabs sectionId={sectionId}>
           {children}
         </SectionTabs>
       </div>

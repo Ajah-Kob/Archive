@@ -11,7 +11,7 @@ import {
   History,
   Loader2,
   MessageSquareText,
-  RotateCcw,
+  Send,
   TriangleAlert,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -91,9 +91,9 @@ export interface DocumentWorkspaceProps {
 /** Which right slide-over panel is open (if any). */
 type PanelId = 'comments' | 'versions'
 
-/** Verdict being confirmed, with the annotation payload captured at open time. */
+/** Review payload captured at modal open time; verdict chosen inside the modal. */
 interface VerdictState {
-  decision: 'APPROVED' | 'NEED_REVISION'
+  decision: 'APPROVED' | 'NEED_REVISION' | null
   summary: AnnotationSummary
   data: unknown | null
 }
@@ -532,11 +532,8 @@ function WorkspaceLayout({
     enabled: !isStudent,
   })
 
-  // Whether the adviser has added any annotations on this submission —
-  // Request Revisions requires at least one annotation.
   const { state: annotationState, provides: annotationApi } =
     useAnnotation(CURRENT_DOCUMENT_ID)
-  const hasAnnotations = Object.keys(annotationState.byUid).length > 0
 
   // Seed the bottom-bar status from the persisted row so an existing draft
   // reads "Draft saved ✓" on load; live status takes over once the user edits.
@@ -682,10 +679,10 @@ function WorkspaceLayout({
     pendingCommentIdsRef.current.clear()
   }
 
-  // Verdict flow: capture THIS submission's annotations (the ones that will
-  // be committed to the submission row) as the serialized payload + a per-tool
-  // summary, then open the confirmation modal.
-  async function openVerdict(decision: 'APPROVED' | 'NEED_REVISION') {
+  // Submit Review flow: capture THIS submission's annotations (the ones that
+  // will be committed to the submission row) as the serialized payload + a
+  // per-tool summary, then open the review modal with no verdict preselected.
+  async function openSubmitReview() {
     const cap = annotationCapabilityRef.current
     let data: unknown = null
     let summary: AnnotationSummary = {}
@@ -707,7 +704,7 @@ function WorkspaceLayout({
         },
       )
     }
-    setVerdict({ decision, summary, data })
+    setVerdict({ decision: null, summary, data })
   }
 
   // Deselect the selected annotation when the user clicks anywhere in the
@@ -769,7 +766,10 @@ function WorkspaceLayout({
               {submission.chapter}
             </p>
           </div>
-          <SubmissionStatusBadge status={submission.status} />
+          <SubmissionStatusBadge
+            status={submission.status}
+            inReviewLabel={isStudent ? 'In Review' : 'For Review'}
+          />
         </div>
 
         {/* Draft save status (right of the stats) — REVIEWER ONLY */}
@@ -872,29 +872,19 @@ function WorkspaceLayout({
             <>
               <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
 
-              {/* Verdict actions — REVIEWER ONLY */}
+              {/* Submit Review — single reviewer entry point */}
               <button
                 type="button"
-                onClick={() => openVerdict('NEED_REVISION')}
-                disabled={!hasAnnotations}
-                title={
-                  hasAnnotations
-                    ? 'Request revisions to this submission'
-                    : 'Add annotations before requesting revisions'
-                }
-                className="flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[8px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] font-sans font-bold text-[11.5px] leading-[17px] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(245,158,11,0.4)] outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[rgba(245,158,11,0.08)]"
+                onClick={() => openSubmitReview()}
+                title="Review annotations and submit the chapter verdict"
+                className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] font-sans font-bold text-[11.5px] leading-[17px] text-white shadow-[0px_4px_7px_rgba(112,125,255,0.32)] hover:opacity-95 transition-opacity focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(165deg, #707dff 0%, #5565ff 100%)',
+                }}
               >
-                <RotateCcw className="size-[13px]" />
-                Request Revisions
-              </button>
-              <button
-                type="button"
-                onClick={() => openVerdict('APPROVED')}
-                title="Approve this submission"
-                className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#16a34a] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#15803d] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(22,163,74,0.4)] outline-none"
-              >
-                <Check className="size-[13px]" strokeWidth={2.5} />
-                Approve
+                <Send className="size-[13px]" />
+                Submit Review
               </button>
             </>
           )}

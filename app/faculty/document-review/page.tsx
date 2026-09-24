@@ -8,14 +8,9 @@ export default async function DocumentReviewPage() {
   const items: EvaluationItem[] = res.success && res.payload ? res.payload : []
 
   return (
-    <section className="min-h-full flex flex-col">
+    <section className="h-full flex flex-col">
       <PageLabel label="Document Review" />
-
-      <div className="flex-1 pb-[30px] flex flex-col min-h-0">
-        <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
-          <EvaluationTeamsView items={items} />
-        </div>
-      </div>
+      <EvaluationTeamsView items={items} />
     </section>
   )
 }

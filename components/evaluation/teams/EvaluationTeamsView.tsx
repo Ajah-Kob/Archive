@@ -32,7 +32,7 @@ const CHAPTER_OPTIONS = [
 
 const STATUS_FILTER_OPTIONS: ReadonlyArray<FilterOption> = [
   { value: 'all', label: 'All Status' },
-  { value: 'PENDING', label: 'Pending' },
+  { value: 'PENDING', label: 'For Review' },
   { value: 'NEED_REVISION', label: 'Need Revision' },
   { value: 'APPROVED', label: 'Approved' },
 ]
@@ -49,7 +49,7 @@ const TEAM_STATUS_STYLES = {
 
 function TeamsStatusBadge({ status }: { status: EvaluationItem['status'] }) {
   const labels = {
-    PENDING: 'In Review',
+    PENDING: 'For Review',
     NEED_REVISION: 'Needs Revision',
     APPROVED: 'Approved',
   } as const
@@ -195,49 +195,54 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
 
   if (items.length === 0) {
     return (
-      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
-        <EmptyState
-          heading="No Submissions Yet"
-          description="Documents submitted by the groups you advise will appear here for evaluation."
-          variant="card"
-        />
+      <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
+          <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
+            <EmptyState
+              heading="No Submissions Yet"
+              description="Documents submitted by the groups you advise will appear here for evaluation."
+              variant="card"
+            />
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <>
-      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
-        <div className="flex items-center gap-2.5 px-5 py-[12px] border-b border-[#f0f2fa] shrink-0">
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Search teams, chapters…"
-            ariaLabel="Search teams and chapters"
-            className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
-          />
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="w-full flex flex-wrap items-center gap-2.5 px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search teams, chapters…"
+          ariaLabel="Search teams and chapters"
+          className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+        />
 
-          <Filter
-            value={teamFilter}
-            options={teamOptions}
-            onChange={setTeamFilter}
-            ariaLabel="Filter by team"
-          />
-          <Filter
-            value={chapterFilter}
-            options={chapterOptions}
-            onChange={setChapterFilter}
-            ariaLabel="Filter by chapter"
-          />
-          <Filter
-            value={statusFilter}
-            options={STATUS_FILTER_OPTIONS}
-            onChange={(v) => setStatusFilter(v as StatusFilter)}
-            ariaLabel="Filter by status"
-          />
-        </div>
+        <Filter
+          value={teamFilter}
+          options={teamOptions}
+          onChange={setTeamFilter}
+          ariaLabel="Filter by team"
+        />
+        <Filter
+          value={chapterFilter}
+          options={chapterOptions}
+          onChange={setChapterFilter}
+          ariaLabel="Filter by chapter"
+        />
+        <Filter
+          value={statusFilter}
+          options={STATUS_FILTER_OPTIONS}
+          onChange={(v) => setStatusFilter(v as StatusFilter)}
+          ariaLabel="Filter by status"
+        />
+      </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
+        <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto">
           <div
             className={`grid ${GRID_COLS} items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0`}
           >
@@ -354,6 +359,7 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
               </div>
             ))
           )}
+          </div>
         </div>
       </div>
 
@@ -361,6 +367,6 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
         submission={detailsTarget}
         onClose={() => setDetailsTarget(null)}
       />
-    </>
+    </div>
   )
 }

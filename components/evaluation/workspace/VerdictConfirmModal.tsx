@@ -7,7 +7,6 @@ import {
   Highlighter,
   Loader2,
   Pen,
-  RotateCcw,
   StickyNote,
   Strikethrough,
   Type,
@@ -39,11 +38,50 @@ const SUMMARY_ROWS: ReadonlyArray<{
 const COMMIT_FAILED_WARNING =
   'Your verdict was saved, but your annotations could not be committed. The draft will be committed on a later visit.'
 
+type ChapterVerdict = 'APPROVED' | 'NEED_REVISION'
+
+const VERDICT_OPTIONS: ReadonlyArray<{
+  value: ChapterVerdict
+  label: string
+  description: string
+  border: string
+  bg: string
+  circleBorder: string
+  circleBg: string
+  buttonGradient: string
+  buttonShadow: string
+}> = [
+  {
+    value: 'APPROVED',
+    label: 'Approved',
+    description: 'The chapter is approved as-is.',
+    border: 'border-[#16a34a]',
+    bg: 'bg-[rgba(22,163,74,0.08)]',
+    circleBorder: 'border-[#16a34a]',
+    circleBg: 'bg-[#16a34a]',
+    buttonGradient:
+      'linear-gradient(103.38deg, rgb(22, 163, 74) 0%, rgb(18, 140, 63) 99.93%)',
+    buttonShadow: 'drop-shadow-[0px_3px_4px_rgba(22,163,74,0.22)]',
+  },
+  {
+    value: 'NEED_REVISION',
+    label: 'Need Revision',
+    description: 'Changes are required before approval.',
+    border: 'border-[#f59e0b]',
+    bg: 'bg-[rgba(245,158,11,0.08)]',
+    circleBorder: 'border-[#f59e0b]',
+    circleBg: 'bg-[#f59e0b]',
+    buttonGradient:
+      'linear-gradient(104.12deg, rgb(245, 158, 11) 5.11%, rgb(218, 140, 7) 99.93%)',
+    buttonShadow: 'drop-shadow-[0px_3px_4px_rgba(245,158,11,0.22)]',
+  },
+]
+
 interface VerdictConfirmModalProps {
   /** MilestoneSubmission id being reviewed. */
   submissionId: number
-  /** The verdict being confirmed. */
-  decision: 'APPROVED' | 'NEED_REVISION'
+  /** Initial verdict selection (null = choose inside the modal). */
+  decision: ChapterVerdict | null
   /** Annotation counts per tool type ({ highlight, text, ink, freeText, strikeout }). */
   annotationSummary?: AnnotationSummary
   /**
@@ -85,12 +123,14 @@ export function VerdictConfirmModal({
   onCommitted,
 }: VerdictConfirmModalProps) {
   const [busy, setBusy] = useState(false)
+  const [selected, setSelected] =
+    useState<ChapterVerdict | null>(decision)
 
-  const isRevision = decision === 'NEED_REVISION'
   const totalCount = SUMMARY_ROWS.reduce(
     (sum, row) => sum + (annotationSummary[row.key] ?? 0),
     0,
   )
+  const selectedOption = VERDICT_OPTIONS.find((o) => o.value === selected)
 
   // Close on Escape while open (matches DetailPanel/VersionDrawer behavior).
   useEffect(() => {
@@ -102,12 +142,13 @@ export function VerdictConfirmModal({
   }, [busy, onClose])
 
   async function confirm() {
+    if (!selected || busy) return
     setBusy(true)
 
     // 1. Record the verdict first — this is the source of truth.
     let review
     try {
-      review = await reviewSubmission(submissionId, decision, null)
+      review = await reviewSubmission(submissionId, selected, null)
     } catch (error) {
       console.error('[VerdictConfirmModal] reviewSubmission failed:', error)
       setBusy(false)
@@ -160,12 +201,11 @@ export function VerdictConfirmModal({
               id="verdict-confirm-title"
               className="font-heading font-bold text-[17px] leading-[25.5px] text-[#12143a] tracking-[-0.17px]"
             >
-              {isRevision ? 'Request Revisions' : 'Approve Submission'}
+              Submit Review
             </h3>
             <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pt-[4px]">
-              {isRevision
-                ? 'The group will be asked to revise the document based on your feedback.'
-                : 'The group will be notified that this submission is approved.'}
+              Review your annotations, then select the final verdict for this
+              chapter.
             </p>
           </div>
           <button
@@ -213,12 +253,61 @@ export function VerdictConfirmModal({
             )}
           </div>
 
-          <div className="bg-[#f8f9ff] border border-[#eef0fb] rounded-[9px] px-[14px] py-[12px]">
-            <p className="font-sans font-medium text-[12.5px] leading-[19px] text-[#3d4566]">
-              {isRevision
-                ? 'Are you sure you want to request a revision? Your annotations on this document will be saved.'
-                : 'Are you sure you want to approve this document? Your annotations on this document will be saved.'}
-            </p>
+          <div className="flex flex-col gap-[10px]">
+            <SectionHeading>Chapter Document Verdict</SectionHeading>
+            <div className="flex flex-col gap-[8px]" role="radiogroup" aria-label="Chapter verdict">
+              {VERDICT_OPTIONS.map((opt) => {
+                const isSelected = selected === opt.value
+                const disabled =
+                  busy ||
+                  (opt.value === 'NEED_REVISION' && totalCount === 0)
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => setSelected(opt.value)}
+                    disabled={disabled}
+                    title={
+                      opt.value === 'NEED_REVISION' && totalCount === 0
+                        ? 'Add at least one annotation to request a revision'
+                        : undefined
+                    }
+                    className={`flex items-center gap-[12px] w-full text-left rounded-[10px] border px-[14px] py-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      isSelected
+                        ? `${opt.border} ${opt.bg}`
+                        : 'border-[#eceef8] bg-white hover:bg-[#fafbff]'
+                    }`}
+                  >
+                    <span
+                      className={`flex size-[22px] items-center justify-center rounded-full border shrink-0 ${
+                        isSelected
+                          ? `${opt.circleBorder} ${opt.circleBg} text-white`
+                          : 'border-[#eceef8] bg-[#fafbff] text-[#bbc0d8]'
+                      }`}
+                    >
+                      {isSelected ? (
+                        <Check className="size-[12px]" strokeWidth={2.5} />
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="font-sans font-bold text-[13px] leading-[19px] text-[#12143a]">
+                        {opt.label}
+                      </span>
+                      <span className="block font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
+                        {opt.description}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            {totalCount === 0 && (
+              <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
+                Add at least one annotation to enable the Need Revision verdict.
+              </p>
+            )}
           </div>
         </div>
 
@@ -234,21 +323,21 @@ export function VerdictConfirmModal({
           <button
             type="button"
             onClick={confirm}
-            disabled={busy}
-            className={`flex items-center justify-center gap-[6px] h-[36px] px-[16px] rounded-[9px] font-sans font-bold text-[12px] transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 outline-none ${
-              isRevision
-                ? 'bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.14)] focus-visible:ring-[rgba(245,158,11,0.4)]'
-                : 'bg-[#16a34a] text-white hover:bg-[#15803d] focus-visible:ring-[rgba(22,163,74,0.4)]'
-            }`}
+            disabled={busy || !selected}
+            className={`flex items-center justify-center gap-[6px] h-[36px] px-[16px] rounded-[9px] border text-white font-sans font-bold text-[12px] transition-opacity hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 outline-none ${selectedOption?.buttonShadow ?? ''}`}
+            style={{
+              backgroundImage:
+                selectedOption?.buttonGradient ??
+                'linear-gradient(135deg, #707dff 0%, #5565ff 100%)',
+              borderColor: 'rgba(255,255,255,0.4)',
+            }}
           >
             {busy ? (
               <Loader2 className="size-[13px] animate-spin" />
-            ) : isRevision ? (
-              <RotateCcw className="size-[13px]" />
             ) : (
               <Check className="size-[13px]" strokeWidth={2.5} />
             )}
-            {isRevision ? 'Yes, Request Revision' : 'Yes, Approve'}
+            Submit Review
           </button>
         </div>
       </div>

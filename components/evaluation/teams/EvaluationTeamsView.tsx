@@ -267,7 +267,17 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
             filtered.map((item) => (
               <div
                 key={item.id}
-                className={`w-full grid ${GRID_COLS} items-center px-[20px] h-[58px] border-b border-[#f0f2fa] last:border-b-0 hover:bg-slate-50/60 transition-colors`}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open details for ${item.groupName} ${item.chapter}`}
+                onClick={() => setDetailsTarget(item)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  setDetailsTarget(item)
+                }}
+                className={`w-full grid ${GRID_COLS} items-center px-[20px] h-[58px] border-b border-[#f0f2fa] last:border-b-0 hover:bg-slate-50/60 transition-colors cursor-pointer`}
               >
                 <span className="min-w-0 pr-4">
                   <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
@@ -312,9 +322,10 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
                   {item.status === 'PENDING' ? (
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(event) => {
+                        event.stopPropagation()
                         router.push(`/faculty/document-review/${item.id}`)
-                      }
+                      }}
                       title="Evaluate Document"
                       aria-label={`Evaluate ${item.groupName} ${item.chapter}`}
                       className="flex items-center gap-[5px] h-[28px] px-[11px] bg-[#707dff] rounded-[7px] font-sans font-semibold text-[11px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-1"
@@ -328,7 +339,10 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setDetailsTarget(item)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setDetailsTarget(item)
+                      }}
                       title="View Details"
                       aria-label={`View details of ${item.groupName} ${item.chapter}`}
                       className="flex items-center justify-center size-[30px] rounded-[8px] border bg-white border-[#e8ebf8] text-[#5a6382] hover:bg-gray-50 transition-colors"

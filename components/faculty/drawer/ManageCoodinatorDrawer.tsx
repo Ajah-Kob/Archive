@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AvailableFacultyList } from '@/components/faculty/drawer/AvaiableFacultyList'
 import { AvailableFacultySkeleton } from '@/components/faculty/drawer/AvailableFacultySkeleton'
-import { DrawerHeader } from '@/components/faculty/drawer/DrawerHeader'
+import { Drawer } from '@/components/ui/Drawer'
 import { useCoordinatorDrawer } from '@/store/useCoordinatorDrawer'
 import { getInitials } from '@/lib/helper'
 import { getAvailableFaculty } from '@/lib/actions/faculty'
@@ -32,11 +32,18 @@ export function ManageCoodinatorDrawer() {
 
   useEffect(() => {
     if (!isOpen) return
-    setLoading(true)
-    Promise.all([
-      getAvailableFaculty(),
-      getPendingCoordinatorInvitations('COORDINATOR'),
-    ]).then(([facultyRes, invitesRes]) => {
+
+    let cancelled = false
+
+    async function loadDrawerData() {
+      if (cancelled) return
+      setLoading(true)
+      setData(null)
+      const [facultyRes, invitesRes] = await Promise.all([
+        getAvailableFaculty(),
+        getPendingCoordinatorInvitations('COORDINATOR'),
+      ])
+      // Preserve the existing unguarded late-response behavior.
       if (!facultyRes.success) toast.error(facultyRes.message)
       if (!invitesRes.success) toast.error(invitesRes.message)
       setData({
@@ -44,22 +51,16 @@ export function ManageCoodinatorDrawer() {
         pendingInvitations: invitesRes.payload ?? [],
       })
       setLoading(false)
-    })
-  }, [isOpen])
+    }
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
-    }
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = 'hidden'
-    }
+    queueMicrotask(() => {
+      if (!cancelled) void loadDrawerData()
+    })
+
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = ''
+      cancelled = true
     }
-  }, [isOpen, close])
+  }, [isOpen])
 
   const availableFacultyList = useMemo(
     () =>
@@ -68,28 +69,19 @@ export function ManageCoodinatorDrawer() {
         initials: getInitials(faculty.user.name),
         name: faculty.user.name,
         email: faculty.user.email,
-        gradient: (faculty.user as any).avatarGradient,
+        gradient: faculty.user.avatarGradient,
       })),
     [data?.availableFaculty],
   )
 
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-40 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] transition-all duration-300 ${
-          isOpen
-            ? 'opacity-100 pointer-events-auto'
-            : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={close}
+    <Drawer open={isOpen} onClose={close} size="sm">
+      <Drawer.Header
+        title="Manage Coordinators"
+        subtitle="Assign faculty to coordinate sections."
       />
-      <div
-        className={`fixed top-0 right-0 h-dvh w-[500px] z-50 bg-white shadow-[0_0_24px_rgba(0,0,0,0.12)] transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <DrawerHeader />
-        <div className="flex flex-col px-6 overflow-y-auto h-[calc(100dvh-57px)]">
+      <Drawer.Body>
+        <div className="flex flex-col px-6">
           {loading ? (
             <AvailableFacultySkeleton />
           ) : (
@@ -99,7 +91,7 @@ export function ManageCoodinatorDrawer() {
             />
           )}
         </div>
-      </div>
-    </>
+      </Drawer.Body>
+    </Drawer>
   )
 }

@@ -1,15 +1,15 @@
 'use client'
 
-import { createContext, use, useEffect } from 'react'
+import { createContext, use } from 'react'
 import {
   Calendar,
   Clock,
   Crown,
   MapPin,
   Trash2,
-  X,
 } from 'lucide-react'
 import type { DefenseType, DefenseVerdict } from '@prisma/client'
+import { Drawer } from '@/components/ui/Drawer'
 import type {
   DefensePanelistPayload,
   DefenseSchedulePayload,
@@ -78,8 +78,8 @@ const VERDICT_META: Record<DefenseVerdict, { label: string; className: string }>
       className:
         'bg-[rgba(225,104,29,0.07)] border border-[rgba(225,104,29,0.2)] text-[#e1681d]',
     },
-    REJECTED: {
-      label: 'Rejected',
+    REDEFENSE: {
+      label: 'Redefense',
       className:
         'bg-[rgba(225,29,72,0.07)] border border-[rgba(225,29,72,0.2)] text-[#e11d48]',
     },
@@ -351,35 +351,17 @@ function PanelistsSection() {
   )
 }
 
-function DefenseDetailsHeader() {
-  const { onClose } = useDefenseDetails()
-  return (
-    <div className="flex self-stretch items-center justify-between gap-[12px] px-[22px] py-4 border-b border-[#f0f2fa] shrink-0">
-      <h2 className="font-heading font-bold text-[14px] leading-[21px] text-[#10133a]">
-        Defense Details
-      </h2>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close defense details"
-        className="bg-[#fafbff] border border-[#eceef8] rounded-[14px] size-[28px] flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
-      >
-        <X className="size-[13px] text-[#8a93b4]" />
-      </button>
-    </div>
-  )
-}
-
 // Only shown for schedules created by the current user (ownership rule) — now delete-only.
 function DefenseDetailsFooter() {
   const { schedule, isOwner, onDelete } = useDefenseDetails()
   if (!schedule || !isOwner) return null
 
   return (
-    <div className="flex items-center gap-2.5 border-t border-[#f0f2fa] px-5 py-3.5 shrink-0">
+    <div className="flex items-center gap-2.5">
       <button
         type="button"
         onClick={() => onDelete(schedule)}
+        aria-label="Delete defense schedule"
         className="flex flex-1 items-center justify-center gap-2 h-10 rounded-[10px] bg-red-50 border border-red-200 text-[13px] font-bold text-red-500 hover:bg-red-100 transition-colors"
       >
         <Trash2 className="size-4" strokeWidth={2.25} />
@@ -401,54 +383,36 @@ export function DefenseDetailsDrawer({
   // payload id is a number — coerce both sides (same rule as DefenseDataRow).
   const isOwner =
     schedule != null && Number(schedule.createdById) === Number(currentUserId)
-  const isOpen = schedule != null
-
-  // Escape closes; body scroll locks while the drawer is open (matches the
-  // existing faculty/evaluation drawers).
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = ''
-    }
-  }, [isOpen, onClose])
 
   return (
     <DefenseDetailsContext
       value={{ schedule, isOwner, onClose, onDelete }}
     >
-      <div
-        className={`fixed inset-0 z-40 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] transition-all duration-300 ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Defense details"
-        className={`fixed top-0 right-0 h-dvh w-[420px] max-w-full z-50 bg-white border-l border-[#eceef8] shadow-[-8px_0px_40px_rgba(112,125,255,0.14)] transition-transform duration-300 flex flex-col ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+      <Drawer
+        open={schedule != null}
+        onClose={onClose}
+        size="sm"
+        className="w-full! sm:w-[420px]!"
       >
-        <DefenseDetailsHeader />
-        <div className="flex-1 min-h-0 overflow-y-auto p-5">
-          {schedule && (
-            <div className="flex flex-col gap-[22px]">
+        <Drawer.Header
+          title="Defense Details"
+          subtitle="Schedule, venue, and panelist assignments."
+        />
+        <Drawer.Body>
+          {schedule ? (
+            <div className="flex flex-col gap-[22px] p-5">
               <GroupInfoCard />
               <ScheduleSection />
               <PanelistsSection />
             </div>
-          )}
-        </div>
-        <DefenseDetailsFooter />
-      </div>
+          ) : null}
+        </Drawer.Body>
+        {schedule && isOwner ? (
+          <Drawer.Footer>
+            <DefenseDetailsFooter />
+          </Drawer.Footer>
+        ) : null}
+      </Drawer>
     </DefenseDetailsContext>
   )
 }

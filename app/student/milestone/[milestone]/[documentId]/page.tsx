@@ -56,10 +56,17 @@ export default async function StudentDefenseWorkspacePage({
   const id = parseInt(documentId, 10)
   if (Number.isNaN(id)) notFound()
 
-  const [detailRes, annotationsRes, versionsRes] = await Promise.all([
-    getStudentDefenseDetail(id),
-    getStudentDefenseAnnotations(id),
-    getStudentDefenseVersionList(id),
+  // Live schedule first; fall back to read-only history (soft-deleted
+  // Redefense schedule with a submitted verdict).
+  let detailRes = await getStudentDefenseDetail(id)
+  let isHistory = false
+  if (!detailRes.success || !detailRes.payload) {
+    detailRes = await getStudentDefenseDetail(id, true)
+    isHistory = detailRes.success && !!detailRes.payload
+  }
+  const [annotationsRes, versionsRes] = await Promise.all([
+    getStudentDefenseAnnotations(id, isHistory),
+    getStudentDefenseVersionList(id, isHistory),
   ])
 
   const detail =
@@ -133,6 +140,7 @@ export default async function StudentDefenseWorkspacePage({
       versions={versions}
       backHref={`/student/milestone/${milestone}`}
       scheduleId={detail.scheduleId}
+      readOnly={isHistory}
     />
   )
 }

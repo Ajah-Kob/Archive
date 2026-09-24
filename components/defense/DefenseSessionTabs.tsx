@@ -211,6 +211,8 @@ export interface DefenseSessionTabsRootProps {
   defaultTab?: DefenseSessionTabKey
   initial?: DocumentHistoryItem | null
   resubmissions?: DocumentHistoryItem[]
+  /** Past defenses' initial documents, loaded server-side with the page (no pop-in). */
+  pastInitials?: DocumentHistoryItem[]
   scheduleId?: number
   session?: DefenseSessionPayload
   className?: string
@@ -231,6 +233,7 @@ export function DefenseSessionTabsRoot({
   defaultTab = 'session',
   initial,
   resubmissions,
+  pastInitials = [],
   scheduleId,
   session,
   className,
@@ -251,6 +254,8 @@ export function DefenseSessionTabsRoot({
         : []
   const resolvedScheduleId =
     scheduleId !== undefined ? scheduleId : session ? session.id : undefined
+
+
 
   // Active tab derived from pathname segment: /session or /resubmission
   // Fallback to ?tab= query for bookmark compat, then defaultTab.
@@ -350,6 +355,7 @@ export function DefenseSessionTabsRoot({
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         initial={resolvedInitial}
+        pastInitials={pastInitials}
         resubmissions={resolvedResubmissions}
         scheduleId={resolvedScheduleId}
       />

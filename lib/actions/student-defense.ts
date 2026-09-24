@@ -54,6 +54,7 @@ export interface DefensePanelistItem {
   name: string
   email: string
   image: string | null
+  avatarGradient?: string | null
   role: PanelistRole
   /**
    * Counts from the initial submission's COMMITTED annotation rows only.
@@ -179,7 +180,7 @@ async function getStudentDefenseSessionData(
       },
       panelists: {
         where: { deletedAt: null },
-        include: { user: { select: { id: true, name: true, email: true, image: true } } },
+        include: { user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } } },
         orderBy: { role: 'asc' },
       },
       submissions: {
@@ -251,6 +252,7 @@ async function getStudentDefenseSessionData(
         name: p.user.name,
         email: p.user.email,
         image: p.user.image,
+        avatarGradient: (p.user as { avatarGradient?: string | null }).avatarGradient ?? null,
         role: p.role,
         feedback: fb
           ? { comments: fb.comments, pages: fb.pages, hasCommitted: true }
@@ -830,6 +832,8 @@ export interface StudentDefenseDetail {
   status: string
   isCurrent: boolean
   reviewedAt: string | null
+  /** True when served from a soft-deleted (past Redefense) schedule. */
+  isHistory?: boolean
 }
 
 // Resolves the calling student's live group, mirrors student-review.ts.
@@ -857,14 +861,26 @@ async function requireStudentGroup() {
 
 // Ownership scope for defense submissions: schedule.group must match student's group.
 // Includes soft-deleted versions so history remains viewable, mirrors findGroupSubmission.
-async function findStudentDefenseSubmission(submissionId: number, groupId: number) {
+// With allowHistory, matches ONLY soft-deleted schedules with a submitted
+// verdict (past Redefense cycles) — live schedules keep the strict path.
+async function findStudentDefenseSubmission(
+  submissionId: number,
+  groupId: number,
+  allowHistory = false,
+) {
   return prisma.defenseSubmission.findFirst({
     where: {
       id: submissionId,
-      schedule: {
-        deletedAt: null,
-        group: { id: groupId, deletedAt: null },
-      },
+      schedule: allowHistory
+        ? {
+            deletedAt: { not: null },
+            verdict: { not: 'PENDING' },
+            group: { id: groupId, deletedAt: null },
+          }
+        : {
+            deletedAt: null,
+            group: { id: groupId, deletedAt: null },
+          },
     },
     select: { id: true, scheduleId: true },
   })
@@ -939,6 +955,7 @@ async function getStudentDefenseDetailData(
   submissionId: number,
   groupId: number,
   userId: number,
+  allowHistory = false,
 ): Promise<{ success: boolean; message: string; payload: StudentDefenseDetail | null }> {
   'use cache'
   cacheTag(`defense-student-detail-${submissionId}-${userId}`)
@@ -949,10 +966,16 @@ async function getStudentDefenseDetailData(
     const submission = await prisma.defenseSubmission.findFirst({
       where: {
         id: submissionId,
-        schedule: {
-          deletedAt: null,
-          group: { id: groupId, deletedAt: null },
-        },
+        schedule: allowHistory
+          ? {
+              deletedAt: { not: null },
+              verdict: { not: 'PENDING' },
+              group: { id: groupId, deletedAt: null },
+            }
+          : {
+              deletedAt: null,
+              group: { id: groupId, deletedAt: null },
+            },
       },
       include: {
         schedule: {
@@ -970,7 +993,10 @@ async function getStudentDefenseDetailData(
     if (!submission) {
       return { success: false, message: 'Submission not found.', payload: null }
     }
-    const payload = toStudentDefenseDetailPayload(submission as never)
+    const payload = {
+      ...toStudentDefenseDetailPayload(submission as never),
+      isHistory: allowHistory,
+    }
     return { success: true, message: '', payload }
   } catch (error) {
     console.error('[getStudentDefenseDetail | Error]:', error)
@@ -980,10 +1006,12 @@ async function getStudentDefenseDetailData(
 
 // Single defense submission detail for the student's own group — any version,
 // current or superseded. Mirrors getStudentVersionDetail / getVersionDetail.
-export async function getStudentDefenseDetail(submissionId: number) {
+// With allowHistory, also serves submissions on soft-deleted (past Redefense)
+// schedules with submitted verdicts.
+export async function getStudentDefenseDetail(submissionId: number, allowHistory = false) {
   const ctx = await requireStudentGroup()
   if (!ctx) return { ...unauthorized, payload: null }
-  return getStudentDefenseDetailData(submissionId, ctx.groupId, ctx.userId)
+  return getStudentDefenseDetailData(submissionId, ctx.groupId, ctx.userId, allowHistory)
 }
 
 // ───────────────────── Student defense annotations (merged) ───────────────
@@ -1001,6 +1029,7 @@ async function getStudentDefenseAnnotationsData(
   submissionId: number,
   groupId: number,
   userId: number,
+  allowHistory = false,
 ) {
   'use cache'
   cacheTag(`defense-student-annotations-${submissionId}-${userId}`)
@@ -1008,7 +1037,11 @@ async function getStudentDefenseAnnotationsData(
   cacheLife('max')
 
   try {
-    const submission = await findStudentDefenseSubmission(submissionId, groupId)
+    const submission = await findStudentDefenseSubmission(
+      submissionId,
+      groupId,
+      allowHistory,
+    )
     if (!submission) {
       return {
         success: false,
@@ -1046,10 +1079,10 @@ async function getStudentDefenseAnnotationsData(
 // merged across all panelist authors. DRAFT rows are never exposed and only
 // COMMITTED rows are flattened. Each annotation carries isVisible (default
 // true) so the student CommentsPanel can render the visibility toggle state.
-export async function getStudentDefenseAnnotations(submissionId: number) {
+export async function getStudentDefenseAnnotations(submissionId: number, allowHistory = false) {
   const ctx = await requireStudentGroup()
   if (!ctx) return { ...unauthorized, payload: null }
-  return getStudentDefenseAnnotationsData(submissionId, ctx.groupId, ctx.userId)
+  return getStudentDefenseAnnotationsData(submissionId, ctx.groupId, ctx.userId, allowHistory)
 }
 
 // ───────────────────── Student versions list (defense) ─────────────────────
@@ -1068,13 +1101,18 @@ async function getStudentDefenseVersionListData(
   submissionId: number,
   groupId: number,
   userId: number,
+  allowHistory = false,
 ) {
   'use cache'
   cacheTag(`defense-student-versions-${submissionId}-${userId}`)
   cacheLife('max')
 
   try {
-    const submission = await findStudentDefenseSubmission(submissionId, groupId)
+    const submission = await findStudentDefenseSubmission(
+      submissionId,
+      groupId,
+      allowHistory,
+    )
     if (!submission) {
       return {
         success: false,
@@ -1120,10 +1158,10 @@ async function getStudentDefenseVersionListData(
   }
 }
 
-export async function getStudentDefenseVersionList(submissionId: number) {
+export async function getStudentDefenseVersionList(submissionId: number, allowHistory = false) {
   const ctx = await requireStudentGroup()
   if (!ctx) return { ...unauthorized, payload: null }
-  return getStudentDefenseVersionListData(submissionId, ctx.groupId, ctx.userId)
+  return getStudentDefenseVersionListData(submissionId, ctx.groupId, ctx.userId, allowHistory)
 }
 
 

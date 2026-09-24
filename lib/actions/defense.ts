@@ -56,7 +56,7 @@ function resolvePanelistFeedbackFromAnnotations(
 }
 
 function toPanelistPayload(
-  p: { userId: number; name: string; email: string; image: string | null; role: PanelistRole },
+  p: { userId: number; name: string; email: string; image: string | null; avatarGradient?: string | null; role: PanelistRole },
   verdict: DefenseVerdict,
   annotationRows: Array<{ status: string; data: unknown }> = [],
 ): DefensePanelistPayload {
@@ -65,6 +65,7 @@ function toPanelistPayload(
     name: p.name,
     email: p.email,
     image: p.image,
+    avatarGradient: p.avatarGradient ?? null,
     role: p.role,
     feedback: resolvePanelistFeedbackFromAnnotations(annotationRows),
   }
@@ -73,7 +74,7 @@ function toPanelistPayload(
 function mapGroupMembers(
   students: Array<{
     id: number
-    user: { id: number; name: string; email: string; image: string | null }
+    user: { id: number; name: string; email: string; image: string | null; avatarGradient?: string | null }
   }>,
   leaderStudentId: number | null | undefined,
 ): DefenseMemberPayload[] {
@@ -82,6 +83,7 @@ function mapGroupMembers(
     name: s.user.name,
     email: s.user.email,
     image: s.user.image,
+    avatarGradient: s.user.avatarGradient ?? null,
     isLeader: leaderStudentId != null && s.id === leaderStudentId,
   }))
   const leader = mapped.filter((m) => m.isLeader)
@@ -146,6 +148,7 @@ export interface DefensePanelistPayload {
   name: string
   email: string
   image: string | null
+  avatarGradient?: string | null
   role: PanelistRole
   feedback?: { comments: number; pages: number; hasCommitted?: boolean; hasDraft?: boolean } | null
 }
@@ -155,6 +158,7 @@ export interface DefenseMemberPayload {
   name: string
   email: string
   image: string | null
+  avatarGradient?: string | null
   isLeader: boolean
 }
 
@@ -201,14 +205,14 @@ async function getDefenseSchedulesData() {
           },
           students: {
             where: { deletedAt: null },
-            include: { user: { select: { id: true, name: true, email: true, image: true } } },
+            include: { user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } } },
             orderBy: { id: 'asc' },
           },
         },
       },
       panelists: {
         where: { deletedAt: null },
-        include: { user: { select: { id: true, name: true, email: true, image: true } } },
+        include: { user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } } },
         orderBy: { role: 'asc' },
       },
       createdByUser: { select: { id: true, name: true } },
@@ -233,14 +237,14 @@ async function getDefenseSchedulesData() {
       createdByName: s.createdByUser.name,
       panelists: s.panelists.map((p) =>
         toPanelistPayload(
-          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
+          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
           s.verdict,
         ),
       ),
       members: mapGroupMembers(
         s.group.students as unknown as Array<{
           id: number
-          user: { id: number; name: string; email: string; image: string | null }
+          user: { id: number; name: string; email: string; image: string | null; avatarGradient: string | null }
         }>,
         s.group.leaderStudentId,
       ),
@@ -304,14 +308,14 @@ async function getMyDefenseSchedulesData(
           },
           students: {
             where: { deletedAt: null },
-            include: { user: { select: { id: true, name: true, email: true, image: true } } },
+            include: { user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } } },
             orderBy: { id: 'asc' },
           },
         },
       },
       panelists: {
         where: { deletedAt: null },
-        include: { user: { select: { id: true, name: true, email: true, image: true } } },
+        include: { user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } } },
         orderBy: { role: 'asc' },
       },
       createdByUser: { select: { id: true, name: true } },
@@ -336,14 +340,14 @@ async function getMyDefenseSchedulesData(
       createdByName: s.createdByUser.name,
       panelists: s.panelists.map((p) =>
         toPanelistPayload(
-          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
+          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
           s.verdict,
         ),
       ),
       members: mapGroupMembers(
         s.group.students as unknown as Array<{
           id: number
-          user: { id: number; name: string; email: string; image: string | null }
+          user: { id: number; name: string; email: string; image: string | null; avatarGradient: string | null }
         }>,
         s.group.leaderStudentId,
       ),
@@ -528,9 +532,9 @@ export interface DefenseWizardGroup {
   id: number
   name: string
   sectionId: number
+  hasSchedule: boolean
   /** Defense types with a live schedule — drives per-type eligibility. */
   scheduledTypes: DefenseType[]
-  hasSchedule: boolean
 }
 
 export interface DefenseWizardOptionsPayload {
@@ -574,11 +578,11 @@ async function getDefenseWizardOptionsData(
       s.groups.map((g) => ({
         id: g.id,
         name: g.groupName,
+        sectionId: s.id,
+        hasSchedule: g.defenseSchedules.length > 0,
         scheduledTypes: Array.from(
           new Set(g.defenseSchedules.map((d) => d.type)),
         ),
-        sectionId: s.id,
-        hasSchedule: g.defenseSchedules.length > 0,
       })),
     ),
   }
@@ -639,11 +643,11 @@ export async function createDefenseSchedule(
   if (!group) {
     return { success: false, message: 'Group not found.' }
   }
+
   const type = formData.get('type')?.toString() ?? ''
   if (!DEFENSE_TYPES.includes(type as DefenseType)) {
     return { success: false, message: 'Invalid defense type.' }
   }
-
 
   const existing = await prisma.defenseSchedule.findFirst({
     where: { groupId, type: type as DefenseType, deletedAt: null },
@@ -1105,6 +1109,129 @@ export async function rescheduleForRedefense(
   }
 }
 
+// ───────────────────────────── Defense history (read-only reference) ─────────
+
+/**
+ * Lists a group's past (soft-deleted) defense schedules with submitted
+ * verdicts, newest first, each with its submissions for reference.
+ * Visible to group members, the section coordinator, panelists, admins,
+ * and the program chair. Everything served here is read-only.
+ */
+export async function getPastDefenseSchedules(groupId: number) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return { success: false, payload: null, message: 'Not authorized' }
+  }
+  if (!Number.isInteger(groupId)) {
+    return { success: false, payload: null, message: 'Invalid group.' }
+  }
+  const userId = +session.user.id
+
+  try {
+    const group = await prisma.group.findFirst({
+      where: { id: groupId, deletedAt: null },
+      select: {
+        id: true,
+        section: {
+          select: {
+            coordinator: {
+              select: { faculty: { select: { userId: true } } },
+            },
+          },
+        },
+        students: {
+          where: { deletedAt: null },
+          select: { userId: true },
+        },
+      },
+    })
+    if (!group) {
+      return { success: false, payload: null, message: 'Group not found.' }
+    }
+
+    const role = (session.user as { role?: string }).role
+    const isAdminLike =
+      role === 'SUPERADMIN' ||
+      role === 'ADMIN' ||
+      (await requireAdminOrProgramChair()) !== null
+    const isMember = group.students.some((s) => s.userId === userId)
+    const isCoordinator =
+      group.section?.coordinator?.faculty?.userId === userId
+    const isPanelist =
+      !isMember && !isCoordinator && !isAdminLike
+        ? (await prisma.defensePanelist.findFirst({
+            where: {
+              userId,
+              deletedAt: null,
+              defenseSchedule: { groupId, deletedAt: null },
+            },
+            select: { id: true },
+          })) !== null
+        : false
+
+    if (!isAdminLike && !isMember && !isCoordinator && !isPanelist) {
+      return { success: false, payload: null, message: 'Not authorized' }
+    }
+
+    const schedules = await prisma.defenseSchedule.findMany({
+      where: {
+        groupId,
+        deletedAt: { not: null },
+        verdict: { not: 'PENDING' },
+      },
+      select: {
+        id: true,
+        type: true,
+        date: true,
+        venue: true,
+        verdict: true,
+        verdictSubmittedAt: true,
+        deletedAt: true,
+        submissions: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            version: true,
+            isInitial: true,
+            fileName: true,
+            blobUrl: true,
+            size: true,
+            createdAt: true,
+            user: { select: { name: true } },
+          },
+          orderBy: { version: 'desc' },
+        },
+      },
+      orderBy: { date: 'desc' },
+    })
+
+    return {
+      success: true,
+      payload: schedules.map((s) => ({
+        id: s.id,
+        type: s.type,
+        date: s.date.toISOString(),
+        venue: s.venue,
+        verdict: s.verdict,
+        verdictSubmittedAt: s.verdictSubmittedAt?.toISOString() ?? null,
+        submissions: s.submissions.map((sub) => ({
+          id: sub.id,
+          version: sub.version,
+          isInitial: sub.isInitial,
+          fileName: sub.fileName,
+          blobUrl: sub.blobUrl,
+          size: sub.size,
+          submittedByName: sub.user?.name ?? 'Unknown',
+          dateSubmitted: sub.createdAt.toISOString(),
+        })),
+      })),
+    }
+  } catch (error) {
+    console.error('[getPastDefenseSchedules | Error]:', error)
+    return { success: false, payload: null, message: 'Failed to load defense history.' }
+  }
+}
+
 // ───────────────────────────── Chair verdict (awaiting-chair callout) ───────────
 
 const CHAIR_VERDICTS: DefenseVerdict[] = ['APPROVED', 'MINOR_REVISION', 'MAJOR_REVISION', 'REDEFENSE']
@@ -1419,14 +1546,14 @@ async function getDefenseSessionData(
           },
           students: {
             where: { deletedAt: null },
-            include: { user: { select: { id: true, name: true, email: true, image: true } } },
+            include: { user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } } },
             orderBy: { id: 'asc' },
           },
         },
       },
       panelists: {
         where: { deletedAt: null },
-        include: { user: { select: { id: true, name: true, email: true, image: true } } },
+        include: { user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } } },
         orderBy: { role: 'asc' },
       },
       createdByUser: { select: { id: true, name: true } },
@@ -1490,7 +1617,7 @@ async function getDefenseSessionData(
       }
       return schedule.panelists.map((p) =>
         toPanelistPayload(
-          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, role: p.role },
+          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
           schedule.verdict,
           byAuthor.get(p.userId) ?? [],
         ),
@@ -1499,7 +1626,7 @@ async function getDefenseSessionData(
     members: mapGroupMembers(
       schedule.group.students as unknown as Array<{
         id: number
-        user: { id: number; name: string; email: string; image: string | null }
+        user: { id: number; name: string; email: string; image: string | null; avatarGradient: string | null }
       }>,
       schedule.group.leaderStudentId,
     ),

@@ -13,16 +13,29 @@ const tag = (submissionId: number, authorId?: number) =>
 
 // Verifies the submission belongs to a schedule where the caller is a panelist.
 // Every hop filters deletedAt:null — mirrors findAdviserSubmission.
-async function findDefenseSubmission(submissionId: number, panelistUserId: number) {
+// With allowHistory, matches ONLY soft-deleted schedules with a submitted
+// verdict (past Redefense cycles) for read-only reference.
+async function findDefenseSubmission(
+  submissionId: number,
+  panelistUserId: number,
+  allowHistory = false,
+) {
   return prisma.defenseSubmission.findFirst({
     where: {
       id: submissionId,
       deletedAt: null,
-      schedule: {
-        deletedAt: null,
-        panelists: { some: { userId: panelistUserId, deletedAt: null } },
-        group: { deletedAt: null, section: { deletedAt: null } },
-      },
+      schedule: allowHistory
+        ? {
+            deletedAt: { not: null },
+            verdict: { not: 'PENDING' },
+            panelists: { some: { userId: panelistUserId, deletedAt: null } },
+            group: { deletedAt: null, section: { deletedAt: null } },
+          }
+        : {
+            deletedAt: null,
+            panelists: { some: { userId: panelistUserId, deletedAt: null } },
+            group: { deletedAt: null, section: { deletedAt: null } },
+          },
     },
     select: { id: true },
   })
@@ -50,6 +63,8 @@ export interface DefenseSubmissionDetail {
   status: 'PENDING' | 'APPROVED' | 'REDEFENSE'
   isCurrent: boolean
   reviewedAt: string | null
+  /** True when served from a soft-deleted (past Redefense) schedule. */
+  isHistory?: boolean
 }
 
 function resolvePanelistStatus(
@@ -115,7 +130,9 @@ function toDefenseDetailPayload(
 // soft-deleted versions so a previous version can be opened read-only.
 // Every hop except the submission row itself filters deletedAt:null;
 // isCurrent derives from submission.deletedAt. Never throws.
-export async function getDefenseSubmissionDetail(submissionId: number) {
+// With allowHistory, also serves submissions on soft-deleted (past Redefense)
+// schedules with submitted verdicts.
+export async function getDefenseSubmissionDetail(submissionId: number, allowHistory = false) {
   const session = await requirePanelist()
   if (!session) return { ...unauthorized, payload: null }
   const authorId = +session.user.id
@@ -123,11 +140,18 @@ export async function getDefenseSubmissionDetail(submissionId: number) {
     const submission = await prisma.defenseSubmission.findFirst({
       where: {
         id: submissionId,
-        schedule: {
-          deletedAt: null,
-          panelists: { some: { userId: authorId, deletedAt: null } },
-          group: { deletedAt: null, section: { deletedAt: null } },
-        },
+        schedule: allowHistory
+          ? {
+              deletedAt: { not: null },
+              verdict: { not: 'PENDING' },
+              panelists: { some: { userId: authorId, deletedAt: null } },
+              group: { deletedAt: null, section: { deletedAt: null } },
+            }
+          : {
+              deletedAt: null,
+              panelists: { some: { userId: authorId, deletedAt: null } },
+              group: { deletedAt: null, section: { deletedAt: null } },
+            },
       },
       include: {
         schedule: {
@@ -145,7 +169,10 @@ export async function getDefenseSubmissionDetail(submissionId: number) {
     if (!submission) {
       return { success: false, message: 'Submission not found.', payload: null }
     }
-    const payload = toDefenseDetailPayload(submission as any, authorId)
+    const payload = {
+      ...toDefenseDetailPayload(submission as any, authorId),
+      isHistory: allowHistory,
+    }
     return { success: true, message: '', payload }
   } catch (error) {
     console.error('[getDefenseSubmissionDetail | Error]:', error)
@@ -155,13 +182,17 @@ export async function getDefenseSubmissionDetail(submissionId: number) {
 
 // ───────────────────────────── Annotations (mirrors annotations.ts) ────────────
 
-export async function getDefenseAnnotations(submissionId: number) {
+export async function getDefenseAnnotations(submissionId: number, allowHistory = false) {
   const session = await requirePanelist()
   if (!session) return { ...unauthorized, payload: null }
-  return getDefenseAnnotationsData(submissionId, +session.user.id)
+  return getDefenseAnnotationsData(submissionId, +session.user.id, allowHistory)
 }
 
-async function getDefenseAnnotationsData(submissionId: number, authorId: number) {
+async function getDefenseAnnotationsData(
+  submissionId: number,
+  authorId: number,
+  allowHistory = false,
+) {
   'use cache'
   cacheTag(tag(submissionId, authorId))
   // Shared tag: every author's write revalidates it (see save/commit
@@ -169,7 +200,11 @@ async function getDefenseAnnotationsData(submissionId: number, authorId: number)
   cacheTag(`defense-submission-${submissionId}-annotations`)
   cacheLife('max')
   try {
-    const submission = await findDefenseSubmission(submissionId, authorId)
+    const submission = await findDefenseSubmission(
+      submissionId,
+      authorId,
+      allowHistory,
+    )
     if (!submission) {
       return {
         success: false,

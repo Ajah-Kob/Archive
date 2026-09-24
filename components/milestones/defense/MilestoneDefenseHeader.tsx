@@ -16,6 +16,8 @@ import type {
 interface MilestoneDefenseHeaderProps {
   milestone: string
   data: StudentDefenseSessionPayload | null
+  /** Past defenses' initial documents, loaded server-side with the page (no pop-in). */
+  pastInitials?: DocumentHistoryItem[]
 }
 
 function getHistoryInitial(
@@ -95,6 +97,7 @@ function getHistoryResubmissions(
 export function MilestoneDefenseHeader({
   milestone,
   data,
+  pastInitials = [],
 }: MilestoneDefenseHeaderProps) {
   const [historyOpen, setHistoryOpen] = useState(false)
   const initialItem = getHistoryInitial(data)
@@ -107,6 +110,7 @@ export function MilestoneDefenseHeader({
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         initial={initialItem}
+        pastInitials={pastInitials}
         resubmissions={resubmissionItems}
         milestoneSlug={milestone}
         variant="student"

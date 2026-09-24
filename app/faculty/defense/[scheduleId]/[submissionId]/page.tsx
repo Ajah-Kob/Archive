@@ -35,10 +35,15 @@ export default async function DefensePanelistWorkspacePage({
   const submissionId = parseInt(submissionIdRaw, 10)
   if (Number.isNaN(scheduleId) || Number.isNaN(submissionId)) notFound()
 
-  const [detailRes, annotationsRes] = await Promise.all([
-    getDefenseSubmissionDetail(submissionId),
-    getDefenseAnnotations(submissionId),
-  ])
+  // Live schedule first; fall back to read-only history (soft-deleted
+  // Redefense schedule with a submitted verdict).
+  let detailRes = await getDefenseSubmissionDetail(submissionId)
+  let isHistory = false
+  if (!detailRes.success || !detailRes.payload) {
+    detailRes = await getDefenseSubmissionDetail(submissionId, true)
+    isHistory = detailRes.success && !!detailRes.payload
+  }
+  const annotationsRes = await getDefenseAnnotations(submissionId, isHistory)
 
   const detail =
     detailRes.success && detailRes.payload ? detailRes.payload : null
@@ -101,7 +106,7 @@ export default async function DefensePanelistWorkspacePage({
 
   const isCommitted = draftStatus === 'COMMITTED'
   // Resubmitted documents remain editable while IN_REVIEW even though the schedule verdict is already submitted (MINOR/MAJOR).
-  // isCommitted only finalizes the *initial* document (Save annotation flow); resubmissions finalize solely via viewStatus (APPROVED/REDEFENSE) so a premature COMMITTED+DRAFT mismatch does not hide the Approve/Request Revision buttons.
+    // isCommitted only finalizes the *initial* document (Save annotation flow); resubmissions finalize solely via viewStatus (APPROVED/REDEFENSE) so a premature COMMITTED+DRAFT mismatch does not hide the Approve/Request Revision buttons.
   const shouldFinalize =
     !detail.isCurrent ||
     viewStatus !== 'IN_REVIEW' ||
@@ -112,12 +117,14 @@ export default async function DefensePanelistWorkspacePage({
     ? `/faculty/defense/${detail.scheduleId}/session`
     : `/faculty/defense/${detail.scheduleId}/resubmission`
 
-  if (shouldFinalize) {
+  // History documents (past Redefense schedules) always render finalized —
+  // read-only by construction, plus the workspace readOnly safety net below.
+  if (shouldFinalize || isHistory) {
     return (
       <DefenseFinalizedWorkspaceView
         submission={meta}
         initialAnnotations={initialAnnotations as unknown[]}
-        isSuperseded={!detail.isCurrent}
+        isSuperseded={!detail.isCurrent || isHistory}
         backHref={backHref}
         scheduleId={detail.scheduleId}
         draftStatus={draftStatus}
@@ -133,6 +140,7 @@ export default async function DefensePanelistWorkspacePage({
       draftStatus={draftStatus}
       backHref={backHref}
       scheduleId={detail.scheduleId}
+      readOnly={isHistory}
     />
   )
 }

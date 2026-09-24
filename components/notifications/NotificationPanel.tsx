@@ -12,6 +12,12 @@ import {
   declineInvitation,
   markAllInvitationsRead,
 } from '@/lib/actions/invitation'
+import {
+  getMyNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  type NotificationItem,
+} from '@/lib/actions/notifications'
 
 interface InvitationNotification {
   id: number
@@ -66,6 +72,7 @@ export default function NotificationPanel() {
 
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<InvitationNotification[]>([])
+  const [updates, setUpdates] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -81,11 +88,17 @@ export default function NotificationPanel() {
   const load = useCallback(async () => {
     if (!userId) return
     setLoading(true)
-    const result = await getMyPendingInvitations(userId)
-    if (result.success) {
-      setNotifications((result.payload ?? []) as InvitationNotification[])
+    const [invitesRes, updatesRes] = await Promise.all([
+      getMyPendingInvitations(userId),
+      getMyNotifications(userId),
+    ])
+    if (invitesRes.success) {
+      setNotifications((invitesRes.payload ?? []) as InvitationNotification[])
     } else {
-      toast.error(result.message)
+      toast.error(invitesRes.message)
+    }
+    if (updatesRes.success) {
+      setUpdates(updatesRes.payload ?? [])
     }
     setLoading(false)
   }, [userId])
@@ -121,7 +134,26 @@ export default function NotificationPanel() {
     }
   }, [isOpen])
 
-  const unreadCount = notifications.filter((n) => !n.readAt).length
+  const unreadCount =
+    notifications.filter((n) => !n.readAt).length +
+    updates.filter((u) => !u.readAt).length
+
+  const handleUpdateClick = async (update: NotificationItem) => {
+    if (!update.readAt) {
+      const result = await markNotificationRead(update.id)
+      if (result.success) {
+        setUpdates((prev) =>
+          prev.map((u) =>
+            u.id === update.id ? { ...u, readAt: new Date().toISOString() } : u,
+          ),
+        )
+      }
+    }
+    if (update.href) {
+      setIsOpen(false)
+      router.push(update.href)
+    }
+  }
 
   // Flip an item to its transient state, then remove it from the panel.
   const transitionItem = (
@@ -183,9 +215,12 @@ export default function NotificationPanel() {
 
   const handleMarkAllRead = async () => {
     if (!userId) return
-    const result = await markAllInvitationsRead(userId)
-    if (result.success) toast.success(result.message)
-    else toast.error(result.message)
+    const [invitesRes, updatesRes] = await Promise.all([
+      markAllInvitationsRead(userId),
+      markAllNotificationsRead(userId),
+    ])
+    if (invitesRes.success && updatesRes.success) toast.success('All notifications marked as read.')
+    else toast.error(invitesRes.message)
     load()
   }
 
@@ -241,15 +276,59 @@ export default function NotificationPanel() {
             </button>
           </div>
 
+          {/* Updates (system events) */}
+          {updates.length > 0 && (
+            <div className="border-b border-[#eceef8]">
+              {updates.map((update) => {
+                const unread = !update.readAt
+                return (
+                  <button
+                    key={`update-${update.id}`}
+                    type="button"
+                    onClick={() => handleUpdateClick(update)}
+                    className={`relative w-full text-left px-[18px] pt-[14px] pb-[15px] border-b border-[#f4f5fc] last:border-b-0 transition-colors hover:bg-[#fafbff] ${
+                      unread ? 'bg-[rgba(112,125,255,0.02)]' : ''
+                    }`}
+                  >
+                    {unread && (
+                      <span className="absolute top-4 right-4 size-[7px] rounded-[3.5px] bg-[#fe6f6f]" />
+                    )}
+                    <div className="flex gap-[11px] items-start">
+                      <div className="size-9 rounded-[18px] flex items-center justify-center shrink-0 bg-[#f4f6ff] border border-[#e5e8ff]">
+                        <Bell size={14} className="text-[#707dff]" />
+                      </div>
+                      <div className="flex-1 min-w-px">
+                        <p className="font-sans font-bold text-[13px] leading-[19px] text-[#1e2145]">
+                          {update.title}
+                        </p>
+                        {update.body && (
+                          <p className="font-sans font-medium text-[12.5px] leading-[18px] text-[#5a6382] pt-[2px]">
+                            {update.body}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-1 pt-1">
+                          <Clock size={10} className="text-[#c4cadf]" />
+                          <span className="text-[11px] font-medium text-[#c4cadf] whitespace-nowrap">
+                            {timeAgo(update.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           {/* Items */}
           <div className="max-h-[min(560px,70vh)] overflow-y-auto">
-            {loading && notifications.length === 0 ? (
+            {loading && notifications.length === 0 && updates.length === 0 ? (
               <div className="flex items-center justify-center h-24">
                 <span className="text-[12.5px] font-medium text-[#9ea8c6]">
                   Loading notifications...
                 </span>
               </div>
-            ) : notifications.length === 0 ? (
+            ) : notifications.length === 0 && updates.length === 0 ? (
               <div className="flex items-center justify-center h-24">
                 <span className="text-[12.5px] font-medium text-[#9ea8c6]">
                   No notifications yet.

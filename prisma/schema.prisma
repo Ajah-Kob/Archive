@@ -51,6 +51,7 @@ model User {
   defenseSubmissionReviews     DefenseSubmissionReview[]
   archivingSubmissions         ArchivingSubmission[]
   calendarEvents               CalendarEvent[]
+  notifications                Notification[]
 
   @@index([email, deletedAt])
 }
@@ -676,4 +677,23 @@ model AuditLog {
   @@index([action])
   @@index([entity])
   @@index([createdAt, action])
+}
+
+// ───────────────────────────── Notifications ─────────────────────────────
+
+// Per-user inbox for system events (e.g. defense rescheduled). Rows are
+// created by server actions and flipped to read by the recipient — never
+// edited otherwise.
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, readAt])
 }

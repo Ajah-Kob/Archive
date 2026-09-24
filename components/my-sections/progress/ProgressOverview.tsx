@@ -2,27 +2,14 @@
 
 import { useState } from 'react'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { UserProfile } from '@/components/ui/UserProfile'
 import type { SectionGroupProgress } from '@/lib/actions/sections'
-import type { JourneyRow } from '@/types/milestones'
 import { JourneyTracker } from '@/components/milestones/JourneyTracker'
+import { getInitials } from '@/lib/helper'
 import { GroupProgressDrawer } from './GroupProgressDrawer'
 
 interface ProgressOverviewProps {
   groups: SectionGroupProgress[]
-}
-
-function currentStep(journey: JourneyRow[]): string {
-  const active = journey.find((r) =>
-    ['DEFAULT', 'SUBMITTED', 'NEEDS_REVISION'].includes(r.state),
-  )
-  if (active) return active.label
-  if (journey.length > 0 && journey.every((r) => r.state === 'APPROVED')) {
-    return 'Completed'
-  }
-  if (journey.length > 0 && journey.every((r) => r.state === 'LOCKED')) {
-    return 'Not started'
-  }
-  return '—'
 }
 
 export function ProgressOverview({ groups }: ProgressOverviewProps) {
@@ -30,16 +17,7 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
 
   return (
     <>
-      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
-        <div className="flex items-center gap-2.5 px-5 py-[14px] border-b border-[#f0f2fa] shrink-0">
-          <h3 className="font-heading font-bold text-[14px] leading-[21px] text-[#1e3a8a] tracking-[-0.14px]">
-            Group Progress
-          </h3>
-          <span className="font-sans font-semibold text-[12px] leading-[18px] text-[#9ea8c6]">
-            {groups.length} {groups.length === 1 ? 'group' : 'groups'}
-          </span>
-        </div>
-
+      <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
         {groups.length === 0 ? (
           <EmptyState
             heading="No Groups Yet"
@@ -48,9 +26,9 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
           />
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1.6fr] items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0">
+          <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1.6fr] items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0 rounded-t-[14px]">
             <span className="font-sans font-bold text-[11px] leading-[16.5px] uppercase tracking-[0.6px] text-[#9ea8c6]">
-              Group
+              Team
             </span>
             <span className="font-sans font-bold text-[11px] leading-[16.5px] uppercase tracking-[0.6px] text-[#9ea8c6]">
               Members
@@ -74,9 +52,6 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
                 <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
                   {group.name}
                 </span>
-                <span className="block font-sans font-medium text-[11px] leading-[16.5px] text-[#9ea8c6]">
-                  {currentStep(group.journey)}
-                </span>
               </span>
 
               <span className="pr-4 font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#6b7399]">
@@ -85,9 +60,11 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
 
               <span className="min-w-0 pr-4">
                 {group.adviser ? (
-                  <span className="block truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3d4566]">
-                    {group.adviser.name}
-                  </span>
+                  <UserProfile
+                    initials={getInitials(group.adviser.name)}
+                    name={group.adviser.name}
+                    email={group.adviser.email}
+                  />
                 ) : (
                   <span className="font-sans font-medium italic text-[12px] leading-[18px] text-[#c4cadf]">
                     None

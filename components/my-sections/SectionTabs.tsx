@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { ChevronLeft, TriangleAlert } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 
-export type SectionTabKey = 'overview' | 'students' | 'progress' | 'milestones' | 'topics'
+export type SectionTabKey = 'overview' | 'students' | 'teams' | 'milestones' | 'topics'
 
 interface SectionTabsProps {
   sectionId: string
@@ -18,15 +18,15 @@ interface SectionTabsProps {
 const TABS: { key: SectionTabKey; label: string; segment: string }[] = [
   { key: 'overview', label: 'Overview', segment: 'overview' },
   { key: 'students', label: 'Students', segment: 'students' },
-  { key: 'progress', label: 'Progress', segment: 'progress' },
+  { key: 'teams', label: 'Teams', segment: 'teams' },
   { key: 'milestones', label: 'Milestones', segment: 'milestones' },
   { key: 'topics', label: 'Topic Reviews', segment: 'topics' },
 ]
 
 function getActiveKey(pathname: string): SectionTabKey {
   if (pathname.includes('/milestones')) return 'milestones'
-  if (pathname.includes('/progress')) return 'progress'
   if (pathname.includes('/topics')) return 'topics'
+  if (pathname.includes('/teams')) return 'teams'
   if (pathname.includes('/students')) return 'students'
   if (pathname.includes('/overview')) return 'overview'
   // Bare /faculty/my-sections/[sectionId] (no segment) defaults to Overview.

@@ -1,9 +1,10 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { revalidateTag } from 'next/cache'
+import { revalidateTag, updateTag } from 'next/cache'
 import { timeAgo } from '@/lib/helper'
 import { revalidateFeature } from '@/lib/actions/revalidate'
+import { audit } from '@/lib/actions/audit'
 
 // A coordinator is considered "active now" if they signed in within this window.
 // Mirrors the faculty activity window in lib/actions/faculty.ts.
@@ -16,6 +17,10 @@ function activityStatusFor(loggedInAt: Date | null): 'active' | string {
 }
 import { USERS_PER_PAGE } from '@/config/constants'
 import { requireAdminOrProgramChair, requireUser } from '@/lib/actions/guard'
+import {
+  requireGlobalSectionManager,
+  sectionUnauthorized,
+} from '@/lib/actions/sectionAuthorization'
 
 const table = 'coordinator'
 
@@ -71,13 +76,36 @@ export async function getCoordinators(page = 1, perPage = USERS_PER_PAGE) {
   return getCoordinatorsData(page, perPage)
 }
 
-// CREATE — called when faculty accepts the coordinator invitation
-export async function addCoordinator(facultyId: number) {
+// Direct manager assignment — no Invitation row and no acceptance step.
+export async function assignCoordinatorRole(facultyId: number) {
+  const session = await requireAdminOrProgramChair()
+  if (!session?.user?.id) {
+    return {
+      success: false,
+      payload: null,
+      message: 'You are not authorized to perform this action.',
+    }
+  }
+  if (!Number.isInteger(facultyId) || facultyId < 1) {
+    return { success: false, payload: null, message: 'Invalid faculty id.' }
+  }
+
   try {
-    const existing = await prisma[table].findFirst({
-      where: { facultyId, deletedAt: null },
+    const faculty = await prisma.faculty.findFirst({
+      where: {
+        id: facultyId,
+        deletedAt: null,
+        user: { deletedAt: null },
+      },
+      include: {
+        coordinator: true,
+        user: { select: { id: true, name: true } },
+      },
     })
-    if (existing) {
+    if (!faculty) {
+      return { success: false, payload: null, message: 'Faculty not found.' }
+    }
+    if (faculty.coordinator && faculty.coordinator.deletedAt === null) {
       return {
         success: false,
         payload: null,
@@ -86,37 +114,73 @@ export async function addCoordinator(facultyId: number) {
     }
 
     // A previous removal soft-deletes the row, which still occupies the
-    // unique facultyId slot. Re-inviting revives the existing record instead
-    // of creating a new one.
-    const record = await prisma[table].upsert({
-      where: { facultyId },
-      create: { facultyId },
-      update: { deletedAt: null },
-      include: {
-        faculty: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true, image: true, avatarGradient: true },
+    // unique facultyId slot. Direct assignment revives that record. The role
+    // and its in-app notification commit together or not at all.
+    const [record] = await prisma.$transaction([
+      prisma.coordinator.upsert({
+        where: { facultyId },
+        create: { facultyId },
+        update: { deletedAt: null },
+        include: {
+          faculty: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  image: true,
+                  avatarGradient: true,
+                },
+              },
             },
           },
         },
-      },
-    })
+      }),
+      prisma.notification.create({
+        data: {
+          userId: faculty.userId,
+          title: 'Coordinator role assigned',
+          body: 'You have been assigned as a Coordinator and can now access coordinator features.',
+          href: '/faculty',
+        },
+      }),
+    ])
 
-    revalidateTag('coordinators', 'max')
-    revalidateTag('faculty', 'max')
+    try {
+      await audit({
+        action: 'COORDINATOR_ASSIGN',
+        entity: 'COORDINATOR',
+        entityId: String(record.id),
+        entityName: faculty.user.name,
+        before: { facultyId, active: false },
+        after: { facultyId, active: true },
+      })
+    } catch {}
+
+    updateTag('coordinators')
+    updateTag('faculty')
+    revalidateFeature('faculties')
     revalidateFeature('sections')
 
     return {
       success: true,
-      message: 'Coordinator created successfully',
+      message: `${faculty.user.name} assigned as Coordinator.`,
       payload: record,
     }
-  } catch {
+  } catch (error) {
+    if ((error as { code?: string })?.code === 'P2002') {
+      return {
+        success: false,
+        payload: null,
+        message: 'This faculty member is already a coordinator.',
+      }
+    }
+    console.error('[assignCoordinatorRole | Error]:', error)
     return {
       success: false,
       payload: null,
-      message: 'Failed to create coordinator',
+      message: 'Failed to assign coordinator role.',
     }
   }
 }
@@ -255,6 +319,82 @@ export async function getCoordinatorDetail(facultyId: number) {
       success: false,
       payload: null,
       message: 'Failed to get coordinator details',
+    }
+  }
+}
+
+export interface ActiveCoordinatorOption {
+  id: number
+  facultyId: number
+  name: string
+  email: string
+  image: string | null
+  avatarGradient: string
+  sectionsManaged: number
+}
+
+// ────────────────── Live active-coordinator list (manager-only) ──
+// Direct-assignment modal source: only Coordinator rows whose full chain is
+// live (Coordinator.deletedAt null, Faculty.deletedAt null, User.deletedAt
+// null). Guarded DB-backed via requireGlobalSectionManager (live
+// SUPERADMIN/ADMIN or live isProgramChair); proxy is never the only guard.
+// Fresh read on every open so the modal never shows a stale roster — no
+// 'use cache' here (mirrors getCoordinatorDetail). Empty roster returns an
+// empty payload (the modal renders "No active coordinators available").
+// Never creates an Invitation or Notification; standard response shape.
+export async function getActiveCoordinators() {
+  // Global-manager-only: DB-backed via sectionAuthorization.
+  const session = await requireGlobalSectionManager()
+  if (!session?.user?.id) {
+    return sectionUnauthorized
+  }
+
+  try {
+    const rows = await prisma[table].findMany({
+      where: {
+        deletedAt: null,
+        faculty: {
+          deletedAt: null,
+          user: { deletedAt: null },
+        },
+      },
+      include: {
+        faculty: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true,
+                image: true,
+                avatarGradient: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: { section: { where: { deletedAt: null } } },
+        },
+      },
+      orderBy: { faculty: { user: { name: 'asc' } } },
+    })
+
+    const payload: ActiveCoordinatorOption[] = rows.map((row) => ({
+      id: row.id,
+      facultyId: row.facultyId,
+      name: row.faculty.user.name,
+      email: row.faculty.user.email,
+      image: row.faculty.user.image,
+      avatarGradient: row.faculty.user.avatarGradient,
+      sectionsManaged: row._count.section,
+    }))
+
+    return { success: true, payload }
+  } catch (error) {
+    console.error('[getActiveCoordinators | Error]:', error)
+    return {
+      success: false,
+      payload: null,
+      message: 'Failed to fetch coordinators.',
     }
   }
 }

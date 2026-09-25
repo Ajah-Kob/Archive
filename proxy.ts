@@ -72,10 +72,15 @@ export async function proxy(req: NextRequest) {
     switch (sub) {
       case 'faculties':
       case 'faculty-management':
-      case 'sections':
       case 'templates':
       case 'defense-scheduling':
         if (!hasCoordinatorAccess(token)) return redirectHome()
+        break
+      case 'section-management':
+        // Global sections view is Admin/Program Chair only. Coordinators use
+        // /faculty/my-sections; the page/server action separately verifies a
+        // live assigned-coordinator relationship.
+        if (!isAdminOrProgramChair(token)) return redirectHome()
         break
       case 'document-review':
         if (token.isAdviser !== true) return redirectHome()

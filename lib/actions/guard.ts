@@ -59,7 +59,6 @@ export async function requireCoordinator(): Promise<Session | null> {
       deletedAt: null,
     },
   })
-  console.log(coordinator)
   return coordinator ? session : null
 }
 
@@ -96,7 +95,6 @@ export async function requireAdviser(): Promise<Session | null> {
       deletedAt: null,
     },
   })
-  console.log(adviser)
   return adviser ? session : null
 }
 

@@ -8,21 +8,15 @@ import { Drawer } from '@/components/ui/Drawer'
 import { useCoordinatorDrawer } from '@/store/useCoordinatorDrawer'
 import { getInitials } from '@/lib/helper'
 import { getAvailableFaculty } from '@/lib/actions/faculty'
-import { getPendingCoordinatorInvitations } from '@/lib/actions/invitation'
 
 interface DrawerData {
   availableFaculty: FacultyRaw[]
-  pendingInvitations: PendingInvitation[]
 }
 
 export interface FacultyRaw {
   id: number
+  isProgramChair: boolean
   user: { id: number; name: string; email: string; image: string | null; avatarGradient: string }
-}
-
-interface PendingInvitation {
-  id: number
-  facultyId: number
 }
 
 export function ManageCoodinatorDrawer() {
@@ -39,17 +33,10 @@ export function ManageCoodinatorDrawer() {
       if (cancelled) return
       setLoading(true)
       setData(null)
-      const [facultyRes, invitesRes] = await Promise.all([
-        getAvailableFaculty(),
-        getPendingCoordinatorInvitations('COORDINATOR'),
-      ])
-      // Preserve the existing unguarded late-response behavior.
+      const facultyRes = await getAvailableFaculty()
+      if (cancelled) return
       if (!facultyRes.success) toast.error(facultyRes.message)
-      if (!invitesRes.success) toast.error(invitesRes.message)
-      setData({
-        availableFaculty: facultyRes.payload ?? [],
-        pendingInvitations: invitesRes.payload ?? [],
-      })
+      setData({ availableFaculty: facultyRes.payload ?? [] })
       setLoading(false)
     }
 
@@ -70,6 +57,7 @@ export function ManageCoodinatorDrawer() {
         name: faculty.user.name,
         email: faculty.user.email,
         gradient: faculty.user.avatarGradient,
+        isProgramChair: faculty.isProgramChair,
       })),
     [data?.availableFaculty],
   )
@@ -85,10 +73,7 @@ export function ManageCoodinatorDrawer() {
           {loading ? (
             <AvailableFacultySkeleton />
           ) : (
-            <AvailableFacultyList
-              data={availableFacultyList}
-              pendingInvitations={data?.pendingInvitations ?? []}
-            />
+            <AvailableFacultyList data={availableFacultyList} />
           )}
         </div>
       </Drawer.Body>

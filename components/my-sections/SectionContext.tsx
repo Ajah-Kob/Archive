@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { SectionModal } from './SectionModal'
-import { RemoveSectionModal } from './RemoveSectionModal'
 import { copySectionJoinCode } from '@/lib/actions/sections'
 import { useSectionsRefresh } from '@/store/useSectionsRefresh'
 
@@ -25,7 +24,6 @@ export function SectionContext({ section }: SectionContextProps) {
   const bump = useSectionsRefresh((state) => state.bump)
   const [copied, setCopied] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [removeOpen, setRemoveOpen] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -73,12 +71,6 @@ export function SectionContext({ section }: SectionContextProps) {
     router.refresh()
   }
 
-  function handleRemoveSuccess() {
-    setRemoveOpen(false)
-    bump()
-    router.push('/faculty/my-sections')
-  }
-
   return (
     <>
       <button
@@ -107,11 +99,6 @@ export function SectionContext({ section }: SectionContextProps) {
             label: 'Edit Section',
             onClick: () => setEditOpen(true),
           },
-          {
-            label: 'Remove Section',
-            onClick: () => setRemoveOpen(true),
-            variant: 'danger',
-          },
         ]}
       />
 
@@ -124,13 +111,6 @@ export function SectionContext({ section }: SectionContextProps) {
         />
       )}
 
-      {removeOpen && (
-        <RemoveSectionModal
-          section={section}
-          onClose={() => setRemoveOpen(false)}
-          onSuccess={handleRemoveSuccess}
-        />
-      )}
     </>
   )
 }

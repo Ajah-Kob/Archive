@@ -7,14 +7,16 @@ export function revalidateFeature(feature: 'sections' | 'templates' | 'faculties
   switch (feature) {
     case 'sections':
       revalidatePath('/admin/sections')
-      revalidatePath('/faculty/sections')
+      revalidatePath('/faculty/section-management')
       break
     case 'templates':
       revalidatePath('/admin/templates')
       revalidatePath('/faculty/templates')
       break
     case 'faculties':
-      revalidatePath('/faculty/faculties')
+      revalidatePath('/faculty/faculty-management/members')
+      revalidatePath('/faculty/faculty-management/advisers')
+      revalidatePath('/faculty/faculty-management/coordinators')
       break
     case 'users':
       revalidatePath('/admin/users')

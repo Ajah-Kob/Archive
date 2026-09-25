@@ -32,7 +32,7 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 - **Role-based access** — `GUEST`, `STUDENT`, `FACULTY`, `ADMIN`, `SUPERADMIN`. Faculty hold adviser/coordinator records; Program Chair is a flag on `Faculty`, not a role.
 - **Join by invitation code** — guests join as student or faculty via a code (on `/guest` itself).
 - **Faculty & coordinator management** — invitations, adviser/coordinator assignment, workload caps (`ADVISER_CAP`); the workload-monitoring list lives at `/faculty/faculties`.
-- **Sections** — coordinators own sections, students enroll; the overview is the admin/program-chair view (duplicated at `/admin/sections` and `/faculty/sections`), and the coordinator's own section workspace lives at `/faculty/my-section/[sectionId]`.
+- **Sections** — coordinators own sections, students enroll; the overview is the admin/program-chair view (duplicated at `/admin/sections` and `/faculty/section-management`), and the coordinator's own section workspace lives at `/faculty/my-section/[sectionId]`.
 - **Templates** — capstone document templates (upload/remove), duplicated at `/admin/templates` and `/faculty/templates`.
 - **Repository** — capstone repository at `/repository` (shared by any role).
 - **Notifications** — in-app notification panel in the aside footer.

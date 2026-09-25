@@ -50,7 +50,7 @@ Repository
 
 ## 1. Coordinator Assignment
 
-Assigns the **Coordinator** role to a faculty member. Once assigned, the coordinator gains access to coordinator-exclusive features and can create class sections within Archive.
+Assigns the **Coordinator** role to a faculty member. Once assigned, the coordinator gains access to coordinator-exclusive features and can manage assigned class sections within Archive.
 
 **Document:** [01-coordinator-assignment.md](./01-coordinator-assignment.md)
 
@@ -58,7 +58,7 @@ Assigns the **Coordinator** role to a faculty member. Once assigned, the coordin
 
 ## 2. Section Management
 
-Describes how coordinators create class sections, generate invitation links, and allow students to join their assigned sections.
+Describes how Admins and the Program Chair create class sections, generate invitation links, assign coordinators, and allow students to join assigned sections.
 
 **Document:** [02-section-management.md](./02-section-management.md)
 

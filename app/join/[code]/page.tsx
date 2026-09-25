@@ -65,7 +65,7 @@ export default async function JoinPage({
   const userId = +session.user.id
   const result =
     record.type === 'STUDENT'
-      ? await joinSectionWithCode(userId, code)
+      ? await joinSectionWithCode(code)
       : await joinFacultyWithCode(userId, code)
   if (!result.success) return <ExpiredInvite message={result.message} />
 

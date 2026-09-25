@@ -27,7 +27,6 @@ async function getAvailableFacultyData() {
       where: {
         deletedAt: null,
         coordinator: { isNot: { deletedAt: null } },
-        isProgramChair: false,
       },
       include: {
         user: { select: { id: true, name: true, email: true, image: true, avatarGradient: true } },
@@ -46,6 +45,9 @@ async function getAvailableFacultyData() {
 }
 
 export async function getAvailableFaculty() {
+  const session = await requireAdminOrProgramChair()
+  if (!session?.user?.id) return unauthorized
+
   return getAvailableFacultyData()
 }
 
@@ -94,7 +96,7 @@ export async function getFacultyMembers() {
       name: f.user.name,
       email: f.user.email,
       image: f.user.image,
-      avatarGradient: (f.user as any).avatarGradient,
+      avatarGradient: f.user.avatarGradient,
       loggedInAt: f.user.loggedInAt,
       activityStatus: activityStatusFor(f.user.loggedInAt),
       isAdviser,

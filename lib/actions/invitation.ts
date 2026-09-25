@@ -2,8 +2,11 @@
 
 import prisma from '@/lib/prisma'
 import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
-import { getSession } from '@/lib/actions/guard'
-import { addCoordinator } from '@/lib/actions/coordinator'
+import {
+  getSession,
+  requireAdminOrProgramChair,
+  unauthorized,
+} from '@/lib/actions/guard'
 import { addAdviser } from '@/lib/actions/adviser'
 import { GROUP_CAP, ADVISER_INVITE_TTL_MS } from '@/types/milestones'
 import type { InvitationRole } from '@prisma/client'
@@ -37,14 +40,16 @@ async function getPendingCoordinatorInvitationsData(role: InvitationRole) {
 }
 
 export async function getPendingCoordinatorInvitations(role: InvitationRole) {
+  const session = await requireAdminOrProgramChair()
+  if (!session?.user?.id) return unauthorized
+
   return getPendingCoordinatorInvitationsData(role)
 }
 
 // Invitations sent TO a specific user (invitee view — notification panel).
-// Resolves the invitee by role: faculty (COORDINATOR / ADVISER /
-// ADVISER_ASSIGNMENT) or student (GROUP). Pending GROUP and
-// ADVISER_ASSIGNMENT invites older than the 7-day TTL flip to CANCELLED
-// lazily on read.
+// Coordinator assignments are immediate, so legacy pending Coordinator rows
+// flip to CANCELLED lazily on read. Pending GROUP and ADVISER_ASSIGNMENT
+// invites older than the 7-day TTL are cancelled the same way.
 async function getMyPendingInvitationsData(userId: number) {
   'use cache'
   cacheTag(`my-invitations-${userId}`)
@@ -59,6 +64,16 @@ async function getMyPendingInvitationsData(userId: number) {
         role: { in: ['GROUP', 'ADVISER_ASSIGNMENT'] },
         createdAt: { lt: cutoff },
         OR: [{ faculty: { userId } }, { student: { userId } }],
+      },
+      data: { status: 'CANCELLED' },
+    })
+
+    await prisma[table].updateMany({
+      where: {
+        deletedAt: null,
+        status: 'PENDING',
+        role: 'COORDINATOR',
+        faculty: { userId },
       },
       data: { status: 'CANCELLED' },
     })
@@ -150,6 +165,20 @@ export async function acceptInvitation(invitationId: number) {
     }
 
     const readAt = new Date()
+
+    if (invitation.role === 'COORDINATOR') {
+      await prisma[table].update({
+        where: { id: invitationId },
+        data: { status: 'CANCELLED', readAt },
+      })
+      revalidateInvitee(invitation)
+      return {
+        success: false,
+        payload: null,
+        message:
+          'Coordinator assignments are now immediate and no longer require acceptance.',
+      }
+    }
 
     if (invitation.role === 'GROUP') {
       const groupId = invitation.groupId
@@ -280,9 +309,7 @@ export async function acceptInvitation(invitationId: number) {
     }
 
     let roleResult
-    if (invitation.role === 'COORDINATOR') {
-      roleResult = await addCoordinator(invitation.facultyId)
-    } else if (invitation.role === 'ADVISER') {
+    if (invitation.role === 'ADVISER') {
       roleResult = await addAdviser(invitation.facultyId)
     } else {
       return {
@@ -404,8 +431,21 @@ export async function markAllInvitationsRead(userId: number) {
 export async function sendInvitation(
   facultyId: number,
   role: InvitationRole,
-  invitedById: number,
 ) {
+  const session = await requireAdminOrProgramChair()
+  if (!session?.user?.id) return unauthorized
+
+  const invitedById = Number(session.user.id)
+  if (!Number.isInteger(invitedById) || invitedById < 1) return unauthorized
+  if (role === 'COORDINATOR') {
+    return {
+      success: false,
+      message:
+        'Coordinator assignments are immediate and no longer require an invitation.',
+      payload: null,
+    }
+  }
+
   try {
     const existing = await prisma[table].findFirst({
       where: { facultyId, role, status: 'PENDING' },
@@ -450,8 +490,8 @@ export async function sendInvitation(
 }
 
 export async function cancelInvitation(invitationId: number) {
-  // const session = await requireAdmin()
-  // if (!session) return { success: false, message: 'Not authorized' }
+  const session = await requireAdminOrProgramChair()
+  if (!session?.user?.id) return unauthorized
 
   try {
     const record = await prisma[table].update({

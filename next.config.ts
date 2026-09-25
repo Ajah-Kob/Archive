@@ -30,7 +30,12 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/faculty/coordinators/:path*',
-        destination: '/faculty/sections/:path*',
+        destination: '/faculty/section-management/:path*',
+        permanent: true,
+      },
+      {
+        source: '/faculty/sections/:path*',
+        destination: '/faculty/section-management/:path*',
         permanent: true,
       },
       {
@@ -40,7 +45,12 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/faculty/coordinators',
-        destination: '/faculty/sections',
+        destination: '/faculty/section-management',
+        permanent: true,
+      },
+      {
+        source: '/faculty/sections',
+        destination: '/faculty/section-management',
         permanent: true,
       },
     ]

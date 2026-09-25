@@ -2,8 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, Layers, Plus } from 'lucide-react'
-import { SectionModal } from '@/components/my-sections/SectionModal'
+import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
 import { getCoordinatorSections, type MySectionCardData } from '@/lib/actions/sections'
 import { useSectionsRefresh } from '@/store/useSectionsRefresh'
 
@@ -26,7 +25,6 @@ export function SectionsGroup({
   const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState(false)
   const [hydrated, setHydrated] = useState(false)
-  const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -102,17 +100,6 @@ export function SectionsGroup({
             ))}
         </button>
 
-        {!minimize && (
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            title="Create Section"
-            aria-label="Create Section"
-            className="flex items-center justify-center size-8 shrink-0 rounded-[8px] text-[#707dff] hover:bg-[rgba(112,125,255,0.1)] transition-colors"
-          >
-            <Plus size={15} />
-          </button>
-        )}
       </div>
 
       {!minimize && expanded && (
@@ -145,16 +132,6 @@ export function SectionsGroup({
         </div>
       )}
 
-      {createOpen && (
-        <SectionModal
-          mode="create"
-          onClose={() => setCreateOpen(false)}
-          onSuccess={() => {
-            setCreateOpen(false)
-            useSectionsRefresh.getState().bump()
-          }}
-        />
-      )}
     </div>
   )
 }

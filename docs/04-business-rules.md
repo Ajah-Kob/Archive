@@ -26,7 +26,7 @@ Faculty members must join the faculty through a valid invitation before they can
 
 ### BR-101
 
-Only the Program Chair may assign or revoke the Coordinator role.
+Only Admins and the Program Chair may assign or revoke the Coordinator role. Assignment is immediate, requires no acceptance, and creates an in-app notification for the faculty member.
 
 ### BR-102
 
@@ -38,7 +38,7 @@ Assigning the Coordinator role does not automatically create a class section wit
 
 ### BR-104
 
-Coordinators are responsible for creating and managing class sections based on their assigned academic sections.
+Coordinators are responsible for managing their assigned class sections. Coordinators may edit the assigned section's name and header color, but they may not create, archive, assign, reassign, or change the section's academic year.
 
 ---
 
@@ -46,7 +46,7 @@ Coordinators are responsible for creating and managing class sections based on t
 
 ### BR-201
 
-Only Coordinators may create and manage class sections.
+Only Admins and the Program Chair may create, assign, reassign, or archive class sections. Only empty sections may be archived, and the Section plus its join code must be archived atomically. Assigned Coordinators may manage their assigned sections within the permitted edit fields. Active section names are unique within an academic year; archived sections do not reserve their names.
 
 ### BR-202
 

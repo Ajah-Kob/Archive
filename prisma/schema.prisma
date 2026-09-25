@@ -172,9 +172,10 @@ model Section {
   id                    Int                     @id @default(autoincrement())
   joinCodeId            Int?                    @unique
   joinCode              JoinCode?               @relation(fields: [joinCodeId], references: [id], onDelete: SetNull)
-  coordinatorId         Int
-  coordinator           Coordinator             @relation(fields: [coordinatorId], references: [id])
+  coordinatorId         Int?
+  coordinator           Coordinator?            @relation(fields: [coordinatorId], references: [id])
   section               String
+  academicYear          String
   headerColor           String?
   students              Student[]
   groups                Group[]
@@ -185,7 +186,6 @@ model Section {
   capstone2OpenedAt     DateTime?
   milestoneAvailability MilestoneAvailability[]
 
-  @@unique([coordinatorId, section])
   @@index([deletedAt])
 }
 

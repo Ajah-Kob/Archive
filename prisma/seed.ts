@@ -129,7 +129,7 @@ async function seedDefenseResubmissions(passwordHash: string) {
   })
   if (!section) {
     section = await prisma.section.create({
-      data: { coordinatorId: coordinator.id, section: sectionName },
+      data: { coordinatorId: coordinator.id, section: sectionName, academicYear: '2026-2027' },
     })
   }
 

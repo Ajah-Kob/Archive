@@ -1,14 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SectionCard } from './SectionCard'
-import { SectionModal } from './SectionModal'
 import type { MySectionCardData } from '@/lib/actions/sections'
 import { useSectionsRefresh } from '@/store/useSectionsRefresh'
 
@@ -22,13 +19,14 @@ interface MySectionsPageProps {
   initialSections: MySectionCardData[]
 }
 
+// Card-only coordinator scope: assigned sections only (unassigned rows never
+// reach here via getCoordinatorSections). No Create Section button, no
+// empty-state create CTA, no create modal, no table toggle, and no
+// global-management controls. Card grid + search/phase filter only.
 export function MySectionsPage({ initialSections }: MySectionsPageProps) {
-  const router = useRouter()
   const version = useSectionsRefresh((s) => s.version)
-  const bump = useSectionsRefresh((s) => s.bump)
   const [search, setSearch] = useState('')
   const [phaseFilter, setPhaseFilter] = useState('all')
-  const [createOpen, setCreateOpen] = useState(false)
 
   // Derive filtered list from props + search + phase; version busts memo on refresh
   const filtered = useMemo(() => {
@@ -45,31 +43,9 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
     })
   }, [initialSections, search, phaseFilter, version])
 
-  function handleCreateSuccess() {
-    setCreateOpen(false)
-    bump()
-    router.refresh()
-  }
-
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <HeaderBar
-        actions={
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 h-[32px] px-[14px] rounded-[8px] font-sans font-bold text-[13px] leading-[19.5px] text-white shrink-0 hover:opacity-90 active:scale-[0.98] transition-all"
-            style={{
-              backgroundImage:
-                'linear-gradient(163.7deg, rgb(112,125,255) 0%, rgb(85,101,255) 100%)',
-              boxShadow: '0px 2px 6px rgba(112,125,255,0.25)',
-            }}
-          >
-            <Plus className="size-[14px]" strokeWidth={2.5} />
-            Create Section
-          </button>
-        }
-      >
+      <HeaderBar>
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="w-[280px] shrink-0 py-[8px]">
             <SearchBar
@@ -93,25 +69,14 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
         {filtered.length === 0 ? (
           <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden w-full">
             <EmptyState
-              heading={search || phaseFilter !== 'all' ? 'No Matching Sections' : 'No Sections Created'}
+              heading={search || phaseFilter !== 'all' ? 'No Matching Sections' : 'No Sections Assigned'}
               description={
                 search || phaseFilter !== 'all'
                   ? 'No sections match your search or filter. Try adjusting your search or filter.'
-                  : 'No sections have been created yet. Create your first class to get started.'
+                  : 'You have no assigned sections yet. Sections assigned to you will appear here.'
               }
               variant="card"
-            >
-              {!search && phaseFilter === 'all' ? (
-                <button
-                  type="button"
-                  onClick={() => setCreateOpen(true)}
-                  className="inline-flex items-center justify-center gap-1.5 h-[36px] px-4 rounded-[10px] bg-[#f4f5fc] border border-[#e0e3f0] font-sans font-bold text-[13px] text-[#707dff] hover:bg-[#eef0ff] transition-colors"
-                >
-                  <Plus className="size-[14px]" />
-                  Create Section
-                </button>
-              ) : null}
-            </EmptyState>
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -121,14 +86,6 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
           </div>
         )}
       </div>
-
-      {createOpen && (
-        <SectionModal
-          mode="create"
-          onClose={() => setCreateOpen(false)}
-          onSuccess={handleCreateSuccess}
-        />
-      )}
     </div>
   )
 }

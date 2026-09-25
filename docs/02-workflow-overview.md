@@ -46,7 +46,7 @@ Repository / Archive
 | Stage                  | Summary                                                                             | Detail                                                                |
 | ---------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Coordinator Assignment | Program Chair assigns the Coordinator role to a faculty member.                     | [01-coordinator-assignment.md](workflow/01-coordinator-assignment.md) |
-| Section Management     | Coordinators create class sections, generate invitation links, and enroll students. | [02-section-management.md](workflow/02-section-management.md)         |
+| Section Management     | Admins and the Program Chair create and archive class sections, assign or reassign coordinators, and enable student enrollment. | [02-section-management.md](workflow/02-section-management.md)         |
 | Group Management       | Students form capstone groups within a class section.                               | [03-group-management.md](workflow/03-group-management.md)             |
 | Adviser Assignment     | A group invites its selected adviser and grants adviser access after acceptance.    | [04-adviser-assignment.md](workflow/04-adviser-assignment.md)         |
 | Capstone 1             | Topic selection, Chapters 1–3, adviser review, and proposal readiness.              | [05-capstone1.md](workflow/05-capstone1.md)                           |
@@ -64,7 +64,7 @@ These rules apply across the workflow set and are described in more detail in th
 - Only the assigned adviser may review a group's chapter submissions.
 - Every revision request must include feedback.
 - Every revised submission creates a new version to preserve revision history.
-- Only coordinators can create and manage class sections, and handle defense scheduling.
+- Only Admins and the Program Chair can create, assign, reassign, or archive class sections; assigned Coordinators manage their assigned sections and handle defense scheduling.
 - Proposal Defense must be completed before Capstone 2 begins.
 - Final Defense must be completed before the approved manuscript is archived.
 - Progress monitoring is read-only for coordinators and advisers.

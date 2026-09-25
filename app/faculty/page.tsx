@@ -13,7 +13,7 @@ export default async function FacultyHomePage() {
   if (session.user.isCoordinator || session.user.isProgramChair)
     links.push({ label: 'Faculty Management', href: '/faculty/faculty-management/members', icon: Users })
   if (session.user.isCoordinator || session.user.isProgramChair)
-    links.push({ label: 'Sections', href: '/faculty/sections', icon: Layers })
+    links.push({ label: 'Section Management', href: '/faculty/section-management', icon: Layers })
   if (session.user.isCoordinator || session.user.isProgramChair)
     links.push({ label: 'Templates', href: '/faculty/templates', icon: FileText })
 

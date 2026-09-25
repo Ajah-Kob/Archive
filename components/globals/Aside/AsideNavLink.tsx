@@ -37,7 +37,7 @@ function isNavActive(pathname: string, href: string) {
     href === '/faculty/my-sections' ||
     href === '/faculty/document-review' ||
     href === '/faculty/faculties' ||
-    href === '/faculty/sections' ||
+    href === '/faculty/section-management' ||
     href === '/faculty/archiving'
   ) {
     return pathname === href || pathname.startsWith(`${href}/`)
@@ -100,8 +100,8 @@ export function NavLinks({
           show: isAdmin || isCoordinator || isProgramChair,
         },
         {
-          label: 'Sections',
-          href: '/faculty/sections',
+          label: 'Section Management',
+          href: '/faculty/section-management',
           icon: Layers,
           show: isAdmin || isCoordinator || isProgramChair,
         },

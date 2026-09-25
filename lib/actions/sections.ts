@@ -1,5 +1,6 @@
 'use server'
 
+import { Prisma, type MilestoneKey } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { cacheLife, cacheTag, revalidateTag, updateTag } from 'next/cache'
 import { getServerSession } from 'next-auth'
@@ -9,13 +10,103 @@ import type { SectionData } from '@/components/sections/main/SectionDataRow'
 import type { StudentData } from '@/components/my-sections/students/StudentDataRow'
 import { generateJoinCode, getInitials, timeAgo } from '@/lib/helper'
 import { requireCoordinator } from '@/lib/actions/guard'
+import {
+  authorizeSectionAccess,
+  requireGlobalSectionManager,
+  sectionUnauthorized,
+} from '@/lib/actions/sectionAuthorization'
 import { audit } from '@/lib/actions/audit'
-import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
-import { CAPSTONE1_KEYS, CAPSTONE2_KEYS, keysForPhase } from '@/lib/milestones/phase'
+import {
+  buildJourneyRows,
+  resolveSectionAvailability,
+} from '@/lib/journey'
+import {
+  DUPLICATE_SECTION_MESSAGE,
+  normalizeSectionKey,
+  parseAcademicYear,
+  parseGlobalSectionName,
+} from '@/lib/sectionValidation'
+import { CAPSTONE2_KEYS, keysForPhase } from '@/lib/milestones/phase'
 import type { JourneyRow } from '@/types/milestones'
-import type { MilestoneKey } from '@prisma/client'
 
 const table = 'section'
+
+const TRANSACTION_MAX_RETRIES = 3
+const TRANSACTION_MAX_WAIT_MS = 5_000
+const TRANSACTION_TIMEOUT_MS = 10_000
+const SECTION_CHANGED_MESSAGE =
+  'This section changed since it was loaded. Refresh and try again.'
+
+class SectionBusinessError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SectionBusinessError'
+  }
+}
+
+class TransactionRetriesExhaustedError extends Error {
+  constructor() {
+    super('Serializable transaction retries exhausted')
+    this.name = 'TransactionRetriesExhaustedError'
+  }
+}
+
+function isPrismaWriteConflict(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'P2034'
+  )
+}
+
+// The callback is deliberately database-only: audit, cache invalidation, and
+// all other non-database side effects run after the transaction commits.
+async function withSerializableTransaction<T>(
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt <= TRANSACTION_MAX_RETRIES; attempt += 1) {
+    try {
+      return await prisma.$transaction(callback, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: TRANSACTION_MAX_WAIT_MS,
+        timeout: TRANSACTION_TIMEOUT_MS,
+      })
+    } catch (error) {
+      if (!isPrismaWriteConflict(error)) throw error
+      if (attempt === TRANSACTION_MAX_RETRIES) {
+        throw new TransactionRetriesExhaustedError()
+      }
+    }
+  }
+
+  throw new TransactionRetriesExhaustedError()
+}
+
+function lockSectionRow(tx: Prisma.TransactionClient, sectionId: number) {
+  return tx.$queryRaw<{ id: number }[]>`
+    SELECT "id"
+    FROM "Section"
+    WHERE "id" = ${sectionId}
+    FOR UPDATE
+  `
+}
+
+function sectionFailureResponse(
+  error: unknown,
+  fallbackMessage: string,
+  actionName: string,
+) {
+  if (error instanceof SectionBusinessError) {
+    return { success: false, message: error.message }
+  }
+  if (error instanceof TransactionRetriesExhaustedError) {
+    return { success: false, message: SECTION_CHANGED_MESSAGE }
+  }
+
+  console.error(`[${actionName} | Error]:`, error)
+  return { success: false, message: fallbackMessage }
+}
 
 // A student is considered "active now" if they signed in within this window.
 const ACTIVE_NOW_MS = 5 * 60 * 1000
@@ -39,7 +130,13 @@ async function getSectionsData() {
           faculty: {
             include: {
               user: {
-                select: { id: true, name: true, email: true, avatarGradient: true },
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatarGradient: true,
+                  deletedAt: true,
+                },
               },
             },
           },
@@ -49,30 +146,70 @@ async function getSectionsData() {
         where: { deletedAt: null },
         select: { id: true, groupId: true },
       },
+      groups: {
+        where: { deletedAt: null },
+        select: { id: true },
+      },
     },
     orderBy: { createdAt: 'desc' },
   })
 
-  const payload: SectionData[] = sections.map((s) => ({
-    id: s.id,
-    coordinator: {
-      initials: getInitials(s.coordinator.faculty.user.name),
-      name: s.coordinator.faculty.user.name,
-      email: s.coordinator.faculty.user.email,
-      avatarGradient: s.coordinator.faculty.user.avatarGradient,
-    },
-    section: s.section,
-    capstonePhase: s.capstone2OpenedAt ? 'CAPSTONE_2' : 'CAPSTONE_1',
-    dateCreated: s.createdAt.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }),
-    students: s.students.length,
-    groups: new Set(
-      s.students.filter((st) => st.groupId).map((st) => st.groupId),
-    ).size,
-  }))
+  // Global row contract (render-safe for assigned + unassigned):
+  // - only live sections (deletedAt null); never a coordinator-owned query.
+  // - academicYear is always present (staged schema, backfilled 2026-2027).
+  // - coordinator is an explicit null when the relation is absent or any link
+  //   in the Coordinator → Faculty → User chain is soft-deleted; never an
+  //   empty or partial user object.
+  // - students counts active students; groups counts distinct active groups
+  //   that still have at least one active student (both sides filtered by
+  //   deletedAt, so archived students/groups never inflate the counts).
+  // - dateCreated keeps the existing en-US display format.
+  // Cache contract: this read is tagged 'sections' with life 'max'.
+  // Mutations that change sections must immediately expire the same global
+  // list via updateTag('sections') + revalidateFeature('sections'), plus the
+  // coordinator-scoped caches (updateTag('my-sections') and
+  // updateTag(`my-section-${id}`)) so global and coordinator views stay
+  // in sync for the acting manager. See revalidateCoordinatorCache() below.
+  const payload: SectionData[] = sections.map((s) => {
+    const coordinator = s.coordinator
+    const faculty = coordinator?.faculty
+    const user = faculty?.user
+    const activeGroupIds = new Set(s.groups.map((g) => g.id))
+    return {
+      id: s.id,
+      coordinatorId: s.coordinatorId,
+      coordinator:
+        s.coordinatorId !== null &&
+        coordinator &&
+        faculty &&
+        user &&
+        coordinator.deletedAt === null &&
+        faculty.deletedAt === null &&
+        user.deletedAt === null
+          ? {
+              id: coordinator.id,
+              initials: getInitials(user.name),
+              name: user.name,
+              email: user.email,
+              avatarGradient: user.avatarGradient,
+            }
+          : null,
+      section: s.section,
+      academicYear: s.academicYear,
+      capstonePhase: s.capstone2OpenedAt ? 'CAPSTONE_2' : 'CAPSTONE_1',
+      dateCreated: s.createdAt.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      students: s.students.length,
+      groups: new Set(
+        s.students
+          .filter((st) => st.groupId && activeGroupIds.has(st.groupId))
+          .map((st) => st.groupId),
+      ).size,
+    }
+  })
 
   return payload
 }
@@ -156,7 +293,7 @@ async function getSectionDetailData(id: number) {
     initials: getInitials(s.user.name),
     name: s.user.name,
     email: s.user.email,
-    avatarGradient: (s.user as any).avatarGradient,
+    avatarGradient: s.user.avatarGradient,
     activityStatus: activityStatusFor(s.user.loggedInAt),
     loggedInAt: s.user.loggedInAt,
     group: s.group
@@ -204,9 +341,13 @@ export async function getSectionById(id: number) {
 }
 
 export async function getSections() {
-  const session = await getServerSession(authOptions)
+  // Global-manager-only read: DB-backed via sectionAuthorization (live
+  // SUPERADMIN/ADMIN or live isProgramChair). Proxy is never the only guard;
+  // ordinary coordinators, students, guests, and faculty receive the standard
+  // unauthorized shape. Deleted sections are excluded inside getSectionsData.
+  const session = await requireGlobalSectionManager()
   if (!session?.user?.id) {
-    return { success: false, message: 'Not authenticated', payload: null }
+    return sectionUnauthorized
   }
 
   try {
@@ -234,130 +375,154 @@ export async function joinSection(formData: FormData) {
     return { success: false, message: 'Please enter an invitation code.' }
   }
 
-  return joinSectionWithCode(+session.user.id, code)
+  return joinSectionWithCode(code)
 }
 
-// Shared core behind joinSection and the one-click /join/[code] route.
-// Takes an explicit userId + code so both callers run identical guards.
-export async function joinSectionWithCode(userId: number, code: string) {
+// Shared core behind joinSection and the one-click /join/[code] route. The
+// caller supplies only the code; the live session is the sole user identity.
+export async function joinSectionWithCode(code: string) {
   try {
-    const joinCode = await prisma.joinCode.findFirst({
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return { success: false, message: 'Not authenticated' }
+    }
+
+    const userId = Number(session.user.id)
+    if (!Number.isInteger(userId)) {
+      return { success: false, message: 'Not authenticated' }
+    }
+
+    const normalizedCode = typeof code === 'string' ? code.trim().toUpperCase() : ''
+    if (!normalizedCode) {
+      return { success: false, message: 'Please enter an invitation code.' }
+    }
+
+    // Resolve the candidate section before entering the transaction. The
+    // authoritative Section and JoinCode reads happen again after its row lock.
+    const candidate = await prisma.joinCode.findFirst({
       where: {
-        code,
+        code: normalizedCode,
         type: 'STUDENT',
         deletedAt: null,
         expiresAt: { gt: new Date() },
       },
-      include: { section: true },
+      select: { id: true, section: { select: { id: true } } },
     })
-
-    if (!joinCode) {
+    if (!candidate) {
       return { success: false, message: 'Invalid or expired invitation code.' }
     }
-
-    if (!joinCode.section) {
+    if (!candidate.section) {
       return { success: false, message: 'No section is linked to this code.' }
     }
 
-    const existingStudent = await prisma.student.findFirst({
-      where: { userId },
-    })
-
-    if (existingStudent && !existingStudent.deletedAt) {
-      return {
-        success: false,
-        message: 'You are already enrolled in a section.',
+    const sectionId = candidate.section.id
+    const joined = await withSerializableTransaction(async (tx) => {
+      const locked = await lockSectionRow(tx, sectionId)
+      if (locked.length !== 1) {
+        throw new SectionBusinessError('No section is linked to this code.')
       }
-    }
 
-    if (existingStudent) {
-      // Resurrect a previously removed student (soft-deleted row) instead of
-      // creating a new one — Student.userId is unique, so a fresh create
-      // would throw a constraint violation.
-      await prisma.student.update({
-        where: { id: existingStudent.id },
-        data: {
-          sectionId: joinCode.section.id,
-          groupId: null,
+      const now = new Date()
+      const liveSection = await tx.section.findFirst({
+        where: { id: sectionId, deletedAt: null },
+        select: { id: true, section: true },
+      })
+      if (!liveSection) {
+        throw new SectionBusinessError('No section is linked to this code.')
+      }
+
+      const liveJoinCode = await tx.joinCode.findFirst({
+        where: {
+          id: candidate.id,
+          code: normalizedCode,
+          type: 'STUDENT',
           deletedAt: null,
+          expiresAt: { gt: now },
+          section: { id: sectionId, deletedAt: null },
         },
+        select: { id: true },
       })
-    } else {
-      await prisma.student.create({
-        data: {
-          userId,
-          sectionId: joinCode.section.id,
-        },
-      })
-    }
+      if (!liveJoinCode) {
+        throw new SectionBusinessError('Invalid or expired invitation code.')
+      }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { role: 'STUDENT' },
+      const existingStudent = await tx.student.findFirst({
+        where: { userId },
+        select: { id: true, deletedAt: true },
+      })
+      if (existingStudent && !existingStudent.deletedAt) {
+        throw new SectionBusinessError('You are already enrolled in a section.')
+      }
+
+      if (existingStudent) {
+        // Student.userId is unique, so resurrect the soft-deleted row instead
+        // of attempting a second create for the same user.
+        await tx.student.update({
+          where: { id: existingStudent.id },
+          data: {
+            sectionId,
+            groupId: null,
+            deletedAt: null,
+          },
+        })
+      } else {
+        await tx.student.create({
+          data: { userId, sectionId },
+        })
+      }
+
+      await tx.user.update({
+        where: { id: userId, deletedAt: null },
+        data: { role: 'STUDENT' },
+      })
+
+      return {
+        sectionId: liveSection.id,
+        sectionName: liveSection.section,
+        userId,
+      }
     })
 
     try {
       await audit({
-        action: "GROUP_JOIN",
-        entity: "SECTION",
-        entityId: String(joinCode.section.id),
-        entityName: joinCode.section.section,
+        action: 'GROUP_JOIN',
+        entity: 'SECTION',
+        entityId: String(joined.sectionId),
+        entityName: joined.sectionName,
         before: null,
-        after: { userId, sectionId: joinCode.section.id, section: joinCode.section.section },
+        after: {
+          userId: joined.userId,
+          sectionId: joined.sectionId,
+          section: joined.sectionName,
+        },
       })
     } catch {}
 
     updateTag('users')
     updateTag('sections')
     updateTag('my-sections')
-    updateTag(`my-section-${joinCode.section.id}`)
+    updateTag(`my-section-${joined.sectionId}`)
     revalidateFeature('sections')
 
     return { success: true, message: 'Successfully joined the section.' }
   } catch (error) {
-    console.error('joinSection error:', error)
-    return {
-      success: false,
-      message: 'Something went wrong. Please try again.',
-    }
+    return sectionFailureResponse(
+      error,
+      'Something went wrong. Please try again.',
+      'joinSection',
+    )
   }
 }
 
-// SOFT DELETE (admin only)
+// Legacy compatibility entry point. All manager authorization and archive
+// behavior live in archiveSection; this wrapper never performs its own delete.
 export async function softDeleteSection(id: string) {
-  const targetId = parseInt(id)
-  if (Number.isNaN(targetId)) {
+  const targetId = Number(id)
+  if (!Number.isInteger(targetId) || targetId < 1) {
     return { success: false, payload: null, message: 'Invalid section id.' }
   }
 
-  try {
-    const target = await prisma[table].findFirst({
-      where: { id: targetId, deletedAt: null },
-    })
-    if (!target) {
-      return { success: false, payload: null, message: 'Section not found.' }
-    }
-
-    const record = await prisma[table].update({
-      where: { id: targetId },
-      data: { deletedAt: new Date() },
-    })
-
-    revalidateTag('sections', 'max')
-    revalidateFeature('sections')
-
-    return {
-      success: true,
-      payload: record,
-      message: 'Section deleted successfully.',
-    }
-  } catch {
-    return {
-      success: false,
-      payload: null,
-      message: 'Failed to delete section',
-    }
-  }
+  return archiveSection(targetId)
 }
 
 // ───────────────────────────── Coordinator: My Sections ─────────────────────────────
@@ -365,6 +530,7 @@ export async function softDeleteSection(id: string) {
 export interface MySectionCardData {
   id: number
   name: string
+  academicYear: string
   students: number
   groups: number
   hasJoinCode: boolean
@@ -379,13 +545,20 @@ export interface MySectionCardData {
 const JOIN_CODE_TTL_MS = 3 * 24 * 60 * 60 * 1000
 
 function revalidateCoordinatorCache(sectionId?: number) {
-  revalidateTag('my-sections', 'max')
-  revalidateTag('sections', 'max')
-  revalidateTag('join-code', 'max')
+  updateTag('my-sections')
+  updateTag('sections')
+  updateTag('join-code')
+  updateTag('faculty')
+  updateTag('coordinators')
   revalidateFeature('sections')
-  if (sectionId) revalidateTag(`my-section-${sectionId}`, 'max')
+  revalidateFeature('faculties')
+  if (sectionId) updateTag(`my-section-${sectionId}`)
 }
 
+// My Sections scope: only live sections assigned to this coordinator.
+// The equality filter on a concrete coordinatorId never matches the staged
+// nullable unassigned rows (coordinatorId null), so unassigned global
+// sections stay hidden here until a manager assigns them.
 async function getCoordinatorSectionsData(coordinatorId: number) {
   'use cache'
   cacheTag('my-sections')
@@ -412,6 +585,7 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
       return {
         id: s.id,
         name: s.section,
+        academicYear: s.academicYear,
         students: s.students.length,
         groups: s.groups.length,
         hasJoinCode: !!validCode,
@@ -425,9 +599,9 @@ async function getCoordinatorSectionsData(coordinatorId: number) {
         capstone2OpenedAt: s.capstone2OpenedAt?.toISOString() ?? null,
         previewAvatars: s.students.slice(0, 3).map((st) => ({
           initials: getInitials(st.user.name),
-          gradient: (st.user as any).avatarGradient,
+          gradient: st.user.avatarGradient,
         })),
-        headerColor: (s as any).headerColor ?? null,
+        headerColor: s.headerColor ?? null,
       }
     },
   )
@@ -513,7 +687,7 @@ async function getCoordinatorSectionData(sectionId: number) {
     initials: getInitials(s.user.name),
     name: s.user.name,
     email: s.user.email,
-    avatarGradient: (s.user as any).avatarGradient,
+    avatarGradient: s.user.avatarGradient,
     activityStatus: activityStatusFor(s.user.loggedInAt),
     loggedInAt: s.user.loggedInAt,
     group: s.group
@@ -521,7 +695,7 @@ async function getCoordinatorSectionData(sectionId: number) {
       : null,
   }))
 
-  const capstone1Open = !!(section as any).capstone1OpenedAt
+  const capstone1Open = !!section.capstone1OpenedAt
   const capstone2Open = !!section.capstone2OpenedAt
   const availability = resolveSectionAvailability(
     capstone1Open,
@@ -573,13 +747,13 @@ async function getCoordinatorSectionData(sectionId: number) {
       }),
       studentsCount: students.length,
       groupsCount: section._count.groups,
-      capstone1OpenedAt: (section as any).capstone1OpenedAt?.toISOString() ?? null,
+      capstone1OpenedAt: section.capstone1OpenedAt?.toISOString() ?? null,
       capstone2OpenedAt: section.capstone2OpenedAt?.toISOString() ?? null,
-      headerColor: (section as any).headerColor ?? null,
+      headerColor: section.headerColor ?? null,
     },
     students,
     groups,
-    milestones: buildMilestoneAvailability(section as any),
+    milestones: buildMilestoneAvailability(section),
   }
 }
 
@@ -821,12 +995,12 @@ export async function setPhaseAvailability(
     // milestones keep their own availability and are gated by the phase overlay
     // + journey's resolveSectionAvailability hard gate.
     if (phase === 'CAPSTONE 1') {
-      if (open && !(section as any).capstone1OpenedAt) {
+      if (open && !section.capstone1OpenedAt) {
         await prisma.section.update({
           where: { id: section.id },
           data: { capstone1OpenedAt: now },
         })
-      } else if (!open && (section as any).capstone1OpenedAt) {
+      } else if (!open && section.capstone1OpenedAt) {
         await prisma.section.update({
           where: { id: section.id },
           data: { capstone1OpenedAt: null },
@@ -870,17 +1044,6 @@ export async function setPhaseAvailability(
   }
 }
 
-function validateSectionName(raw: string): string | null {
-  const name = raw.trim()
-  if (name.length < 3 || name.length > 60) {
-    return 'Section name must be between 3 and 60 characters.'
-  }
-  if (name !== raw) {
-    return 'Section name cannot have leading or trailing spaces.'
-  }
-  return name
-}
-
 function parseHeaderColor(raw: unknown): string | null | { error: string } {
   const v = typeof raw === 'string' ? raw.trim() : ''
   if (!v || v === 'default') return null
@@ -888,46 +1051,81 @@ function parseHeaderColor(raw: unknown): string | null | { error: string } {
   return { error: 'Invalid color selected.' }
 }
 
-export async function createSection(_prevState: any, formData: FormData) {
-  const coordinator = await requireCoordinatorRow()
-  if (!coordinator) {
-    return { success: false, message: 'You are not authorized to perform this action.' }
+export interface SectionFormState {
+  success: boolean
+  message: string
+}
+
+// ───────────────────────── Global section creation (Admin/Program Chair) ──
+// New sections start unassigned (coordinatorId null) with the purple default
+// (headerColor null, the first entry of SECTION_HEADER_PALETTE). Validation
+// helpers live in lib/sectionValidation.ts so pure logic can be unit tested.
+
+export async function createSection(
+  _prevState: SectionFormState | null,
+  formData: FormData,
+) {
+  // Global-manager-only: DB-backed via sectionAuthorization (live
+  // SUPERADMIN/ADMIN or live isProgramChair). Proxy is never the only guard;
+  // coordinators, students, guests, and ordinary faculty are denied with the
+  // standard shape and never throw.
+  const session = await requireGlobalSectionManager()
+  if (!session?.user?.id) {
+    return sectionUnauthorized
   }
 
-  const name = validateSectionName(formData.get('name')?.toString() ?? '')
-  if (typeof name !== 'string') {
-    return { success: false, message: name }
+  const nameResult = parseGlobalSectionName(formData.get('name'))
+  if (typeof nameResult === 'object' && 'error' in nameResult) {
+    return { success: false, message: nameResult.error }
   }
+  const name = nameResult as string
 
-  const headerColorRaw = parseHeaderColor(formData.get('headerColor'))
-  if (headerColorRaw && typeof headerColorRaw === 'object' && 'error' in headerColorRaw) {
-    return { success: false, message: headerColorRaw.error }
+  const yearResult = parseAcademicYear(formData.get('academicYear'))
+  if (typeof yearResult === 'object' && 'error' in yearResult) {
+    return { success: false, message: yearResult.error }
   }
-  const headerColor = headerColorRaw as string | null
+  const academicYear = yearResult as string
 
-  const existing = await prisma.section.findFirst({
-    where: {
-      coordinatorId: coordinator.id,
-      section: { equals: name, mode: 'insensitive' },
-    },
-  })
-  if (existing && !existing.deletedAt) {
-    return { success: false, message: `Section ${name} already exists.` }
-  }
+  // Client-supplied coordinator/header-color are intentionally ignored: every
+  // global create starts unassigned (coordinatorId null) with the purple
+  // default (headerColor null). No invitation or notification is created.
 
   try {
+    // Active-only duplicate preflight per academic year across all
+    // coordinators. The DB expression index is the final backstop; the app
+    // surfaces the exact copy without leaking internals.
+    const siblings = await prisma.section.findMany({
+      where: { academicYear },
+      select: { id: true, section: true, deletedAt: true, joinCodeId: true },
+    })
+    const targetKey = normalizeSectionKey(name)
+    const activeDuplicate = siblings.find(
+      (s) => !s.deletedAt && normalizeSectionKey(s.section) === targetKey,
+    )
+    if (activeDuplicate) {
+      return { success: false, message: DUPLICATE_SECTION_MESSAGE }
+    }
+    // Reuse the most recent archived/deleted match so its name stays reusable
+    // under the active-only constraint.
+    const archived =
+      siblings
+        .filter(
+          (s) => s.deletedAt && normalizeSectionKey(s.section) === targetKey,
+        )
+        .sort((a, b) => b.id - a.id)[0] ?? null
+
     const code = generateJoinCode()
     const expiresAt = new Date(Date.now() + JOIN_CODE_TTL_MS)
 
     let createdSectionId: number | null = null
     let createdSectionBefore: unknown = null
 
-    if (existing && existing.deletedAt) {
-      // Resurrect a previously removed section and reassign it to this
-      // coordinator with a fresh join code.
-      if (existing.joinCodeId) {
+    if (archived) {
+      // Revive the archived row unassigned with a fresh STUDENT join code.
+      // Only the join code is cleaned up; students/groups are untouched.
+      if (archived.joinCodeId) {
         await prisma.joinCode.update({
-          where: { id: existing.joinCodeId },
+          where: { id: archived.joinCodeId },
           data: { deletedAt: new Date() },
         })
       }
@@ -935,25 +1133,32 @@ export async function createSection(_prevState: any, formData: FormData) {
         data: { code, type: 'STUDENT', expiresAt },
       })
       await prisma.section.update({
-        where: { id: existing.id },
+        where: { id: archived.id },
         data: {
-          coordinatorId: coordinator.id,
+          section: name,
+          academicYear,
+          coordinatorId: null,
+          headerColor: null,
           joinCodeId: joinCode.id,
-          headerColor,
           deletedAt: null,
         },
       })
-      createdSectionId = existing.id
-      createdSectionBefore = { section: existing.section, deletedAt: existing.deletedAt, headerColor: (existing as any).headerColor ?? null }
+      createdSectionId = archived.id
+      createdSectionBefore = {
+        section: archived.section,
+        academicYear,
+        deletedAt: archived.deletedAt,
+      }
     } else {
       const joinCode = await prisma.joinCode.create({
         data: { code, type: 'STUDENT', expiresAt },
       })
       const created = await prisma.section.create({
         data: {
-          coordinatorId: coordinator.id,
           section: name,
-          headerColor,
+          academicYear,
+          coordinatorId: null,
+          headerColor: null,
           joinCodeId: joinCode.id,
         },
       })
@@ -968,34 +1173,141 @@ export async function createSection(_prevState: any, formData: FormData) {
         entityId: String(createdSectionId),
         entityName: name,
         before: createdSectionBefore,
-        after: { section: name, headerColor },
+        after: {
+          section: name,
+          academicYear,
+          coordinatorId: null,
+          headerColor: null,
+        },
       })
     } catch {}
 
-    revalidateCoordinatorCache()
+    revalidateCoordinatorCache(createdSectionId ?? undefined)
     return { success: true, message: `Section ${name} created successfully.` }
   } catch (error) {
+    // Race backstop: a concurrent insert that passes preflight still hits the
+    // active-only DB index. Surface the exact copy instead of internals.
+    if ((error as { code?: string })?.code === 'P2002') {
+      return { success: false, message: DUPLICATE_SECTION_MESSAGE }
+    }
     console.error('[createSection | Error]:', error)
     return { success: false, message: 'Failed to create section.' }
   }
 }
 
-export async function updateSection(_prevState: any, formData: FormData) {
-  const coordinator = await requireCoordinatorRow()
-  if (!coordinator) {
-    return { success: false, message: 'You are not authorized to perform this action.' }
-  }
-
+// ────────────────── Role-scoped section update (Global / Coordinator) ──
+// Single capability-aware edit action consumed by both modal variants:
+// the global-edit form submits name + academicYear while the coordinator
+// form submits name + headerColor (academic year rendered read-only). The
+// role policy is enforced server-side from live DB rows, so fields outside
+// the caller's capability are ignored — a crafted hidden input can never
+// escalate (a coordinator cannot change academicYear/coordinatorId, and a
+// global manager cannot change headerColor/coordinatorId).
+//
+// Contract (FormData):
+// - sectionId (required): numeric id of a live section.
+// - name (required): trimmed/whitespace-collapsed display value, 3-60 chars.
+// - academicYear (global managers only): required `YYYY-YYYY` inside the
+//   supported window; ignored for coordinators.
+// - headerColor (assigned coordinators only): palette key or default/empty
+//   for purple; ignored for global managers.
+//
+// Authorization is DB-backed via authorizeSectionAccess (proxy is never the
+// only guard): global-manager = live SUPERADMIN/ADMIN or live isProgramChair
+// (any live section, including unassigned); assigned-coordinator = a live
+// coordinator row owning this live assigned section. Everyone else —
+// unrelated coordinators, coordinators on unassigned sections, students,
+// guests, advisers, ordinary faculty, deleted chains — receives the standard
+// unauthorized shape (null also covers not-found/archived, so existence is
+// never leaked). Active-name uniqueness is global per academic year on the
+// normalized key (trim + collapse + lowercase, matching the staged DB
+// backstop); archived/deleted names stay reusable.
+export async function updateSection(
+  _prevState: SectionFormState | null,
+  formData: FormData,
+) {
   const sectionId = parseInt(formData.get('sectionId')?.toString() ?? '')
   if (Number.isNaN(sectionId)) {
     return { success: false, message: 'Invalid section.' }
   }
 
-  const name = validateSectionName(formData.get('name')?.toString() ?? '')
-  if (typeof name !== 'string') {
-    return { success: false, message: name }
+  const nameResult = parseGlobalSectionName(formData.get('name'))
+  if (typeof nameResult === 'object' && 'error' in nameResult) {
+    return { success: false, message: nameResult.error }
+  }
+  const name = nameResult as string
+
+  // Re-checks the section and the caller from live database rows inside the
+  // action (deleted rows filtered); proxy JWTs are never trusted here.
+  const access = await authorizeSectionAccess(sectionId)
+  if (!access) {
+    return sectionUnauthorized
   }
 
+  // ── Global manager: name + academic year; headerColor/coordinatorId ignored.
+  if (access.kind === 'global-manager') {
+    const yearResult = parseAcademicYear(formData.get('academicYear'))
+    if (typeof yearResult === 'object' && 'error' in yearResult) {
+      return { success: false, message: yearResult.error }
+    }
+    const academicYear = yearResult as string
+
+    try {
+      const current = await prisma[table].findFirst({
+        where: { id: access.sectionId, deletedAt: null },
+      })
+      if (!current) {
+        return sectionUnauthorized
+      }
+
+      if (current.section === name && current.academicYear === academicYear) {
+        return { success: true, message: 'No changes to save.' }
+      }
+
+      // Active-only duplicate preflight per academic year across all
+      // coordinators; the DB expression index is the final race backstop.
+      const siblings = await prisma[table].findMany({
+        where: { academicYear, deletedAt: null },
+        select: { id: true, section: true },
+      })
+      const targetKey = normalizeSectionKey(name)
+      const activeDuplicate = siblings.find(
+        (s) => s.id !== current.id && normalizeSectionKey(s.section) === targetKey,
+      )
+      if (activeDuplicate) {
+        return { success: false, message: DUPLICATE_SECTION_MESSAGE }
+      }
+
+      await prisma[table].update({
+        where: { id: current.id },
+        data: { section: name, academicYear },
+      })
+
+      try {
+        await audit({
+          action: "SECTION_UPDATE",
+          entity: "SECTION",
+          entityId: String(current.id),
+          entityName: name,
+          before: { section: current.section, academicYear: current.academicYear },
+          after: { section: name, academicYear },
+        })
+      } catch {}
+      revalidateCoordinatorCache(current.id)
+      return { success: true, message: `Section renamed to ${name}.` }
+    } catch (error) {
+      // A concurrent insert/update that passes preflight still hits the
+      // active-only DB index — surface the exact copy, never internals.
+      if ((error as { code?: string })?.code === 'P2002') {
+        return { success: false, message: DUPLICATE_SECTION_MESSAGE }
+      }
+      console.error('[updateSection | Error]:', error)
+      return { success: false, message: 'Failed to update section.' }
+    }
+  }
+
+  // ── Assigned coordinator: name + header color; academicYear is read-only
+  // and coordinatorId can never be assigned through this form.
   const headerColorRaw = parseHeaderColor(formData.get('headerColor'))
   if (headerColorRaw && typeof headerColorRaw === 'object' && 'error' in headerColorRaw) {
     return { success: false, message: headerColorRaw.error }
@@ -1003,24 +1315,24 @@ export async function updateSection(_prevState: any, formData: FormData) {
   const headerColor = headerColorRaw as string | null
 
   try {
-    const current = await prisma.section.findFirst({
-      where: { id: sectionId, coordinatorId: coordinator.id, deletedAt: null },
+    const current = await prisma[table].findFirst({
+      where: { id: access.sectionId, deletedAt: null },
     })
     if (!current) {
-      return { success: false, message: 'Section not found.' }
+      return sectionUnauthorized
     }
 
     const nameChanged = current.section !== name
-    const currentColor = (current as any).headerColor ?? null
+    const currentColor = current.headerColor ?? null
     const colorChanged = currentColor !== headerColor
 
     if (!nameChanged && !colorChanged) {
       return { success: true, message: 'No changes to save.' }
     }
 
-    // Color-only change (name stays same)
+    // Color-only change (name stays the same, same academic year).
     if (!nameChanged && colorChanged) {
-      await prisma.section.update({
+      await prisma[table].update({
         where: { id: current.id },
         data: { headerColor },
       })
@@ -1034,145 +1346,354 @@ export async function updateSection(_prevState: any, formData: FormData) {
           after: { section: name, headerColor },
         })
       } catch {}
-      revalidateCoordinatorCache(sectionId)
+      revalidateCoordinatorCache(current.id)
       return { success: true, message: 'Section updated.' }
     }
 
-    const target = await prisma.section.findFirst({
-      where: {
-        coordinatorId: coordinator.id,
-        section: { equals: name, mode: 'insensitive' },
-      },
+    // Name change: active-only duplicate preflight within the section's own
+    // academic year across all coordinators. Archived/deleted names are
+    // reusable — no student/group transfer, no row swap.
+    const siblings = await prisma[table].findMany({
+      where: { academicYear: current.academicYear, deletedAt: null },
+      select: { id: true, section: true },
     })
-    if (target && !target.deletedAt) {
-      return { success: false, message: `Section ${name} already exists.` }
+    const targetKey = normalizeSectionKey(name)
+    const activeDuplicate = siblings.find(
+      (s) => s.id !== current.id && normalizeSectionKey(s.section) === targetKey,
+    )
+    if (activeDuplicate) {
+      return { success: false, message: DUPLICATE_SECTION_MESSAGE }
     }
 
-    if (target && target.deletedAt) {
-      // Resurrect-on-edit (swap): revive the target, transfer this section's
-      // join code, students and groups onto it, then soft-delete the old row.
-      if (target.joinCodeId && target.joinCodeId !== current.joinCodeId) {
-        await prisma.joinCode.update({
-          where: { id: target.joinCodeId },
-          data: { deletedAt: new Date() },
-        })
-      }
-      await prisma.$transaction([
-        prisma.section.update({
-          where: { id: current.id },
-          data: { joinCodeId: null },
-        }),
-        prisma.section.update({
-          where: { id: target.id },
-          data: {
-            coordinatorId: coordinator.id,
-            joinCodeId: current.joinCodeId,
-            headerColor,
-            section: name,
-            deletedAt: null,
-          },
-        }),
-        prisma.student.updateMany({
-          where: { sectionId: current.id },
-          data: { sectionId: target.id },
-        }),
-        prisma.group.updateMany({
-          where: { sectionId: current.id },
-          data: { sectionId: target.id },
-        }),
-        prisma.section.update({
-          where: { id: current.id },
-          data: { deletedAt: new Date() },
-        }),
-      ])
-      try {
-        await audit({
-          action: "SECTION_UPDATE",
-          entity: "SECTION",
-          entityId: String(target.id),
-          entityName: name,
-          before: { section: current.section, headerColor: currentColor, id: current.id },
-          after: { section: name, headerColor, id: target.id, revivedFromDeletedId: target.id },
-        })
-      } catch {}
-    } else {
-      await prisma.section.update({
-        where: { id: current.id },
-        data: { section: name, headerColor },
+    await prisma[table].update({
+      where: { id: current.id },
+      data: { section: name, headerColor },
+    })
+    try {
+      await audit({
+        action: "SECTION_UPDATE",
+        entity: "SECTION",
+        entityId: String(current.id),
+        entityName: name,
+        before: { section: current.section, headerColor: currentColor },
+        after: { section: name, headerColor },
       })
-      try {
-        await audit({
-          action: "SECTION_UPDATE",
-          entity: "SECTION",
-          entityId: String(current.id),
-          entityName: name,
-          before: { section: current.section, headerColor: currentColor },
-          after: { section: name, headerColor },
-        })
-      } catch {}
-    }
+    } catch {}
 
-    revalidateCoordinatorCache(sectionId)
+    revalidateCoordinatorCache(current.id)
     return { success: true, message: `Section renamed to ${name}.` }
   } catch (error) {
+    if ((error as { code?: string })?.code === 'P2002') {
+      return { success: false, message: DUPLICATE_SECTION_MESSAGE }
+    }
     console.error('[updateSection | Error]:', error)
     return { success: false, message: 'Failed to update section.' }
   }
 }
 
-export async function removeSection(id: number) {
-  const coordinator = await requireCoordinatorRow()
-  if (!coordinator) {
-    return { success: false, message: 'You are not authorized to perform this action.' }
+// ────────────────── Manager-only section archive ──
+// Global-manager-only soft-delete consumed by the neutral archive confirmation
+// modal (ArchiveSectionModal calls archiveSection(section.id)).
+// The lock, live checks, counts, and the Section/linked join-code soft-deletes
+// share one Serializable transaction. Audit and cache invalidation happen only
+// after that transaction commits, so a retried attempt cannot duplicate either
+// side effect.
+export async function archiveSection(id: number) {
+  const session = await requireGlobalSectionManager()
+  if (!session?.user?.id) {
+    return sectionUnauthorized
+  }
+  if (!Number.isInteger(id)) {
+    return { success: false, message: 'Invalid section.' }
   }
 
   try {
-    const section = await prisma.section.findFirst({
-      where: { id, coordinatorId: coordinator.id, deletedAt: null },
-    })
-    if (!section) {
-      return { success: false, message: 'Section not found.' }
-    }
-
-    const [studentCount, groupCount] = await prisma.$transaction([
-      prisma.student.count({ where: { sectionId: section.id, deletedAt: null } }),
-      prisma.group.count({ where: { sectionId: section.id } }),
-    ])
-
-    if (studentCount > 0 || groupCount > 0) {
-      return {
-        success: false,
-        message: 'Only empty sections can be removed. Move or remove students first.',
+    const archived = await withSerializableTransaction(async (tx) => {
+      const locked = await lockSectionRow(tx, id)
+      if (locked.length !== 1) {
+        throw new SectionBusinessError('Section not found.')
       }
-    }
 
-    if (section.joinCodeId) {
-      await prisma.joinCode.update({
-        where: { id: section.joinCodeId },
-        data: { deletedAt: new Date() },
+      const section = await tx.section.findFirst({
+        where: { id, deletedAt: null },
+        select: { id: true, section: true, joinCodeId: true },
       })
-    }
-    await prisma.section.update({
-      where: { id: section.id },
-      data: { deletedAt: new Date() },
+      if (!section) {
+        throw new SectionBusinessError('Section not found.')
+      }
+
+      const studentCount = await tx.student.count({
+        where: { sectionId: section.id, deletedAt: null },
+      })
+      const groupCount = await tx.group.count({
+        where: { sectionId: section.id, deletedAt: null },
+      })
+      if (studentCount > 0 || groupCount > 0) {
+        throw new SectionBusinessError(
+          'Only empty sections can be archived. Move or remove students and groups first.',
+        )
+      }
+
+      const archivedAt = new Date()
+      if (section.joinCodeId !== null) {
+        await tx.joinCode.updateMany({
+          where: { id: section.joinCodeId, deletedAt: null },
+          data: { deletedAt: archivedAt },
+        })
+      }
+
+      const updated = await tx.section.updateMany({
+        where: { id: section.id, deletedAt: null },
+        data: { deletedAt: archivedAt },
+      })
+      if (updated.count !== 1) {
+        throw new SectionBusinessError(SECTION_CHANGED_MESSAGE)
+      }
+
+      return { section, archivedAt }
     })
 
     try {
       await audit({
-        action: "SECTION_REMOVE",
-        entity: "SECTION",
+        action: 'SECTION_ARCHIVE',
+        entity: 'SECTION',
+        entityId: String(archived.section.id),
+        entityName: archived.section.section,
+        before: { section: archived.section.section, deletedAt: null },
+        after: {
+          section: archived.section.section,
+          deletedAt: archived.archivedAt.toISOString(),
+        },
+      })
+    } catch {}
+
+    revalidateCoordinatorCache(archived.section.id)
+    return { success: true, message: `Section ${archived.section.section} archived.` }
+  } catch (error) {
+    return sectionFailureResponse(
+      error,
+      'Failed to archive section.',
+      'archiveSection',
+    )
+  }
+}
+
+// ────────────────── Manager-only one-time coordinator assignment ──
+// Direct assignment consumed by the unassigned-row modal
+// (AssignCoordinatorModal calls assignSectionCoordinator(sectionId,
+// coordinatorId) with numeric ids, then toasts/closes/refreshes).
+// DB-backed via requireGlobalSectionManager (live SUPERADMIN/ADMIN or live
+// isProgramChair); proxy is never the only guard. Assigned coordinators,
+// unrelated coordinators, students, guests, advisers, and ordinary faculty
+// receive sectionUnauthorized. Staged schema: Section.coordinatorId is
+// nullable, so unassigned means coordinatorId null; academicYear is required
+// but untouched here. Succeeds only when the live section is unassigned — an
+// already-assigned section is rejected. Assigned-row changes use the separate
+// reassignSectionCoordinator() action below; this entry point never
+// overwrites an assigned row or unassigns it.
+// Both ids are re-checked from live rows inside the action (deletedAt null on
+// Section, and the full Coordinator → Faculty → User chain live); unrelated
+// or deleted records are rejected before any write. The write itself is
+// race-safe: updateMany guarded by coordinatorId null, so a concurrent assign
+// that wins first turns this call into the already-assigned refusal instead
+// of an overwrite. Never creates an Invitation or Notification — this is a
+// direct link, not the faculty invitation flow. Success revalidates global
+// sections, coordinator workload/faculty data, and the assigned coordinator's
+// My Sections caches. Never exposes raw DB errors; all failures return the
+// standard { success, message } shape.
+export async function assignSectionCoordinator(
+  sectionId: number,
+  coordinatorId: number,
+) {
+  const session = await requireGlobalSectionManager()
+  if (!session?.user?.id) {
+    return sectionUnauthorized
+  }
+  if (!Number.isInteger(sectionId)) {
+    return { success: false, message: 'Invalid section.' }
+  }
+  if (!Number.isInteger(coordinatorId)) {
+    return { success: false, message: 'Invalid coordinator.' }
+  }
+
+  try {
+    const section = await prisma.section.findFirst({
+      where: { id: sectionId, deletedAt: null },
+      select: { id: true, section: true, coordinatorId: true },
+    })
+    if (!section) {
+      return { success: false, message: 'Section not found.' }
+    }
+    if (section.coordinatorId !== null) {
+      return {
+        success: false,
+        message: 'This section already has a coordinator.',
+      }
+    }
+
+    const coordinator = await prisma.coordinator.findFirst({
+      where: {
+        id: coordinatorId,
+        deletedAt: null,
+        faculty: {
+          deletedAt: null,
+          user: { deletedAt: null },
+        },
+      },
+      select: { id: true },
+    })
+    if (!coordinator) {
+      return { success: false, message: 'Coordinator not found.' }
+    }
+
+    // Idempotency/race guard: only an unassigned live row can be linked.
+    const updated = await prisma.section.updateMany({
+      where: { id: section.id, coordinatorId: null, deletedAt: null },
+      data: { coordinatorId: coordinator.id },
+    })
+    if (updated.count === 0) {
+      return {
+        success: false,
+        message: 'This section already has a coordinator.',
+      }
+    }
+
+    revalidateCoordinatorCache(section.id)
+
+    return {
+      success: true,
+      message: `Coordinator assigned to ${section.section} successfully.`,
+      payload: { sectionId: section.id, coordinatorId: coordinator.id },
+    }
+  } catch (error) {
+    console.error('[assignSectionCoordinator | Error]:', error)
+    return { success: false, message: 'Failed to assign coordinator.' }
+  }
+}
+
+// ────────────────── Manager-only coordinator reassignment ──
+// DB-backed via requireGlobalSectionManager (live SUPERADMIN/ADMIN or live
+// Program Chair); proxy is never the only guard. Reassignment is available
+// only for an assigned live section and requires the caller to submit the
+// coordinator id it observed. The expected id is checked again in the atomic
+// update, so a concurrent manager change cannot be overwritten. There is
+// intentionally no unassign path here.
+export async function reassignSectionCoordinator(
+  sectionId: number,
+  nextCoordinatorId: number,
+  expectedCoordinatorId: number,
+) {
+  const session = await requireGlobalSectionManager()
+  if (!session?.user?.id) {
+    return sectionUnauthorized
+  }
+  if (!Number.isInteger(sectionId)) {
+    return { success: false, message: 'Invalid section.' }
+  }
+  if (!Number.isInteger(nextCoordinatorId)) {
+    return { success: false, message: 'Invalid coordinator.' }
+  }
+  if (!Number.isInteger(expectedCoordinatorId)) {
+    return { success: false, message: 'Invalid expected coordinator.' }
+  }
+
+  try {
+    // These reads are independent after authorization and input validation.
+    const [section, coordinator] = await Promise.all([
+      prisma.section.findFirst({
+        where: { id: sectionId, deletedAt: null },
+        select: { id: true, section: true, coordinatorId: true },
+      }),
+      prisma.coordinator.findFirst({
+        where: {
+          id: nextCoordinatorId,
+          deletedAt: null,
+          faculty: {
+            deletedAt: null,
+            user: { deletedAt: null },
+          },
+        },
+        select: {
+          id: true,
+          deletedAt: true,
+          faculty: {
+            select: {
+              id: true,
+              deletedAt: true,
+              user: {
+                select: { id: true, deletedAt: true },
+              },
+            },
+          },
+        },
+      }),
+    ])
+
+    if (!section) {
+      return { success: false, message: 'Section not found.' }
+    }
+    if (section.coordinatorId === null) {
+      return {
+        success: false,
+        message: 'This section is unassigned and cannot be reassigned.',
+      }
+    }
+    if (section.coordinatorId !== expectedCoordinatorId) {
+      return {
+        success: false,
+        message: 'This section changed since it was loaded. Refresh and try again.',
+      }
+    }
+    if (nextCoordinatorId === section.coordinatorId) {
+      return { success: false, message: 'Choose a different coordinator.' }
+    }
+    if (
+      !coordinator ||
+      coordinator.deletedAt !== null ||
+      !coordinator.faculty ||
+      coordinator.faculty.deletedAt !== null ||
+      !coordinator.faculty.user ||
+      coordinator.faculty.user.deletedAt !== null
+    ) {
+      return { success: false, message: 'Coordinator not found or inactive.' }
+    }
+
+    const updated = await prisma.section.updateMany({
+      where: {
+        id: sectionId,
+        deletedAt: null,
+        coordinatorId: expectedCoordinatorId,
+      },
+      data: { coordinatorId: coordinator.id },
+    })
+    if (updated.count === 0) {
+      return {
+        success: false,
+        message: 'This section changed since it was loaded. Refresh and try again.',
+      }
+    }
+
+    try {
+      await audit({
+        action: 'SECTION_COORDINATOR_REASSIGN',
+        entity: 'SECTION',
         entityId: String(section.id),
         entityName: section.section,
-        before: { section: section.section, deletedAt: null },
-        after: { section: section.section, deletedAt: new Date().toISOString() },
+        before: { coordinatorId: expectedCoordinatorId },
+        after: { coordinatorId: nextCoordinatorId },
       })
     } catch {}
 
     revalidateCoordinatorCache(section.id)
-    return { success: true, message: `Section ${section.section} removed.` }
+
+    return {
+      success: true,
+      message: `Coordinator reassigned for ${section.section} successfully.`,
+      payload: { sectionId: section.id, coordinatorId: coordinator.id },
+    }
   } catch (error) {
-    console.error('[removeSection | Error]:', error)
-    return { success: false, message: 'Failed to remove section.' }
+    console.error('[reassignSectionCoordinator | Error]:', error)
+    return { success: false, message: 'Failed to reassign coordinator.' }
   }
 }
 

@@ -205,10 +205,11 @@ export function SectionCard({ section }: SectionCardProps) {
 
       {editOpen && (
         <SectionModal
-          mode="edit"
+          mode="coordinator-edit"
           section={{
             id: section.id,
             name: section.name,
+            academicYear: section.academicYear,
             headerColor: section.headerColor,
           }}
           onClose={() => setEditOpen(false)}

@@ -30,6 +30,10 @@ const DEFENSE_VERDICTS: DefenseVerdict[] = [
 ]
 const PANELIST_ROLES: PanelistRole[] = ['CHAIR', 'PANEL_MEMBER']
 
+async function revalidateDefenseJourneyCache(sectionId: number | null | undefined) {
+  if (sectionId) revalidateTag(`my-section-${sectionId}`, 'max')
+}
+
 // ───────────────────────────── Panelist session helpers (pure) ─────────────
 
 type PanelistFeedback = { comments: number; pages: number; hasCommitted?: boolean; hasDraft?: boolean } | null
@@ -638,7 +642,7 @@ export async function createDefenseSchedule(
 
   const group = await prisma.group.findFirst({
     where: { id: groupId, deletedAt: null },
-    select: { id: true },
+    select: { id: true, sectionId: true },
   })
   if (!group) {
     return { success: false, message: 'Group not found.' }
@@ -725,6 +729,7 @@ export async function createDefenseSchedule(
     // scheduling page (faculty/admins) sees the new schedule immediately.
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
+    await revalidateDefenseJourneyCache(group.sectionId)
 
     return {
       success: true,
@@ -853,7 +858,7 @@ export async function updateDefenseSchedule(
               }
             : {}),
         },
-        include: { panelists: true, group: { select: { groupName: true } } },
+        include: { panelists: true, group: { select: { groupName: true, sectionId: true } } },
       })
     })
 
@@ -871,6 +876,7 @@ export async function updateDefenseSchedule(
 
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
+    await revalidateDefenseJourneyCache(updated.group.sectionId)
 
     return {
       success: true,
@@ -890,7 +896,7 @@ export async function deleteDefenseSchedule(id: number) {
   try {
     const schedule = await prisma.defenseSchedule.findFirst({
       where: { id, deletedAt: null },
-      select: { id: true, createdBy: true, type: true, groupId: true, group: { select: { groupName: true } } },
+      select: { id: true, createdBy: true, type: true, groupId: true, group: { select: { groupName: true, sectionId: true } } },
     })
     if (!schedule) {
       return { success: false, message: 'Defense schedule not found.' }
@@ -927,6 +933,7 @@ export async function deleteDefenseSchedule(id: number) {
 
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
+    await revalidateDefenseJourneyCache(schedule.group.sectionId)
 
     return { success: true, message: 'Defense schedule deleted.' }
   } catch (error) {
@@ -969,7 +976,7 @@ export async function rescheduleForRedefense(
           where: { deletedAt: null },
           select: { userId: true, role: true },
         },
-        group: { select: { id: true, groupName: true } },
+        group: { select: { id: true, groupName: true, sectionId: true } },
       },
     })
     if (!schedule) {
@@ -1097,6 +1104,7 @@ export async function rescheduleForRedefense(
 
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
+    await revalidateDefenseJourneyCache(schedule.group.sectionId)
 
     return {
       success: true,
@@ -1322,6 +1330,7 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
           },
           group: {
             select: {
+              sectionId: true,
               students: {
                 where: { deletedAt: null },
                 select: { userId: true },
@@ -1346,6 +1355,7 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
           revalidateTag(`defense-student-versions-${submission.id}-${userId}`, 'max')
         }
       }
+      await revalidateDefenseJourneyCache(affected?.group.sectionId)
     } catch (revalidateError) {
       console.error('[submitPanelistVerdict | revalidate students | Error]:', revalidateError)
     }
@@ -1472,6 +1482,15 @@ export async function reviewDefenseResubmission(
 
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
+    try {
+      const schedule = await prisma.defenseSchedule.findFirst({
+        where: { id: submission.scheduleId, deletedAt: null },
+        select: { group: { select: { sectionId: true } } },
+      })
+      await revalidateDefenseJourneyCache(schedule?.group.sectionId)
+    } catch (revalidateError) {
+      console.error('[reviewDefenseResubmission | revalidate journey | Error]:', revalidateError)
+    }
 
     return {
       success: true,

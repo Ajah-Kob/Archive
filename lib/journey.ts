@@ -5,7 +5,7 @@
 // (coordinator progress) import. 'use server' files can only export async
 // functions, so this logic lives outside of lib/actions/.
 
-import type { JourneyRow } from '@/types/milestones'
+import type { JourneyRow, JourneyState } from '@/types/milestones'
 import { CAPSTONE1_KEYS, CAPSTONE2_KEYS } from '@/lib/milestones/phase'
 
 const CHAPTER_SLUG: Record<string, string> = {
@@ -32,6 +32,113 @@ export type JourneySource = {
   }[]
   capstoneArchive: { deletedAt: Date | null } | null
   archivingSubmission?: { status: string; deletedAt: Date | null } | null
+  defenses?: readonly DefenseJourneyInput[]
+}
+
+export type DefenseJourneyType = 'PROPOSAL' | 'FINAL'
+
+export type DefenseJourneyVerdict =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'MINOR_REVISION'
+  | 'MAJOR_REVISION'
+  | 'REDEFENSE'
+
+export type DefenseJourneyReviewStatus = 'PENDING' | 'APPROVED' | 'REDEFENSE'
+
+/**
+ * Minimal live input for one defense type. Callers must supply only the
+ * current, non-deleted schedule and its latest non-deleted submission.
+ * Resubmission reviews override the original schedule verdict.
+ */
+export type DefenseJourneyInput = {
+  schedule: {
+    type: DefenseJourneyType
+    verdict: DefenseJourneyVerdict
+  }
+  latestSubmission: {
+    isInitial: boolean
+    reviewStatuses: readonly DefenseJourneyReviewStatus[]
+  } | null
+}
+
+export type DefenseJourneyRecord = {
+  type: DefenseJourneyType
+  verdict: DefenseJourneyVerdict
+  submissions: readonly {
+    isInitial: boolean
+    reviews: readonly { status: DefenseJourneyReviewStatus }[]
+  }[]
+}
+
+/**
+ * Maps the already-filtered defense rows returned by journey queries to the
+ * minimal input consumed by the shared journey derivation. The query supplies
+ * the active schedule, its latest active submission, and active reviews.
+ */
+export function mapDefenseJourneyInputs(
+  schedules: readonly DefenseJourneyRecord[],
+): DefenseJourneyInput[] {
+  return schedules.map((schedule) => {
+    const latestSubmission = schedule.submissions[0] ?? null
+    return {
+      schedule: {
+        type: schedule.type,
+        verdict: schedule.verdict,
+      },
+      latestSubmission: latestSubmission
+        ? {
+            isInitial: latestSubmission.isInitial,
+            reviewStatuses: latestSubmission.reviews.map(
+              (review) => review.status,
+            ),
+          }
+        : null,
+    }
+  })
+}
+
+/** Purely maps live Proposal/Final defense state to its journey state. */
+export function deriveDefenseJourneyState(
+  input: DefenseJourneyInput,
+): JourneyState {
+  const latestSubmission = input.latestSubmission
+
+  if (latestSubmission && !latestSubmission.isInitial) {
+    if (latestSubmission.reviewStatuses.some((status) => status === 'REDEFENSE')) {
+      return 'REDEFENSE'
+    }
+    if (
+      latestSubmission.reviewStatuses.length > 0 &&
+      latestSubmission.reviewStatuses.every((status) => status === 'APPROVED')
+    ) {
+      return 'APPROVED'
+    }
+    return 'SUBMITTED'
+  }
+
+  switch (input.schedule.verdict) {
+    case 'APPROVED':
+      return 'APPROVED'
+    case 'MINOR_REVISION':
+      return 'MINOR_REVISION'
+    case 'MAJOR_REVISION':
+      return 'MAJOR_REVISION'
+    case 'REDEFENSE':
+      return 'REDEFENSE'
+    case 'PENDING':
+      return latestSubmission ? 'SUBMITTED' : 'DEFAULT'
+    default:
+      return 'DEFAULT'
+  }
+}
+
+function resolveDefenseJourneyState(
+  defenses: readonly DefenseJourneyInput[] | undefined,
+  type: DefenseJourneyType,
+): JourneyState {
+  const input = defenses?.find((defense) => defense.schedule.type === type)
+  return input ? deriveDefenseJourneyState(input) : 'DEFAULT'
 }
 
 // Statically built groupless journey (all locked) so we never allocate it per request.
@@ -174,9 +281,9 @@ export function buildJourneyRows(
     // Insert the defense step after its preceding chapter. Proposal Defense
     // follows Chapter 3 (end of Capstone 1); Final Defense follows Chapter 5
     // (end of Capstone 2). The step is gated by the coordinator's availability
-    // (see resolveSectionAvailability): locked stays locked, open surfaces as
-    // an available step. Defense state derivation (verdict / review status) is
-    // wired separately — see lib/actions/student-defense.ts.
+    // (see resolveSectionAvailability): locked stays locked. Open steps derive
+    // from the matching live Proposal/Final defense input when supplied, and
+    // otherwise remain available.
     if (chapter === 'CHAPTER_3') {
       const defense: JourneyRow = {
         slug: 'proposal-defense',
@@ -185,7 +292,7 @@ export function buildJourneyRows(
         state: 'LOCKED',
       }
       if (isOpen('PROPOSAL_DEFENSE')) {
-        defense.state = 'DEFAULT'
+        defense.state = resolveDefenseJourneyState(group.defenses, 'PROPOSAL')
       }
       rows.push(defense)
     } else if (chapter === 'CHAPTER_5') {
@@ -196,7 +303,7 @@ export function buildJourneyRows(
         state: 'LOCKED',
       }
       if (isOpen('FINAL_DEFENSE')) {
-        defense.state = 'DEFAULT'
+        defense.state = resolveDefenseJourneyState(group.defenses, 'FINAL')
       }
       rows.push(defense)
     }

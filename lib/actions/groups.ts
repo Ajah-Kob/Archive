@@ -6,7 +6,11 @@ import { timeAgo } from '@/lib/helper'
 import { requireStudent, requireUser, unauthorized } from '@/lib/actions/guard'
 import { ADVISER_CAP } from '@/config/constants'
 import { audit } from '@/lib/actions/audit'
-import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
+import {
+  buildJourneyRows,
+  mapDefenseJourneyInputs,
+  resolveSectionAvailability,
+} from '@/lib/journey'
 import {
   GROUP_CAP,
   type AdviserOption,
@@ -114,6 +118,25 @@ export async function getMyWorkspace(userId: number): Promise<{
                 select: { status: true, deletedAt: true },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
+              },
+            },
+          },
+          defenseSchedules: {
+            where: { deletedAt: null },
+            select: {
+              type: true,
+              verdict: true,
+              submissions: {
+                where: { deletedAt: null },
+                orderBy: { version: 'desc' },
+                take: 1,
+                select: {
+                  isInitial: true,
+                  reviews: {
+                    where: { deletedAt: null },
+                    select: { status: true },
+                  },
+                },
               },
             },
           },
@@ -256,7 +279,16 @@ export async function getMyWorkspace(userId: number): Promise<{
       invitations,
       finalTopic,
     },
-    journey: buildJourneyRows(group, availability),
+    journey: buildJourneyRows(
+      {
+        capstone: group.capstone,
+        milestones: group.milestones,
+        capstoneArchive: group.capstoneArchive,
+        archivingSubmission: group.archivingSubmission,
+        defenses: mapDefenseJourneyInputs(group.defenseSchedules),
+      },
+      availability,
+    ),
     phaseLocks,
   } as any
 

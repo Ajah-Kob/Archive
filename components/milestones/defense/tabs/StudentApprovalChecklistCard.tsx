@@ -31,6 +31,7 @@ export interface StudentChecklistPanelist {
   name: string
   email: string
   image: string | null
+  avatarGradient?: string | null
   role: PanelistRole
 }
 
@@ -85,9 +86,9 @@ function getStatusColor(
 }
 
 /**
- * Whether a REDEFENSE review resets to PENDING on new version creation.
+  * Whether a REDEFENSE review resets to PENDING on new version creation.
  * Delegates to shared helper so carry-forward stays in one place.
- * APPROVED stays (carry-forward), REDEFENSE → PENDING, PENDING → PENDING.
+  * APPROVED stays (carry-forward), REDEFENSE → PENDING, PENDING → PENDING.
  */
 function willResetOnNewVersion(status: string): boolean {
   return shouldResetOnResubmission(status as DefenseReviewStatus)
@@ -194,7 +195,7 @@ function ChecklistRow({ panelist, isFirst, isLast }: ChecklistRowProps) {
           initials={getInitials(panelist.name)}
           name={panelist.name}
           email={panelist.email}
-          gradient={PANELIST_AVATAR_GRADIENT}
+          gradient={panelist.avatarGradient ?? PANELIST_AVATAR_GRADIENT}
           avatarClassName="size-[35px]"
         />
       </div>

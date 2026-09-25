@@ -5,7 +5,11 @@ import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client'
 import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
-import { buildJourneyRows, resolveSectionAvailability } from '@/lib/journey'
+import {
+  buildJourneyRows,
+  mapDefenseJourneyInputs,
+  resolveSectionAvailability,
+} from '@/lib/journey'
 import { audit } from '@/lib/actions/audit'
 import {
   CHAPTER_LABELS,
@@ -213,6 +217,25 @@ export async function getChapterData(
               submissions: { select: { status: true, deletedAt: true } },
             },
           },
+          defenseSchedules: {
+            where: { deletedAt: null },
+            select: {
+              type: true,
+              verdict: true,
+              submissions: {
+                where: { deletedAt: null },
+                orderBy: { version: 'desc' },
+                take: 1,
+                select: {
+                  isInitial: true,
+                  reviews: {
+                    where: { deletedAt: null },
+                    select: { status: true },
+                  },
+                },
+              },
+            },
+          },
           capstoneArchive: { select: { deletedAt: true } },
           archivingSubmission: { select: { status: true, deletedAt: true } },
         },
@@ -241,6 +264,7 @@ export async function getChapterData(
           })),
           capstoneArchive: effectiveGroup.capstoneArchive,
           archivingSubmission: (effectiveGroup as unknown as { archivingSubmission?: { status: string; deletedAt: Date | null } | null }).archivingSubmission ?? null,
+          defenses: mapDefenseJourneyInputs(effectiveGroup.defenseSchedules),
         }
       : null,
     availability,

@@ -18,6 +18,7 @@ import {
 import { audit } from '@/lib/actions/audit'
 import {
   buildJourneyRows,
+  mapDefenseJourneyInputs,
   resolveSectionAvailability,
 } from '@/lib/journey'
 import {
@@ -672,6 +673,25 @@ async function getCoordinatorSectionData(sectionId: number) {
               },
             },
           },
+          defenseSchedules: {
+            where: { deletedAt: null },
+            select: {
+              type: true,
+              verdict: true,
+              submissions: {
+                where: { deletedAt: null },
+                orderBy: { version: 'desc' },
+                take: 1,
+                select: {
+                  isInitial: true,
+                  reviews: {
+                    where: { deletedAt: null },
+                    select: { status: true },
+                  },
+                },
+              },
+            },
+          },
           capstoneArchive: { select: { deletedAt: true } },
           archivingSubmission: { select: { status: true, deletedAt: true } },
         },
@@ -724,6 +744,7 @@ async function getCoordinatorSectionData(sectionId: number) {
           })),
           capstoneArchive: g.capstoneArchive,
           archivingSubmission: (g as unknown as { archivingSubmission?: { status: string; deletedAt: Date | null } | null }).archivingSubmission ?? null,
+          defenses: mapDefenseJourneyInputs(g.defenseSchedules),
         },
         availability,
       ),
@@ -2044,7 +2065,27 @@ export async function getCoordinatorGroupDetail(groupId: number) {
         archivingSubmission: { select: { status: true, deletedAt: true, title: true, fileName: true, blobUrl: true, mimeType: true, size: true } },
         defenseSchedules: {
           where: { deletedAt: null },
-          select: { id: true, type: true, date: true, venue: true, verdict: true, startTime: true, endTime: true },
+          select: {
+            id: true,
+            type: true,
+            date: true,
+            venue: true,
+            verdict: true,
+            startTime: true,
+            endTime: true,
+            submissions: {
+              where: { deletedAt: null },
+              orderBy: { version: 'desc' },
+              take: 1,
+              select: {
+                isInitial: true,
+                reviews: {
+                  where: { deletedAt: null },
+                  select: { status: true },
+                },
+              },
+            },
+          },
           orderBy: { date: 'desc' },
         },
       },
@@ -2066,6 +2107,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
         })),
         capstoneArchive: group.capstoneArchive,
         archivingSubmission: (group as unknown as { archivingSubmission?: { status: string; deletedAt: Date | null } | null }).archivingSubmission ?? null,
+        defenses: mapDefenseJourneyInputs(group.defenseSchedules),
       },
       resolveSectionAvailability(
         !!(group.section as unknown as { capstone1OpenedAt: Date | null }).capstone1OpenedAt,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Lock, TriangleAlert } from 'lucide-react'
+import { Check, Clock, Lock, TriangleAlert } from 'lucide-react'
 import type { JourneyRow } from '@/types/milestones'
 
 const STATUS_LABEL: Record<JourneyRow['state'], string> = {
@@ -44,8 +44,13 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
     <div className="flex items-center justify-start">
       {journey.map((row, i) => {
         const isCurrent = i === activeIndex
-        const isRevision = row.state === 'NEEDS_REVISION'
-        const showActiveBadge = isCurrent && isRevision
+        const isDefenseRevision =
+          row.state === 'NEEDS_REVISION' || row.state === 'REDEFENSE'
+        const isMajorRevision = row.state === 'MAJOR_REVISION'
+        const isPendingReview =
+          row.state === 'SUBMITTED' || row.state === 'MINOR_REVISION'
+        const showActiveBadge =
+          isCurrent && (isDefenseRevision || isMajorRevision)
         const connectorColor =
           i < journey.length - 1
             ? row.state === 'APPROVED'
@@ -114,23 +119,55 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     />
                   </div>
                 </>
-              ) : isRevision ? (
-                <div
-                  className="flex items-center justify-center rounded-full"
-                  style={{
-                    width: s.circle,
-                    height: s.circle,
-                    backgroundColor: 'rgba(245,158,11,0.09)',
-                    border: '1px solid rgba(245,158,11,0.31)',
-                  }}
-                >
-                  <TriangleAlert
-                    className="text-[#f59e0b]"
-                    strokeWidth={2.5}
-                    style={{ width: s.check, height: s.check }}
-                  />
-                </div>
-              ) : isCurrent ? (
+               ) : isDefenseRevision ? (
+                 <div
+                   className="flex items-center justify-center rounded-full"
+                   style={{
+                     width: s.circle,
+                     height: s.circle,
+                     backgroundColor: 'rgba(239,68,68,0.09)',
+                     border: '1px solid rgba(239,68,68,0.31)',
+                   }}
+                 >
+                   <TriangleAlert
+                     className="text-[#ef4444]"
+                     strokeWidth={2.5}
+                     style={{ width: s.check, height: s.check }}
+                   />
+                 </div>
+               ) : isMajorRevision ? (
+                 <div
+                   className="flex items-center justify-center rounded-full"
+                   style={{
+                     width: s.circle,
+                     height: s.circle,
+                     backgroundColor: 'rgba(249,115,22,0.09)',
+                     border: '1px solid rgba(249,115,22,0.31)',
+                   }}
+                 >
+                   <TriangleAlert
+                     className="text-[#f97316]"
+                     strokeWidth={2.5}
+                     style={{ width: s.check, height: s.check }}
+                   />
+                 </div>
+               ) : isPendingReview ? (
+                 <div
+                   className="flex items-center justify-center rounded-full"
+                   style={{
+                     width: s.circle,
+                     height: s.circle,
+                     backgroundColor: 'rgba(245,158,11,0.09)',
+                     border: '1px solid rgba(245,158,11,0.31)',
+                   }}
+                 >
+                   <Clock
+                     className="text-[#f59e0b]"
+                     strokeWidth={2.5}
+                     style={{ width: s.check, height: s.check }}
+                   />
+                 </div>
+               ) : isCurrent ? (
                 <div
                   className="flex items-center justify-center rounded-full"
                   style={{

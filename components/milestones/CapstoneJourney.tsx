@@ -2,12 +2,9 @@ import Link from 'next/link'
 import { Check, Clock, Lock, TriangleAlert } from 'lucide-react'
 import type { JourneyRow } from '@/types/milestones'
 
-const HEADER_ORDER: JourneyRow['header'][] = [
-  'CAPSTONE 1',
-  'CAPSTONE 2',
-]
+const HEADER_ORDER: JourneyRow['header'][] = ['CAPSTONE 1', 'CAPSTONE 2']
 
-function RowIcon({
+export function RowIcon({
   state,
   isActive,
 }: {
@@ -41,15 +38,18 @@ function RowIcon({
   if (state === 'NEEDS_REVISION' || state === 'REDEFENSE') {
     return (
       <div className="bg-[#fef2f2] border border-[rgba(239,68,68,0.3)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
-        <TriangleAlert className="size-[12px] text-[#ef4444]" strokeWidth={2.25} />
+        <TriangleAlert
+          className="size-[12px] text-[#ef4444]"
+          strokeWidth={2.25}
+        />
       </div>
     )
   }
 
   if (state === 'SUBMITTED' || state === 'MINOR_REVISION') {
     return (
-      <div className="bg-[rgba(234,179,8,0.08)] border border-[rgba(234,179,8,0.25)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
-        <Clock className="size-[12px] text-[#eab308]" strokeWidth={2.25} />
+      <div className="bg-[rgba(245,158,11,0.07)] border border-[rgba(245,158,11,0.2)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
+        <Clock className="size-[12px] text-[#f59e0b]" strokeWidth={2.25} />
       </div>
     )
   }
@@ -57,7 +57,10 @@ function RowIcon({
   if (state === 'MAJOR_REVISION') {
     return (
       <div className="bg-[rgba(249,115,22,0.08)] border border-[rgba(249,115,22,0.25)] rounded-[11px] size-[22px] flex items-center justify-center shrink-0">
-        <TriangleAlert className="size-[12px] text-[#f97316]" strokeWidth={2.25} />
+        <TriangleAlert
+          className="size-[12px] text-[#f97316]"
+          strokeWidth={2.25}
+        />
       </div>
     )
   }
@@ -147,7 +150,8 @@ export function CapstoneJourney({
 
   // When phaseLocks[header] === true, the phase is locked — show transparent
   // overlay covering its milestone rows, matching the coordinator's Milestones tab.
-  const isPhaseLocked = (header: JourneyRow['header']) => phaseLocks?.[header] === true
+  const isPhaseLocked = (header: JourneyRow['header']) =>
+    phaseLocks?.[header] === true
 
   return (
     <aside className="self-stretch bg-white shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] w-[200px] shrink-0 flex flex-col gap-[12px] px-[13px] py-[26px] overflow-hidden">
@@ -159,7 +163,10 @@ export function CapstoneJourney({
         {groups.map((group, groupIndex) => {
           const locked = isPhaseLocked(group.header)
           return (
-            <section key={group.header} className={groupIndex > 0 ? 'pt-[1px]' : ''}>
+            <section
+              key={group.header}
+              className={groupIndex > 0 ? 'pt-[1px]' : ''}
+            >
               <p className="font-sans font-extrabold text-[9.5px] leading-[14.25px] tracking-[0.95px] uppercase text-[#bbc0d8] px-[4px] pb-[7px]">
                 {group.header}
               </p>

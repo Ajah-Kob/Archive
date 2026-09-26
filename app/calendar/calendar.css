@@ -13,13 +13,8 @@
   --fc-classic-strong-border: #dfe3fb;
   --fc-classic-today: rgba(112, 125, 255, 0.12);
   --fc-classic-primary: #707dff;
-  --fc-classic-event: #707dff;
+  --fc-classic-event: #00085d;
   --fc-classic-event-contrast: #ffffff;
-  --fc-classic-button: #707dff;
-  --fc-classic-button-border: none;
-  --fc-classic-button-strong: #5565ff;
-  --fc-classic-button-strong-border: #5565ff;
-  --fc-classic-button-foreground: #ffffff;
   --fc-classic-background: #ffffff;
   --fc-classic-foreground: #10133a;
   --fc-classic-muted-foreground: #5a6382;
@@ -27,15 +22,6 @@
 
   font-family: var(--font-sans), sans-serif;
   font-size: 11px;
-}
-
-/* Toolbar title matches the app heading voice. */
-.calendar-scope .fc-toolbar-title {
-  font-family: var(--font-heading), sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.16px;
-  color: #10133a;
 }
 
 /* Column headers + day numbers stay muted so event colors carry the meaning. */
@@ -60,15 +46,22 @@
 
 /* Event pills read as pills, not raw theme blocks. */
 .calendar-scope .fc-daygrid-event,
+.calendar-scope .fc-timegrid-event,
 .calendar-scope .fc-list-event {
   border-radius: 6px;
   font-weight: 600;
 }
 
 /* Outer event chrome stays transparent — every pill paints itself via
- * renderEventContent (solid purple for manual events, fill-less colored
- * outline for defenses), so no theme fill can leak through. */
+ * renderEventContent (solid priority color for manual events, tinted fill +
+ * colored hairline for defenses), so no theme fill can leak through.
+ *
+ * `.fc-timegrid-event` MUST be listed here. Without it the week/day block
+ * keeps the backgroundColor we pass and renders as a filled box with the
+ * inner pill floating inside it — two nested boxes both claiming to be the
+ * event. Month and list looked right only because they were listed. */
 .calendar-scope .fc-daygrid-event,
+.calendar-scope .fc-timegrid-event,
 .calendar-scope .fc-list-event {
   background-color: transparent;
   border-color: transparent;
@@ -87,9 +80,19 @@
   white-space: nowrap;
 }
 
-/* List-view events read smaller than the 12px date cushions above them. */
+/* Month chips get a little more presence than the 11px baseline — a day cell is
+ * a seventh of a full-width grid, so there is room for it. Pinned explicitly
+ * rather than nudged: the day-grid container resolves its own font-size
+ * internally, so an inherited bump here would be unreliable. */
+.calendar-scope .fc-daygrid-event .fc-custom-event {
+  font-size: 12px;
+}
+
+/* List-view events match the 11px day cushion above them. The previous 1px
+ * value made list rows render blank — and List is the default view on
+ * mobile, so the whole agenda was unreadable there. */
 .calendar-scope .fc-list-event .fc-custom-event {
-  font-size: 1px;
+  font-size: 11px;
   font-weight: 500;
 }
 

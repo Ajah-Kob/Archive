@@ -25,14 +25,6 @@ export default async function AdminAuditPage() {
   return (
     <section className="flex flex-col w-full h-full min-h-0 overflow-hidden">
       <PageLabel label="Audit Log" />
-      <div className="flex flex-col gap-1 px-8 pt-6 pb-2 shrink-0">
-        <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px] font-[Sora]">
-          Audit Log
-        </h1>
-        <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] font-[Plus_Jakarta_Sans]">
-          Business-critical mutations — actor, action, entity and before/after diff. Admin only.
-        </p>
-      </div>
 
       <AuditClient initialLogs={logs as never} initialTotalCount={totalCount} initialTotalPages={totalPages} initialPerPage={20} />
     </section>

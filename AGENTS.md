@@ -39,7 +39,8 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 - **Admin** — user management at `/admin/users`; soft-delete.
 - **Account** — profile/security shared by all roles at `/account/profile` and `/account/security`.
 
-**Planned (aside nav placeholders, no pages yet):** Defense, Calendar.
+- **Defense** — scheduling + sessions at `/faculty/defense-scheduling` and `/faculty/defense/[scheduleId]`; students see their group's defense in the milestone journey.
+- **Calendar** — shared read surface at `/calendar` (all roles except `GUEST`). Renders `DefenseSchedule` + chair/admin-created `CalendarEvent` rows; see `docs/calendar-page-layout.md`.
 
 **Workflow docs:** the complete capstone lifecycle — coordinator assignment → section management → group management → adviser assignment → Capstone 1 (topic, ch. 1–3, adviser review, proposal defense) → Capstone 2 (ch. 4–5, final defense) → progress monitoring — is documented in `docs/workflow/`. Start at `docs/workflow/00-overview.md`; each numbered file (`01-…`–`10-…`) details one business process.
 

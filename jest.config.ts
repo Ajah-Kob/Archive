@@ -61,7 +61,9 @@ const config: Config = {
   // forceCoverageMatch: [],
 
   // A path to a module which exports an async function that is triggered once before all test suites
-  // globalSetup: undefined,
+  // Pins TZ=UTC so no test depends on the developer's own timezone — see the
+  // file for why a Manila machine would otherwise hide timezone regressions.
+  globalSetup: '<rootDir>/jest.global-setup.ts',
 
   // A path to a module which exports an async function that is triggered once after all test suites
   // globalTeardown: undefined,

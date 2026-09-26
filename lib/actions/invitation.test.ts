@@ -49,7 +49,7 @@ jest.mock('next/cache', () => ({
 }))
 
 jest.mock('@/lib/actions/adviser', () => ({ addAdviser: jest.fn() }))
-jest.mock('@/lib/actions/revalidate', () => ({ revalidateFeature: jest.fn() }))
+jest.mock('@/lib/actions/revalidate', () => ({ revalidateFeature: jest.fn(), revalidateCalendarCache: jest.fn() }))
 
 type AsyncMock<Result> = jest.MockedFunction<
   (args: unknown) => Promise<Result>

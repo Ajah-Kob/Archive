@@ -476,20 +476,24 @@ model Template {
 
 // ───────────────────────────── Calendar ─────────────────────────────
 
-// Manual calendar events (chair/admin-created). Automatic sources
-// (DefenseSchedule, MilestoneAvailability, MilestoneSubmission) are merged
-// at read time in the event feed action — not stored here.
+// Manual calendar events (chair/admin-created). DefenseSchedule rows are merged
+// at read time in the event feed action (lib/actions/calendar.ts) — not stored
+// here. MilestoneAvailability / MilestoneSubmission are NOT in the feed.
 // Audience controls visibility: STUDENT = students only, FACULTY = staff
 // only, ALL = everyone with calendar access.
-enum CalendarEventCategory {
-  DEADLINE
-  CUSTOM
-}
-
 enum CalendarEventAudience {
   STUDENT
   FACULTY
   ALL
+}
+
+// Chair/admin-set urgency for a manual event. NONE keeps the neutral indigo,
+// so pre-existing rows are visually unchanged after the migration.
+enum CalendarEventPriority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
 }
 
 model CalendarEvent {
@@ -500,6 +504,7 @@ model CalendarEvent {
   endsAt      DateTime
   allDay      Boolean                   @default(true)
   audience      CalendarEventAudience @default(ALL)
+  priority     CalendarEventPriority @default(NONE)
   createdById   Int
   createdBy   User                  @relation(fields: [createdById], references: [id])
   createdAt   DateTime              @default(now())

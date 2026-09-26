@@ -3,10 +3,11 @@
 import prisma from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import { cacheTag, cacheLife, revalidateTag, revalidatePath } from 'next/cache'
+import { cacheTag, cacheLife } from 'next/cache'
 import { connection } from 'next/server'
 import { requireAdminOrProgramChair } from '@/lib/actions/guard'
 import { audit } from '@/lib/actions/audit'
+import { revalidateCalendarCache } from '@/lib/actions/revalidate'
 
 // ───────────────────────── Event feed reader (subtask 03) ─────────────────────────
 // Role-scoped feed of DefenseSchedule + manual CalendarEvent rows into one
@@ -35,9 +36,24 @@ const CALENDAR_COLORS = {
   finalDefense: '#fe6f6f',
 } as const
 
-// The single purple for all manual events (user decision: no per-event
-// colors). Matches the app primary.
+// Manual-event color by chair/admin-set priority. NONE keeps the neutral
+// indigo every event used before priorities existed, so pre-existing rows are
+// visually unchanged.
+//
+// The ramp deliberately skips red: #fe6f6f already means "Final Defense", and
+// reusing it for HIGH would make a high-priority event indistinguishable from a
+// final defense. MEDIUM/HIGH are the 700 steps of the amber/orange ramps (dark
+// enough for white text on a solid pill) and reuse the app's existing
+// "needs action" family — #e1681d is Major Revision on the milestone status pill.
 const MANUAL_EVENT_COLOR = '#707dff'
+const PRIORITY_COLORS = {
+  NONE: '#707dff',
+  LOW: '#64748b',
+  MEDIUM: '#b45309',
+  HIGH: '#c2410d',
+} as const
+
+export type CalendarEventPriority = keyof typeof PRIORITY_COLORS
 
 export type CalendarFeedKind =
   | 'defense'
@@ -62,6 +78,8 @@ export interface CalendarFeedEvent {
   groupName: string | null
   sectionName: string | null
   audience: string | null
+  // Manual events only; defenses carry null (their color comes from type).
+  priority: string | null
   description: string | null
   status: string | null
 }
@@ -142,6 +160,7 @@ interface ManualFeedRow {
   endsAt: string
   allDay: boolean
   audience: 'STUDENT' | 'FACULTY' | 'ALL'
+  priority: CalendarEventPriority
 }
 
 async function getCalendarManualEventsData(): Promise<ManualFeedRow[] | null> {
@@ -160,6 +179,7 @@ async function getCalendarManualEventsData(): Promise<ManualFeedRow[] | null> {
         endsAt: true,
         allDay: true,
         audience: true,
+        priority: true,
       },
       orderBy: { startsAt: 'asc' },
     })
@@ -171,6 +191,7 @@ async function getCalendarManualEventsData(): Promise<ManualFeedRow[] | null> {
       endsAt: r.endsAt.toISOString(),
       allDay: r.allDay,
       audience: r.audience,
+      priority: r.priority,
     }))
   } catch (error) {
     console.error('[getCalendarManualEventsData | Error]:', error)
@@ -184,9 +205,7 @@ interface CalendarScope {
   userId: number
   isPrivileged: boolean
   isStaff: boolean
-  canOpenSectionWorkspace: boolean
   groupIds: number[]
-  sectionIds: number[]
 }
 
 // Resolves the caller's server-side scope. Privileged = SUPERADMIN/ADMIN or
@@ -212,9 +231,7 @@ async function resolveCalendarScope(): Promise<CalendarScope | null> {
       userId,
       isPrivileged: true,
       isStaff: true,
-      canOpenSectionWorkspace: true,
       groupIds: [],
-      sectionIds: [],
     }
   }
 
@@ -262,61 +279,59 @@ async function resolveCalendarScope(): Promise<CalendarScope | null> {
       userId,
       isPrivileged: true,
       isStaff: true,
-      canOpenSectionWorkspace: true,
       groupIds: [],
-      sectionIds: [],
     }
   }
 
   const groupIds = new Set<number>()
-  const sectionIds = new Set<number>()
 
-  if (student) {
-    if (student.groupId != null) groupIds.add(student.groupId)
-    sectionIds.add(student.sectionId)
-  }
+  if (student?.groupId != null) groupIds.add(student.groupId)
 
   const adviser = faculty?.adviser
   if (adviser) {
     for (const g of adviser.groups ?? []) {
       groupIds.add(g.id)
-      sectionIds.add(g.sectionId)
     }
   }
 
   const coordinator = faculty?.coordinator
   if (coordinator) {
     for (const s of coordinator.section ?? []) {
-      sectionIds.add(s.id)
       for (const g of s.groups ?? []) groupIds.add(g.id)
     }
   }
 
-  const isStaff = !!faculty
-  // /faculty/my-sections is proxy-gated to coordinators (+ admins/chair
-  // handled above); adviser-only staff fall back to /faculty/document-review.
-  const canOpenSectionWorkspace = !!coordinator
   return {
     userId,
     isPrivileged: false,
-    isStaff,
-    canOpenSectionWorkspace,
+    isStaff: !!faculty,
     groupIds: [...groupIds],
-    sectionIds: [...sectionIds],
   }
 }
 
 // ───────────────────────── mapping helpers ─────────────────────────
 
+// Calendar events are authored and displayed in Manila wall-clock time
+// (CalendarClient sets timeZone="Asia/Manila"; the scheduling wizard uses a
+// bare <input type="time">). Asia/Manila is a fixed UTC+8 with no DST, so a
+// literal offset is exact. It must be applied explicitly: building a
+// server-local Date made every defense shift by 8 hours wherever the server
+// was not itself on UTC+8 (Vercel runs UTC, so a 9:00 AM defense rendered at
+// 5:00 PM and evening defenses fell into the wrong day cell).
+const MANILA_UTC_OFFSET = '+08:00'
+
 // Combines a DefenseSchedule date (midnight) with an "HH:mm" time string
-// (<input type="time"> in the scheduling wizard). Returns null when the time
-// is missing/malformed so callers fall back to the date-only day event.
+// (<input type="time"> in the scheduling wizard), interpreting both as Manila
+// wall-clock time. Returns null when the time is missing/malformed so callers
+// fall back to the date-only day event.
 function combineDefenseDateTime(dateISO: string, time: string): string | null {
   const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec((time ?? '').trim())
   if (!match) return null
   const day = dateISO.slice(0, 10)
   const seconds = match[3] ?? '00'
-  const combined = new Date(`${day}T${match[1]}:${match[2]}:${seconds}`)
+  const combined = new Date(
+    `${day}T${match[1]}:${match[2]}:${seconds}${MANILA_UTC_OFFSET}`,
+  )
   if (Number.isNaN(combined.getTime())) return null
   return combined.toISOString()
 }
@@ -396,6 +411,7 @@ export async function getCalendarFeed(): Promise<{
         groupName: d.groupName,
         sectionName: d.sectionName,
         audience: null,
+        priority: null,
         description: d.venue ? `Venue: ${d.venue}` : null,
         status: d.verdict,
       })
@@ -410,13 +426,15 @@ export async function getCalendarFeed(): Promise<{
         start: m.startsAt,
         end: m.endsAt,
         allDay: m.allDay,
-        color: MANUAL_EVENT_COLOR,
+        // Priority drives the pill color; defense colors stay type-driven.
+        color: PRIORITY_COLORS[m.priority] ?? MANUAL_EVENT_COLOR,
         href: '/calendar',
         groupId: null,
         sectionId: null,
         groupName: null,
         sectionName: null,
         audience: m.audience,
+        priority: m.priority,
         description: m.description,
         status: null,
       })
@@ -444,12 +462,13 @@ export async function getCalendarFeed(): Promise<{
 /**
  * Busts the calendar feed cache + the /calendar path. Subtask-04 mutations
  * (create/update/delete CalendarEvent) MUST call this after every write.
- * Defense/milestone/archive writers should also call it so automatic events
- * stay fresh (follow-up — those files are outside this subtask's scope).
+ *
+ * Defense writes are covered without calling this directly:
+ * revalidateFeature('defense') delegates to the same helper, so every
+ * schedule/reschedule/verdict mutation already invalidates the feed.
  */
 export async function revalidateCalendar(): Promise<void> {
-  revalidateTag('calendar', 'max')
-  revalidatePath('/calendar')
+  revalidateCalendarCache()
 }
 
 // ───────────────────────── mutations (subtask 04) ─────────────────────────
@@ -471,6 +490,7 @@ export interface CalendarEventInput {
   endsAt?: string | Date | null
   allDay?: boolean | string | null
   audience?: string | null
+  priority?: string | null
 }
 
 export interface CalendarEventPayload {
@@ -481,10 +501,15 @@ export interface CalendarEventPayload {
   endsAt: string
   allDay: boolean
   audience: 'STUDENT' | 'FACULTY' | 'ALL'
+  priority: CalendarEventPriority
 }
 
 function isCalendarAudience(value: unknown): value is 'STUDENT' | 'FACULTY' | 'ALL' {
   return value === 'STUDENT' || value === 'FACULTY' || value === 'ALL'
+}
+
+function isCalendarPriority(value: unknown): value is CalendarEventPriority {
+  return value === 'NONE' || value === 'LOW' || value === 'MEDIUM' || value === 'HIGH'
 }
 
 // Reads one field from either a FormData (useActionState) or a plain object.
@@ -538,6 +563,7 @@ function mapCalendarRow(row: {
   startsAt: Date
   endsAt: Date
   audience: 'STUDENT' | 'FACULTY' | 'ALL'
+  priority?: CalendarEventPriority
 } & { allDay?: boolean }): CalendarEventPayload {
   return {
     id: row.id,
@@ -547,6 +573,7 @@ function mapCalendarRow(row: {
     endsAt: row.endsAt.toISOString(),
     allDay: row.allDay ?? true,
     audience: row.audience,
+    priority: row.priority ?? 'NONE',
   }
 }
 
@@ -657,6 +684,27 @@ export async function createCalendarEvent(
       }
     }
 
+    const priorityField = getCalendarField(raw as Record<string, unknown>, 'priority')
+    let priority: CalendarEventPriority = 'NONE'
+    if (priorityField.present) {
+      const rawPriority =
+        priorityField.value === null || priorityField.value === undefined
+          ? ''
+          : String(priorityField.value).trim()
+      // Explicit empty is treated as "no priority" rather than an error, so a
+      // form that submits an empty priority select still saves.
+      if (rawPriority !== '') {
+        if (!isCalendarPriority(rawPriority)) {
+          return {
+            success: false,
+            message: 'Priority must be NONE, LOW, MEDIUM, or HIGH.',
+            payload: null,
+          }
+        }
+        priority = rawPriority
+      }
+    }
+
     const createdById = +session.user.id
     if (!Number.isFinite(createdById)) {
       return {
@@ -674,19 +722,18 @@ export async function createCalendarEvent(
         endsAt,
         allDay,
         audience,
+        priority,
         createdById,
       },
     })
-    try {
-      await audit({
-        action: "CALENDAR_CREATE",
-        entity: "CALENDAR",
-        entityId: String(row.id),
-        entityName: row.title,
-        before: null,
-        after: { title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, allDay: (row as any).allDay },
-      })
-    } catch {}
+    await audit({
+      action: "CALENDAR_CREATE",
+      entity: "CALENDAR",
+      entityId: String(row.id),
+      entityName: row.title,
+      before: null,
+      after: { title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, priority: row.priority, allDay: row.allDay },
+    })
     await revalidateCalendar()
     return { success: true, message: 'Calendar event created.', payload: mapCalendarRow(row) }
   } catch (error) {
@@ -837,20 +884,40 @@ export async function updateCalendarEvent(
       audience = rawAudience
     }
 
+    // Omitted keeps the stored priority; explicit empty resets to NONE so a
+    // chair can always clear it back to the neutral color.
+    let priority = (existing as unknown as { priority?: CalendarEventPriority }).priority ?? 'NONE'
+    const priorityField = getCalendarField(record, 'priority')
+    if (priorityField.present) {
+      const rawPriority =
+        priorityField.value === null || priorityField.value === undefined
+          ? ''
+          : String(priorityField.value).trim()
+      if (rawPriority === '') {
+        priority = 'NONE'
+      } else if (!isCalendarPriority(rawPriority)) {
+        return {
+          success: false,
+          message: 'Priority must be NONE, LOW, MEDIUM, or HIGH.',
+          payload: null,
+        }
+      } else {
+        priority = rawPriority
+      }
+    }
+
     const row = await prisma.calendarEvent.update({
       where: { id: numericId },
-      data: { title, description, startsAt, endsAt, allDay, audience },
+      data: { title, description, startsAt, endsAt, allDay, audience, priority },
     })
-    try {
-      await audit({
-        action: "CALENDAR_UPDATE",
-        entity: "CALENDAR",
-        entityId: String(numericId),
-        entityName: row.title,
-        before: { title: existing.title, description: existing.description, startsAt: existing.startsAt.toISOString(), endsAt: existing.endsAt.toISOString(), audience: (existing as any).audience, allDay: (existing as any).allDay },
-        after: { title: row.title, description: row.description, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, allDay: (row as any).allDay },
-      })
-    } catch {}
+    await audit({
+      action: "CALENDAR_UPDATE",
+      entity: "CALENDAR",
+      entityId: String(numericId),
+      entityName: row.title,
+      before: { title: existing.title, description: existing.description, startsAt: existing.startsAt.toISOString(), endsAt: existing.endsAt.toISOString(), audience: existing.audience, priority: existing.priority, allDay: existing.allDay },
+      after: { title: row.title, description: row.description, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, priority: row.priority, allDay: row.allDay },
+    })
     await revalidateCalendar()
     return { success: true, message: 'Calendar event updated.', payload: mapCalendarRow(row) }
   } catch (error) {
@@ -893,16 +960,14 @@ export async function deleteCalendarEvent(
       where: { id: numericId },
       data: { deletedAt: new Date() },
     })
-    try {
-      await audit({
-        action: "CALENDAR_DELETE",
-        entity: "CALENDAR",
-        entityId: String(numericId),
-        entityName: (existing as any).title ?? `Calendar ${numericId}`,
-        before: { title: (existing as any).title, deletedAt: null },
-        after: { deletedAt: new Date().toISOString() },
-      })
-    } catch {}
+    await audit({
+      action: "CALENDAR_DELETE",
+      entity: "CALENDAR",
+      entityId: String(numericId),
+      entityName: existing.title ?? `Calendar ${numericId}`,
+      before: { title: existing.title, deletedAt: null },
+      after: { deletedAt: new Date().toISOString() },
+    })
     await revalidateCalendar()
     return {
       success: true,

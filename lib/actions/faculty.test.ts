@@ -48,6 +48,7 @@ jest.mock('next/cache', () => ({
 
 jest.mock('@/lib/actions/revalidate', () => ({
   revalidateFeature: jest.fn(),
+  revalidateCalendarCache: jest.fn(),
 }))
 
 jest.mock('@/lib/actions/audit', () => ({

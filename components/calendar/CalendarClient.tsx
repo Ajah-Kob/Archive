@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
@@ -20,7 +20,6 @@ import type {
   DateClickInfo,
   DateSelectInfo,
   EventClickInfo,
-  ContentGenerator,
   EventDisplayInfo,
   MountInfo,
 } from '@fullcalendar/react'
@@ -54,29 +53,50 @@ const VIEW_OPTIONS: FilterOption[] = [
   { value: LIST_VIEW, label: 'List' },
 ]
 
-// Custom event rendering: owns the pill DOM entirely (resolved feed color +
-// white text) so no theme tint, opacity, or foreground rule can interfere.
+// FullCalendar's content callback receives no view information, so the active
+// view is passed in by the caller (kept fresh through a ref, see
+// CalendarClient). The time prefix is redundant in the time-grid views — an
+// event's vertical position already encodes the hour — so it is dropped there
+// and kept in month, where a day cell carries no time cue. The list view is
+// unaffected either way: FullCalendar leaves timeText empty for it and prints
+// the time in its own column.
+const VIEWS_WITHOUT_TIME_PREFIX = new Set([WEEK_VIEW, DAY_VIEW])
+
+// Custom event rendering: owns the pill DOM entirely so no theme tint,
+// opacity, or foreground rule can interfere.
 // Defined at module scope so FullCalendar never remounts content on re-render.
-const renderEventContent: ContentGenerator<EventDisplayInfo> = (arg) => {
+const renderEventContent = (
+  arg: EventDisplayInfo,
+  viewType: string,
+): React.ReactNode => {
   // NOTE: read the color from OUR feed object in extendedProps — v7 resolves
   // EventDisplayInfo.color through the theme, which masks per-event colors.
   // The feed color is authoritative (verified stored correctly in the DB).
   const feed = arg.event.extendedProps.feed as CalendarFeedEvent | undefined
   const raw = feed?.color
-  const color = typeof raw === 'string' && raw !== '' ? raw : '#a178cd'
-  // Defense spans carry no fill and no border — dark text as before. Manual
-  // events stay solid purple with white text.
+  // Every feed event carries a resolved color; this is a defensive default for
+  // a malformed event, not a real palette entry.
+  const color = typeof raw === 'string' && raw !== '' ? raw : '#707dff'
+  // Defenses get a tinted wash + a hairline in their own color, so proposal
+  // (indigo) and final (red) are finally distinguishable from each other.
+  // Manual events stay solid with white text, which keeps the two classes
+  // readable apart at a glance.
   const isDefense = feed?.kind === 'defense'
+  const showTime = arg.timeText && !VIEWS_WITHOUT_TIME_PREFIX.has(viewType)
   return (
     <span
       className="fc-custom-event"
       style={
         isDefense
-          ? { backgroundColor: 'transparent', color: '#10133a' }
+          ? {
+              backgroundColor: `color-mix(in srgb, ${color} 14%, white)`,
+              border: `1px solid ${color}`,
+              color: '#10133a',
+            }
           : { backgroundColor: color, color: '#FFFFFF' }
       }
     >
-      {arg.timeText ? <b>{arg.timeText} </b> : null}
+      {showTime ? <b>{arg.timeText} </b> : null}
       <span>{arg.event.title}</span>
     </span>
   )
@@ -124,11 +144,10 @@ export interface CalendarDateSpan {
 interface CalendarClientProps {
   events: CalendarFeedEvent[]
   canManage?: boolean
-  // Pluggable for defense-scheduling entry points: when provided, clicks and
-  // span-selects delegate to the parent. When omitted, clicks open the
-  // EventDetailsModal and (canManage only) span-selects open NewEventModal.
-  onEventClick?: (event: CalendarFeedEvent) => void
-  onDateSelect?: (span: CalendarDateSpan) => void
+  // Set when the feed failed (DB error, or no scope for this account). Kept
+  // distinct from "genuinely no events" so an outage never reads as an empty
+  // calendar. Null/omitted means the load succeeded.
+  loadError?: string | null
 }
 
 // Single-day span for the + New Event button (no grid selection involved).
@@ -154,10 +173,40 @@ function CalendarViewSwitcher({
   view: string
   onChange: (view: string) => void
 }) {
+  // WAI-ARIA tabs pattern: arrow keys move between tabs, Home/End jump to the
+  // ends. Without this the tablist is reachable by Tab but not navigable.
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
+    if (!keys.includes(event.key)) return
+
+    const currentIndex = VIEW_OPTIONS.findIndex((option) => option.value === view)
+    if (currentIndex === -1) return
+
+    event.preventDefault()
+    let nextIndex = currentIndex
+    if (event.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + VIEW_OPTIONS.length) % VIEW_OPTIONS.length
+    } else if (event.key === 'ArrowRight') {
+      nextIndex = (currentIndex + 1) % VIEW_OPTIONS.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else {
+      nextIndex = VIEW_OPTIONS.length - 1
+    }
+
+    const next = VIEW_OPTIONS[nextIndex]
+    onChange(next.value)
+    // Move focus with the selection so the roving focus stays in sync.
+    const tablist = event.currentTarget
+    const tabs = tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+    tabs[nextIndex]?.focus()
+  }
+
   return (
     <div
       role="tablist"
       aria-label="Calendar view"
+      onKeyDown={handleKeyDown}
       className="flex items-center h-[37.5px] px-[5px] py-[6px] bg-white border border-[#e8ebf8] rounded-lg gap-[2px] shrink-0"
     >
       {VIEW_OPTIONS.map((option) => {
@@ -168,11 +217,12 @@ function CalendarViewSwitcher({
             type="button"
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={
               active
-                ? 'h-[25.5px] px-[12px] rounded-[7px] bg-[#707dff] text-white shadow-[0px_2px_5px_rgba(112,125,255,0.25)] font-sans font-semibold text-[13px] transition-colors'
-                : 'h-[25.5px] px-[12px] rounded-[7px] text-[#5a6382] hover:bg-[#f4f6ff] font-sans font-semibold text-[13px] transition-colors'
+                ? 'h-[25.5px] px-[12px] rounded-[7px] bg-[#707dff] text-white shadow-[0px_2px_5px_rgba(112,125,255,0.25)] font-sans font-semibold text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.45)]'
+                : 'h-[25.5px] px-[12px] rounded-[7px] text-[#5a6382] hover:bg-[#f4f6ff] font-sans font-semibold text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.25)]'
             }
           >
             {option.label}
@@ -186,8 +236,7 @@ function CalendarViewSwitcher({
 export function CalendarClient({
   events,
   canManage = false,
-  onEventClick,
-  onDateSelect,
+  loadError = null,
 }: CalendarClientProps) {
   const calendarRef = useRef<CalendarRef | null>(null)
   const [view, setView] = useState(MONTH_VIEW)
@@ -210,7 +259,22 @@ export function CalendarClient({
     setReady(true)
   }, [])
 
+  // renderEventContent needs the active view but must keep a stable identity,
+  // or FullCalendar tears down and rebuilds every event pill on each switch.
+  // A ref carries the current value; the callback identity never changes.
+  const viewRef = useRef(view)
+  useEffect(() => {
+    viewRef.current = view
+  }, [view])
+  const eventContent = useCallback(
+    (arg: EventDisplayInfo) => renderEventContent(arg, viewRef.current),
+    [],
+  )
+
   // Per-event colors come straight from the feed — never recolored here.
+  // No textColor: renderEventContent owns the pill's foreground (dark text on
+  // the tinted defense pills, white on solid manual ones), so a single
+  // feed-level text color would be wrong for one of the two variants.
   const fcEvents = useMemo(
     () =>
       events.map((event) => ({
@@ -221,7 +285,6 @@ export function CalendarClient({
         allDay: event.allDay,
         backgroundColor: event.color,
         borderColor: event.color,
-        textColor: '#FFFFFF',
         extendedProps: { feed: event },
       })),
     [events],
@@ -270,24 +333,15 @@ export function CalendarClient({
       | CalendarFeedEvent
       | undefined
     if (!feed) return
-    if (onEventClick) {
-      onEventClick(feed)
-    } else {
-      setSelectedEvent(feed)
-    }
+    setSelectedEvent(feed)
   }
 
   function handleSelect(selectInfo: DateSelectInfo) {
-    const span: CalendarDateSpan = {
+    setDraftSpan({
       startStr: selectInfo.startStr,
       endStr: selectInfo.endStr,
       allDay: selectInfo.allDay,
-    }
-    if (onDateSelect) {
-      onDateSelect(span)
-    } else {
-      setDraftSpan(span)
-    }
+    })
     calendarRef.current?.getApi().unselect()
   }
 
@@ -346,7 +400,7 @@ export function CalendarClient({
       </HeaderBar>
 
       <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
-        <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)] p-4 sm:p-6 w-full max-w-5xl mx-auto">
+        <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)] p-4 sm:p-6 w-full">
           <div className="flex items-center justify-center pb-1">
             <span
               aria-live="polite"
@@ -355,7 +409,14 @@ export function CalendarClient({
               {title}
             </span>
           </div>
-          {events.length === 0 ? (
+          {loadError ? (
+            <p
+              role="alert"
+              className="text-center font-sans font-semibold text-[13px] leading-[20px] text-[#e11d48] pb-3"
+            >
+              {loadError}
+            </p>
+          ) : events.length === 0 ? (
             <p className="text-center font-sans font-medium text-[13px] leading-[20px] text-[#8a93b4] pb-3">
               No events scheduled — check back soon.
             </p>
@@ -370,11 +431,9 @@ export function CalendarClient({
                     datesSet={handleDatesSet}
                     firstDay={1}
                     timeZone="Asia/Manila"
-                    slotMinTime="06:00:00"
-                    slotMaxTime="18:00:00"
                     nowIndicator
                     events={fcEvents}
-                    eventContent={renderEventContent}
+                    eventContent={eventContent}
                     eventDidMount={handleEventMount}
                     eventClick={handleEventClick}
                     dateClick={handleDateClick}
@@ -383,7 +442,17 @@ export function CalendarClient({
                 selectMinDistance={8}
                 select={canManage ? handleSelect : undefined}
                     height="auto"
-                    dayMaxEvents
+                    // MUST stay a number, not the `dayMaxEvents` boolean
+                    // shorthand. A boolean resolves FullCalendar's day-grid
+                    // placement mode to 'auto', which mounts a hidden
+                    // measurement node carrying `inert: ''` — React 19 rejects
+                    // empty-string boolean attributes and logs
+                    // "Received an empty string for a boolean attribute
+                    // `inert`". A numeric cap resolves the mode to
+                    // 'maxEvents', so that probe is never rendered.
+                    // Side effect: days cap at a fixed 3 + "+N more" instead
+                    // of collapsing by measured height.
+                    dayMaxEvents={3}
                     tableHeaderSticky={false}
                   />
             ) : (

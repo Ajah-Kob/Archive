@@ -14,6 +14,7 @@ import {
   type CalendarFeedEvent,
 } from '@/lib/actions/calendar'
 import { parseManualCalendarId } from '@/components/calendar/EventDetailsModal'
+import { useModalFocus } from '@/components/calendar/useModalFocus'
 import type { CalendarDateSpan } from '@/components/calendar/CalendarClient'
 
 // ───────────────────────────── constants + pure helpers ─────────────────────────────
@@ -24,6 +25,21 @@ const AUDIENCE_OPTIONS: ReadonlyArray<{ value: ManualAudience; label: string }> 
   { value: 'STUDENT', label: 'Students' },
   { value: 'FACULTY', label: 'Faculty' },
   { value: 'ALL', label: 'All' },
+]
+
+type ManualPriority = 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+
+// Swatches mirror PRIORITY_COLORS in lib/actions/calendar.ts. The server
+// resolves the authoritative color; this is only a preview in the form.
+const PRIORITY_OPTIONS: ReadonlyArray<{
+  value: ManualPriority
+  label: string
+  swatch: string
+}> = [
+  { value: 'NONE', label: 'None', swatch: '#707dff' },
+  { value: 'LOW', label: 'Low', swatch: '#64748b' },
+  { value: 'MEDIUM', label: 'Medium', swatch: '#b45309' },
+  { value: 'HIGH', label: 'High', swatch: '#c2410d' },
 ]
 
 const TITLE_MAX = 200
@@ -177,6 +193,8 @@ function ManualEventFields({
   onTitleChange,
   scope,
   onScopeChange,
+  priority,
+  onPriorityChange,
   allDay,
   onAllDayChange,
   start,
@@ -192,6 +210,8 @@ function ManualEventFields({
   onTitleChange: (next: string) => void
   scope: ManualAudience
   onScopeChange: (next: ManualAudience) => void
+  priority: ManualPriority
+  onPriorityChange: (next: ManualPriority) => void
   allDay: boolean
   onAllDayChange: (next: boolean) => void
   start: Date | null
@@ -220,23 +240,57 @@ function ManualEventFields({
         />
       </div>
 
-      <div className="flex flex-col gap-[6px]">
-        <FieldLabel htmlFor={`${idPrefix}-scope`}>
-          Scope <span className="text-[#ef4444]">*</span>
-        </FieldLabel>
-        <select
-          id={`${idPrefix}-scope`}
-          value={scope}
-          onChange={(e) => onScopeChange(e.target.value as ManualAudience)}
-          disabled={disabled}
-          className={inputClass}
-        >
-          {AUDIENCE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-col gap-[14px] sm:flex-row sm:items-end sm:gap-[12px]">
+        <div className="flex flex-col gap-[6px] flex-1 min-w-0">
+          <FieldLabel htmlFor={`${idPrefix}-scope`}>
+            Scope <span className="text-[#ef4444]">*</span>
+          </FieldLabel>
+          <select
+            id={`${idPrefix}-scope`}
+            value={scope}
+            onChange={(e) => onScopeChange(e.target.value as ManualAudience)}
+            disabled={disabled}
+            className={inputClass}
+          >
+            {AUDIENCE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-[6px] flex-1 min-w-0">
+          <FieldLabel htmlFor={`${idPrefix}-priority`}>Priority</FieldLabel>
+          <select
+            id={`${idPrefix}-priority`}
+            value={priority}
+            onChange={(e) => onPriorityChange(e.target.value as ManualPriority)}
+            disabled={disabled}
+            className={inputClass}
+          >
+            {PRIORITY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {/* Color preview — the server owns the real value on save. */}
+          <div className="flex items-center gap-[6px]">
+            <span
+              aria-hidden="true"
+              className="size-[10px] rounded-full shrink-0"
+              style={{
+                backgroundColor:
+                  PRIORITY_OPTIONS.find((o) => o.value === priority)?.swatch ??
+                  '#707dff',
+              }}
+            />
+            <span className="font-sans text-[11px] text-[#8a93b4]">
+              Sets the event color on the calendar
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col gap-[14px] sm:flex-row sm:items-end sm:gap-[12px]">
@@ -341,31 +395,9 @@ function EventModalFrame({
     onClose()
   }, [disabled, onClose])
 
-  // Focus + Esc + body lock while open (DeleteArchiveModal precedent).
-  useEffect(() => {
-    if (!mounted) return
+  // Focus + focus trap + Esc + body lock while open.
+  useModalFocus(mounted, overlayRef, closeBtnRef, handleClose)
 
-    const previouslyFocused = globalThis.document.activeElement as HTMLElement | null
-    const t = setTimeout(() => closeBtnRef.current?.focus(), 0)
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        handleClose()
-      }
-    }
-
-    globalThis.document.addEventListener('keydown', handleKeyDown)
-    const prevOverflow = globalThis.document.body.style.overflow
-    globalThis.document.body.style.overflow = 'hidden'
-
-    return () => {
-      clearTimeout(t)
-      globalThis.document.removeEventListener('keydown', handleKeyDown)
-      globalThis.document.body.style.overflow = prevOverflow
-      previouslyFocused?.focus()
-    }
-  }, [mounted, handleClose])
 
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent) => {
@@ -446,6 +478,7 @@ export function NewEventModal({ span, onClose }: NewEventModalProps) {
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [scope, setScope] = useState<ManualAudience>('ALL')
+  const [priority, setPriority] = useState<ManualPriority>('NONE')
   const [allDay, setAllDay] = useState(true)
   const [start, setStart] = useState<Date | null>(null)
   const [end, setEnd] = useState<Date | null>(null)
@@ -460,6 +493,7 @@ export function NewEventModal({ span, onClose }: NewEventModalProps) {
     const inputs = spanToDateInputs(span)
     setTitle('')
     setScope('ALL')
+    setPriority('NONE')
     setAllDay(inputs.allDay)
     setStart(inputs.start)
     setEnd(inputs.end)
@@ -485,6 +519,7 @@ export function NewEventModal({ span, onClose }: NewEventModalProps) {
         endsAt: toSubmitISO(end, allDay),
         allDay,
         audience: scope,
+        priority,
       })
       if (res.success) {
         toast.success(res.message || 'Calendar event created.')
@@ -498,7 +533,7 @@ export function NewEventModal({ span, onClose }: NewEventModalProps) {
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, title, description, start, end, allDay, scope, onClose, router])
+  }, [isSaving, title, description, start, end, allDay, scope, priority, onClose, router])
 
   if (!span) return null
 
@@ -542,6 +577,8 @@ export function NewEventModal({ span, onClose }: NewEventModalProps) {
         onTitleChange={setTitle}
         scope={scope}
         onScopeChange={setScope}
+        priority={priority}
+        onPriorityChange={setPriority}
         allDay={allDay}
         onAllDayChange={setAllDay}
         start={start}
@@ -574,6 +611,7 @@ export function EditEventModal({ event, onClose }: EditEventModalProps) {
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [scope, setScope] = useState<ManualAudience>('ALL')
+  const [priority, setPriority] = useState<ManualPriority>('NONE')
   const [allDay, setAllDay] = useState(true)
   const [start, setStart] = useState<Date | null>(null)
   const [end, setEnd] = useState<Date | null>(null)
@@ -587,6 +625,11 @@ export function EditEventModal({ event, onClose }: EditEventModalProps) {
     setTitle(event.title ?? '')
     setScope(
       event.audience === 'STUDENT' || event.audience === 'FACULTY' ? event.audience : 'ALL',
+    )
+    setPriority(
+      event.priority === 'LOW' || event.priority === 'MEDIUM' || event.priority === 'HIGH'
+        ? event.priority
+        : 'NONE',
     )
     setAllDay(event.allDay)
     setStart(toDateValue(event.start))
@@ -618,6 +661,7 @@ export function EditEventModal({ event, onClose }: EditEventModalProps) {
         endsAt: toSubmitISO(end, allDay),
         allDay,
         audience: scope,
+        priority,
       })
       if (res.success) {
         toast.success(res.message || 'Calendar event updated.')
@@ -631,7 +675,7 @@ export function EditEventModal({ event, onClose }: EditEventModalProps) {
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, event, title, description, start, end, allDay, scope, onClose, router])
+  }, [isSaving, event, title, description, start, end, allDay, scope, priority, onClose, router])
 
   if (!event) return null
 
@@ -676,6 +720,8 @@ export function EditEventModal({ event, onClose }: EditEventModalProps) {
         onTitleChange={setTitle}
         scope={scope}
         onScopeChange={setScope}
+        priority={priority}
+        onPriorityChange={setPriority}
         allDay={allDay}
         onAllDayChange={setAllDay}
         start={start}

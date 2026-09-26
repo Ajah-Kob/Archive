@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   X,
   CalendarDays,
@@ -19,6 +20,7 @@ import {
   type CalendarFeedEvent,
   type CalendarFeedKind,
 } from '@/lib/actions/calendar'
+import { useModalFocus } from '@/components/calendar/useModalFocus'
 
 interface EventDetailsModalProps {
   event: CalendarFeedEvent | null
@@ -44,6 +46,13 @@ function getAudienceLabel(audience: string | null | undefined): string {
   if (audience === 'STUDENT') return 'Students'
   if (audience === 'FACULTY') return 'Faculty'
   return 'All'
+}
+
+function getPriorityLabel(priority: string | null | undefined): string {
+  if (priority === 'LOW') return 'Low'
+  if (priority === 'MEDIUM') return 'Medium'
+  if (priority === 'HIGH') return 'High'
+  return 'None'
 }
 
 // Deep-link button copy per automatic kind (href comes straight from the
@@ -126,31 +135,8 @@ export function EventDetailsModal({
     onClose()
   }, [isDeleting, onClose])
 
-  // Focus + Esc + body lock while open (DeleteArchiveModal precedent).
-  useEffect(() => {
-    if (!event || !mounted) return
-
-    const previouslyFocused = globalThis.document.activeElement as HTMLElement | null
-    const t = setTimeout(() => closeBtnRef.current?.focus(), 0)
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        handleClose()
-      }
-    }
-
-    globalThis.document.addEventListener('keydown', handleKeyDown)
-    const prevOverflow = globalThis.document.body.style.overflow
-    globalThis.document.body.style.overflow = 'hidden'
-
-    return () => {
-      clearTimeout(t)
-      globalThis.document.removeEventListener('keydown', handleKeyDown)
-      globalThis.document.body.style.overflow = prevOverflow
-      previouslyFocused?.focus()
-    }
-  }, [event, mounted, handleClose])
+  // Focus + focus trap + Esc + body lock while open.
+  useModalFocus(Boolean(event) && mounted, overlayRef, closeBtnRef, handleClose)
 
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent) => {
@@ -201,17 +187,14 @@ export function EventDetailsModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="calendar-event-title"
+        aria-labelledby="calendar-event-name"
         className="relative bg-white rounded-[14px] shadow-[0_24px_64px_rgba(16,19,58,0.16),0_4px_16px_rgba(0,0,0,0.06)] border border-[#eceef8] w-full max-w-[480px] max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-[24px] pt-[20px] pb-[14px] border-b border-[#f0f2fa] shrink-0 bg-white">
           <div className="flex items-start justify-between gap-[16px]">
             <div className="min-w-0">
-              <h2
-                id="calendar-event-title"
-                className="font-heading font-bold text-[16px] leading-[24px] tracking-[-0.16px] text-[#10133a]"
-              >
+              <h2 className="font-heading font-bold text-[16px] leading-[24px] tracking-[-0.16px] text-[#10133a]">
                 Event Details
               </h2>
               <p className="font-sans font-medium text-[12.5px] leading-[18px] text-[#8a93b4] pt-[2px]">
@@ -233,7 +216,10 @@ export function EventDetailsModal({
 
         <div className="flex-1 min-h-0 overflow-y-auto px-[24px] py-[20px] flex flex-col gap-[16px]">
           <DetailRow label="Title">
-            <p className="font-sans font-bold text-[14px] leading-[20px] text-[#1e2145] break-words">
+            <p
+              id="calendar-event-name"
+              className="font-sans font-bold text-[14px] leading-[20px] text-[#1e2145] break-words"
+            >
               {event.title}
             </p>
           </DetailRow>
@@ -280,6 +266,21 @@ export function EventDetailsModal({
             <DetailRow label="Section">
               <p className="font-sans font-semibold text-[13px] leading-[19px] text-[#1e2145]">
                 {event.sectionName}
+              </p>
+            </DetailRow>
+          ) : null}
+
+          {/* Named in words, not color-only — the pill color alone would hide
+              the level from color-blind users and from a printed agenda. */}
+          {event.kind === 'manual' && event.priority && event.priority !== 'NONE' ? (
+            <DetailRow label="Priority">
+              <p className="font-sans font-semibold text-[13px] leading-[19px] text-[#1e2145] inline-flex items-center gap-[6px]">
+                <span
+                  aria-hidden="true"
+                  className="size-[8px] rounded-full shrink-0"
+                  style={{ backgroundColor: event.color }}
+                />
+                {getPriorityLabel(event.priority)}
               </p>
             </DetailRow>
           ) : null}
@@ -350,20 +351,20 @@ export function EventDetailsModal({
                 </>
               ) : null}
               {deepLinkLabel ? (
-                <a
+                <Link
                   href={event.href}
                   aria-label={deepLinkLabel}
                   className="inline-flex items-center justify-center gap-[6px] h-[36px] px-[16px] rounded-[9px] font-heading font-semibold text-[13px] leading-none text-white shadow-[0px_4px_7px_rgba(112,125,255,0.32)] bg-gradient-to-r from-[#707dff] to-[#5565ff] border border-[rgba(112,125,255,0.2)] hover:opacity-95 active:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.3)]"
                 >
                   {deepLinkLabel}
                   <ExternalLink className="size-[14px]" strokeWidth={2} />
-                </a>
+                </Link>
               ) : null}
               <button
                 type="button"
                 onClick={handleClose}
                 disabled={isDeleting}
-                className="h-[36px] px-[16px] rounded-[9px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[13px] leading-none text-[#5a6382] hover:bg-[#f8f9ff] transition-colors disabled:opacity-60"
+                className="h-[36px] px-[16px] rounded-[9px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[13px] leading-none text-[#5a6382] hover:bg-[#f8f9ff] transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.15)]"
               >
                 Close
               </button>

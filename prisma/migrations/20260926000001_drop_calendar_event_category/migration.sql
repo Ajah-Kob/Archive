@@ -1,0 +1,11 @@
+-- Drop the unused CalendarEventCategory enum.
+--
+-- The `category` column was already removed by
+-- 20260916000005_drop_calendar_event_category, but the Postgres type itself was
+-- never dropped, so it lingered in the database while nothing referenced it.
+--
+-- Preflight against the live database confirmed 0 columns of this type
+-- (information_schema.columns WHERE udt_name = 'CalendarEventCategory'), so the
+-- drop cannot fail on a dependency. CalendarEventAudience is still referenced
+-- by CalendarEvent.audience and is deliberately left alone.
+DROP TYPE "CalendarEventCategory";

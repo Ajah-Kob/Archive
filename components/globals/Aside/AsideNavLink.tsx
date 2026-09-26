@@ -16,6 +16,7 @@ import {
   UserCog,
   UserPlus,
   Archive,
+  ScrollText,
   type LucideIcon,
 } from 'lucide-react'
 import { roleHome } from '@/lib/helper'
@@ -110,6 +111,12 @@ export function NavLinks({
           href: '/faculty/archiving',
           icon: Archive,
           show: isAdmin || isProgramChair,
+        },
+        {
+          label: 'Audit Logs',
+          href: '/admin/audit',
+          icon: ScrollText,
+          show: isAdmin,
         },
       ],
     },

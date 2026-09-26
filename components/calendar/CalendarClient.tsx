@@ -23,6 +23,7 @@ import type {
   EventDisplayInfo,
   MountInfo,
 } from '@fullcalendar/react'
+import { SECTION_HEADER_PALETTE } from '@/lib/sectionHeader'
 import type { CalendarFeedEvent } from '@/lib/actions/calendar'
 
 // FullCalendar touches the DOM on mount, so it loads client-only behind a
@@ -37,6 +38,9 @@ const LIST_VIEW = 'listMonth'
 const WEEK_VIEW = 'timeGridWeek'
 const DAY_VIEW = 'timeGridDay'
 const MOBILE_BREAKPOINT = '(max-width: 639px)'
+
+  // Defense pills are bare text on the grid, so the label is dark ink.
+const DEFENSE_TEXT_COLOR = '#10133a'
 
 const CALENDAR_PLUGINS = [
   classicThemePlugin,
@@ -62,6 +66,10 @@ const VIEW_OPTIONS: FilterOption[] = [
 // the time in its own column.
 const VIEWS_WITHOUT_TIME_PREFIX = new Set([WEEK_VIEW, DAY_VIEW])
 
+// In month view a defense stays bare text on the grid; in week/day it renders as
+// a filled chip, because a timed block with no fill reads as an empty slot.
+const TIME_GRID_VIEWS = new Set([WEEK_VIEW, DAY_VIEW])
+
 // Custom event rendering: owns the pill DOM entirely so no theme tint,
 // opacity, or foreground rule can interfere.
 // Defined at module scope so FullCalendar never remounts content on re-render.
@@ -69,49 +77,108 @@ const renderEventContent = (
   arg: EventDisplayInfo,
   viewType: string,
 ): React.ReactNode => {
-  // NOTE: read the color from OUR feed object in extendedProps — v7 resolves
+  // NOTE: read the color from OUR feed object in extendedProps � v7 resolves
   // EventDisplayInfo.color through the theme, which masks per-event colors.
   // The feed color is authoritative (verified stored correctly in the DB).
   const feed = arg.event.extendedProps.feed as CalendarFeedEvent | undefined
   const raw = feed?.color
   // Every feed event carries a resolved color; this is a defensive default for
   // a malformed event, not a real palette entry.
-  const color = typeof raw === 'string' && raw !== '' ? raw : '#707dff'
-  // Defenses get a tinted wash + a hairline in their own color, so proposal
-  // (indigo) and final (red) are finally distinguishable from each other.
-  // Manual events stay solid with white text, which keeps the two classes
-  // readable apart at a glance.
-  const isDefense = feed?.kind === 'defense'
+  const color = typeof raw === 'string' && raw !== '' ? raw : '#c7d2fe'
+  // Label tone. The feed supplies it for every variant: palette `text` for a
+  // manual event or a week/day defense chip, dark ink for a bare month defense.
+  const textColor =
+    typeof feed?.textColor === 'string' && feed.textColor !== ''
+      ? feed.textColor
+      : DEFENSE_TEXT_COLOR
+
+  const isBareDefense =
+    feed?.kind === 'defense' && !TIME_GRID_VIEWS.has(viewType)
+  // In the time-grid the event BLOCK is the time span (7–8am), so the fill is
+  // carried by the block (see `.cal-evt-timed` in calendar.css) and the label
+  // sits on it with no background of its own. Painting the fill on the label
+  // instead left the span hollow — you could only see its bounds on hover.
+  const isTimeGridChip = !isBareDefense && TIME_GRID_VIEWS.has(viewType)
+  // Saturated marker for a fill-less month row. The palette's pastel `bg` is
+  // far too light to read as a dot, so the feed carries the preset's `dot`
+  // tone separately. Decorative only — the title already says "Defense".
+  const markerColor =
+    typeof feed?.markerColor === 'string' && feed.markerColor !== ''
+      ? feed.markerColor
+      : '#818cf8'
   const showTime = arg.timeText && !VIEWS_WITHOUT_TIME_PREFIX.has(viewType)
   return (
     <span
-      className="fc-custom-event"
+      // `fc-custom-event-bare` marks a fill-less row so it can pick up a hover
+      // wash. `data-cal-view` and `fc-custom-event-past` are OUR hooks: this
+      // theme build emits none of FullCalendar's standard structural class
+      // names (no fc-event / fc-daygrid-event anywhere), so view-specific and
+      // past-event styling hangs off attributes we set ourselves rather than
+      // library classes that do not exist in the DOM.
+      className={`fc-custom-event${isBareDefense ? ' fc-custom-event-bare' : ''}${
+        arg.isPast ? ' fc-custom-event-past' : ''
+      }`}
+      data-cal-view={viewType}
       style={
-        isDefense
+        isBareDefense
           ? {
-              backgroundColor: `color-mix(in srgb, ${color} 14%, white)`,
-              border: `1px solid ${color}`,
-              color: '#10133a',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: DEFENSE_TEXT_COLOR,
             }
-          : { backgroundColor: color, color: '#FFFFFF' }
+          : isTimeGridChip
+            ? // Fill comes from the block; only the label tone is ours.
+              { backgroundColor: 'transparent', color: textColor }
+            : // Month manual event: a self-contained palette chip.
+              { backgroundColor: color, color: textColor }
       }
     >
+      {isBareDefense ? (
+        <span
+          aria-hidden="true"
+          className="fc-defense-marker"
+          style={{ backgroundColor: markerColor }}
+        />
+      ) : null}
       {showTime ? <b>{arg.timeText} </b> : null}
       <span>{arg.event.title}</span>
     </span>
   )
 }
 
-// Forces the theme variable to OUR feed color on the real element, so every
-// theme-driven bit (outer tint wash, dots, list markers) agrees with the
-// custom inner pill. Also stamps a hover tooltip summarizing the event.
-// Defined at module scope like renderEventContent.
+// Per-event color is applied through a CLASS, never an inline style.
+//
+// The obvious implementation — writing `--fc-event-color` on the element in
+// eventDidMount — is wrong, because eventDidMount fires only when an element
+// is first created. FullCalendar reuses the element when event data changes
+// and patches just its content, so the pill updates (re-rendered from
+// extendedProps) while the wrapper keeps the PREVIOUS color until a reload
+// rebuilds the DOM. A class in the event input is recomputed with the data, so
+// the token can never go stale.
+//
+// Built from the palette rather than hand-listed so a new preset cannot drift.
+// Defenses need no entries here: their type maps to a palette preset on the
+// server (Proposal → default/Purple, Final → Rose), so they resolve to the same
+// classes as a manual event of that color and share its hover treatment.
+const FEED_COLOR_CLASS: Record<string, string> = Object.fromEntries(
+  SECTION_HEADER_PALETTE.map((preset) => [
+    preset.bg,
+    `cal-evt-${preset.label.toLowerCase()}`,
+  ]),
+)
+
+const DEFAULT_EVENT_COLOR_CLASS = 'cal-evt-purple'
+
+function feedColorClass(feed: CalendarFeedEvent | undefined): string {
+  const color = feed?.color
+  if (typeof color !== 'string') return DEFAULT_EVENT_COLOR_CLASS
+  return FEED_COLOR_CLASS[color] ?? DEFAULT_EVENT_COLOR_CLASS
+}
+
+// Hover tooltip only. Deliberately mount-time: there is no rename UI, so a
+// stale title attribute after a data change is not a reachable state.
 function handleEventMount(info: MountInfo<EventDisplayInfo>) {
   const feed = info.event.extendedProps.feed as CalendarFeedEvent | undefined
-  const raw = feed?.color
-  if (typeof raw === 'string' && raw !== '') {
-    info.el.style.setProperty('--fc-event-color', raw)
-  }
   if (feed) {
     const extra = feed.description ? `\n${feed.description}` : ''
     info.el.setAttribute('title', `${feed.title}\n${formatFeedSpan(feed)}${extra}`)
@@ -259,22 +326,29 @@ export function CalendarClient({
     setReady(true)
   }, [])
 
-  // renderEventContent needs the active view but must keep a stable identity,
-  // or FullCalendar tears down and rebuilds every event pill on each switch.
-  // A ref carries the current value; the callback identity never changes.
-  const viewRef = useRef(view)
-  useEffect(() => {
-    viewRef.current = view
-  }, [view])
+  // renderEventContent needs the active view, and the identity of this
+  // callback is what makes FullCalendar re-render event content.
+  //
+  // It must therefore be keyed on `view` — NOT a stable callback reading a ref.
+  // Day and week are both time-grid, so switching between them reuses the
+  // existing event elements; with an unchanged `eventContent` prop FullCalendar
+  // has no reason to re-run the renderer and the pills keep whatever the
+  // previous view drew. Keying on `view` makes the prop change, which is the
+  // signal to re-render. It also removes the ref, which lagged a switch behind
+  // because effects run after commit.
   const eventContent = useCallback(
-    (arg: EventDisplayInfo) => renderEventContent(arg, viewRef.current),
-    [],
+    (arg: EventDisplayInfo) => renderEventContent(arg, view),
+    [view],
   )
 
   // Per-event colors come straight from the feed — never recolored here.
-  // No textColor: renderEventContent owns the pill's foreground (dark text on
-  // the tinted defense pills, white on solid manual ones), so a single
-  // feed-level text color would be wrong for one of the two variants.
+  // `className` carries the palette token (see FEED_COLOR_CLASS): a class is
+  // recomputed with the data, so the color can never go stale the way an
+  // inline style written in eventDidMount does.
+  // `cal-evt-timed` marks the time-grid views, where the BLOCK is the time span
+  // and therefore carries the fill — see calendar.css.
+  // No textColor: renderEventContent owns the pill's foreground.
+  const isTimeGrid = TIME_GRID_VIEWS.has(view)
   const fcEvents = useMemo(
     () =>
       events.map((event) => ({
@@ -285,9 +359,10 @@ export function CalendarClient({
         allDay: event.allDay,
         backgroundColor: event.color,
         borderColor: event.color,
+        className: `${feedColorClass(event)}${isTimeGrid ? ' cal-evt-timed' : ''}`,
         extendedProps: { feed: event },
       })),
-    [events],
+    [events, isTimeGrid],
   )
 
   function switchView(next: string) {

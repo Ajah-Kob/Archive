@@ -3,9 +3,33 @@
  * Every rule below is rooted at .calendar-scope so nothing leaks into the
  * rest of the app — never add :root overrides here (the library's own
  * palette.css keeps its defaults globally; this file only narrows them
- * inside the calendar wrapper). Structural tokens only: per-event colors
- * arrive from the feed as backgroundColor/borderColor and are intentionally
- * left untouched.
+ * inside the calendar wrapper).
+ *
+ * ── Selector policy ────────────────────────────────────────────────────────
+ * This theme build does NOT emit FullCalendar's standard structural class
+ * names. A rendered event element looks like:
+ *
+ *   <div role="button" class="fc-classic-uqo … cal-evt-purple fc-bH fc-ZR">
+ *     <div class="fc-classic-lNM … fc-classic-Mjo …"></div>   ← theme marker
+ *     <div class="fc-classic-GAX fc-classic-dl1 …">            ← content box
+ *       <span class="fc-custom-event">…</span>                 ← ours
+ *   </div>
+ *
+ * There is no `.fc-event`, `.fc-daygrid-event`, `.fc-timegrid-event`,
+ * `.fc-list-event` or `.fc-event-main` anywhere — verified against the theme
+ * bundle and the rendered markup. Rules targeting those names compile fine and
+ * silently do nothing.
+ *
+ * So everything below anchors to something we own:
+ *   • `.cal-evt-*`  — the class CalendarClient puts on each event element
+ *   • `.fc-custom-event` + `data-cal-view` / `.fc-custom-event-past` — our
+ *     rendered content, which carries the view and past-state
+ *   • `[class*='cal-evt-']` — matches any palette preset, including future ones
+ *   • `[role='button']` — the event wrapper FullCalendar always emits
+ *
+ * Do not reintroduce `fc-*` structural selectors here. The only exception is
+ * the `--fc-classic-*` custom properties in the token block below: those are
+ * inherited by descendants and need no class to apply.
  */
 
 .calendar-scope {
@@ -13,8 +37,17 @@
   --fc-classic-strong-border: #dfe3fb;
   --fc-classic-today: rgba(112, 125, 255, 0.12);
   --fc-classic-primary: #707dff;
-  --fc-classic-event: #00085d;
+  --fc-classic-event: #707dff;
   --fc-classic-event-contrast: #ffffff;
+  /* The theme draws its event ring as
+   *   box-shadow: 0 0 0 1px var(--fc-classic-ring-color, currentcolor)
+   * — a box-shadow, NOT a border, so `border-color: transparent` cannot
+   * remove it. That left a 1px indigo fringe around every pill.
+   * Neutralizing the variable kills the ring while leaving the theme's
+   * drop-shadow elevations (selection, drag) intact, which use literal
+   * colors rather than this token. renderEventContent draws the only
+   * borders we actually want. */
+  --fc-classic-ring-color: transparent;
   --fc-classic-background: #ffffff;
   --fc-classic-foreground: #10133a;
   --fc-classic-muted-foreground: #5a6382;
@@ -39,60 +72,235 @@
   color: #5a6382;
 }
 
-/* Past events dim back per the layout doc; today keeps the tinted cell. */
-.calendar-scope .fc-event-past {
-  opacity: 0.55;
-}
-
-/* Event pills read as pills, not raw theme blocks. */
-.calendar-scope .fc-daygrid-event,
-.calendar-scope .fc-timegrid-event,
-.calendar-scope .fc-list-event {
-  border-radius: 6px;
-  font-weight: 600;
-}
-
-/* Outer event chrome stays transparent — every pill paints itself via
- * renderEventContent (solid priority color for manual events, tinted fill +
- * colored hairline for defenses), so no theme fill can leak through.
+/* Past events fade back per the layout doc; today keeps the tinted cell.
+ * Hooked off our own class — FullCalendar's `.fc-event-past` does not exist in
+ * this theme build, so the renderer sets it from `arg.isPast`.
  *
- * `.fc-timegrid-event` MUST be listed here. Without it the week/day block
- * keeps the backgroundColor we pass and renders as a filled box with the
- * inner pill floating inside it — two nested boxes both claiming to be the
- * event. Month and list looked right only because they were listed. */
-.calendar-scope .fc-daygrid-event,
-.calendar-scope .fc-timegrid-event,
-.calendar-scope .fc-list-event {
+ * A translucent white background-image, deliberately NOT `opacity`. `opacity`
+ * fades the label along with the fill, and on a pastel chip with dark text that
+ * reads as washed-out rather than "past" — it was making the week/day labels
+ * look pale. background-image paints *behind* the glyphs, so the fill recedes
+ * while the text keeps full contrast.
+ *
+ * The fade has to follow the fill, and the fill moved: in month/list it is on
+ * the label, but in the time-grid it is on the block (`.cal-evt-timed`). So the
+ * timed views fade the BLOCK via :has() and switch the label's own overlay off —
+ * otherwise a full-height label lays a white sheet across the block's fill and
+ * reads as a white pill sitting on a coloured block. */
+.calendar-scope .fc-custom-event-past {
+  background-image: linear-gradient(
+    rgba(255, 255, 255, 0.5),
+    rgba(255, 255, 255, 0.5)
+  );
+}
+
+.calendar-scope .cal-evt-timed:has(.fc-custom-event-past) {
+  background-image: linear-gradient(
+    rgba(255, 255, 255, 0.5),
+    rgba(255, 255, 255, 0.5)
+  );
+}
+
+.calendar-scope .cal-evt-timed .fc-custom-event-past {
+  background-image: none;
+}
+
+/* Event chrome: two rules, because the two boxes have different jobs.
+ *
+ * 1. The WRAPPER (the element carrying cal-evt-*). Exempt `.cal-evt-timed`,
+ *    because in the time-grid the wrapper IS the time span and must keep the
+ *    fill — see the rule below. Month and list get a transparent wrapper, since
+ *    their fill is painted on the label instead.
+ *
+ * 2. The CONTENT BOX (whatever div directly contains our span). Always
+ *    transparent, in every view.
+ *
+ *    Rule 2 is deliberately NOT a child selector. Nesting depth differs per
+ *    view — the time-grid inserts an extra layer — so `wrapper > div:has(...)`
+ *    matched in month and silently missed in week/day, letting the theme's
+ *    white box and border paint straight over the block's fill. Anchoring on
+ *    "a div that directly contains .fc-custom-event" is depth-independent, and
+ *    it still cannot match the theme's empty marker div, which has no children.
+ */
+.calendar-scope [class*='cal-evt-']:not(.cal-evt-timed) {
+  background-color: transparent;
+  border-color: transparent;
+  border-radius: 6px;
+}
+
+.calendar-scope [class*='cal-evt-'] div:has(> .fc-custom-event) {
   background-color: transparent;
   border-color: transparent;
 }
 
+/* Time-grid only (week / day): the block spans 7am–8am, so the fill goes on
+ * the block and the label sits on it with no background of its own. Painting
+ * the fill on the label left the span hollow — its bounds were only visible on
+ * hover, which is what this replaces.
+ *
+ * `--fc-event-color` is the palette fill, already set by the .cal-evt-* class,
+ * so no extra color plumbing is needed. `overflow: hidden` clips the label to
+ * the block's radius. */
+.calendar-scope .cal-evt-timed {
+  background-color: var(--fc-event-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
 /* Custom event content (renderEventContent): owned DOM so theme tints can't
  * interfere. Colors arrive inline per variant — this class only handles
- * shape and truncation. */
+ * shape, fill, and type.
+ *
+ * `width: 100%` is load-bearing, not cosmetic. The theme makes the content
+ * container a row flexbox, and a flex item defaults to `flex: 0 1 auto`, so
+ * without this the pill shrink-wraps to the text and only the strip behind the
+ * words gets colored instead of the whole event row. `min-width: 0` is what
+ * lets the ellipsis engage once the box is width-constrained.
+ *
+ * `font-size` is declared here, once, so all four views match at 13px. It also
+ * has to win over the theme: the day-grid content container sets its own 12px
+ * (fc-classic-a3B), which our span would otherwise inherit.
+ *
+ * `align-self: stretch` matters in the time-grid. The content container is the
+ * full height of the slot and centres its items (`align-items: center`), so
+ * without this the label is only as tall as its text — the fill behind it
+ * covered the words, not the 7–8am span. Stretching makes the label occupy the
+ * whole span, so the block's fill reads edge to edge. A no-op in month and
+ * list, where the container is already content-height. */
 .calendar-scope .fc-custom-event {
   display: block;
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
   border-radius: 6px;
   padding: 1px 6px;
+  font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Month chips get a little more presence than the 11px baseline — a day cell is
- * a seventh of a full-width grid, so there is room for it. Pinned explicitly
- * rather than nudged: the day-grid container resolves its own font-size
- * internally, so an inherited bump here would be unreliable. */
-.calendar-scope .fc-daygrid-event .fc-custom-event {
-  font-size: 12px;
+/* Per-event color tokens, keyed by the class CalendarClient puts in each
+ * event's `className` (see FEED_COLOR_CLASS). The class is rebuilt from the
+ * feed on every data change, so recoloring an event recolors its chrome in the
+ * same render — the bug this replaced was an inline style written once in
+ * eventDidMount, which went stale until a reload.
+ *
+ * The fill/label tones themselves are applied inline by renderEventContent;
+ * these tokens cover the theme-driven chrome (tint wash, list markers, day-grid
+ * accents) so nothing is left holding a previous color. */
+.cal-evt-purple {
+  --fc-event-color: #c7d2fe;
+  --fc-classic-event: #c7d2fe;
+  --cal-evt-ring: #a5b4fc;
+}
+.cal-evt-rose {
+  --fc-event-color: #fecdd3;
+  --fc-classic-event: #fecdd3;
+  --cal-evt-ring: #fda4af;
+}
+.cal-evt-amber {
+  --fc-event-color: #fde68a;
+  --fc-classic-event: #fde68a;
+  --cal-evt-ring: #fcd34d;
+}
+.cal-evt-mint {
+  --fc-event-color: #a7f3d0;
+  --fc-classic-event: #a7f3d0;
+  --cal-evt-ring: #6ee7b7;
+}
+.cal-evt-sky {
+  --fc-event-color: #bae6fd;
+  --fc-classic-event: #bae6fd;
+  --cal-evt-ring: #7dd3fc;
+}
+.cal-evt-peach {
+  --fc-event-color: #fed7aa;
+  --fc-classic-event: #fed7aa;
+  --cal-evt-ring: #fdba74;
 }
 
-/* List-view events match the 11px day cushion above them. The previous 1px
- * value made list rows render blank — and List is the default view on
- * mobile, so the whole agenda was unreadable there. */
-.calendar-scope .fc-list-event .fc-custom-event {
-  font-size: 11px;
+/* Hover and keyboard focus.
+ *
+ * Events are anchors that open the details modal, so they need an explicit
+ * affordance — and the transparency rules above neutralise the theme's own
+ * hover wash along with everything else. The ring colour comes from
+ * --cal-evt-ring, which each .cal-evt-* class sets from that preset's `border`
+ * tone, so the feedback always belongs to the event's own palette family. */
+@media (prefers-reduced-motion: no-preference) {
+  .calendar-scope [class*='cal-evt-'] {
+    transition:
+      background-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+}
+
+/* The pointer cursor. Events are anchors that open the details modal, and the
+ * theme does not set one on the element it renders. Matched by class prefix so
+ * every palette preset — present and future — is covered without a list. */
+.calendar-scope [class*='cal-evt-'] {
+  cursor: pointer;
+}
+
+.calendar-scope [class*='cal-evt-']:hover {
+  box-shadow: 0 0 0 1px var(--cal-evt-ring, #a5b4fc);
+}
+
+/* Keyboard parity: events are focusable, so focus must be as visible as hover. */
+.calendar-scope [class*='cal-evt-']:focus-visible {
+  outline: 2px solid var(--fc-classic-primary, #707dff);
+  outline-offset: -1px;
+}
+
+/* A month-view defense is bare text on the grid, so the ring alone is thin
+ * feedback for something clickable — it also gets a faint wash. Keyed on our
+ * own class rather than a FullCalendar view class, so it does not depend on
+ * library-internal naming. */
+.calendar-scope .fc-custom-event-bare:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--fc-event-color, #a5b4fc) 12%,
+    transparent
+  );
+  border-radius: 6px;
+}
+
+/* Suppress the theme's own event marker.
+ *
+ * The classic theme renders an EMPTY div beside the content container, painted
+ * as a dotted border in the event's fill tone — a second, pale dot next to
+ * renderEventContent's own marker. Hiding it by its hashed class
+ * (fc-classic-Mjo) would break on the next theme build, since the name is
+ * generated per build. "An empty div, direct child of an event element that
+ * contains our content" is stable across builds, so target that instead.
+ *
+ * The :has() guard keeps this scoped to real event rows: a theme button that
+ * happens to contain an empty div is untouched. */
+.calendar-scope [role='button']:has(.fc-custom-event) > div:empty {
+  display: none;
+}
+
+/* Solid marker for a fill-less month defense row.
+ *
+ * Painted in the preset's saturated `dot` tone; the palette's pastel fill is
+ * near-invisible at this size. Our own element rather than a theme class, so it
+ * does not depend on library internals. */
+.calendar-scope .fc-defense-marker {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: 1px;
+  flex-shrink: 0;
+}
+
+/* List rows read a shade lighter than the grid chips — the only remaining
+ * view-specific type rule, scoped by `data-cal-view` (the sanctioned hook,
+ * since this theme emits no `fc-list-event` to select on). The size itself is
+ * inherited from the base rule above, so all four views sit at 13px. */
+.calendar-scope .fc-custom-event[data-cal-view='listMonth'] {
   font-weight: 500;
 }
 

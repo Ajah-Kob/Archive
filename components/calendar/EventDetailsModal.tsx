@@ -21,6 +21,7 @@ import {
   type CalendarFeedKind,
 } from '@/lib/actions/calendar'
 import { useModalFocus } from '@/components/calendar/useModalFocus'
+import { SECTION_HEADER_PALETTE } from '@/lib/sectionHeader'
 
 interface EventDetailsModalProps {
   event: CalendarFeedEvent | null
@@ -48,11 +49,11 @@ function getAudienceLabel(audience: string | null | undefined): string {
   return 'All'
 }
 
-function getPriorityLabel(priority: string | null | undefined): string {
-  if (priority === 'LOW') return 'Low'
-  if (priority === 'MEDIUM') return 'Medium'
-  if (priority === 'HIGH') return 'High'
-  return 'None'
+function getColorLabel(colorKey: string): string {
+  return (
+    SECTION_HEADER_PALETTE.find((preset) => preset.key === colorKey)?.label ??
+    'Default'
+  )
 }
 
 // Deep-link button copy per automatic kind (href comes straight from the
@@ -271,16 +272,16 @@ export function EventDetailsModal({
           ) : null}
 
           {/* Named in words, not color-only — the pill color alone would hide
-              the level from color-blind users and from a printed agenda. */}
-          {event.kind === 'manual' && event.priority && event.priority !== 'NONE' ? (
-            <DetailRow label="Priority">
+              the choice from color-blind users and from a printed agenda. */}
+          {event.kind === 'manual' && event.colorKey ? (
+            <DetailRow label="Color">
               <p className="font-sans font-semibold text-[13px] leading-[19px] text-[#1e2145] inline-flex items-center gap-[6px]">
                 <span
                   aria-hidden="true"
-                  className="size-[8px] rounded-full shrink-0"
+                  className="size-[10px] rounded-full shrink-0 border border-black/10"
                   style={{ backgroundColor: event.color }}
                 />
-                {getPriorityLabel(event.priority)}
+                {getColorLabel(event.colorKey)}
               </p>
             </DetailRow>
           ) : null}

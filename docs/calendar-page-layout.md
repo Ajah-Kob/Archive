@@ -37,42 +37,90 @@
 | Event click | `EventDetailsModal`: title, date span, venue (defenses), description, audience (manual), deep-link button per kind; Edit/Delete inside modal for manual events (chair/admin) |
 | Date-span select | Chair/admin only: drag across days → `NewEventModal` prefilled with the span (title, audience, dates) |
 
-## Event colors (existing tokens)
+## Event colors
 
-| Category | Color | Treatment | Source |
+### Defenses — a palette preset, chosen by type
+
+| Category | Palette key | Fill | Label |
 |---|---|---|---|
-| Proposal defense | `#707dff` | 14% tint fill + 1px `#707dff` border, dark text | `DefenseSchedule.type` |
-| Final defense | `#fe6f6f` | 14% tint fill + 1px `#fe6f6f` border, dark text | `DefenseSchedule.type` |
-| Manual — `NONE` | `#707dff` | solid fill, white text | `CalendarEvent.priority` (default) |
-| Manual — `LOW` | `#64748b` | solid fill, white text | `CalendarEvent.priority` |
-| Manual — `MEDIUM` | `#b45309` | solid fill, white text | `CalendarEvent.priority` |
-| Manual — `HIGH` | `#c2410d` | solid fill, white text | `CalendarEvent.priority` |
+| Proposal defense | `default` (Purple) | `#c7d2fe` | `#1e3a8a` |
+| Final defense | `0` (Rose) | `#fecdd3` | `#881337` |
 
-Defense pills are tinted + outlined (manual events stay solid) so the two
-classes read apart at a glance and proposal vs final are distinguishable. The
-tint is `color-mix(in srgb, <color> 14%, white)`, applied as an inline style by
-`renderEventContent`; `app/calendar/calendar.css` forces the *outer* FullCalendar
-chrome transparent so no theme fill leaks through.
+Defense types map onto `SECTION_HEADER_PALETTE` on the server
+(`defensePresetFor`), so a defense chip is the **same construct** as a manual
+event — same fill, same label tone, same hover ring. The client chooses the
+treatment per view:
 
-### Priority (manual events only)
+| View | Defense treatment |
+|---|---|
+| Week / Day | filled palette chip, identical to a manual event |
+| Month | bare dark-ink text preceded by a **saturated 7px dot** |
+| List | no pill of its own; FullCalendar's time column carries the time |
 
-Chair/admin set `NONE | LOW | MEDIUM | HIGH` in the event form; the server
-resolves the color in `getCalendarFeed` so the client never picks colors. Rules:
+Month stays chrome-free so a busy day cell doesn't turn into a wall of chips;
+week/day fills the chip because a bare text line inside a timed block reads as
+an empty slot.
 
-- The ramp **deliberately skips red** — `#fe6f6f` already means "Final Defense",
-  so a red `HIGH` would be indistinguishable from a final defense.
-- `NONE` keeps the neutral indigo, so every pre-existing event is visually
-  unchanged after the migration.
-- `MEDIUM`/`HIGH` use the 700 steps of the amber/orange ramps, dark enough for
-  white text on a solid pill, reusing the app's existing "needs action" family.
-- Priority is **not color-only**: the details modal names the level in words
-  (shown when it isn't `NONE`) and the audit `after` payload records it.
-- Defenses have no priority — their color is type-driven and `priority` is
-  `null` on defense feed rows.
+### The month marker
 
-> A user-picked event color was designed here once but the `color` column was
-> dropped in `20260916000006_drop_calendar_event_color`. Priority is the current
-> answer to per-event differentiation.
+The palette's pastel `bg` tone is invisible at dot size on the grid, so a
+month defense's marker uses the **saturated `dot` tone** from the same preset —
+`#818cf8` for Proposal, `#fb7185` for Final — which is also the swatch the
+section and event pickers show. The server carries it as `markerColor`
+(`preset.dot`), so the client never reaches into the palette for color.
+
+The marker is our own `<span class="fc-defense-marker">` rather than the theme's:
+the classic theme draws markers as a *dotted border* in the event's fill tone,
+which is why the previous attempt was barely visible. Ours is `aria-hidden`
+(the title already says "Defense") and appears only on the fill-less month row —
+a filled week/day chip needs no marker, and manual events never get one.
+
+**Accepted trade-off:** a Proposal defense and a default-coloured manual event
+are now the same fill, as are a Final defense and a Rose manual event. The hue
+no longer distinguishes *system* from *chair-created*, nor proposal from final —
+the title does (`Proposal Defense — Team 5`). A test asserts the type still
+appears in the title.
+
+### Manual events — driven by a palette key
+
+Manual events pick from `SECTION_HEADER_PALETTE` (`lib/sectionHeader.ts`) — the
+same six header presets the **section cards** use, so the calendar and the
+sections read as one system. Each preset supplies a light `bg` for the fill and
+a dark `text` for the label; the picker (`components/ui/ColorKeyPicker.tsx`,
+shared with the section form so the two can't drift) shows the saturated `dot`
+tone.
+
+| Preset | `key` | Fill (`bg`) | Label (`text`) |
+|---|---|---|---|
+| Purple *(default)* | `default` | `#c7d2fe` | `#1e3a8a` |
+| Rose | `0` | `#fecdd3` | `#881337` |
+| Amber | `1` | `#fde68a` | `#78350f` |
+| Mint | `2` | `#a7f3d0` | `#065f46` |
+| Sky | `3` | `#bae6fd` | `#0c4a6e` |
+| Peach | `4` | `#fed7aa` | `#7c2d12` |
+
+`CalendarEvent.colorKey` stores the **key**, not a hex: validation is then a
+fixed list, and a palette change propagates without a data migration. `NULL`
+means the palette default (Purple).
+
+Rules:
+
+- The server resolves both tones in `getCalendarFeed`; the client never picks a
+  color. `textColor` is part of the feed event because the label tone varies per
+  preset.
+- No manual preset collides with a defense color — `#fe6f6f` and `#707dff` stay
+  exclusively type meanings. A test asserts this.
+- A `NULL` or unrecognized `colorKey` degrades to the Purple default rather than
+  rendering an uncolored pill.
+- The choice is **not color-only**: the details modal names the preset in words
+  when one is set, and the audit `after` payload records the key.
+- Defenses carry `colorKey: null` and are unaffected by any of this.
+
+> Earlier iterations: a user-picked color column was dropped in
+> `20260916000006_drop_calendar_event_color`, and a
+> `priority` (NONE/LOW/MEDIUM/HIGH) column was added then removed in
+> `20260926000003_calendar_event_color` — the client chose a plain palette color
+> instead. The `feature/calendar-event-priority` branch keeps that version.
 
 > Feed scope: defenses (`DefenseSchedule`) + manual events only. Milestone
 > openings, submissions, and repository publishes are intentionally excluded —

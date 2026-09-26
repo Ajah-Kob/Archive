@@ -8,6 +8,12 @@ import { connection } from 'next/server'
 import { requireAdminOrProgramChair } from '@/lib/actions/guard'
 import { audit } from '@/lib/actions/audit'
 import { revalidateCalendarCache } from '@/lib/actions/revalidate'
+import {
+  SECTION_HEADER_PALETTE,
+  headerStyleFor,
+  isSectionHeaderColorKey,
+  type SectionHeaderColorKey,
+} from '@/lib/sectionHeader'
 
 // ───────────────────────── Event feed reader (subtask 03) ─────────────────────────
 // Role-scoped feed of DefenseSchedule + manual CalendarEvent rows into one
@@ -28,32 +34,37 @@ import { revalidateCalendarCache } from '@/lib/actions/revalidate'
 // manual events so the client contract stays stable alongside defense rows
 // (which keep their real group/section data).
 
-// FullCalendar event colors — docs/calendar-page-layout.md (existing tokens).
+// FullCalendar event colors — docs/calendar-page-layout.md.
 // Module-private: 'use server' files cannot export values, and clients don't
 // need the map (every feed event already carries its resolved color).
-const CALENDAR_COLORS = {
-  proposalDefense: '#707dff',
-  finalDefense: '#fe6f6f',
-} as const
-
-// Manual-event color by chair/admin-set priority. NONE keeps the neutral
-// indigo every event used before priorities existed, so pre-existing rows are
-// visually unchanged.
 //
-// The ramp deliberately skips red: #fe6f6f already means "Final Defense", and
-// reusing it for HIGH would make a high-priority event indistinguishable from a
-// final defense. MEDIUM/HIGH are the 700 steps of the amber/orange ramps (dark
-// enough for white text on a solid pill) and reuse the app's existing
-// "needs action" family — #e1681d is Major Revision on the milestone status pill.
-const MANUAL_EVENT_COLOR = '#707dff'
-const PRIORITY_COLORS = {
-  NONE: '#707dff',
-  LOW: '#64748b',
-  MEDIUM: '#b45309',
-  HIGH: '#c2410d',
-} as const
+// Defense types map onto SECTION_HEADER_PALETTE presets rather than bespoke
+// hexes, so a defense chip is the same construct as a manual one: Proposal
+// takes the palette default (Purple) and Final takes Rose. The client decides
+// the treatment per view — see renderEventContent.
+const DEFENSE_PALETTE_KEY = {
+  proposal: 'default',
+  final: '0',
+} as const satisfies Record<string, SectionHeaderColorKey>
 
-export type CalendarEventPriority = keyof typeof PRIORITY_COLORS
+function defensePresetFor(type: string) {
+  const key = type === 'FINAL' ? DEFENSE_PALETTE_KEY.final : DEFENSE_PALETTE_KEY.proposal
+  return { key, preset: headerStyleFor(key) }
+}
+
+// Manual-event color comes from the section-card palette
+// (SECTION_HEADER_PALETTE in lib/sectionHeader.ts) — the same six presets the
+// section cards use, so the calendar and the sections read as one system.
+// Each preset supplies a light `bg` for the pill and a dark `text` for the
+// label; that pairing is the whole reason the palette has five tones per entry.
+//
+// The ramp deliberately does NOT reuse the defense colors: #fe6f6f already
+// means "Final Defense" and #707dff means "Proposal Defense", so neither is
+// available as a manual-event color without creating an ambiguous overlap.
+//
+// The palette default (Purple, entry 0) is the fallback for a null or unknown
+// key, so a malformed row still renders a sane pill.
+const MANUAL_EVENT_FALLBACK_COLOR = SECTION_HEADER_PALETTE[0]
 
 export type CalendarFeedKind =
   | 'defense'
@@ -78,8 +89,16 @@ export interface CalendarFeedEvent {
   groupName: string | null
   sectionName: string | null
   audience: string | null
-  // Manual events only; defenses carry null (their color comes from type).
-  priority: string | null
+  /** Manual events: the chosen palette key (null = default). Defenses: the
+   *  preset their type maps to. */
+  colorKey: string | null
+  /** Saturated marker tone for a fill-less row. Set for defenses only — a
+   *  filled chip needs no marker, and the palette's pastel `bg` is far too
+   *  light to read as a small dot on the grid. */
+  markerColor: string | null
+  /** Label color for the pill. Dark for every variant, but supplied per-event
+   *  because the palette supplies a different dark tone per preset. */
+  textColor: string
   description: string | null
   status: string | null
 }
@@ -160,7 +179,7 @@ interface ManualFeedRow {
   endsAt: string
   allDay: boolean
   audience: 'STUDENT' | 'FACULTY' | 'ALL'
-  priority: CalendarEventPriority
+  colorKey: SectionHeaderColorKey | null
 }
 
 async function getCalendarManualEventsData(): Promise<ManualFeedRow[] | null> {
@@ -179,7 +198,7 @@ async function getCalendarManualEventsData(): Promise<ManualFeedRow[] | null> {
         endsAt: true,
         allDay: true,
         audience: true,
-        priority: true,
+        colorKey: true,
       },
       orderBy: { startsAt: 'asc' },
     })
@@ -191,7 +210,7 @@ async function getCalendarManualEventsData(): Promise<ManualFeedRow[] | null> {
       endsAt: r.endsAt.toISOString(),
       allDay: r.allDay,
       audience: r.audience,
-      priority: r.priority,
+      colorKey: isSectionHeaderColorKey(r.colorKey) ? r.colorKey : null,
     }))
   } catch (error) {
     console.error('[getCalendarManualEventsData | Error]:', error)
@@ -393,6 +412,7 @@ export async function getCalendarFeed(): Promise<{
       if (d.groupDeletedAt) continue
       if (!inGroupScope(d.groupId)) continue
       const isFinal = d.type === 'FINAL'
+      const { key: defenseColorKey, preset } = defensePresetFor(d.type)
       const start = combineDefenseDateTime(d.date, d.startTime) ?? d.date
       const end = combineDefenseDateTime(d.date, d.endTime) ?? d.date
       events.push({
@@ -402,7 +422,9 @@ export async function getCalendarFeed(): Promise<{
         start,
         end,
         allDay: start === end,
-        color: isFinal ? CALENDAR_COLORS.finalDefense : CALENDAR_COLORS.proposalDefense,
+        // Palette fill + label tone, identical in shape to a manual event.
+        color: preset.bg,
+        textColor: preset.text,
         href: scope.isStaff
           ? `/faculty/defense/${d.id}`
           : `/student/milestone/${isFinal ? 'final-defense' : 'proposal-defense'}`,
@@ -411,7 +433,9 @@ export async function getCalendarFeed(): Promise<{
         groupName: d.groupName,
         sectionName: d.sectionName,
         audience: null,
-        priority: null,
+        colorKey: defenseColorKey,
+        // Saturated dot tone: the pastel g is invisible at marker size.
+        markerColor: preset.dot,
         description: d.venue ? `Venue: ${d.venue}` : null,
         status: d.verdict,
       })
@@ -419,6 +443,9 @@ export async function getCalendarFeed(): Promise<{
 
     for (const m of manual) {
       if (!isManualVisible(m.audience)) continue
+      // Unknown or null key resolves to the palette default, so a malformed
+      // row still renders a sane pill instead of an uncolored one.
+      const preset = m.colorKey ? headerStyleFor(m.colorKey) : MANUAL_EVENT_FALLBACK_COLOR
       events.push({
         id: `manual-${m.id}`,
         kind: 'manual',
@@ -426,15 +453,18 @@ export async function getCalendarFeed(): Promise<{
         start: m.startsAt,
         end: m.endsAt,
         allDay: m.allDay,
-        // Priority drives the pill color; defense colors stay type-driven.
-        color: PRIORITY_COLORS[m.priority] ?? MANUAL_EVENT_COLOR,
+        // The palette preset supplies both tones: light fill, dark label.
+        color: preset.bg,
+        textColor: preset.text,
         href: '/calendar',
         groupId: null,
         sectionId: null,
         groupName: null,
         sectionName: null,
         audience: m.audience,
-        priority: m.priority,
+        colorKey: m.colorKey,
+        // A filled chip needs no marker.
+        markerColor: null,
         description: m.description,
         status: null,
       })
@@ -490,7 +520,7 @@ export interface CalendarEventInput {
   endsAt?: string | Date | null
   allDay?: boolean | string | null
   audience?: string | null
-  priority?: string | null
+  colorKey?: string | null
 }
 
 export interface CalendarEventPayload {
@@ -501,16 +531,18 @@ export interface CalendarEventPayload {
   endsAt: string
   allDay: boolean
   audience: 'STUDENT' | 'FACULTY' | 'ALL'
-  priority: CalendarEventPriority
+  colorKey: SectionHeaderColorKey | null
 }
 
 function isCalendarAudience(value: unknown): value is 'STUDENT' | 'FACULTY' | 'ALL' {
   return value === 'STUDENT' || value === 'FACULTY' || value === 'ALL'
 }
 
-function isCalendarPriority(value: unknown): value is CalendarEventPriority {
-  return value === 'NONE' || value === 'LOW' || value === 'MEDIUM' || value === 'HIGH'
-}
+// Human-readable list for the validation message, so adding a palette preset
+// automatically updates the copy.
+const COLOR_KEY_ERROR = `Color must be one of: ${SECTION_HEADER_PALETTE.map(
+  (preset) => preset.label,
+).join(', ')}.`
 
 // Reads one field from either a FormData (useActionState) or a plain object.
 // `present` distinguishes omitted (update keeps existing) from explicit empty
@@ -563,7 +595,10 @@ function mapCalendarRow(row: {
   startsAt: Date
   endsAt: Date
   audience: 'STUDENT' | 'FACULTY' | 'ALL'
-  priority?: CalendarEventPriority
+  // Loose on the way in: Prisma types the column as a plain string. Narrowed
+  // here so an unexpected value degrades to the palette default instead of
+  // reaching the client as an unknown key.
+  colorKey?: string | null
 } & { allDay?: boolean }): CalendarEventPayload {
   return {
     id: row.id,
@@ -573,7 +608,7 @@ function mapCalendarRow(row: {
     endsAt: row.endsAt.toISOString(),
     allDay: row.allDay ?? true,
     audience: row.audience,
-    priority: row.priority ?? 'NONE',
+    colorKey: isSectionHeaderColorKey(row.colorKey) ? row.colorKey : null,
   }
 }
 
@@ -684,24 +719,24 @@ export async function createCalendarEvent(
       }
     }
 
-    const priorityField = getCalendarField(raw as Record<string, unknown>, 'priority')
-    let priority: CalendarEventPriority = 'NONE'
-    if (priorityField.present) {
-      const rawPriority =
-        priorityField.value === null || priorityField.value === undefined
+    const colorKeyField = getCalendarField(raw as Record<string, unknown>, 'colorKey')
+    let colorKey: SectionHeaderColorKey | null = null
+    if (colorKeyField.present) {
+      const rawColorKey =
+        colorKeyField.value === null || colorKeyField.value === undefined
           ? ''
-          : String(priorityField.value).trim()
-      // Explicit empty is treated as "no priority" rather than an error, so a
-      // form that submits an empty priority select still saves.
-      if (rawPriority !== '') {
-        if (!isCalendarPriority(rawPriority)) {
+          : String(colorKeyField.value).trim()
+      // Explicit empty means "use the palette default" rather than an error, so
+      // a form that submits a blank hidden input still saves.
+      if (rawColorKey !== '') {
+        if (!isSectionHeaderColorKey(rawColorKey)) {
           return {
             success: false,
-            message: 'Priority must be NONE, LOW, MEDIUM, or HIGH.',
+            message: COLOR_KEY_ERROR,
             payload: null,
           }
         }
-        priority = rawPriority
+        colorKey = rawColorKey
       }
     }
 
@@ -722,7 +757,7 @@ export async function createCalendarEvent(
         endsAt,
         allDay,
         audience,
-        priority,
+        colorKey,
         createdById,
       },
     })
@@ -732,7 +767,7 @@ export async function createCalendarEvent(
       entityId: String(row.id),
       entityName: row.title,
       before: null,
-      after: { title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, priority: row.priority, allDay: row.allDay },
+      after: { title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, colorKey: row.colorKey, allDay: row.allDay },
     })
     await revalidateCalendar()
     return { success: true, message: 'Calendar event created.', payload: mapCalendarRow(row) }
@@ -884,39 +919,39 @@ export async function updateCalendarEvent(
       audience = rawAudience
     }
 
-    // Omitted keeps the stored priority; explicit empty resets to NONE so a
-    // chair can always clear it back to the neutral color.
-    let priority = (existing as unknown as { priority?: CalendarEventPriority }).priority ?? 'NONE'
-    const priorityField = getCalendarField(record, 'priority')
-    if (priorityField.present) {
-      const rawPriority =
-        priorityField.value === null || priorityField.value === undefined
+    // Omitted keeps the stored key; explicit empty resets to the palette
+    // default so a chair can always clear it back to Purple.
+    let colorKey = (existing as unknown as { colorKey?: string | null }).colorKey ?? null
+    const colorKeyField = getCalendarField(record, 'colorKey')
+    if (colorKeyField.present) {
+      const rawColorKey =
+        colorKeyField.value === null || colorKeyField.value === undefined
           ? ''
-          : String(priorityField.value).trim()
-      if (rawPriority === '') {
-        priority = 'NONE'
-      } else if (!isCalendarPriority(rawPriority)) {
+          : String(colorKeyField.value).trim()
+      if (rawColorKey === '') {
+        colorKey = null
+      } else if (!isSectionHeaderColorKey(rawColorKey)) {
         return {
           success: false,
-          message: 'Priority must be NONE, LOW, MEDIUM, or HIGH.',
+          message: COLOR_KEY_ERROR,
           payload: null,
         }
       } else {
-        priority = rawPriority
+        colorKey = rawColorKey
       }
     }
 
     const row = await prisma.calendarEvent.update({
       where: { id: numericId },
-      data: { title, description, startsAt, endsAt, allDay, audience, priority },
+      data: { title, description, startsAt, endsAt, allDay, audience, colorKey },
     })
     await audit({
       action: "CALENDAR_UPDATE",
       entity: "CALENDAR",
       entityId: String(numericId),
       entityName: row.title,
-      before: { title: existing.title, description: existing.description, startsAt: existing.startsAt.toISOString(), endsAt: existing.endsAt.toISOString(), audience: existing.audience, priority: existing.priority, allDay: existing.allDay },
-      after: { title: row.title, description: row.description, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, priority: row.priority, allDay: row.allDay },
+      before: { title: existing.title, description: existing.description, startsAt: existing.startsAt.toISOString(), endsAt: existing.endsAt.toISOString(), audience: existing.audience, colorKey: existing.colorKey, allDay: existing.allDay },
+      after: { title: row.title, description: row.description, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(), audience: row.audience, colorKey: row.colorKey, allDay: row.allDay },
     })
     await revalidateCalendar()
     return { success: true, message: 'Calendar event updated.', payload: mapCalendarRow(row) }

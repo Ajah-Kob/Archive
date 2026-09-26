@@ -17,3 +17,19 @@ export function headerStyleFor(key: string | null | undefined) {
   if (!key) return SECTION_HEADER_PALETTE[0]
   return SECTION_HEADER_PALETTE.find((p) => p.key === key) ?? SECTION_HEADER_PALETTE[0]
 }
+
+// Narrows an untrusted string to a palette key. Used by the calendar event
+// actions so an unknown colorKey is rejected instead of silently rendering as
+// the default.
+export function isSectionHeaderColorKey(
+  value: unknown,
+): value is SectionHeaderColorKey {
+  return (
+    typeof value === 'string' &&
+    SECTION_HEADER_PALETTE.some((preset) => preset.key === value)
+  )
+}
+
+export const SECTION_HEADER_COLOR_KEYS = SECTION_HEADER_PALETTE.map(
+  (preset) => preset.key,
+)

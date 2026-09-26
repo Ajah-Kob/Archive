@@ -104,7 +104,7 @@ const manualRow = (overrides: Record<string, unknown> = {}) => ({
   endsAt: new Date('2026-05-01T00:00:00.000Z'),
   allDay: true,
   audience: 'ALL',
-  priority: 'NONE',
+  colorKey: null,
   ...overrides,
 })
 
@@ -380,7 +380,7 @@ describe('getCalendarFeed — defense time handling (Manila wall clock)', () => 
     expect(res.payload?.[0].allDay).toBe(true)
   })
 
-  test('proposal and final defenses carry different colors', async () => {
+  test('defenses resolve to the same palette chips manual events use', async () => {
     sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
     prismaMock.defenseSchedule.findMany.mockResolvedValue([
       defenseRow({ id: 501, type: 'PROPOSAL' }),
@@ -388,12 +388,16 @@ describe('getCalendarFeed — defense time handling (Manila wall clock)', () => 
     ])
 
     const res = await getCalendarFeed()
-
     const proposal = res.payload?.find((e) => e.id === 'defense-501')
     const final = res.payload?.find((e) => e.id === 'defense-502')
-    expect(proposal?.color).not.toBe(final?.color)
-    expect(proposal?.title).toContain('Proposal Defense')
-    expect(final?.title).toContain('Final Defense')
+
+    // Proposal takes the palette default (Purple), Final takes Rose.
+    expect(proposal?.color).toBe('#c7d2fe')
+    expect(proposal?.textColor).toBe('#1e3a8a')
+    expect(proposal?.colorKey).toBe('default')
+    expect(final?.color).toBe('#fecdd3')
+    expect(final?.textColor).toBe('#881337')
+    expect(final?.colorKey).toBe('0')
   })
 
   test('the feed is sorted oldest first', async () => {
@@ -446,76 +450,129 @@ describe('getCalendarFeed — failure handling', () => {
   })
 })
 
-describe('getCalendarFeed — manual event priority colors', () => {
-  const PRIORITY_CASES = [
-    ['NONE', '#707dff'],
-    ['LOW', '#64748b'],
-    ['MEDIUM', '#b45309'],
-    ['HIGH', '#c2410d'],
-  ] as const
+describe('getCalendarFeed - manual event palette colors', () => {
+  // The six SECTION_HEADER_PALETTE presets, with their light bg + dark text.
+  const COLOR_CASES: ReadonlyArray<[string, string, string]> = [
+    ['default', '#c7d2fe', '#1e3a8a'],
+    ['0', '#fecdd3', '#881337'],
+    ['1', '#fde68a', '#78350f'],
+    ['2', '#a7f3d0', '#065f46'],
+    ['3', '#bae6fd', '#0c4a6e'],
+    ['4', '#fed7aa', '#7c2d12'],
+  ]
 
-  test.each(PRIORITY_CASES)(
-    'a %s priority event resolves to %s',
-    async (priority, expected) => {
+  test.each(COLOR_CASES)(
+    'colorKey %s resolves to the %s fill with %s text',
+    async (colorKey, expectedBg, expectedText) => {
       sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
       prismaMock.calendarEvent.findMany.mockResolvedValue([
-        manualRow({ id: 700 + PRIORITY_CASES.findIndex(([p]) => p === priority), priority }),
+        manualRow({ id: 700, colorKey }),
       ])
 
       const res = await getCalendarFeed()
 
-      expect(res.payload?.[0].color).toBe(expected)
+      expect(res.payload?.[0].color).toBe(expectedBg)
+      expect(res.payload?.[0].textColor).toBe(expectedText)
     },
   )
 
-  test('the four levels resolve to four distinct colors', async () => {
+  test('every preset produces a distinct fill', async () => {
     sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
     prismaMock.calendarEvent.findMany.mockResolvedValue(
-      PRIORITY_CASES.map(([priority], i) => manualRow({ id: 800 + i, priority })),
+      COLOR_CASES.map(([colorKey], i) => manualRow({ id: 800 + i, colorKey })),
     )
 
     const res = await getCalendarFeed()
 
     const colors = res.payload?.map((e) => e.color) ?? []
-    expect(new Set(colors).size).toBe(4)
+    expect(new Set(colors).size).toBe(COLOR_CASES.length)
   })
 
-  test('priority never collides with the final-defense red', async () => {
+  test('a null colorKey falls back to the palette default (Purple)', async () => {
     sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
     prismaMock.calendarEvent.findMany.mockResolvedValue([
-      manualRow({ id: 810, priority: 'HIGH' }),
+      manualRow({ id: 810, colorKey: null }),
+    ])
+
+    const res = await getCalendarFeed()
+
+    expect(res.payload?.[0].color).toBe('#c7d2fe')
+    expect(res.payload?.[0].colorKey).toBeNull()
+  })
+
+  test('an unknown stored colorKey falls back to the default rather than rendering uncolored', async () => {
+    sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
+    prismaMock.calendarEvent.findMany.mockResolvedValue([
+      manualRow({ id: 820, colorKey: 'CHARTREUSE' }),
+    ])
+
+    const res = await getCalendarFeed()
+
+    expect(res.payload?.[0].color).toBe('#c7d2fe')
+    expect(res.payload?.[0].colorKey).toBeNull()
+  })
+
+  test('defense chips are palette entries, so they share a manual event of that color', async () => {
+    sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
+    prismaMock.calendarEvent.findMany.mockResolvedValue([
+      manualRow({ id: 830, colorKey: 'default' }),
+      manualRow({ id: 831, colorKey: '0' }),
     ])
     prismaMock.defenseSchedule.findMany.mockResolvedValue([
-      defenseRow({ id: 811, type: 'FINAL' }),
+      defenseRow({ id: 840, type: 'PROPOSAL' }),
+      defenseRow({ id: 841, type: 'FINAL' }),
     ])
 
     const res = await getCalendarFeed()
-    const high = res.payload?.find((e) => e.kind === 'manual')
-    const final = res.payload?.find((e) => e.kind === 'defense')
+    const byId = (id: string) => res.payload?.find((e) => e.id === id)
 
-    expect(high?.color).not.toBe(final?.color)
-    expect(final?.color).toBe('#fe6f6f')
+    // Proposal defense and a default manual event are the same chip; same for
+    // Final and a Rose manual event. That is the accepted trade-off of mapping
+    // defenses onto the palette — type is carried by the title, not the hue.
+    expect(byId('defense-840')?.color).toBe(byId('manual-830')?.color)
+    expect(byId('defense-840')?.textColor).toBe(byId('manual-830')?.textColor)
+    expect(byId('defense-841')?.color).toBe(byId('manual-831')?.color)
+    expect(byId('defense-841')?.textColor).toBe(byId('manual-831')?.textColor)
   })
 
-  test('an unknown stored priority falls back to the neutral indigo', async () => {
+  test('defense titles still carry the type, since the hue no longer does', async () => {
     sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
+    prismaMock.defenseSchedule.findMany.mockResolvedValue([
+      defenseRow({ id: 501, type: 'PROPOSAL' }),
+      defenseRow({ id: 502, type: 'FINAL' }),
+    ])
+
+    const res = await getCalendarFeed()
+
+    expect(res.payload?.find((e) => e.id === 'defense-501')?.title).toContain(
+      'Proposal Defense',
+    )
+    expect(res.payload?.find((e) => e.id === 'defense-502')?.title).toContain(
+      'Final Defense',
+    )
+  })
+
+  test('a month defense carries a saturated marker tone, a manual event does not', async () => {
+    sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
+    prismaMock.defenseSchedule.findMany.mockResolvedValue([
+      defenseRow({ id: 501, type: 'PROPOSAL' }),
+      defenseRow({ id: 502, type: 'FINAL' }),
+    ])
     prismaMock.calendarEvent.findMany.mockResolvedValue([
-      manualRow({ id: 820, priority: 'URGENT' }),
+      manualRow({ id: 600, colorKey: '0' }),
     ])
 
     const res = await getCalendarFeed()
 
-    expect(res.payload?.[0].color).toBe('#707dff')
-  })
-
-  test('defenses carry no priority and keep their type color', async () => {
-    sessionMock.mockResolvedValue(sessionFor('SUPERADMIN'))
-    prismaMock.defenseSchedule.findMany.mockResolvedValue([defenseRow()])
-
-    const res = await getCalendarFeed()
-
-    expect(res.payload?.[0].priority).toBeNull()
-    expect(res.payload?.[0].color).toBe('#707dff')
+    // The palette's pastel bg is invisible at dot size, so the marker uses the
+    // saturated `dot` tone instead. A filled chip needs no marker.
+    expect(res.payload?.find((e) => e.id === 'defense-501')?.markerColor).toBe(
+      '#818cf8',
+    )
+    expect(res.payload?.find((e) => e.id === 'defense-502')?.markerColor).toBe(
+      '#fb7185',
+    )
+    expect(res.payload?.find((e) => e.id === 'manual-600')?.markerColor).toBeNull()
   })
 })
 
@@ -617,7 +674,7 @@ describe('createCalendarEvent', () => {
     expect(revalidateCalendarMock).toHaveBeenCalled()
   })
 
-  test('defaults priority to NONE when omitted', async () => {
+  test('defaults colorKey to null (palette default) when omitted', async () => {
     await createCalendarEvent(null, {
       title: 'Capstone Kickoff',
       startsAt: '2026-05-01T00:00:00.000Z',
@@ -625,53 +682,54 @@ describe('createCalendarEvent', () => {
     })
 
     const arg = prismaMock.calendarEvent.create.mock.calls[0][0] as any
-    expect(arg.data.priority).toBe('NONE')
+    expect(arg.data.colorKey).toBeNull()
   })
 
-  test('stores an explicit priority', async () => {
+  test('stores an explicit palette colorKey', async () => {
     await createCalendarEvent(null, {
       title: 'Defense Week',
       startsAt: '2026-05-01T00:00:00.000Z',
       endsAt: '2026-05-01T00:00:00.000Z',
-      priority: 'HIGH',
+      colorKey: '2',
     })
 
     const arg = prismaMock.calendarEvent.create.mock.calls[0][0] as any
-    expect(arg.data.priority).toBe('HIGH')
+    expect(arg.data.colorKey).toBe('2')
   })
 
-  test('rejects an unknown priority', async () => {
+  test('rejects a colorKey that is not in the palette', async () => {
     const res = await createCalendarEvent(null, {
       title: 'X',
       startsAt: '2026-05-01T00:00:00.000Z',
       endsAt: '2026-05-01T00:00:00.000Z',
-      priority: 'URGENT',
+      colorKey: 'CHARTREUSE',
     })
 
-    expect(res.message).toBe('Priority must be NONE, LOW, MEDIUM, or HIGH.')
+    expect(res.message).toBe(
+      'Color must be one of: Purple, Rose, Amber, Mint, Sky, Peach.',
+    )
     expect(prismaMock.calendarEvent.create).not.toHaveBeenCalled()
   })
 
-  test('records the priority in the audit payload', async () => {
+  test('records the colorKey in the audit payload', async () => {
     prismaMock.calendarEvent.create.mockResolvedValue(
-      manualRow({ id: 901, title: 'Defense Week', priority: 'HIGH' }),
+      manualRow({ id: 901, title: 'Defense Week', colorKey: '0' }),
     )
 
     await createCalendarEvent(null, {
       title: 'Defense Week',
       startsAt: '2026-05-01T00:00:00.000Z',
       endsAt: '2026-05-01T00:00:00.000Z',
-      priority: 'HIGH',
+      colorKey: '0',
     })
 
     expect(auditMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        after: expect.objectContaining({ priority: 'HIGH' }),
+        after: expect.objectContaining({ colorKey: '0' }),
       }),
     )
   })
 })
-
 describe('updateCalendarEvent', () => {
   const chairSession = sessionFor('FACULTY', { isProgramChair: true })
   const existing = {
@@ -748,33 +806,34 @@ describe('updateCalendarEvent', () => {
     )
   })
 
-  test('an omitted priority keeps the stored value', async () => {
-    prismaMock.calendarEvent.findFirst.mockResolvedValue({ ...existing, priority: 'HIGH' })
-    prismaMock.calendarEvent.update.mockResolvedValue({ ...existing, title: 'New Title', priority: 'HIGH' })
+  test('an omitted colorKey keeps the stored value', async () => {
+    prismaMock.calendarEvent.findFirst.mockResolvedValue({ ...existing, colorKey: '3' })
+    prismaMock.calendarEvent.update.mockResolvedValue({ ...existing, title: 'New Title', colorKey: '3' })
 
     await updateCalendarEvent(701, { title: 'New Title' })
 
     const arg = prismaMock.calendarEvent.update.mock.calls[0][0] as any
-    expect(arg.data.priority).toBe('HIGH')
+    expect(arg.data.colorKey).toBe('3')
   })
 
-  test('an explicit empty priority resets to NONE', async () => {
-    prismaMock.calendarEvent.findFirst.mockResolvedValue({ ...existing, priority: 'HIGH' })
+  test('an explicit empty colorKey resets to the palette default', async () => {
+    prismaMock.calendarEvent.findFirst.mockResolvedValue({ ...existing, colorKey: '3' })
 
-    await updateCalendarEvent(701, { priority: '' })
+    await updateCalendarEvent(701, { colorKey: '' })
 
     const arg = prismaMock.calendarEvent.update.mock.calls[0][0] as any
-    expect(arg.data.priority).toBe('NONE')
+    expect(arg.data.colorKey).toBeNull()
   })
 
-  test('rejects an unknown priority without writing', async () => {
-    const res = await updateCalendarEvent(701, { priority: 'URGENT' })
+  test('rejects a colorKey outside the palette without writing', async () => {
+    const res = await updateCalendarEvent(701, { colorKey: 'CHARTREUSE' })
 
-    expect(res.message).toBe('Priority must be NONE, LOW, MEDIUM, or HIGH.')
+    expect(res.message).toBe(
+      'Color must be one of: Purple, Rose, Amber, Mint, Sky, Peach.',
+    )
     expect(prismaMock.calendarEvent.update).not.toHaveBeenCalled()
   })
 })
-
 describe('deleteCalendarEvent', () => {
   const chairSession = sessionFor('FACULTY', { isProgramChair: true })
 

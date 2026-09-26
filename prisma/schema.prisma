@@ -487,15 +487,6 @@ enum CalendarEventAudience {
   ALL
 }
 
-// Chair/admin-set urgency for a manual event. NONE keeps the neutral indigo,
-// so pre-existing rows are visually unchanged after the migration.
-enum CalendarEventPriority {
-  NONE
-  LOW
-  MEDIUM
-  HIGH
-}
-
 model CalendarEvent {
   id          Int                   @id @default(autoincrement())
   title       String
@@ -504,7 +495,11 @@ model CalendarEvent {
   endsAt      DateTime
   allDay      Boolean                   @default(true)
   audience      CalendarEventAudience @default(ALL)
-  priority     CalendarEventPriority @default(NONE)
+  // Palette key from SECTION_HEADER_PALETTE (lib/sectionHeader.ts) — the same
+  // six presets the section cards use. Null = the palette default (Purple).
+  // A key rather than a hex so validation stays a fixed list and a palette
+  // change propagates.
+  colorKey    String?
   createdById   Int
   createdBy   User                  @relation(fields: [createdById], references: [id])
   createdAt   DateTime              @default(now())

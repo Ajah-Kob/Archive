@@ -10,7 +10,8 @@ import {
   updateSection,
   type MySectionCardData,
 } from '@/lib/actions/sections'
-import { SECTION_HEADER_PALETTE } from '@/lib/sectionHeader'
+import { ColorKeyPicker } from '@/components/ui/ColorKeyPicker'
+import { isSectionHeaderColorKey } from '@/lib/sectionHeader'
 import {
   getDefaultAcademicYear,
   getSupportedAcademicYears,
@@ -219,41 +220,11 @@ export function SectionModal({
                   </div>
                 </div>
 
-                <div className="flex flex-col items-start w-full">
-                  <label className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
-                    Header Color
-                  </label>
-                  <div className="flex items-center gap-[10px] pt-[10px] flex-wrap">
-                    {SECTION_HEADER_PALETTE.map((c) => {
-                      const isDefault = c.key === 'default'
-                      const active = isDefault
-                        ? headerColor === null
-                        : headerColor === c.key
-                      return (
-                        <button
-                          key={c.key}
-                          type="button"
-                          onClick={() =>
-                            setHeaderColor(isDefault ? null : c.key)
-                          }
-                          disabled={active}
-                          aria-label={c.label}
-                          title={c.label}
-                          className={`size-[32px] rounded-full border-2 border-[#5a6382] flex items-center justify-center transition-all ${
-                            active
-                              ? 'ring-2 ring-[rgba(112,125,255,0.22)] ring-offset-2 ring-offset-white opacity-100 cursor-not-allowed'
-                              : 'border-none shadow-[0_1px_4px_rgba(0,0,0,0.12)] hover:scale-90 cursor-pointer'
-                          }`}
-                          style={{ backgroundColor: c.dot }}
-                        >
-                          {active && (
-                            <span className="size-[8px] rounded-full bg-white shadow-[0_0_2px_rgba(0,0,0,0.2)]" />
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
+                <ColorKeyPicker
+                  label="Header Color"
+                  value={isSectionHeaderColorKey(headerColor) ? headerColor : null}
+                  onChange={(next) => setHeaderColor(next)}
+                />
               </>
             )}
 

@@ -423,7 +423,7 @@ Derived constants in `config/constants.ts`: `APP_NAME`, `APP_BASE_URL`, `SMTP_FR
 ## Seed Defaults
 
 ```
-email:    admin@domain.com
+email:    superadmin@domain.com
 password: defaultpass
 role:     SUPERADMIN
 ```

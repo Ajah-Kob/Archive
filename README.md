@@ -172,7 +172,7 @@ npm run dev                # Start dev server on :3000
 ### Default admin credentials
 
 ```
-email:    admin@domain.com
+email:    superadmin@domain.com
 password: defaultpass
 role:     SUPERADMIN
 ```

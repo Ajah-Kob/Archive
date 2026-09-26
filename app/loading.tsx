@@ -1,7 +1,6 @@
-import TemplateDefault from "@/templates/Default"
 export default function Loading() {
   return (
-    <TemplateDefault>
+    <main className="bg-primary min-h-dvh">
       <section className="animate-pulse">
         <div className="container">
           <div className="flex flex-col gap-5">
@@ -11,6 +10,6 @@ export default function Loading() {
           </div>
         </div>
       </section>
-    </TemplateDefault>
+    </main>
   )
 }

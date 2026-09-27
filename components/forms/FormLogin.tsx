@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useRef, useTransition } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
 import { PasswordToggle } from '@/components/ui/PasswordToggle'
 import { useAuthFormValidity } from '@/components/forms/useAuthFormValidity'
-import { isValidEmail, roleHome, safeNextPath } from '@/lib/helper'
+import { isValidEmail } from '@/lib/helper'
 
 export default function FormLogin({ className }: { className?: string }) {
   // Refs
@@ -18,9 +17,7 @@ export default function FormLogin({ className }: { className?: string }) {
   const [pending, startTransition] = useTransition()
   const { isFormValid, checkFormValidity } = useAuthFormValidity(formRef)
   const { update } = useSession()
-  const searchParams = useSearchParams()
-  // Resume target after login (e.g. /join/<code> from an invite link).
-  const next = safeNextPath(searchParams.get('next'))
+  // `?next=` is read by RedirectIfAuthed on this page, not here.
 
   // State
   const [state, setState] = useState({
@@ -82,15 +79,14 @@ export default function FormLogin({ className }: { className?: string }) {
             },
           })
 
-          // Refresh the session so the role is available, then resume the
-          // invite link when present, else land on the role's home route.
-          const refreshed = await update()
-          const role = (refreshed?.user?.role as string) ?? 'GUEST'
-
-          // Wait 1 second before redirecting
-          setTimeout(() => {
-            window.location.href = next ?? roleHome(role)
-          }, 1000)
+          // Refresh the session so the role is available. Navigation is NOT
+          // done here: RedirectIfAuthed (rendered on this page) owns it and
+          // fires as soon as `update()` flips the session to authenticated.
+          // This form used to also schedule a 1s-delayed
+          // `window.location.href`, which raced that component — the slower of
+          // the two won, so a login whose tab had /signup in last-route showed
+          // a visible /signup hop before landing correctly.
+          await update()
         } else {
           setState({
             message: null,

@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { roleHome, safeNextPath } from '@/lib/helper'
+import { isAuthRoute, roleHome, safeNextPath } from '@/lib/helper'
 import { LAST_ROUTE_KEY } from '@/components/globals/RouteTracker'
 
 /**
@@ -23,12 +23,13 @@ export function RedirectIfAuthed() {
   useEffect(() => {
     if (status !== 'authenticated') return
 
+    // This component is the single owner of post-login navigation — FormLogin
+    // no longer schedules a competing redirect of its own, because two
+    // disagreeing navigations meant the slower one won and the user saw an
+    // intermediate hop.
     const last = sessionStorage.getItem(LAST_ROUTE_KEY)
-    const target =
-      next ??
-      (last && last.startsWith('/') && last !== '/login' && last !== '/'
-        ? last
-        : roleHome(session?.user?.role))
+    const resumable = last && last.startsWith('/') && !isAuthRoute(last)
+    const target = next ?? (resumable ? last : roleHome(session?.user?.role))
 
     router.replace(target)
   }, [status, session, router, next])

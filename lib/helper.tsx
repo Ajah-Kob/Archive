@@ -13,6 +13,26 @@ export function safeNextPath(value?: string | null): string | null {
   return value
 }
 
+// Routes a user should never be "returned" to: they are entry points into the
+// auth flow, not destinations inside the app.
+//
+// Two places depend on this list agreeing, which is why it lives here rather
+// than being inlined in each:
+//   - RouteTracker must not record them as the tab's last route
+//   - RedirectIfAuthed must not resume to them after login
+//
+// Getting this wrong is what made a fresh login bounce through /signup: the
+// tracker recorded /signup (it is one click from /login), and the resume logic
+// only excluded /login and '/', so the stale value won over roleHome. Note '/'
+// is excluded for a different reason — it is a public landing page, not an auth
+// route — so it is listed separately rather than folded in here.
+const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password'] as const
+
+export function isAuthRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return (AUTH_ROUTES as readonly string[]).includes(pathname)
+}
+
 // Returns the role-root home route for a given role, falling back to /guest.
 // Used by the login flow, the proxy, and the Join flow to land users on their
 // own role's home page after auth changes.

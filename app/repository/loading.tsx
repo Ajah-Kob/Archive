@@ -1,29 +1,21 @@
-import TableSkeleton from '@/components/templates/main/TableSkeleton'
+import { RepositorySkeleton } from '@/components/repository/RepositorySkeleton'
+import { PageLabel } from '@/components/globals/PageLabel'
 
-export default function RepositoryLoarding() {
+/**
+ * Streaming fallback for /repository.
+ *
+ * The page is Partial Prerendered: the archive list is served from
+ * getArchivedCapstonesData() ('use cache'), while the session read and the
+ * per-user favorites read are dynamic. This file is the fallback for that
+ * dynamic part, so it must match RepositoryClient's real layout — an earlier
+ * version rendered a table skeleton against a card list, which made the swap
+ * to loaded content more visible rather than less.
+ */
+export default function RepositoryLoading() {
   return (
-    <div className="flex flex-col w-full gap-5 h-full animate-pulse">
-      <div className="flex flex-col gap-[12px]">
-        <div className="flex items-center gap-2">
-          <div className="h-[12px] w-[60px] rounded bg-[#e8ebf8]" />
-          <div className="size-[4px] rounded-full bg-[#e8ebf8]" />
-          <div className="h-[12px] w-[80px] rounded bg-[#e8ebf8]" />
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <div className="h-[20px] w-[200px] rounded bg-[#e8ebf8]" />
-            <div className="h-[14px] w-[280px] rounded bg-[#e8ebf8]" />
-          </div>
-          <div className="h-[38px] w-[145px] rounded-xl bg-[#e8ebf8]" />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-[10px] flex-1 min-h-px">
-        <div className="h-[38px] w-full max-w-[300px] rounded-xl bg-[#e8ebf8]" />
-
-        <TableSkeleton />
-      </div>
-    </div>
+    <section className="h-full flex flex-col">
+      <PageLabel label="Repository" />
+      <RepositorySkeleton />
+    </section>
   )
 }

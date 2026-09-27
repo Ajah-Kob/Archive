@@ -6,8 +6,10 @@
 // Instead derive the pathname and fetch via `GET /api/blob/{pathname}` which
 // does a server-side head+auth gate and returns a signed stream/redirect.
 //
-// Repository `archives/*` stays PUBLIC in this feature (see note below) — that
-// prefix is NOT routed through /api/blob/... and continues to use the raw URL.
+// Repository `archives/*` is also PRIVATE: the Blob store in use rejects
+// `access: 'public'`, so published capstones upload with `access: 'private'`
+// and are served through the same signed route as every other prefix.
+// Any signed-in user may read them (including GUEST); signed-out callers 401.
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -18,6 +20,8 @@
  *     → chapter/12/CHAPTER_1/foo-abc.pdf
  *   https://xxx.public.blob.vercel-storage.com/archiving/5/doc-xyz.pdf
  *     → archiving/5/doc-xyz.pdf
+ *   https://xxx.public.blob.vercel-storage.com/archives/doc-xyz.pdf
+ *     → archives/doc-xyz.pdf
  *   /api/blob/chapter/1/CHAPTER_1/foo.pdf
  *     → chapter/1/CHAPTER_1/foo.pdf
  *   chapter/1/CHAPTER_1/foo.pdf
@@ -92,8 +96,9 @@ export function getSignedBlobUrl(blobUrl: string | null | undefined): string {
 
 /**
  * Whether a stored blobUrl is a private capstone blob that MUST go through
- * the signed route. `user/*` avatars stay public; `archives/*` (repository)
- * stays public in this private-blobs feature (see repository page note).
+ * the signed route. Every content prefix is private, including `user/*`
+ * (avatars) — the Blob store rejects `access: 'public'`, so nothing can be
+ * fetched by raw URL.
  */
 export function isPrivateBlobPath(pathname: string): boolean {
   if (!pathname) return false
@@ -101,7 +106,9 @@ export function isPrivateBlobPath(pathname: string): boolean {
     pathname.startsWith('templates/') ||
     pathname.startsWith('chapter/') ||
     pathname.startsWith('defense/') ||
-    pathname.startsWith('archiving/')
+    pathname.startsWith('archiving/') ||
+    pathname.startsWith('archives/') ||
+    pathname.startsWith('user/')
   )
 }
 
@@ -120,21 +127,25 @@ export const getBlobPathname = blobUrlToPathname
 
 // ───────────────────────────── Repository note ─────────────────────────────
 //
-// NOTE — Repository archives/* stays PUBLIC in this feature (intentional).
+// `archives/*` is PRIVATE, like every other content prefix.
 //
-// CapstoneArchive blobs under `archives/*` are published to the shared
-// Repository at `/repository` and remain `access: 'public'` with a direct
-// Vercel Blob URL in `capstoneArchive.blobUrl`. This file's helpers and the
-// signed route (`/api/blob/...`) intentionally do NOT handle `archives/*`:
+// The Blob store rejects `access: 'public'`, so `publishArchive` /
+// `updateArchive` upload with `access: 'private'` and store the raw
+// vercel-storage URL in `capstoneArchive.blobUrl`. Clients MUST NOT link that
+// URL directly — they derive the pathname and go through `GET /api/blob/...`:
 //
-//   - app/repository/page.tsx renders `item.blobUrl` directly (no signed fetch).
-//   - scripts/migrate-private-blobs.ts skips the `archives/` prefix.
-//   - app/api/blob/[...pathname] returns 404 for `archives/*` so the public
-//     path remains the only access path.
+//   - app/repository/page.tsx passes `blobUrl` to RepositoryClient, which
+//     fetches `toSignedBlobPath(blobUrl)` with `credentials: 'include'`.
 //
-// Rationale: repository is “any role” (proxy.ts has no guard) and is not
-// sensitivity-gated like chapter/defense/archiving (group-scoped). If a future
-// spec requires repository privatization, add `archives/` to the signed-route
-// branch with the same “any signed-in user” or public gate and migrate the
-// stored URLs — no schema change.
+// (There is no `scripts/migrate-private-blobs.ts` in this repo. Nothing needs
+// migrating anyway: archive uploads always failed before this change, so every
+// stored archives/* URL already points at a private blob.)
+//
+// Authorization: the signed route's global gate is the whole policy — any
+// signed-in, non-deleted user of ANY role (GUEST included) may read a
+// published capstone; signed-out callers get 401. Published work is not
+// group-scoped the way chapter/defense/archiving are.
+//
+// No data migration is required: existing rows keep the same blobUrl shape,
+// only the fetch path changes.
 // ────────────────────────────────────────────────────────────────────────────

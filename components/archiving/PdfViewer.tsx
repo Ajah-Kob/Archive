@@ -42,8 +42,9 @@ export interface ArchivingPdfViewerProps {
  * and an inline unauthorized state; the PDF is rendered via EmbedPDF from a
  * fetched object URL, not the raw public URL.
  *
- * Repository `archives/*` stays public (see lib/blob.ts + app/repository/page.tsx note)
- * and is intentionally NOT routed through this viewer.
+ * Repository `archives/*` is also private and is not routed through this
+ * viewer — RepositoryClient opens it via the signed route instead.
+ * See lib/blob.ts + app/repository/page.tsx note.
  */
 export function PdfViewer({ src, fileName }: ArchivingPdfViewerProps) {
   const { engine, isLoading: engineLoading, error: engineError } = usePdfiumEngine()

@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { X, Users, User, Check, Loader2 } from 'lucide-react'
 import { getMyWorkspace } from '@/lib/actions/groups'
 import { splitName } from '@/lib/archiving/author-helpers'
+import { toSignedBlobPath } from '@/lib/blob'
 import type { AuthorEntry } from '@/lib/archiving/validation'
 
 interface GroupMember {
@@ -269,9 +270,12 @@ export function AddStudentModal({
                     {/* Avatar */}
                     <div className="shrink-0 size-[36px] rounded-full overflow-hidden bg-white border border-[#eceef8] flex items-center justify-center">
                       {member.image ? (
+                        // Avatars are private blobs — the raw vercel-storage URL
+                        // 401s, so read through the signed route. A plain <img>
+                        // sends the session cookie, which next/image would not.
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={member.image}
+                          src={toSignedBlobPath(member.image)}
                           alt={member.name}
                           className="size-full object-cover"
                         />

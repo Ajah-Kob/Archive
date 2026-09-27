@@ -9,13 +9,14 @@ const ADMIN_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
 /**
  * Auth-gated read route for private Vercel Blobs.
  *
- * Single Vercel Blob store — per-upload `access: 'private'` for
- * templates/chapter/defense/archiving, `public` for user/* avatars.
+ * Single Vercel Blob store — everything is per-upload `access: 'private'`.
+ * The store rejects `access: 'public'`, so no blob has a usable raw URL.
  * This route stays outside proxy.ts (does its own getServerSession) and
  * branches by prefix:
  *   templates/* → role !== GUEST
  *   chapter/*, defense/*, archiving/* → group member | adviser | coordinator-of-section | chair/admin
- *   archives/* → 404 (repository stays public via raw blobUrl — see lib/blob.ts note)
+ *   archives/* → any signed-in user, any role (GUEST included)
+ *   user/* (avatars) → any signed-in user
  *   invalid prefix → 404
  *
  * Anonymous → 401, deleted user → 401, cross-section coordinator → 403.
@@ -134,13 +135,30 @@ async function handleRequest(
     return NextResponse.json({ message: 'Invalid pathname' }, { status: 400 })
   }
 
-  // Repository archives/* stays public — not served via signed route (see lib/blob.ts note)
-  // Return 404 so callers keep using the raw public URL for /repository.
-  if (pathname.startsWith('archives/')) {
-    return NextResponse.json({ message: 'Not found' }, { status: 404 })
+  // 3) Branch by prefix
+  // Avatars (user/*) → any signed-in user. Not self-only: member avatars are
+  // shown next to other people in group/member lists, so restricting this to
+  // the owner would break those views. The global auth gate above is the whole
+  // policy, same as archives/*.
+  if (pathname.startsWith('user/')) {
+    const verified = await verifyBlobPathname(pathname)
+    if (!verified) {
+      return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+    return await serveBlob(pathname, req)
   }
 
-  // 3) Branch by prefix
+  // Archives (repository) → any signed-in user. Published capstone work is not
+  // group-scoped, so the global auth gate above IS the whole policy: no extra
+  // role check, and GUEST is deliberately allowed (unlike templates/*).
+  if (pathname.startsWith('archives/')) {
+    const verified = await verifyBlobPathname(pathname)
+    if (!verified) {
+      return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+    return await serveBlob(pathname, req)
+  }
+
   // Templates → any non-GUEST
   if (pathname.startsWith('templates/')) {
     if (role === 'GUEST') {

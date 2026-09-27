@@ -19,7 +19,7 @@ import { toast } from 'sonner'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
-import { blobUrlToPathname, toSignedBlobPath } from '@/lib/blob'
+import { blobUrlToPathname, isPrivateBlobPath, toSignedBlobPath } from '@/lib/blob'
 import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
 import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
 import {
@@ -188,11 +188,13 @@ export function DocumentWorkspace({
         }
         return
       }
-      // Repository archives/* stays public — but chapter blobs are private archiving/chapter.
-      // If pathname is not a private prefix, fall back to direct blobUrl (e.g. legacy public).
-      const isPrivate = pathname.startsWith('chapter/') || pathname.startsWith('archiving/') || pathname.startsWith('defense/')
+      // Every content prefix is private (chapter/defense/archiving/archives/
+      // templates) and must be fetched through the signed route. Shared helper
+      // instead of a local list so the prefixes cannot drift from lib/blob.ts.
+      // Only legacy public blobs (e.g. user/* avatars) take the direct path.
+      const isPrivate = isPrivateBlobPath(pathname)
       if (!isPrivate) {
-        // Non-private (e.g. archives/* or old public) — allow direct load but still try signed route first when available.
+        // Non-private (e.g. legacy public) — allow direct load but still try signed route first when available.
         if (signedPath && pathname) {
           // try signed; fall back to raw on failure
         } else {

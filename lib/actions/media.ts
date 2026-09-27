@@ -32,8 +32,11 @@ export async function uploadMedia(image: File) {
     const arrayBuffer = await image.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
+    // Private: the Blob store rejects `access: 'public'`, and a profile photo
+    // has no need to be world-readable. Read back through the signed route
+    // (GET /api/blob/user/...) like every other content prefix.
     const blob = await put(`user/${userId}/${image.name}`, buffer, {
-      access: 'public',
+      access: 'private',
       contentType: image.type,
       addRandomSuffix: true,
     })

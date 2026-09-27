@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { getInitials } from '@/lib/helper'
+import { toSignedBlobPath } from '@/lib/blob'
 
 export default function DrawerProfile() {
   // Ref
@@ -46,8 +47,12 @@ export default function DrawerProfile() {
   const initials = session?.user?.name ? getInitials(session.user.name) : '?'
 
   const avatar = session?.user?.image ? (
+    // Avatars are private blobs, so the raw vercel-storage URL 401s. Go through
+    // the signed route. `unoptimized` is required: next/image would otherwise
+    // fetch the source server-side without the session cookie and get a 401.
     <Image
-      src={session.user.image}
+      unoptimized
+      src={toSignedBlobPath(session.user.image)}
       alt="Profile"
       width={40}
       height={40}

@@ -3,7 +3,7 @@
 import prisma from '@/lib/prisma'
 import { cacheTag, cacheLife, revalidateTag } from 'next/cache'
 import { put, del } from '@vercel/blob'
-import { requireAdmin, unauthorized } from '@/lib/actions/guard'
+import { getSession, requireAdmin, unauthorized } from '@/lib/actions/guard'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import { audit } from '@/lib/actions/audit'
 import {
@@ -385,7 +385,7 @@ export async function publishArchive(_prevState: any, formData: FormData) {
       const buffer = Buffer.from(arrayBuffer)
 
       const blob = await put(`archives/${safeName}`, buffer, {
-        access: 'public',
+        access: 'private',
         contentType: data.file.type || PDF_MIME,
         addRandomSuffix: true,
       })
@@ -583,7 +583,7 @@ export async function updateArchive(id: number, formData: FormData) {
       const buffer = Buffer.from(arrayBuffer)
 
       const blob = await put(`archives/${safeName}`, buffer, {
-        access: 'public',
+        access: 'private',
         contentType: data.file.type || PDF_MIME,
         addRandomSuffix: true,
       })
@@ -715,5 +715,111 @@ export async function removeArchive(id: number) {
   } catch (error) {
     console.error('[removeArchive | Error]:', error)
     return { success: false, message: 'Failed to remove archive. Please try again.' }
+  }
+}
+
+// ─────────────────────────── Favorites (per user) ───────────────────────────
+// Deliberately NOT 'use cache' and NOT audited. getArchivedCapstonesData() is
+// cached under a tag shared by every visitor, so a per-user read placed inside
+// it would serve one person's favorites to everyone. These run per-request
+// alongside the session read in app/repository/page.tsx.
+//
+// No audit rows either: every other repository mutation is a business event
+// the admin audit page exists to show, and a personal star is not one — logging
+// it would bury ARCHIVE_PUBLISH / ARCHIVE_UPDATE in noise.
+
+const FAVORITE_FAILURE = 'Could not update favorites. Please try again.'
+
+/**
+ * Read the signed-in user's favorite archive IDs.
+ *
+ * Returns `null` for signed-out or soft-deleted callers so the caller can
+ * render the unstarred state without treating it as an error. Never throws.
+ */
+export async function getMyFavoriteArchiveIds(): Promise<number[] | null> {
+  const session = await getSession()
+  if (!session?.user?.id) return null
+
+  const userId = Number(session.user.id)
+  if (!Number.isFinite(userId)) return null
+
+  try {
+    const rows = await prisma.capstoneArchiveFavorite.findMany({
+      where: { userId, archive: { deletedAt: null } },
+      select: { archiveId: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    return rows.map((r) => r.archiveId)
+  } catch (error) {
+    console.error('[getMyFavoriteArchiveIds | Error]:', error)
+    return []
+  }
+}
+
+/** Shared precondition: a signed-in caller and a live archive. */
+async function resolveFavoriteTarget(archiveId: number) {
+  const session = await getSession()
+  if (!session?.user?.id) return { error: unauthorized } as const
+
+  const userId = Number(session.user.id)
+  if (!Number.isFinite(userId)) return { error: unauthorized } as const
+
+  if (!Number.isInteger(archiveId)) {
+    return { error: { success: false, payload: null, message: 'Invalid document.' } } as const
+  }
+
+  const archive = await prisma.capstoneArchive.findFirst({
+    where: { id: archiveId, deletedAt: null },
+    select: { id: true },
+  })
+  if (!archive) {
+    return { error: { success: false, payload: null, message: 'Document not found.' } } as const
+  }
+
+  return { userId, archiveId } as const
+}
+
+/**
+ * Add a repository entry to the signed-in user's favorites.
+ *
+ * Uses an upsert on the (userId, archiveId) unique pair, so a double-click or a
+ * retried request is idempotent — the composite unique constraint in the schema
+ * is what makes that true, and what stops two rows ever existing.
+ */
+export async function favoriteArchive(archiveId: number) {
+  const resolved = await resolveFavoriteTarget(archiveId)
+  if ('error' in resolved) return resolved.error
+
+  try {
+    await prisma.capstoneArchiveFavorite.upsert({
+      where: { userId_archiveId: { userId: resolved.userId, archiveId } },
+      create: { userId: resolved.userId, archiveId },
+      update: {},
+    })
+    return { success: true, message: 'Added to favorites.', payload: { archiveId, favorited: true } }
+  } catch (error) {
+    console.error('[favoriteArchive | Error]:', error)
+    return { success: false, payload: null, message: FAVORITE_FAILURE }
+  }
+}
+
+/**
+ * Remove a repository entry from the signed-in user's favorites.
+ *
+ * Uses deleteMany rather than delete so removing something already absent is a
+ * no-op success instead of a thrown "record not found".
+ */
+export async function unfavoriteArchive(archiveId: number) {
+  const resolved = await resolveFavoriteTarget(archiveId)
+  if ('error' in resolved) return resolved.error
+
+  try {
+    await prisma.capstoneArchiveFavorite.deleteMany({
+      where: { userId: resolved.userId, archiveId },
+    })
+    return { success: true, message: 'Removed from favorites.', payload: { archiveId, favorited: false } }
+  } catch (error) {
+    console.error('[unfavoriteArchive | Error]:', error)
+    return { success: false, payload: null, message: FAVORITE_FAILURE }
   }
 }

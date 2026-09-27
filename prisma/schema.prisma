@@ -39,6 +39,7 @@ model User {
   student                      Student?
   templates                    Template[]
   capstoneArchives             CapstoneArchive[]
+  archiveFavorites             CapstoneArchiveFavorite[]
   milestoneSubmissions         MilestoneSubmission[]
   submissionAnnotations        SubmissionAnnotation[]
   defenseSubmissionAnnotations DefenseSubmissionAnnotation[]
@@ -238,25 +239,25 @@ model Student {
 }
 
 model Group {
-  id               Int               @id @default(autoincrement())
-  groupName        String
-  sectionId        Int
-  section          Section           @relation(fields: [sectionId], references: [id])
-  leaderStudentId  Int?              @unique
-  leaderStudent    Student?          @relation("GroupLeader", fields: [leaderStudentId], references: [id])
-  adviserId        Int?
-  adviser          Adviser?          @relation(fields: [adviserId], references: [id])
-  students         Student[]
-  topics           Topic[]
-  capstone         Capstone?
-  milestones       Milestone[]
-  capstoneArchive       CapstoneArchive?
-  archivingSubmission   ArchivingSubmission?
-  invitations           Invitation[]
-  defenseSchedules      DefenseSchedule[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  deletedAt        DateTime?
+  id                  Int                  @id @default(autoincrement())
+  groupName           String
+  sectionId           Int
+  section             Section              @relation(fields: [sectionId], references: [id])
+  leaderStudentId     Int?                 @unique
+  leaderStudent       Student?             @relation("GroupLeader", fields: [leaderStudentId], references: [id])
+  adviserId           Int?
+  adviser             Adviser?             @relation(fields: [adviserId], references: [id])
+  students            Student[]
+  topics              Topic[]
+  capstone            Capstone?
+  milestones          Milestone[]
+  capstoneArchive     CapstoneArchive?
+  archivingSubmission ArchivingSubmission?
+  invitations         Invitation[]
+  defenseSchedules    DefenseSchedule[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
 
   @@index([sectionId])
   @@index([deletedAt])
@@ -271,18 +272,18 @@ enum TopicStatus {
 }
 
 model Topic {
-  id            Int         @id @default(autoincrement())
-  groupId       Int
-  group         Group       @relation(fields: [groupId], references: [id])
-  title         String
-  background    String
-  uploadedById  Int?
-  uploadedBy    Student?    @relation(fields: [uploadedById], references: [id])
-  status        TopicStatus @default(PENDING)
-  capstone      Capstone?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  deletedAt     DateTime?
+  id           Int         @id @default(autoincrement())
+  groupId      Int
+  group        Group       @relation(fields: [groupId], references: [id])
+  title        String
+  background   String
+  uploadedById Int?
+  uploadedBy   Student?    @relation(fields: [uploadedById], references: [id])
+  status       TopicStatus @default(PENDING)
+  capstone     Capstone?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
 
   @@index([groupId])
   @@index([uploadedById])
@@ -402,9 +403,9 @@ model SubmissionAnnotation {
 // ───────────────────────────── Repository ─────────────────────────────
 
 model CapstoneArchive {
-  id            Int       @id @default(autoincrement())
-  groupId       Int?      @unique
-  group         Group?    @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  id            Int                       @id @default(autoincrement())
+  groupId       Int?                      @unique
+  group         Group?                    @relation(fields: [groupId], references: [id], onDelete: Restrict)
   title         String
   abstract      String?
   datePublished DateTime
@@ -413,11 +414,12 @@ model CapstoneArchive {
   mimeType      String
   size          Int
   uploadedById  Int
-  uploadedBy    User      @relation(fields: [uploadedById], references: [id])
-  tags          Json      @default("[]")
-  authorOrder   Json      @default("[]")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  uploadedBy    User                      @relation(fields: [uploadedById], references: [id])
+  favorites     CapstoneArchiveFavorite[]
+  tags          Json                      @default("[]")
+  authorOrder   Json                      @default("[]")
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
   deletedAt     DateTime?
 
   @@index([deletedAt])
@@ -434,26 +436,43 @@ enum ArchivingStatus {
 }
 
 model ArchivingSubmission {
-  id            Int             @id @default(autoincrement())
-  groupId       Int             @unique
-  group         Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  title         String
-  abstract      String
-  tags          Json            @default("[]")
-  authorOrder   Json            @default("[]")
-  status        ArchivingStatus @default(DRAFT)
-  fileName      String?
-  blobUrl       String?
-  mimeType      String?
-  size          Int?
-  uploadedById  Int
-  uploadedBy    User            @relation(fields: [uploadedById], references: [id])
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  deletedAt     DateTime?
+  id           Int             @id @default(autoincrement())
+  groupId      Int             @unique
+  group        Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title        String
+  abstract     String
+  tags         Json            @default("[]")
+  authorOrder  Json            @default("[]")
+  status       ArchivingStatus @default(DRAFT)
+  fileName     String?
+  blobUrl      String?
+  mimeType     String?
+  size         Int?
+  uploadedById Int
+  uploadedBy   User            @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  deletedAt    DateTime?
 
   @@index([deletedAt])
-  @@index([status])
+}
+
+/// A user's saved repository entry. Personal, not a business record: it has no
+/// lifecycle of its own, so it hard-cascades with the archive or the user rather
+/// than carrying a deletedAt (see the soft-delete rule in AGENTS.md for why this
+/// is a deliberate exception). The composite unique constraint is what makes the
+/// star idempotent — a double-click can never create two rows.
+model CapstoneArchiveFavorite {
+  id        Int             @id @default(autoincrement())
+  userId    Int
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  archiveId Int
+  archive   CapstoneArchive @relation(fields: [archiveId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+
+  @@unique([userId, archiveId])
+  @@index([userId])
+  @@index([archiveId])
 }
 
 // ───────────────────────────── Template ─────────────────────────────
@@ -493,14 +512,14 @@ model CalendarEvent {
   description String?
   startsAt    DateTime
   endsAt      DateTime
-  allDay      Boolean                   @default(true)
-  audience      CalendarEventAudience @default(ALL)
+  allDay      Boolean               @default(true)
+  audience    CalendarEventAudience @default(ALL)
   // Palette key from SECTION_HEADER_PALETTE (lib/sectionHeader.ts) — the same
   // six presets the section cards use. Null = the palette default (Purple).
   // A key rather than a hex so validation stays a fixed list and a palette
   // change propagates.
   colorKey    String?
-  createdById   Int
+  createdById Int
   createdBy   User                  @relation(fields: [createdById], references: [id])
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt

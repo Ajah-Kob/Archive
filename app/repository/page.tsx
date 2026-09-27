@@ -1,26 +1,29 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import { PageLabel } from '@/components/globals/PageLabel'
-import { getRepositoryArchives } from '@/lib/actions/repository'
+import { getMyFavoriteArchiveIds, getRepositoryArchives } from '@/lib/actions/repository'
 import { RepositoryClient } from '@/components/repository/RepositoryClient'
 
 /**
- * Repository — CapstoneArchive blobs (`archives/*`) stay PUBLIC in the
- * private-blobs feature (intentional, per subtask 03). The DB
- * `CapstoneArchive.blobUrl` remains a direct https://…vercel-storage.com/archives/…
- * URL and `RepositoryClient` renders it directly in <a href={item.blobUrl}> / window.open.
+ * Repository — CapstoneArchive blobs under `archives/*` are PRIVATE.
  *
- * `archives/*` is NOT routed through GET /api/blob/... (that route returns 404 for
- * archives/ and the migration script skips the prefix). If a future spec
- * privatizes the repository, add `archives/` to the signed-route branch and
- * migrate stored URLs — no schema change. See lib/blob.ts note.
+ * The Vercel Blob store rejects `access: 'public'`, so `publishArchive` and
+ * `updateArchive` upload with `access: 'private'`. The DB
+ * `CapstoneArchive.blobUrl` is still the full https://…vercel-storage.com/archives/…
+ * URL, but the browser must NOT open it directly — it 401s.
+ *
+ * `RepositoryClient` derives the pathname and fetches
+ * `GET /api/blob/archives/...` with credentials, then opens an object URL.
+ * The route's global gate is the entire policy: any signed-in, non-deleted
+ * user of any role (GUEST included) may read published work; signed-out
+ * callers get 401. See lib/blob.ts for the full note.
+ *
+ * This page itself stays ungated (proxy.ts has no guard), so a signed-out
+ * visitor still sees the catalogue and gets a "Sign in to open" toast rather
+ * than a raw 401.
  *
  * Chapter/defense/archiving (`chapter/*`, `defense/*`, `archiving/*`) are
- * private and MUST be fetched via the signed route:
- *   pathname = blobUrlToPathname(blobUrl) // new URL(blobUrl).pathname slice
- *   signedHref = `/api/blob/${pathname}`   // GET with credentials, 401/403 handled
- * and rendered from a fetched object URL, not the raw blobUrl.
- * Public repository links remain working; private links require auth (curl 401).
+ * group-scoped and are fetched the same way but authorized more strictly.
  */
 
 export default async function RepositoryPage() {
@@ -29,16 +32,24 @@ export default async function RepositoryPage() {
 
   // Client-side UI gating only — /repository stays public in proxy.ts,
   // enforcement lives in the server actions (requireAdmin).
-  // NOTE: archives/* is excluded from the private-blobs signed route; see
-  // file header and lib/blob.ts for the explicit decision to keep repository public.
   const session = await getServerSession(authOptions)
   const role = session?.user?.role as string | undefined
   const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN'
 
+  // Per-user and deliberately outside the cached archive read: this must not
+  // be folded into getArchivedCapstonesData(), whose cache tag is shared by
+  // every visitor. null means signed out — the client renders every star unset.
+  const favoriteIds = await getMyFavoriteArchiveIds()
+
   return (
     <section className="h-full flex flex-col">
       <PageLabel label="Repository" />
-      <RepositoryClient archives={archives} isAdmin={isAdmin} />
+      <RepositoryClient
+        archives={archives}
+        isAdmin={isAdmin}
+        favoriteIds={favoriteIds ?? []}
+        canFavorite={favoriteIds !== null}
+      />
     </section>
   )
 }

@@ -275,7 +275,7 @@ function DefenseSaveConfirmDialog() {
 }
 
 /**
- * Defense save confirmation modal â€” defense-specific single-path variant of
+ * Defense save confirmation modal — defense-specific single-path variant of
  * VerdictConfirmModal. Shows per-tool annotation counts (highlight/text/ink/
  * freeText/strikeout) filtered via isReviewAnnotation upstream, then a single
  * Save path that writes a DRAFT via saveDefenseAnnotationDraft. On success the parent's
@@ -290,7 +290,7 @@ export function DefenseSaveConfirmModal(props: DefenseSaveConfirmModalProps) {
 }
 
 /**
- * Compound exports for flexible composition â€” all subcomponents read from the
+ * Compound exports for flexible composition — all subcomponents read from the
  * same DefenseSaveConfirmContext via use() (React 19). Prefer the main
  * DefenseSaveConfirmModal for the default layout; compose these for custom shells.
  */

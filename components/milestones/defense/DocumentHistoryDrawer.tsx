@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Clock, Eye, FileSearch, Loader2 } from 'lucide-react'
+import { Clock, Eye, FolderOpen, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Drawer } from '@/components/ui/Drawer'
 import { getSignedBlobUrl } from '@/lib/blob'
@@ -312,8 +312,8 @@ function InitialDocumentRow({
               href={href}
               className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] transition-all shrink-0"
             >
-              <FileSearch className="size-[13px]" strokeWidth={2} />
-              Review Document
+              <FolderOpen className="size-[13px]" strokeWidth={2} />
+              Open
             </a>
           ) : (
             <button
@@ -322,8 +322,8 @@ function InitialDocumentRow({
               disabled={isViewing}
               className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] transition-all shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isViewing ? <Loader2 className="size-[13px] animate-spin motion-reduce:animate-none" /> : <FileSearch className="size-[13px]" strokeWidth={2} />}
-              Review Document
+              {isViewing ? <Loader2 className="size-[13px] animate-spin motion-reduce:animate-none" /> : <FolderOpen className="size-[13px]" strokeWidth={2} />}
+              Open
             </button>
           )
         ) : href ? (
@@ -515,8 +515,8 @@ function ResubmissionRow({
               href={href}
               className="flex items-center justify-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] transition-all w-full"
             >
-              <FileSearch className="size-[13px]" strokeWidth={2} />
-              Review
+              <FolderOpen className="size-[13px]" strokeWidth={2} />
+              Open
             </a>
           ) : (
             <button
@@ -525,8 +525,8 @@ function ResubmissionRow({
               disabled={isViewing}
               className="flex items-center justify-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] transition-all w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isViewing ? <Loader2 className="size-[13px] animate-spin motion-reduce:animate-none" /> : <FileSearch className="size-[13px]" strokeWidth={2} />}
-              Review
+              {isViewing ? <Loader2 className="size-[13px] animate-spin motion-reduce:animate-none" /> : <FolderOpen className="size-[13px]" strokeWidth={2} />}
+              Open
             </button>
           )
         ) : href ? (

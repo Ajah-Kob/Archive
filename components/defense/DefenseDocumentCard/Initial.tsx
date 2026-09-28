@@ -1,4 +1,4 @@
-import { Eye, FileSearch } from 'lucide-react'
+import { Eye, FolderOpen } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { CircleHistoryState } from './CircleHistoryState'
 import { StatusPill } from './StatusPill'
@@ -163,17 +163,17 @@ export function LatestDocumentCardInitial({
           ) : null}
         </div>
 
-        {/* Actions: Review Document (purple) when pending/in review and not yet reviewed, else View (grey) */}
+        {/* Actions: Open (purple) when pending/in review and not yet reviewed, else View (grey) */}
         <div className="flex items-start gap-[10px] shrink-0">
           {showReviewAction ? (
             <a
               href={workspaceHref ?? document.blobUrl}
-              aria-label={`Review ${document.fileName} in document workspace`}
+              aria-label={`Open ${document.fileName} in document workspace`}
               title="Open in document workspace to review"
               className="flex items-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12.5px] leading-[18.75px] shadow-[0_3px_8px_rgba(112,125,255,0.24)] border border-[rgba(255,255,255,0.4)] hover:bg-[#5565ff] hover:shadow-[0_4px_12px_rgba(112,125,255,0.32)] transition-all focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-2 outline-none shrink-0"
             >
-              <FileSearch className="size-[13px]" strokeWidth={2} />
-              Review Document
+              <FolderOpen className="size-[13px]" strokeWidth={2} />
+              Open
             </a>
           ) : (
             <a

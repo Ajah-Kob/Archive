@@ -223,7 +223,7 @@ export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
   )
   void readOnlyIds
 
-  // Guard for current panelist's Review action — approved => read-only, no Review Document
+  // Guard for current panelist's Open action — approved => read-only, no Open button
   const { data: authSession } = useSession()
   const currentUserId = authSession?.user?.id != null ? Number(authSession.user.id) : null
   const myReview = currentUserId != null ? reviews.find((r) => r.panelistId === currentUserId) : undefined

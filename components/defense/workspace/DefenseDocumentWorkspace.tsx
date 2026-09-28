@@ -438,9 +438,17 @@ function DefenseWorkspaceLayout({
   // the hover overlay so list + document stay in sync. Null = all reviewers.
   const [visibleAuthor, setVisibleAuthor] = useState<string | null>(null)
   const [resubmissionVerdict, setResubmissionVerdict] = useState<ResubmissionVerdictState | null>(null)
+  // isInitial is the authority for "is this a resubmission". `version` is NOT
+  // a valid substitute: the counter spans the group's whole submission chain, so
+  // a re-defense produces a brand-new initial submission that still carries a
+  // version > 1. Reading version here made an initial document render the
+  // resubmission branch - Submit Review plus the verdict modal - which does not
+  // belong on an initial. The version check is kept only for legacy rows whose
+  // isInitial is absent entirely.
   const isResubmission =
     (submission as unknown as { isInitial?: boolean }).isInitial === false ||
-    (typeof (submission as unknown as { version?: number }).version === 'number' &&
+    ((submission as unknown as { isInitial?: boolean }).isInitial === undefined &&
+      typeof (submission as unknown as { version?: number }).version === 'number' &&
       (submission as unknown as { version?: number }).version! > 1)
 
   const [activeTool, setActiveTool] = useState<ToolId | null>(null)

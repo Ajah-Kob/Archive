@@ -228,10 +228,15 @@ export function DefenseFinalizedWorkspaceView({
   const [showComments, setShowComments] = useState(false)
 
   const annotations = deserializeAnnotations(initialAnnotations ?? [])
-  // Robust resubmission check: isInitial===false is primary, version>1 is fallback for legacy rows missing isInitial.
+  // isInitial is the authority for "is this a resubmission". `version` is NOT
+  // a valid substitute: the counter spans the group's whole submission chain, so
+  // a re-defense produces a brand-new initial submission that still carries a
+  // version > 1. The version check therefore only applies to legacy rows where
+  // isInitial is absent entirely — never when isInitial is explicitly true.
   const isResubmission =
     (submission as unknown as { isInitial?: boolean }).isInitial === false ||
-    (typeof (submission as unknown as { version?: number }).version === 'number' &&
+    ((submission as unknown as { isInitial?: boolean }).isInitial === undefined &&
+      typeof (submission as unknown as { version?: number }).version === 'number' &&
       (submission as unknown as { version?: number }).version! > 1)
   const resolvedBackHref =
     backHref ??

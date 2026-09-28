@@ -70,3 +70,27 @@ export function getAnnotationSegments(annotation: PdfAnnotationObject): Rect[] {
   }
   return [annotation.rect]
 }
+
+/**
+ * Distinct reviewer names across a set of serialized annotations, sorted
+ * alphabetically — the order the reviewer dropdown lists them in.
+ *
+ * Mirrors the derivation in DefenseCommentsPanel exactly, including the
+ * 'Unknown' fallback for an annotation with no author, so the two can never
+ * disagree about who the reviewers are. It reads `item.annotation` because
+ * these are `AnnotationTransferItem`s (serialization only rewrites `ctx.data`,
+ * so `type` stays a `PdfAnnotationSubtype` and `isReviewAnnotation` applies).
+ */
+export function collectReviewAuthors(items: unknown): string[] {
+  if (!Array.isArray(items)) return []
+  const names = new Set<string>()
+  for (const item of items) {
+    const annotation = (item as { annotation?: unknown } | null)?.annotation
+    if (!annotation || typeof annotation !== 'object') continue
+    if (!isReviewAnnotation(annotation as Pick<PdfAnnotationObject, 'type'>)) continue
+    const raw = (annotation as { author?: unknown }).author
+    const author = typeof raw === 'string' ? raw.trim() : ''
+    names.add(author || 'Unknown')
+  }
+  return [...names].sort((a, b) => a.localeCompare(b))
+}

@@ -112,7 +112,7 @@ export default async function StudentDefenseWorkspacePage({
 
   const viewStatus = toViewStatus(detail.status)
 
-  const meta: SubmissionMeta & { scheduleId?: number } = {
+  const meta: SubmissionMeta & { scheduleId?: number; verdict?: string } = {
     id: detail.id,
     groupName: detail.groupName,
     chapter: chapterLabel,
@@ -128,6 +128,11 @@ export default async function StudentDefenseWorkspacePage({
     reviewedAt: detail.reviewedAt,
     reviewNote: null,
     scheduleId: detail.scheduleId,
+    // The toolbar pill reports the defense verdict. Without this the workspace
+    // had no verdict to read and fell back to SubmissionStatusBadge, which
+    // renders the collapsed 'Needs Revision' instead of the real outcome
+    // (e.g. a Minor Revision verdict read as 'Needs Revision').
+    verdict: detail.verdict,
   }
 
   return (

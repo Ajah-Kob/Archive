@@ -364,13 +364,16 @@ export function DefenseFinalizedWorkspaceView({
                     {submission.chapter}
                   </p>
                 </div>
-                {(submission as unknown as { isInitial?: boolean; verdict?: string }).isInitial &&
-                (submission as unknown as { verdict?: string }).verdict &&
-                (submission as unknown as { verdict?: string }).verdict !== 'PENDING' ? (
-                  <StatusPill state={(submission as unknown as { verdict: string }).verdict} />
-                ) : (
-                  <SubmissionStatusBadge status={submission.status} />
-                )}
+        {/* The pill reports the DEFENSE verdict, not this panelist's review of
+            this version — see the identical branch in DefenseDocumentWorkspace.
+            Keyed off the verdict alone so a resubmission reports the same thing
+            its initial does. */}
+        {(submission as unknown as { verdict?: string }).verdict &&
+        (submission as unknown as { verdict?: string }).verdict !== 'PENDING' ? (
+        <StatusPill state={(submission as unknown as { verdict: string }).verdict} />
+        ) : (
+        <SubmissionStatusBadge status={submission.status} />
+        )}
               </div>
 
               <div className="flex-1" />

@@ -60,7 +60,7 @@ import type { AnnotationSummary } from '@/components/defense/workspace/DefenseSa
 import { DefenseResubmissionVerdictModal } from '@/components/defense/workspace/DefenseResubmissionVerdictModal'
 import { useAnnotationDraft } from '@/components/defense/workspace/useAnnotationDraft'
 import type { AnnotationDraftStatus } from '@/components/defense/workspace/useAnnotationDraft'
-import { isReviewAnnotation } from '@/components/defense/workspace/review-annotations'
+import { isReviewAnnotation, collectReviewAuthors } from '@/components/defense/workspace/review-annotations'
 import { VersionPanel } from '@/components/defense/workspace/VersionPanel'
 import type { StudentVersionListItem } from '@/lib/actions/student-review'
 import type { SubmissionMeta } from '@/types/milestones'
@@ -437,6 +437,25 @@ function DefenseWorkspaceLayout({
   // Author filter shared by the comments panel, the annotation layer, and
   // the hover overlay so list + document stay in sync. Null = all reviewers.
   const [visibleAuthor, setVisibleAuthor] = useState<string | null>(null)
+  // ...but "null" must not mean "unfiltered" on first paint. The comments panel
+  // resolves the same fallback and lifts it into this state, yet the panel is a
+  // drawer — it does not mount until opened, so before that the layer received
+  // null and rendered EVERY reviewer's annotations, then snapped to one reviewer
+  // the moment the panel opened. Deriving the fallback here (from the
+  // annotations already in hand, so there is no flash) makes the document show
+  // the same single reviewer as the dropdown on the very first frame.
+  const availableAuthors = useMemo(
+    () => collectReviewAuthors(initialAnnotations),
+    [initialAnnotations],
+  )
+  const effectiveVisibleAuthor = useMemo(() => {
+    // Prefer the explicit choice, but only while it is still a real reviewer —
+    // switching document or version can leave it pointing at someone absent.
+    if (visibleAuthor && availableAuthors.includes(visibleAuthor)) {
+      return visibleAuthor
+    }
+    return availableAuthors[0] ?? null
+  }, [visibleAuthor, availableAuthors])
   const [resubmissionVerdict, setResubmissionVerdict] = useState<ResubmissionVerdictState | null>(null)
   // isInitial is the authority for "is this a resubmission". `version` is NOT
   // a valid substitute: the counter spans the group's whole submission chain, so
@@ -636,13 +655,19 @@ function DefenseWorkspaceLayout({
               {submission.chapter}
             </p>
           </div>
-          {(submission as unknown as { isInitial?: boolean; verdict?: string }).isInitial &&
-          (submission as unknown as { verdict?: string }).verdict &&
-          (submission as unknown as { verdict?: string }).verdict !== 'PENDING' ? (
-            <StatusPill state={(submission as unknown as { verdict: string }).verdict} />
-          ) : (
-            <SubmissionStatusBadge status={submission.status} />
-          )}
+        {/* The pill reports the DEFENSE verdict, not this panelist's review of
+            this version. `submission.status` is per-panelist and collapses
+            REDEFENSE to NEEDS_REVISION, so gating on isInitial made every
+            resubmission show "Needs Revision" while the schedule verdict said
+            something else entirely. Keyed off the verdict alone, both document
+            kinds report the same thing. Falls back to the review status only
+            while no verdict has been recorded. */}
+        {(submission as unknown as { verdict?: string }).verdict &&
+        (submission as unknown as { verdict?: string }).verdict !== 'PENDING' ? (
+        <StatusPill state={(submission as unknown as { verdict: string }).verdict} />
+        ) : (
+        <SubmissionStatusBadge status={submission.status} />
+        )}
           {readOnly && (
             <span className="inline-flex items-center rounded-[7px] border border-[#e0e3f0] bg-[#f4f5fc] px-[9px] py-[2px] font-sans font-bold text-[11px] leading-[16px] text-[#8a93b4] whitespace-nowrap">
               History
@@ -832,7 +857,7 @@ function DefenseWorkspaceLayout({
                                 documentId={activeDocumentId}
                                 pageIndex={pageIndex}
                                 readOnly={!editable}
-                                visibleAuthorName={visibleAuthor}
+                                visibleAuthorName={effectiveVisibleAuthor}
                               />
                             </PagePointerProvider>
                           </div>
@@ -855,7 +880,7 @@ function DefenseWorkspaceLayout({
               onSelectAnnotation={handleSelectAnnotation}
               onDeselectAnnotation={handleDeselectAnnotation}
               initialMenuId={openMenuId}
-              visibleAuthorName={visibleAuthor}
+              visibleAuthorName={effectiveVisibleAuthor}
             />
           )}
         </div>

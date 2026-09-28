@@ -6,7 +6,7 @@ import {
   Highlighter,
   Loader2,
   Pen,
-  Save,
+  Send,
   StickyNote,
   Strikethrough,
   Type,
@@ -82,11 +82,11 @@ function DefenseSaveConfirmHeader() {
           id="defense-save-confirm-title"
           className="font-heading font-bold text-[17px] leading-[25.5px] text-[#12143a] tracking-[-0.17px]"
         >
-          Save annotations
+          Submit annotations
         </h3>
         <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pt-[4px]">
-          Saved privately to you. The panel and the team only see them once the
-          defense verdict is submitted â€” you can keep editing and save again.
+          This stays private to you. The panel and the team only see your
+          annotations once the defense verdict is submitted.
         </p>
       </div>
       <button
@@ -144,10 +144,11 @@ function DefenseSaveConfirmBox() {
   return (
     <div className="bg-[#f8f9ff] border border-[#eef0fb] rounded-[9px] px-[14px] py-[12px]">
       <p className="font-sans font-medium text-[12.5px] leading-[19px] text-[#3d4566]">
-        Save annotations and return to defense session?
+        Are you sure you want to submit your annotations?
       </p>
       <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4] pt-[4px]">
-        Your annotations will be committed and you will be redirected to the defense session.
+        You can reopen this document and add more annotations at any time before
+        the verdict is submitted.
       </p>
     </div>
   )
@@ -174,9 +175,9 @@ function DefenseSaveConfirmFooter() {
         {busy ? (
           <Loader2 className="size-[13px] animate-spin" />
         ) : (
-          <Save className="size-[13px]" strokeWidth={2} />
+          <Send className="size-[13px]" strokeWidth={2} />
         )}
-        Save annotation
+        Submit annotations
       </button>
     </div>
   )

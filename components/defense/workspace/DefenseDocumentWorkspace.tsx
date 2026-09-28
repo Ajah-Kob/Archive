@@ -11,7 +11,6 @@ import {
   History,
   Loader2,
   MessageSquareText,
-  Save,
   Send,
   TriangleAlert,
 } from 'lucide-react'
@@ -86,7 +85,7 @@ export interface DefenseDocumentWorkspaceProps {
   versions?: StudentVersionListItem[]
   /** Back-link target (defaults to the defense session / list). */
   backHref?: string
-  /** Defense schedule id for post-save redirect. Falls back to submission.scheduleId. */
+  /** Defense schedule id for post-submit navigation. Falls back to submission.scheduleId. */
   scheduleId?: number
   /**
    * History mode — hides every mutation affordance (toolbar actions, tools,
@@ -98,7 +97,7 @@ export interface DefenseDocumentWorkspaceProps {
 /** Which right slide-over panel is open (if any). */
 type PanelId = 'comments' | 'versions'
 
-/** Save payload captured at Save click time. */
+  /** Submit payload captured at Submit annotations click time. */
 interface SaveState {
   summary: AnnotationSummary
   data: unknown | null
@@ -150,7 +149,7 @@ function summarizeAnnotations(items: unknown[]): AnnotationSummary {
  * This is a defense-namespace copy of `components/evaluation/workspace/DocumentWorkspace.tsx`
  * preserving every feature (header, draft status, toolbar, zoom, undo/redo,
  * panels, annotation behaviors) except the verdict actions — replaced by a
- * single Save annotation button that opens DefenseSaveConfirmModal.
+ * single Submit annotations button that opens DefenseSaveConfirmModal.
  *
  * The ENTIRE layout lives inside a single `<EmbedPDF>` root so every child
  * (header toolbar, panels) can use the plugin hooks.
@@ -754,13 +753,13 @@ function DefenseWorkspaceLayout({
                   disabled={!hasAnnotations}
                   title={
                     hasAnnotations
-                      ? 'Save annotations for this defense submission'
-                      : 'Add annotations before saving'
+                      ? 'Submit your annotations for this defense submission'
+                      : 'Add annotations before submitting'
                   }
                   className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#707dff] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#707dff]"
                 >
-                  <Save className="size-[13px]" strokeWidth={2} />
-                  Save annotation
+                  <Send className="size-[13px]" />
+                  Submit annotations
                 </button>
               </>
             )

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, CalendarDays, Loader2, Lock, MessageSquareText, Pencil, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, CalendarDays, FolderOpen, Loader2, Lock, MessageSquareText, TriangleAlert } from 'lucide-react'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
@@ -31,14 +31,14 @@ export interface DefenseFinalizedWorkspaceViewProps {
   initialAnnotations: unknown[] | null
   /**
    * True when this tab opens a SUPERSEDED (soft-deleted) version rather than
-   * the current submission — the banner wording adapts.
+   * the current submission â€” the banner wording adapts.
    */
   isSuperseded?: boolean
-  /** Back-link target — defaults to the defense session or list. */
+  /** Back-link target â€” defaults to the defense session or list. */
   backHref?: string
   /** Defense schedule id for fallback backHref (/faculty/defense/[scheduleId]). */
   scheduleId?: number
-  /** Draft status of the viewer's own annotation row — COMMITTED enables re-edit via Annotate. */
+  /** Draft status of the viewer's own annotation row â€” COMMITTED enables re-edit via Open. */
   draftStatus?: 'DRAFT' | 'COMMITTED' | null
 }
 
@@ -54,20 +54,20 @@ function FinalizedBadge({ isSuperseded }: { isSuperseded: boolean }) {
   return (
     <span className="flex items-center gap-[6px] h-[32px] px-[12px] rounded-[8px] bg-[#f4f5fc] border border-[#e0e3f0] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382]">
       <Lock className="size-[12px] text-[#9ea8c6]" strokeWidth={2.25} />
-      {isSuperseded ? 'Previous version — read-only' : 'Defense annotation saved'}
+      {isSuperseded ? 'Previous version â€” read-only' : 'Defense annotation saved'}
     </span>
   )
 }
 
-function AnnotateButton({ onClick }: { onClick: () => void }) {
+function OpenButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex items-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#707dff] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none shrink-0"
     >
-      <Pencil className="size-[13px]" strokeWidth={2} />
-      Annotate
+      <FolderOpen className="size-[13px]" strokeWidth={2} />
+      Open
     </button>
   )
 }
@@ -105,7 +105,7 @@ function ReadOnlyCommentCard({
         <p className="truncate font-sans font-medium text-[11px] leading-[16.5px] text-[#9ea8c6]">{author}</p>
       </div>
       <p className="pt-[8px] font-sans font-medium text-[12px] leading-[18px] text-[#5a6382] text-left">
-        {contents || 'No text — annotation on page.'}
+        {contents || 'No text â€” annotation on page.'}
       </p>
     </button>
   )
@@ -198,23 +198,23 @@ function AnnotationHydrator({
 /**
  * Read-only view of a FINALIZED defense annotation.
  *
- * The panelist can no longer edit anything — the committed annotations are
+ * The panelist can no longer edit anything â€” the committed annotations are
  * rendered inside the defense PdfViewer with all pointer interaction disabled
  * (see the `.read-only` rule in globals.css), mirroring what students see.
  * No toolbar, no draft auto-save, no save actions.
  *
  * Gating (route layer): `!isCurrent || status !== 'PENDING'` routes to this
- * view — mirrors evaluation page gating. Superseded versions are always
+ * view â€” mirrors evaluation page gating. Superseded versions are always
  * read-only; the current version is read-only once status is not PENDING
   * (e.g. APPROVED / REDEFENSE / COMMITTED).
  *
  * Re-edit flow: when the panelist has a COMMITTED annotation on the current
  * version (`!isSuperseded && draftStatus === 'COMMITTED' && status === 'IN_REVIEW'`)
- * the header shows an Annotate button next to the Lock badge. Clicking it
+ * the header shows an Open button next to the Lock badge. Clicking it
  * toggles this component into edit mode by rendering the full
  * DefenseDocumentWorkspace (same toolbar, useAnnotationDraft, DeleteKey, etc.)
  * so the panelist can edit and Save again. Historical superseded versions
- * never show the button — they stay truly read-only.
+ * never show the button â€” they stay truly read-only.
  */
 export function DefenseFinalizedWorkspaceView({
   submission,
@@ -232,7 +232,7 @@ export function DefenseFinalizedWorkspaceView({
   // a valid substitute: the counter spans the group's whole submission chain, so
   // a re-defense produces a brand-new initial submission that still carries a
   // version > 1. The version check therefore only applies to legacy rows where
-  // isInitial is absent entirely — never when isInitial is explicitly true.
+  // isInitial is absent entirely â€” never when isInitial is explicitly true.
   const isResubmission =
     (submission as unknown as { isInitial?: boolean }).isInitial === false ||
     ((submission as unknown as { isInitial?: boolean }).isInitial === undefined &&
@@ -247,7 +247,8 @@ export function DefenseFinalizedWorkspaceView({
         : '/faculty/defense')
   // Only the current COMMITTED IN_REVIEW version is re-editable. Superseded
   // (historical) versions and non-IN_REVIEW (APPROVED/NEEDS_REVISION) stay
-  // strictly read-only — no Annotate affordance. Resubmissions use Approve/Request Revision flow, not Annotate.
+  // strictly read-only — no Open affordance. Resubmissions use the Submit
+  // Review flow, not re-editing.
   const canAnnotate =
     !isResubmission && !isSuperseded && draftStatus === 'COMMITTED' && submission.status === 'IN_REVIEW'
 
@@ -322,7 +323,7 @@ export function DefenseFinalizedWorkspaceView({
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
         <Loader2 className="size-6 animate-spin text-[#707dff]" />
-        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading PDF engine…</p>
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading PDF engineâ€¦</p>
       </div>
     )
   }
@@ -367,7 +368,7 @@ export function DefenseFinalizedWorkspaceView({
 
               <div className="flex-1" />
 
-              {/* Finalized notice + comments + optional re-edit — zoom is centered in header, not here. For resubmissions hide Defense annotation saved + Annotate (resub uses Approve/Request Revision). */}
+              {/* Finalized notice + comments + optional re-edit â€” zoom is centered in header, not here. For resubmissions hide Defense annotation saved + Annotate (resub uses Approve/Request Revision). */}
               <div className="flex items-center gap-[8px] shrink-0">
                 {!isResubmission && <FinalizedBadge isSuperseded={isSuperseded} />}
                 <button
@@ -383,7 +384,7 @@ export function DefenseFinalizedWorkspaceView({
                   <MessageSquareText className="size-[13px]" strokeWidth={1.75} />
                   Comments
                 </button>
-                {!isResubmission && canAnnotate && <AnnotateButton onClick={() => setIsEditing(true)} />}
+                {!isResubmission && canAnnotate && <OpenButton onClick={() => setIsEditing(true)} />}
                 {submission.reviewedAt && (
                   <span className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
                     <CalendarDays className="size-[12px] text-[#9ea8c6]" strokeWidth={1.75} />
@@ -422,7 +423,7 @@ export function DefenseFinalizedWorkspaceView({
                         return (
                           <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
                             <Loader2 className="size-6 animate-spin text-[#707dff]" />
-                            <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading document…</p>
+                            <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading documentâ€¦</p>
                           </div>
                         )
                       }

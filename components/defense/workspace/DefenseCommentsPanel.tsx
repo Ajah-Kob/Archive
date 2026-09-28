@@ -632,10 +632,19 @@ export function DefenseCommentsPanel({
       onClose={onClose}
     >
       {authorOptions.length > 1 && onAuthorFilterChange ? (
-        <div className="px-[14px] pt-[12px]">
+        <div className="px-[14px] pt-[12px] pb-[14px]">
           <Filter
+            fullWidth
             value={effectiveAuthor ?? ''}
-            options={authorOptions.map((name) => ({ value: name, label: name }))}
+            options={authorOptions.map((name) => ({
+              value: name,
+              label: name,
+              // Suppress Filter's implicit divider above index 1. That default
+              // exists to separate a leading "All ..." option from the list,
+              // and there is no such option here — every entry is a reviewer,
+              // so a rule above the second name would group nothing.
+              dividerBefore: false,
+            }))}
             onChange={(v) => onAuthorFilterChange(v)}
             ariaLabel="Choose which reviewer's annotations to show"
           />

@@ -21,6 +21,12 @@ interface FilterProps {
   ariaLabel: string
   /** Extra classes for the wrapping element. */
   className?: string
+  /**
+   * Stretch the trigger to the full width of its container and match the menu
+   * to it, instead of sizing to the selected label. Opt-in: the audit
+   * toolbar composes several filters in a row and wants them content-sized.
+   */
+  fullWidth?: boolean
 }
 
 /**
@@ -35,6 +41,7 @@ export function Filter({
   onChange,
   ariaLabel,
   className = '',
+  fullWidth = false,
 }: FilterProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -53,24 +60,24 @@ export function Filter({
     options.find((o) => o.value === value)?.label ?? options[0]?.label ?? ''
 
   return (
-    <div className={`relative shrink-0 ${className}`} ref={ref}>
+    <div className={`relative ${fullWidth ? 'w-full' : 'shrink-0'} ${className}`} ref={ref}>
       <button
         type="button"
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex gap-2 items-center h-[37.5px] px-[13px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] hover:border-[rgba(112,125,255,0.6)] transition-colors"
+        className={`flex gap-2 items-center h-[37.5px] px-[13px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] hover:border-[rgba(112,125,255,0.6)] transition-colors ${fullWidth ? 'w-full' : ''}`}
       >
         <span className="whitespace-nowrap">{selectedLabel}</span>
-        <ChevronDown className="size-[13px] text-[#8a93b4]" />
+        <ChevronDown className="size-[13px] text-[#8a93b4] shrink-0" />
       </button>
       {open && (
         <div className="absolute left-0 top-full z-20 pt-1.5">
           <div
             role="listbox"
             aria-label={ariaLabel}
-            className="bg-white border border-[#e8ebf8] rounded-lg w-[180px] py-1 shadow-[0_8px_24px_rgba(112,125,255,0.14),0_2px_6px_rgba(0,0,0,0.06)]"
+            className={`bg-white border border-[#e8ebf8] rounded-lg py-1 shadow-[0_8px_24px_rgba(112,125,255,0.14),0_2px_6px_rgba(0,0,0,0.06)] ${fullWidth ? 'w-full min-w-[180px]' : 'w-[180px]'}`}
           >
             {options.map((option, index) => {
               const selected = option.value === value

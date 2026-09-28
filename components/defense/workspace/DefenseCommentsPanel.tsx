@@ -67,8 +67,11 @@ interface DefenseCommentsPanelProps {
   /** Fired after a comment is saved. */
   onSaveComment: (comment: CommentItem) => void
   /**
-   * Author-name filter (null = all reviewers). Owned by the workspace so the
-   * document rendering filters in sync — see AnnotationLayerWithDrag and
+   * Which reviewer's annotations are shown. There is no "all reviewers"
+   * option: null means "nothing chosen yet", and the panel resolves it to the
+   * first available author and reports that back via onAuthorFilterChange, so
+   * one reviewer is shown at a time. Owned by the workspace so the document
+   * rendering filters in sync — see AnnotationLayerWithDrag and
    * AnnotationHover `visibleAuthorName`.
    */
   authorFilter?: string | null
@@ -587,12 +590,28 @@ export function DefenseCommentsPanel({
     }
     return [...names].sort((a, b) => a.localeCompare(b))
   }, [comments])
+
+  // One reviewer at a time. There is no "all reviewers" option, so with no
+  // explicit selection we fall back to the first available author rather than
+  // showing every reviewer's annotations at once.
+  const effectiveAuthor = authorFilter ?? authorOptions[0] ?? null
+
+  // The resolved name is reported upward so the document's annotation layer and
+  // hover overlay highlight the same reviewer the list is showing. Without
+  // this the list would show one reviewer while the PDF highlighted all of
+  // them, because the parent's visibleAuthorName would still be null.
+  useEffect(() => {
+    if (effectiveAuthor && effectiveAuthor !== authorFilter) {
+      onAuthorFilterChange?.(effectiveAuthor)
+    }
+  }, [effectiveAuthor, authorFilter, onAuthorFilterChange])
+
   const shownComments = useMemo(
     () =>
-      authorFilter
-        ? comments.filter((c) => c.author.trim() === authorFilter)
+      effectiveAuthor
+        ? comments.filter((c) => c.author.trim() === effectiveAuthor)
         : comments,
-    [comments, authorFilter],
+    [comments, effectiveAuthor],
   )
   const visibleCount = shownComments.filter((c) => c.isVisible).length
   const hiddenCount = shownComments.length - visibleCount
@@ -615,13 +634,10 @@ export function DefenseCommentsPanel({
       {authorOptions.length > 1 && onAuthorFilterChange ? (
         <div className="px-[14px] pt-[12px]">
           <Filter
-            value={authorFilter ?? ''}
-            options={[
-              { value: '', label: 'All reviewers' },
-              ...authorOptions.map((name) => ({ value: name, label: name })),
-            ]}
-            onChange={(v) => onAuthorFilterChange(v === '' ? null : v)}
-            ariaLabel="Filter comments by author"
+            value={effectiveAuthor ?? ''}
+            options={authorOptions.map((name) => ({ value: name, label: name }))}
+            onChange={(v) => onAuthorFilterChange(v)}
+            ariaLabel="Choose which reviewer's annotations to show"
           />
         </div>
       ) : null}
@@ -634,11 +650,11 @@ export function DefenseCommentsPanel({
             />
           </div>
           <p className="pt-[8px] font-sans font-semibold text-[12.5px] text-[#8a93b4]">
-            {authorFilter ? `No comments from ${authorFilter}` : 'No comments yet'}
+            {effectiveAuthor ? `No comments from ${effectiveAuthor}` : 'No comments yet'}
           </p>
           <p className="pt-[3px] font-sans font-medium text-[11px] text-[#c4cadf] leading-[16.5px]">
-            {authorFilter
-              ? 'Try another reviewer.'
+            {effectiveAuthor
+              ? 'Choose another reviewer from the list above.'
               : 'Annotations you add to the document will appear here.'}
           </p>
         </div>

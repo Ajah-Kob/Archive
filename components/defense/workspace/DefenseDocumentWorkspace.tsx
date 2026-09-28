@@ -886,10 +886,12 @@ function DefenseWorkspaceLayout({
           annotationSummary={saveState.summary}
           annotationData={saveState.data}
           onClose={() => setSaveState(null)}
-          onCommitted={() => {
-            if (!resolvedScheduleId) return
-            router.refresh()
-            router.push(`/faculty/defense/${resolvedScheduleId}/session`)
+          onSaved={() => {
+            // Intentionally no navigation and no router.refresh(): saving now
+            // writes a DRAFT, so the document must stay editable for further
+            // annotation. The 1.5s debounced auto-save already owns the saved
+            // indicator, and the verdict — not this button — is what finalizes
+            // the document and releases annotations to the team.
           }}
         />
       )}

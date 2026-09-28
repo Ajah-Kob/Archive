@@ -106,7 +106,14 @@ export default async function DefensePanelistWorkspacePage({
 
   const isCommitted = draftStatus === 'COMMITTED'
   // Resubmitted documents remain editable while IN_REVIEW even though the schedule verdict is already submitted (MINOR/MAJOR).
-    // isCommitted only finalizes the *initial* document (Save annotation flow); resubmissions finalize solely via viewStatus (APPROVED/REDEFENSE) so a premature COMMITTED+DRAFT mismatch does not hide the Approve/Request Revision buttons.
+  // Finalization differs by document kind:
+  // - initial: 'Save annotation' now writes a DRAFT, so the panelist can keep
+  //   editing and the document stays open. The chair's verdict both commits
+  //   every draft (submitPanelistVerdict) and flips isVerdictSubmitted, so the
+  //   document closes at the verdict and not before. isCommitted is kept as a
+  //   belt-and-braces guard for a draft that was committed by the verdict path.
+  // - resubmission: finalized solely via viewStatus (APPROVED/REDEFENSE) so a
+  //   premature COMMITTED+DRAFT mismatch does not hide Submit Review.
   const shouldFinalize =
     !detail.isCurrent ||
     viewStatus !== 'IN_REVIEW' ||

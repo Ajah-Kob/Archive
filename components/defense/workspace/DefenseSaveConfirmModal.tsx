@@ -12,7 +12,7 @@ import {
   Type,
   X,
 } from 'lucide-react'
-import { commitDefenseAnnotations } from '@/lib/actions/defense-annotations'
+import { saveDefenseAnnotationDraft } from '@/lib/actions/defense-annotations'
 
 export type DefenseAnnotationSummary = Record<string, number>
 
@@ -34,7 +34,7 @@ interface DefenseSaveConfirmModalProps {
   annotationSummary?: DefenseAnnotationSummary
   annotationData: unknown | null
   onClose: () => void
-  onCommitted: () => void
+  onSaved: () => void
 }
 
 interface DefenseSaveConfirmContextValue {
@@ -85,7 +85,8 @@ function DefenseSaveConfirmHeader() {
           Save annotations
         </h3>
         <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4] pt-[4px]">
-          Your annotations will be saved and you will return to the defense session.
+          Saved privately to you. The panel and the team only see them once the
+          defense verdict is submitted â€” you can keep editing and save again.
         </p>
       </div>
       <button
@@ -187,7 +188,7 @@ function DefenseSaveConfirmProvider({
   annotationSummary = {},
   annotationData,
   onClose,
-  onCommitted,
+  onSaved,
   children,
 }: DefenseSaveConfirmModalProps & { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false)
@@ -207,20 +208,21 @@ function DefenseSaveConfirmProvider({
     setBusy(true)
     try {
       const payload = annotationData ?? []
-      // Wait for the server to persist the COMMITTED row before showing success
-      const result = await commitDefenseAnnotations(submissionId, payload)
+      // Writes a DRAFT, not a COMMITTED row. The panelist keeps editing after
+      // this; submitPanelistVerdict is what flips drafts to COMMITTED and
+      // releases them to the team.
+      const result = await saveDefenseAnnotationDraft(submissionId, payload)
       if (!result.success) {
         toast.error(result.message || 'Failed to save annotations.')
         setBusy(false)
         return
       }
-      // Annotation is now saved — navigate first, then unmount (avoids refresh-before-push race)
       toast.success(result.message || 'Annotations saved.')
-      onCommitted()
+      onSaved()
       onClose()
       return
     } catch (error) {
-      console.error('[DefenseSaveConfirmModal] commit failed:', error)
+      console.error('[DefenseSaveConfirmModal] draft save failed:', error)
       toast.error('Failed to save annotations. Please try again.')
       setBusy(false)
       return
@@ -272,11 +274,11 @@ function DefenseSaveConfirmDialog() {
 }
 
 /**
- * Defense save confirmation modal — defense-specific single-path variant of
+ * Defense save confirmation modal â€” defense-specific single-path variant of
  * VerdictConfirmModal. Shows per-tool annotation counts (highlight/text/ink/
  * freeText/strikeout) filtered via isReviewAnnotation upstream, then a single
- * Save path that commits via commitDefenseAnnotations. On success the parent's
- * onCommitted refreshes and redirects to /faculty/defense/[scheduleId].
+ * Save path that writes a DRAFT via saveDefenseAnnotationDraft. On success the parent's
+ * onSaved fires; the panelist stays on the document and can keep editing.
  */
 export function DefenseSaveConfirmModal(props: DefenseSaveConfirmModalProps) {
   return (
@@ -287,7 +289,7 @@ export function DefenseSaveConfirmModal(props: DefenseSaveConfirmModalProps) {
 }
 
 /**
- * Compound exports for flexible composition — all subcomponents read from the
+ * Compound exports for flexible composition â€” all subcomponents read from the
  * same DefenseSaveConfirmContext via use() (React 19). Prefer the main
  * DefenseSaveConfirmModal for the default layout; compose these for custom shells.
  */

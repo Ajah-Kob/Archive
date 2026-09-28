@@ -1290,9 +1290,43 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
 
     const now = new Date()
     const beforeVerdict = schedule.verdict
-    const updated = await prisma.defenseSchedule.update({
-      where: { id: scheduleId },
-      data: { verdict: verdict as DefenseVerdict, verdictSubmittedAt: now },
+    // The verdict is the release gate for annotations. A panelist's Save writes
+    // a DRAFT (private to them); this flips every panelist's DRAFT rows for this
+    // defense to COMMITTED in the same transaction, so a recorded verdict can
+    // never leave the team's annotations unpublished. Students read
+    // DefenseSubmissionAnnotation filtered on COMMITTED
+    // (getStudentDefenseAnnotationsData), so COMMITTED is what makes them visible.
+    const updated = await prisma.$transaction(async (tx) => {
+      const scheduleRow = await tx.defenseSchedule.update({
+        where: { id: scheduleId },
+        data: { verdict: verdict as DefenseVerdict, verdictSubmittedAt: now },
+      })
+
+      const submissions = await tx.defenseSubmission.findMany({
+        where: { scheduleId, deletedAt: null },
+        select: { id: true },
+      })
+
+      if (submissions.length > 0) {
+        const annotationTable = (
+          tx as unknown as {
+            defenseSubmissionAnnotation: {
+              updateMany: (args: unknown) => Promise<unknown>
+            }
+          }
+        ).defenseSubmissionAnnotation
+
+        await annotationTable.updateMany({
+          where: {
+            submissionId: { in: submissions.map((s) => s.id) },
+            status: 'DRAFT',
+            deletedAt: null,
+          },
+          data: { status: 'COMMITTED' },
+        })
+      }
+
+      return scheduleRow
     })
 
     try {

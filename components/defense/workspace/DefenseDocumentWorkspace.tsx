@@ -894,11 +894,19 @@ function DefenseWorkspaceLayout({
           annotationData={saveState.data}
           onClose={() => setSaveState(null)}
           onSaved={() => {
-            // Intentionally no navigation and no router.refresh(): saving now
-            // writes a DRAFT, so the document must stay editable for further
-            // annotation. The 1.5s debounced auto-save already owns the saved
-            // indicator, and the verdict — not this button — is what finalizes
-            // the document and releases annotations to the team.
+            // Return to the session list. The save wrote a DRAFT, so the
+            // document does NOT finalize - reopening it from the session list
+            // keeps it editable for more annotation, and getDefenseAnnotations
+            // returns the panelist's own draft rows on reload.
+            // No router.refresh(): saveDefenseAnnotationDraft already
+            // revalidated the detail/annotation/defense tags server-side, and
+            // these routes are dynamic so the client Router Cache will not
+            // serve a stale payload.
+            if (!resolvedScheduleId) return
+            const target = isResubmission
+              ? `/faculty/defense/${resolvedScheduleId}/resubmission`
+              : `/faculty/defense/${resolvedScheduleId}/session`
+            router.push(target)
           }}
         />
       )}

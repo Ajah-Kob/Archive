@@ -208,9 +208,11 @@ function AnnotationHydrator({
  * read-only; the current version is read-only once status is not PENDING
   * (e.g. APPROVED / REDEFENSE / COMMITTED).
  *
- * Re-edit flow: when the panelist has a COMMITTED annotation on the current
- * version (`!isSuperseded && draftStatus === 'COMMITTED' && status === 'IN_REVIEW'`)
- * the header shows an Open button next to the Lock badge. Clicking it
+ * Re-edit flow: while the current version is still IN_REVIEW and not
+ * superseded (`!isSuperseded && status === 'IN_REVIEW'`) the header shows an
+ * Open button next to the Lock badge. It is not gated on this panelist's own
+ * annotation status — a panelist who has not started yet must be able to open
+ * the document in order to start. Clicking it
  * toggles this component into edit mode by rendering the full
  * DefenseDocumentWorkspace (same toolbar, useAnnotationDraft, DeleteKey, etc.)
  * so the panelist can edit and Save again. Historical superseded versions
@@ -249,8 +251,13 @@ export function DefenseFinalizedWorkspaceView({
   // (historical) versions and non-IN_REVIEW (APPROVED/NEEDS_REVISION) stay
   // strictly read-only — no Open affordance. Resubmissions use the Submit
   // Review flow, not re-editing.
+  //
+  // Deliberately not gated on draftStatus: that is a per-panelist value, and
+  // using it here made the affordance depend on whether this particular
+  // panelist had already saved. "Has not started" must still be able to open
+  // the document in order to start.
   const canAnnotate =
-    !isResubmission && !isSuperseded && draftStatus === 'COMMITTED' && submission.status === 'IN_REVIEW'
+    !isResubmission && !isSuperseded && submission.status === 'IN_REVIEW'
 
   const { engine, isLoading, error } = usePdfiumEngine()
   const annotationAuthor = submission.reviewedBy ?? 'Panelist'

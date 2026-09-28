@@ -233,10 +233,16 @@ async function getDefenseAnnotationsData(
     }
     const deduped = dedupeAnnotationData(merged)
     const data = filterVisibleAnnotations(deduped)
+    // `status` describes THIS panelist's own row. Having no row means "has not
+    // started", which is a distinct state from either DRAFT or COMMITTED - so
+    // it must not fall back to 'COMMITTED'. Doing that made a panelist who had
+    // never annotated report as committed, which tripped `isCommitted` in the
+    // workspace page and rendered the read-only finalized view with no way to
+    // submit, while panelists who did have a draft stayed editable.
     return {
       success: true,
       message: '',
-      payload: { data, status: own?.status ?? 'COMMITTED' },
+      payload: { data, status: own?.status ?? null },
     }
   } catch (error) {
     console.error('[getDefenseAnnotations | Error]:', error)

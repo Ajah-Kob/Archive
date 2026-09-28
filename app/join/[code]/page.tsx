@@ -76,7 +76,7 @@ export default async function JoinPage({
     <JoinRedirect
       to={
         record.type === 'STUDENT'
-          ? '/student/milestone?joined=1'
+          ? '/student/my-team?joined=1'
           : '/faculty?joined=1'
       }
     />

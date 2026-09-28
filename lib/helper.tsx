@@ -44,7 +44,7 @@ export function roleHome(role?: string | null): string {
     case 'FACULTY':
       return '/faculty'
     case 'STUDENT':
-      return '/student/milestone'
+      return '/student/my-team'
     default:
       return '/guest'
   }

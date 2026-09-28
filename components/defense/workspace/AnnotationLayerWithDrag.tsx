@@ -92,12 +92,17 @@ export function AnnotationLayerWithDrag({
       // by other authors. children (the visual) is skipped too — a filtered
       // annotation neither renders nor captures the pointer. Compared
       // trimmed: the panel derives options from the same trimmed names.
+      //
+      // MUST return an empty fragment, never null: the plugin does
+      // `customRender ?? childrenRender`, so a null return is read as "no
+      // custom renderer" and falls back to the default visual — which is why
+      // filtering the list had no effect on the page.
       const itemAuthor = (annotation as unknown as { author?: unknown }).author
       if (
         visibleAuthorName != null &&
         (typeof itemAuthor !== 'string' || itemAuthor.trim() !== visibleAuthorName)
       ) {
-        return null
+        return <></>
       }
       const type = annotation.type
       const draggable = !readOnly && DRAGGABLE_TYPES.has(type)

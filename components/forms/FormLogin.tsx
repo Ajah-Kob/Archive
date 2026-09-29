@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef, useTransition } from 'react'
+import { useEffect, useState, useRef, useTransition } from 'react'
 import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
 import { PasswordToggle } from '@/components/ui/PasswordToggle'
@@ -29,6 +30,19 @@ export default function FormLogin({ className }: { className?: string }) {
     },
   })
   const [showPassword, setShowPassword] = useState(false)
+
+  // Success is reported as a toast. `toastShownRef` keeps it to one firing —
+  // this state object is re-read on every render, and RedirectIfAuthed unmounts
+  // this form the moment `update()` flips the session, so an unguarded toast
+  // would double-fire in the window before the redirect lands. The <Toaster>
+  // lives in the root layout, so it survives the navigation and reads on the
+  // destination page.
+  const toastShownRef = useRef(false)
+  useEffect(() => {
+    if (!state.success || !state.message || toastShownRef.current) return
+    toastShownRef.current = true
+    toast.success(state.message)
+  }, [state.success, state.message])
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -130,15 +144,9 @@ export default function FormLogin({ className }: { className?: string }) {
         </p>
       </div>
 
-      {/* Error/Success Alert Banner */}
-      {state?.message && (
-        <p
-          className={`alert ${
-            state.success ? `alert--success` : `alert--danger`
-          }`}
-        >
-          {state?.message}
-        </p>
+      {/* Errors only — success is a toast. */}
+      {state?.message && !state.success && (
+        <p className="alert alert--danger">{state?.message}</p>
       )}
 
       <div className="flex flex-col gap-4">

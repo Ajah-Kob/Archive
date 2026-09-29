@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useActionState } from 'react'
+import { useEffect, useRef, useActionState } from 'react'
 import { updateMePassword } from '@/lib/actions/me'
+import { toast } from 'sonner'
 
 export default function FormSecurity({ className }: { className?: string }) {
   const formRef = useRef<HTMLFormElement>(null)
@@ -11,6 +12,16 @@ export default function FormSecurity({ className }: { className?: string }) {
     message: null,
     errors: null,
   })
+
+  // Success is a toast. One-shot guard: useActionState keeps the returned
+  // object in state after the action settles, so without the ref the toast
+  // would re-fire on every subsequent re-render of this form.
+  const successToastRef = useRef(false)
+  useEffect(() => {
+    if (!state.success || successToastRef.current) return
+    successToastRef.current = true
+    toast.success(state.message || 'Password updated successfully.')
+  }, [state.success, state.message])
 
   return (
     <form
@@ -79,14 +90,9 @@ export default function FormSecurity({ className }: { className?: string }) {
             )}
           </div>
 
-          {state.message && (
-            <div
-              className={`alert ${
-                state.success ? 'alert--success' : 'alert--danger'
-              }`}
-            >
-              {state.message}
-            </div>
+          {/* Errors only — success is a toast. */}
+          {state.message && !state.success && (
+            <div className="alert alert--danger">{state.message}</div>
           )}
 
           <button

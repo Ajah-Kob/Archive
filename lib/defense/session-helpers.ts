@@ -153,6 +153,203 @@ export function resolvePanelistFeedback(
 export type ResubmissionStatus = 'FOR_REVIEW' | 'NEED_REVISION' | 'APPROVED'
 export type ResubmissionCalloutState = ResubmissionStatus
 
+// ── Panelist-specific resubmission state (faculty resubmission tab) ───────────
+
+/** A review as the panelist sees it — needs reviewedAt to tell fresh from carried. */
+export interface PanelistReviewView {
+  panelistId: number
+  name?: string
+  status: DefenseReviewStatus | string
+  reviewedAt?: string | null
+}
+
+export interface PanelistResubmissionState {
+  status: ResubmissionStatus
+  /**
+   * The version this panelist actually approved, or null when they have not
+   * approved anything. Null means the card should show the LATEST version.
+   */
+  approvedVersion: number | null
+  /**
+   * True when the approval was inherited from an earlier version rather than
+   * made on the version currently shown — a new submission carries APPROVED
+   * forward, so the callout must not imply the panelist reviewed the new file.
+   */
+  carriedForward: boolean
+}
+
+/**
+ * Resolves ONE panelist's own review state, ignoring every other panelist.
+ *
+ * The old derivation was collective: `some(PENDING)` forced FOR_REVIEW for
+ * everyone, so a panelist who had already approved still saw a waiting state
+ * because a peer had not acted. Status must be per-panelist and independent.
+ *
+ * `versions` must be ordered by version ascending.
+ */
+export function derivePanelistResubmissionState(
+  currentUserId: number | null,
+  versions: Array<{
+    version: number
+    isInitial?: boolean
+    dateSubmitted?: string
+    reviews?: PanelistReviewView[]
+  }>,
+): PanelistResubmissionState {
+  const ordered = [...versions].sort((a, b) => a.version - b.version)
+  // Scan newest → oldest: the newest version on which this panelist has a review
+  // is the one to report.
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const v = ordered[i]
+    const mine = (v.reviews ?? []).find((r) => r.panelistId === currentUserId)
+    if (!mine) continue
+    if (mine.status === 'REDEFENSE') {
+      return { status: 'NEED_REVISION', approvedVersion: null, carriedForward: false }
+    }
+    if (mine.status === 'APPROVED') {
+      // Which file they truly approved comes from the DECISION TIMESTAMP, not
+      // from which version happens to hold the row. A new submission copies
+      // APPROVED onto the new version but leaves the original reviewedAt in
+      // place, so a decision dated before this upload belongs to an earlier file.
+      const approvedVersion = versionDecidedOn(ordered, currentUserId, mine)
+      return {
+        status: 'APPROVED',
+        approvedVersion,
+        carriedForward: approvedVersion < v.version,
+      }
+    }
+    return { status: 'FOR_REVIEW', approvedVersion: null, carriedForward: false }
+  }
+  return { status: 'FOR_REVIEW', approvedVersion: null, carriedForward: false }
+}
+
+type VersionLike = {
+  version: number
+  dateSubmitted?: string
+  reviews?: PanelistReviewView[]
+}
+
+/**
+ * The newest version that was already uploaded when this panelist's decision was
+ * recorded — i.e. the file they actually looked at.
+ *
+ * Falls back to the newest version carrying an APPROVED row when no usable
+ * timestamps exist, so a legacy row without reviewedAt still resolves to
+ * something sensible rather than nothing.
+ */
+function versionDecidedOn(
+  versions: VersionLike[],
+  currentUserId: number | null,
+  decision: { reviewedAt?: string | null },
+): number {
+  const decidedAt = decision.reviewedAt ? new Date(decision.reviewedAt).getTime() : NaN
+  if (Number.isNaN(decidedAt)) {
+    const approved = [...versions]
+      .sort((a, b) => a.version - b.version)
+      .filter((v) => (v.reviews ?? []).some((r) => r.panelistId === currentUserId && r.status === 'APPROVED'))
+    return approved.length > 0 ? approved[approved.length - 1].version : versions[versions.length - 1].version
+  }
+  const uploadedBeforeDecision = versions.filter((v) => {
+    if (!v.dateSubmitted) return false
+    const uploaded = new Date(v.dateSubmitted).getTime()
+    return !Number.isNaN(uploaded) && uploaded <= decidedAt
+  })
+  if (uploadedBeforeDecision.length === 0) return versions[versions.length - 1].version
+  return uploadedBeforeDecision[uploadedBeforeDecision.length - 1].version
+}
+
+// ── Resubmission activity feed (faculty resubmission tab) ───────────────────
+
+export type ResubmissionActivityKind = 'UPLOAD' | 'APPROVED' | 'REVISION_REQUESTED'
+
+type ActivityVersion = {
+  version: number
+  isInitial?: boolean
+  dateSubmitted?: string
+  submittedByName?: string
+  reviews?: PanelistReviewView[]
+}
+
+/** The newest version uploaded at or before `at`, or null when nothing matches. */
+function versionUploadedBy(versions: ActivityVersion[], at: number): number | null {
+  const matches = versions.filter((v) => {
+    if (!v.dateSubmitted) return false
+    const uploaded = new Date(v.dateSubmitted).getTime()
+    return !Number.isNaN(uploaded) && uploaded <= at
+  })
+  return matches.length > 0 ? matches[matches.length - 1].version : null
+}
+
+export interface ResubmissionActivityEntry {
+  id: string
+  kind: ResubmissionActivityKind
+  /** Display name of whoever acted — the student who uploaded, the panelist who reviewed. */
+  actor: string
+  version: number
+  at: string
+}
+
+/**
+ * Builds a chronological timeline of the whole resubmission process: every
+ * version upload plus every non-PENDING panelist decision, across all versions.
+ *
+ * Pending reviews are omitted on purpose — nothing has happened yet, and a
+ * "waiting" line per panelist is noise the panelist does not need.
+ *
+ * Entries are returned newest-first, which is how the feed renders them.
+ */
+export function deriveResubmissionActivity(
+  versions: Array<{
+    version: number
+    isInitial?: boolean
+    dateSubmitted?: string
+    submittedByName?: string
+    reviews?: PanelistReviewView[]
+  }>,
+): ResubmissionActivityEntry[] {
+  const ordered = [...versions].sort((a, b) => a.version - b.version)
+  const entries: ResubmissionActivityEntry[] = []
+  for (const v of versions) {
+    if (v.isInitial) continue
+    if (v.dateSubmitted) {
+      entries.push({
+        id: `v${v.version}-upload`,
+        kind: 'UPLOAD',
+        actor: v.submittedByName || 'The group',
+        version: v.version,
+        at: v.dateSubmitted,
+      })
+    }
+    for (const r of v.reviews ?? []) {
+      if (r.status !== 'APPROVED' && r.status !== 'REDEFENSE') continue
+      if (!r.reviewedAt) continue
+      // A carried-forward row repeats on every later version with the ORIGINAL
+      // decision timestamp, so the same event would otherwise be listed many
+      // times. Credit it once, to the version that was uploaded when the
+      // decision was made.
+      const decidedAt = new Date(r.reviewedAt).getTime()
+      const decidedVersion = Number.isNaN(decidedAt)
+        ? v.version
+        : versionUploadedBy(ordered, decidedAt)
+      const dedupeKey = `review-${r.panelistId}-${decidedAt}`
+      if (entries.some((e) => e.id === dedupeKey)) continue
+      entries.push({
+        id: dedupeKey,
+        kind: r.status === 'APPROVED' ? 'APPROVED' : 'REVISION_REQUESTED',
+        actor: r.name || 'Panelist',
+        version: decidedVersion,
+        at: r.reviewedAt,
+      })
+    }
+  }
+  return entries.sort((a, b) => {
+    const diff = new Date(b.at).getTime() - new Date(a.at).getTime()
+    if (diff !== 0) return diff
+    // Same timestamp: keep uploads above the decisions they triggered.
+    return a.kind === 'UPLOAD' ? -1 : 1
+  })
+}
+
 /**
  * Derives resubmission status from per-panelist reviews.
  * - empty -> FOR_REVIEW

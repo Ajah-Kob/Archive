@@ -3,16 +3,12 @@
 import { Check, Clock, TriangleAlert } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { ResubmittedDocumentCard } from './ResubmittedDocumentCard'
-import { ApprovalChecklistCard } from './ApprovalChecklistCard'
+import { ResubmissionActivityFeed } from './ResubmissionActivityFeed'
 import {
-  deriveApprovalChecklist,
-  deriveApprovalProgress,
-  deriveResubmissionStatus,
-  isPanelistReadOnly,
-  shouldResetOnResubmission,
+  derivePanelistResubmissionState,
+  deriveResubmissionActivity,
 } from '@/lib/defense/session-helpers'
 import type { DefenseSessionPayload } from '@/lib/actions/defense'
-import type { DefenseReviewStatus } from '@prisma/client'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,15 +18,7 @@ interface ResubmissionTabPanelProps {
 
 type ResubmissionStatus = 'FOR_REVIEW' | 'NEED_REVISION' | 'APPROVED'
 
-type LatestResubmission = DefenseSessionPayload['resubmissions'][number]
-
-type CalloutMeta = {
-  Icon: typeof Clock
-  boxClass: string
-  iconTileClass: string
-  headlineClass: string
-  headline: string
-}
+type SessionSubmission = DefenseSessionPayload['resubmissions'][number]
 
 // ── Pure helpers (<50 lines each) ────────────────────────────────────────────
 
@@ -41,10 +29,48 @@ function formatDate(iso: string | Date | null | undefined): string | null {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function resolveLatestResubmission(session: DefenseSessionPayload): LatestResubmission | null {
+/** The newest resubmission (isInitial === false), or null. */
+function resolveLatestResubmission(session: DefenseSessionPayload): SessionSubmission | null {
   const list = session.resubmissions
   if (!list || list.length === 0) return null
   return list[list.length - 1]
+}
+
+/**
+ * The version this panelist actually approved, or null when they never have.
+ *
+ * The card pins to this so an approved document stays visible even after the
+ * group uploads a newer one. Newer versions remain in Document History.
+ */
+function resolveApprovedVersion(
+  session: DefenseSessionPayload,
+  currentUserId: number | null,
+): SessionSubmission | null {
+  if (currentUserId == null) return null
+  const ordered = [...session.resubmissions].sort((a, b) => a.version - b.version)
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const mine = (ordered[i].reviews ?? []).find((r) => r.panelistId === currentUserId)
+    if (mine?.status === 'APPROVED') return ordered[i]
+  }
+  return null
+}
+
+/** The reviewing panelist's own reviewedAt for a version, for the callout date. */
+function resolveMyReviewedAt(
+  sub: SessionSubmission | null,
+  currentUserId: number | null,
+): string | null {
+  if (!sub || currentUserId == null) return null
+  const mine = (sub.reviews ?? []).find((r) => r.panelistId === currentUserId)
+  return mine?.reviewedAt ?? null
+}
+
+type CalloutMeta = {
+  Icon: typeof Clock
+  boxClass: string
+  iconTileClass: string
+  headlineClass: string
+  headline: string
 }
 
 function getResubmissionCalloutMeta(status: ResubmissionStatus): CalloutMeta {
@@ -75,42 +101,43 @@ function getResubmissionCalloutMeta(status: ResubmissionStatus): CalloutMeta {
   }
 }
 
+/**
+ * The callout's supporting line — always about THIS panelist.
+ *
+ * No `N/M approve` counter and no mention of other panelists: the whole point is
+ * that a panelist's own verdict is complete on its own, and a count made them
+ * feel responsible for a peer they cannot hurry. A carried-forward approval
+ * says so explicitly, since a new version inherits APPROVED without the
+ * panelist having seen the new file.
+ */
 function buildCalloutContext(
   status: ResubmissionStatus,
-  approvedCount: number,
-  total: number,
-  comments: number | null,
-  pages: number | null,
+  approvedVersion: number | null,
+  carriedForward: boolean,
   reviewedAt: string | null,
 ): string {
-  const base = `${approvedCount}/${total} approve`
-  const hasCounts = typeof comments === 'number' && typeof pages === 'number' && comments > 0
-  const countsLabel = hasCounts ? `${comments} comments on ${pages} pages` : null
   const dateLabel = reviewedAt ? `Reviewed ${formatDate(reviewedAt)}` : null
-  if (status === 'FOR_REVIEW') {
-    if (countsLabel && dateLabel) return `${base} · ${countsLabel} · ${dateLabel}`
-    if (countsLabel) return `${base} · ${countsLabel}`
-    return `Waiting for panelist approvals · ${base}`
+  if (status === 'APPROVED' && carriedForward && approvedVersion != null) {
+    return dateLabel
+      ? `Carried over from version ${approvedVersion} · ${dateLabel}`
+      : `Carried over from version ${approvedVersion}`
+  }
+  if (status === 'APPROVED') {
+    return dateLabel ? `Your review · ${dateLabel}` : 'Your review is recorded'
   }
   if (status === 'NEED_REVISION') {
-    if (countsLabel && dateLabel) return `${base} · ${countsLabel} · ${dateLabel}`
-    if (countsLabel) return `${base} · ${countsLabel}`
-    if (dateLabel) return `${base} · ${dateLabel}`
-    return `${base} · Requires revision`
+    return dateLabel ? `Your feedback · ${dateLabel}` : 'Revision requested'
   }
-  if (countsLabel && dateLabel) return `${base} · ${countsLabel} · ${dateLabel}`
-  if (countsLabel) return `${base} · ${countsLabel}`
-  if (dateLabel) return `${base} · ${dateLabel}`
-  return `${base} · All panelists approved`
+  return 'Your review is not submitted yet'
 }
 
-function resolveAnnotationStats(latest: LatestResubmission | null): { comments: number; pages: number } | null {
+function resolveAnnotationStats(latest: SessionSubmission | null): { comments: number; pages: number } | null {
   const ann = (latest as unknown as { annotationStats?: { comments: number; pages: number } | null })?.annotationStats
   if (ann && typeof ann.comments === 'number') return ann
   return null
 }
 
-function resolveWorkspaceHref(session: DefenseSessionPayload, latest: LatestResubmission | null): string | undefined {
+function resolveWorkspaceHref(session: DefenseSessionPayload, latest: SessionSubmission | null): string | undefined {
   if (!latest) return undefined
   return `/faculty/defense/${session.id}/${latest.id}`
 }
@@ -119,24 +146,27 @@ function resolveWorkspaceHref(session: DefenseSessionPayload, latest: LatestResu
 
 interface ResubmissionCalloutProps {
   status: ResubmissionStatus
-  approvedCount: number
-  total: number
-  comments?: number | null
-  pages?: number | null
+  /** The version this panelist approved, or null when they never have. */
+  approvedVersion: number | null
+  /** True when that approval was inherited from an earlier version. */
+  carriedForward: boolean
   reviewedAt?: string | null
 }
 
 function ResubmissionStatusCallout({
   status,
-  approvedCount,
-  total,
-  comments,
-  pages,
+  approvedVersion,
+  carriedForward,
   reviewedAt,
 }: ResubmissionCalloutProps) {
   const meta = getResubmissionCalloutMeta(status)
   const Icon = meta.Icon
-  const context = buildCalloutContext(status, approvedCount, total, comments ?? null, pages ?? null, reviewedAt ?? null)
+  const context = buildCalloutContext(
+    status,
+    approvedVersion,
+    carriedForward,
+    reviewedAt ?? null,
+  )
   return (
     <section
       aria-live="polite"
@@ -174,15 +204,27 @@ function NoVerdictPlaceholder() {
 // ── Main panel ───────────────────────────────────────────────────────────────
 
 /**
- * ResubmissionTabPanel — Resubmission tab for the defense workspace.
- * - Status callout (For Review amber / Need Revision red / Approved green) derived via deriveResubmissionStatus + deriveApprovalProgress with 1/3 counts
- * - ResubmittedDocumentCard (latest !isInitial, resubmissions[resubmissions.length-1]) with empty placeholder
- * - ApprovalChecklistCard (per-panelist Approved / Need Revision / Pending via deriveApprovalChecklist, feedback counts)
- * - isPanelistReadOnly guard: Approved panelists are read-only on future versions (no Review action)
-  * - shouldResetOnResubmission: REDEFENSE -> PENDING on new version, APPROVED carry-forward
+ * ResubmissionTabPanel — the faculty/panelist Resubmission tab.
+ *
+ * Centered on the CURRENT panelist's own review, never on the panel's
+ * aggregate progress. A panelist's verdict is complete on its own, so nothing
+ * here implies they are waiting on a peer:
+ * - Status callout: APPROVED / NEED_REVISION / FOR_REVIEW from this panelist's
+ *   review alone, with "Carried over from version N" when the approval was
+ *   inherited. The old `N/M approve` counter is gone for the same reason.
+ * - ResubmittedDocumentCard pinned to the version THIS panelist approved, so a
+ *   newer upload does not replace the file they reviewed. Newer versions stay in
+ *   Document History. Falls back to the latest when they have approved nothing.
+ * - ResubmissionActivityFeed replaces the Approval Checklist: a read-only
+ *   timeline across every resubmission, with no waiting-on-others framing.
+ *
  * gap-[16px], responsive, pure helpers.
  */
 export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
+  // Before the early return: this hook must run on every render.
+  const { data: authSession } = useSession()
+  const currentUserId = authSession?.user?.id != null ? Number(authSession.user.id) : null
+
   if ((session as unknown as { verdict?: string })?.verdict === 'PENDING') {
     return (
       <div className="flex flex-col gap-[16px] w-full mx-auto h-full flex-1 min-h-0">
@@ -190,129 +232,75 @@ export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
       </div>
     )
   }
+
   const latest = resolveLatestResubmission(session)
-  const reviews = (latest?.reviews as Array<{ panelistId: number; name: string; status: DefenseReviewStatus | string }> | undefined) ?? []
-  const hasPending = reviews.some((r) => r.status === 'PENDING')
-  const derivedStatus = deriveResubmissionStatus(reviews as Array<{ status: DefenseReviewStatus | string }>) as ResubmissionStatus
-  const status = hasPending && latest ? ('FOR_REVIEW' as const) : derivedStatus
-  const progress = deriveApprovalProgress(reviews as Array<{ status: DefenseReviewStatus | string }>)
-  const approvedCount = progress.approvedCount
-  const total = progress.total || session.panelists.length || 3
+  const versions = session.resubmissions.map((v) => ({
+    version: v.version,
+    isInitial: v.isInitial,
+    dateSubmitted: v.dateSubmitted,
+    submittedByName: v.submittedByName,
+    reviews: v.reviews,
+  }))
 
-  // Per-panelist checklist for latest version — includes feedback counts (comments/pages) when available
-  const checklistItems = deriveApprovalChecklist(
-    reviews.map((r) => ({
-      panelistId: r.panelistId,
-      name: r.name,
-      status: r.status as DefenseReviewStatus | string,
-      feedback: (r as unknown as { feedback?: { comments: number; pages: number } | null }).feedback ?? null,
-      comments: (r as unknown as { comments?: number }).comments,
-      pages: (r as unknown as { pages?: number }).pages,
-      reviewedAt: (r as unknown as { reviewedAt?: string | null }).reviewedAt ?? null,
-    })),
-  )
+  // Everything below is about THIS panelist only. The previous derivation was
+  // collective — `some(PENDING)` forced FOR_REVIEW on everyone, so a panelist
+  // who had already approved still saw a waiting state because a peer had not
+  // acted. Their own verdict is complete on its own.
+  const myState = derivePanelistResubmissionState(currentUserId, versions)
+  const status: ResubmissionStatus = myState.status
 
-  // Demonstrate carry-forward: REDEFENSE resets to PENDING on new version, APPROVED stays
-  const resetCandidates = reviews.filter((r) => shouldResetOnResubmission(r.status as DefenseReviewStatus))
-  void resetCandidates
-  void checklistItems
+  // Pin the card to the version this panelist approved, so a newer upload does
+  // not replace the file they actually reviewed. Falls back to the latest.
+  const approvedSub = resolveApprovedVersion(session, currentUserId)
+  const shownSub = approvedSub ?? latest
+  const myReviewedAt = resolveMyReviewedAt(approvedSub, currentUserId)
 
-  // Read-only guard: APPROVED panelists cannot re-review future versions
-  const readOnlyIds = new Set(
-    reviews.filter((r) => isPanelistReadOnly(r.status as DefenseReviewStatus)).map((r) => r.panelistId),
-  )
-  void readOnlyIds
+  // Read-only guard for the Open action: a resolved verdict means no re-review.
+  const isCurrentReadOnly = status === 'APPROVED' || status === 'NEED_REVISION'
 
-  // Guard for current panelist's Open action — approved => read-only, no Open button
-  const { data: authSession } = useSession()
-  const currentUserId = authSession?.user?.id != null ? Number(authSession.user.id) : null
-  const myReview = currentUserId != null ? reviews.find((r) => r.panelistId === currentUserId) : undefined
-  const isCurrentReadOnly = myReview ? isPanelistReadOnly(myReview.status as DefenseReviewStatus) : false
-  void isCurrentReadOnly
-  void shouldResetOnResubmission
+  const annotationStats = resolveAnnotationStats(shownSub)
+  const activity = deriveResubmissionActivity(versions)
 
-  // Has current panelist already submitted annotation (COMMITTED) for this resubmission?
-  const hasReviewedResub = (() => {
-    if (currentUserId == null || !latest) return false
-    const anns = (latest as unknown as { annotations?: Array<{ authorId: number; status: string }> })?.annotations
-    if (anns && anns.length > 0) {
-      return anns.some((a) => a.authorId === currentUserId && a.status === 'COMMITTED')
-    }
-    return myReview ? myReview.status !== 'PENDING' : false
-  })()
-
-  const annotationStats = resolveAnnotationStats(latest)
-  const reviewedAt =
-    (session as unknown as { verdictSubmittedAt?: string | null }).verdictSubmittedAt ??
-    (latest as unknown as { dateSubmitted?: string })?.dateSubmitted ??
-    null
-
-  const latestDoc = latest
+  const shownDoc = shownSub
     ? {
-        fileName: latest.fileName,
-        size: latest.size,
-        blobUrl: latest.blobUrl,
-        dateSubmitted: latest.dateSubmitted,
-        submittedByName: session.groupName,
-        version: latest.version,
-        isInitial: latest.isInitial,
+        fileName: shownSub.fileName,
+        size: shownSub.size,
+        blobUrl: shownSub.blobUrl,
+        dateSubmitted: shownSub.dateSubmitted,
+        submittedByName: shownSub.submittedByName || session.groupName,
+        version: shownSub.version,
+        isInitial: shownSub.isInitial,
         annotationStats,
-        reviews: reviews as Array<{ status: string }>,
         comments: annotationStats?.comments ?? null,
         pages: annotationStats?.pages ?? null,
-        reviewedAt,
+        reviewedAt: myReviewedAt,
       }
     : null
 
-  const workspaceHref = resolveWorkspaceHref(session, latest)
-
-  // Map reviews to ApprovalChecklistCard shape (panelistId + status + feedback)
-  const checklistReviews = reviews.map((r) => ({
-    panelistId: r.panelistId,
-    status: r.status as DefenseReviewStatus | string,
-    feedback: (r as unknown as { feedback?: { comments: number; pages: number } | null }).feedback ?? null,
-    comments: (r as unknown as { comments?: number }).comments,
-    pages: (r as unknown as { pages?: number }).pages,
-    reviewedAt: (r as unknown as { reviewedAt?: string | null }).reviewedAt ?? null,
-  }))
+  const workspaceHref = resolveWorkspaceHref(session, shownSub)
 
   return (
     <div className="flex flex-col gap-[16px] w-full mx-auto">
       {latest ? (
         <ResubmissionStatusCallout
           status={status}
-          approvedCount={approvedCount}
-          total={total}
-          comments={annotationStats?.comments ?? null}
-          pages={annotationStats?.pages ?? null}
-          reviewedAt={reviewedAt}
+          approvedVersion={myState.approvedVersion}
+          carriedForward={myState.carriedForward}
+          reviewedAt={myReviewedAt}
         />
       ) : null}
 
       <ResubmittedDocumentCard
-        document={latestDoc as unknown as never}
-        resubmissions={session.resubmissions as unknown as never}
-        reviews={reviews as unknown as never}
-        totalPanelists={total}
-        approvedCount={approvedCount}
+        document={shownDoc as unknown as never}
+        myStatus={status}
         comments={annotationStats?.comments ?? null}
         pages={annotationStats?.pages ?? null}
-        reviewedAt={reviewedAt}
+        reviewedAt={myReviewedAt}
         workspaceHref={workspaceHref}
-        hasReviewed={hasReviewedResub}
         hasApprovedPrevious={isCurrentReadOnly}
       />
 
-      {latest ? (
-        <ApprovalChecklistCard
-          panelists={session.panelists as unknown as never}
-          reviews={checklistReviews as unknown as never}
-        />
-      ) : (
-        <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] p-[18px]">
-          <p className="font-sans font-medium text-[13px] text-[#8a93b4] text-center py-6">No resubmitted document yet.</p>
-        </div>
-      )}
+      <ResubmissionActivityFeed entries={activity} versions={versions} />
     </div>
   )
 }

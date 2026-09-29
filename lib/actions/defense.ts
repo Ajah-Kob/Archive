@@ -1548,13 +1548,27 @@ export interface DefenseSessionSubmissionPayload {
   size: number
   /** When this version was submitted. */
   dateSubmitted: string
+  /**
+   * Name of the student who submitted THIS version. Per-version, not per-group:
+   * different group members can upload different revisions, and the Activity
+   * Feed credits the actual submitter.
+   */
+  submittedByName: string
   isInitial: boolean
   annotationStats?: { comments: number; pages: number } | null
-  /** Per-panelist review state for this version. */
+  /**
+   * Per-panelist review state for this version.
+   *
+   * `reviewedAt` is the decision timestamp. It was omitted before, which made it
+   * impossible to tell a fresh decision from a carried-forward one, so the
+   * resubmission callout could not say when a review happened and the Activity
+   * Feed had no dates to order or display.
+   */
   reviews: {
     panelistId: number
     name: string
     status: DefenseReviewStatus
+    reviewedAt: string | null
   }[]
 }
 
@@ -1613,6 +1627,8 @@ async function getDefenseSessionData(
       submissions: {
         where: { deletedAt: null },
         include: {
+          // The submitting student, for the Activity Feed's upload entries.
+          user: { select: { name: true } },
           reviews: {
             where: { deletedAt: null },
             include: { panelist: { select: { id: true, name: true } } },
@@ -1687,6 +1703,7 @@ async function getDefenseSessionData(
       schedule.panelists.find((p) => p.userId === userId)?.role ?? 'PANEL_MEMBER',
     submissions: schedule.submissions.map((r) => {
       const rWithAnn = r as unknown as { annotations?: Array<{ authorId: number; data: unknown; status: string }> }
+      const submittedBy = (r as unknown as { user?: { name?: string } | null }).user
       let annStats: { comments: number; pages: number } | null = null
       if (rWithAnn.annotations && rWithAnn.annotations.length > 0) {
         const allItems = rWithAnn.annotations.flatMap((a) => (Array.isArray(a.data) ? (a.data as unknown[]) : []))
@@ -1720,6 +1737,7 @@ async function getDefenseSessionData(
         mimeType: r.mimeType,
         size: r.size,
         dateSubmitted: r.createdAt.toISOString(),
+        submittedByName: submittedBy?.name ?? '',
         isInitial: r.isInitial,
         annotationStats: annStats,
         reviews: r.reviews.map((review) => {
@@ -1772,22 +1790,24 @@ async function getDefenseSessionData(
           blobUrl: r.blobUrl,
           mimeType: r.mimeType,
           size: r.size,
-          dateSubmitted: r.createdAt.toISOString(),
-          isInitial: r.isInitial,
-          annotationStats: annStats,
-          reviews: r.reviews.map((review) => {
-            const fb = annByAuthor.get(review.panelistId) ?? null
-            return {
-              panelistId: review.panelistId,
-              name: review.panelist.name,
-              status: review.status,
-              reviewedAt: (review as unknown as { reviewedAt?: Date | null }).reviewedAt?.toISOString() ?? null,
-              feedback: fb,
-              comments: fb?.comments ?? 0,
-              pages: fb?.pages ?? 0,
-            }
-          }),
-        }
+        dateSubmitted: r.createdAt.toISOString(),
+        submittedByName:
+          (r as unknown as { user?: { name?: string } | null }).user?.name ?? '',
+        isInitial: r.isInitial,
+        annotationStats: annStats,
+        reviews: r.reviews.map((review) => {
+          const fb = annByAuthor.get(review.panelistId) ?? null
+          return {
+            panelistId: review.panelistId,
+            name: review.panelist.name,
+            status: review.status,
+            reviewedAt: (review as unknown as { reviewedAt?: Date | null }).reviewedAt?.toISOString() ?? null,
+            feedback: fb,
+            comments: fb?.comments ?? 0,
+            pages: fb?.pages ?? 0,
+          }
+        }),
+      }
       }),
   }
 }

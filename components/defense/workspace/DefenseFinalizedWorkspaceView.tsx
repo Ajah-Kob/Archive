@@ -390,6 +390,9 @@ export function DefenseFinalizedWorkspaceView({
         draftStatus={draftStatus}
         backHref={resolvedBackHref}
         scheduleId={scheduleId ?? submission.scheduleId}
+        // Return to this component's read-only state. Without it the only way
+        // out of annotation mode was the Back link, which navigates away.
+        onExitAnnotationMode={() => setIsEditing(false)}
       />
     )
   }

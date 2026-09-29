@@ -88,10 +88,23 @@ export interface DefenseDocumentWorkspaceProps {
   /** Defense schedule id for post-submit navigation. Falls back to submission.scheduleId. */
   scheduleId?: number
   /**
-   * History mode — hides every mutation affordance (toolbar actions, tools,
+   * History mode - hides every mutation affordance (toolbar actions, tools,
    * drafts) and forces annotation layers read-only. Viewing UI is unchanged.
    */
   readOnly?: boolean
+  /**
+   * Render a "Done" action that leaves annotation mode and returns to the
+   * read-only view, instead of making Back the only exit.
+   *
+   * Only passed by DefenseFinalizedWorkspaceView, which owns the read-only ⇄ edit
+   * switch. Left undefined elsewhere (student mode, direct links) so no other
+   * entry point grows an action it cannot honour.
+   *
+   * Exiting unmounts this component, so any annotations not yet submitted are
+   * discarded — the same as navigating away via Back today. Re-entering remounts
+   * from the server-supplied `initialAnnotations`, never from local state.
+   */
+  onExitAnnotationMode?: () => void
 }
 
 /** Which right slide-over panel is open (if any). */
@@ -164,6 +177,7 @@ export function DefenseDocumentWorkspace({
   backHref,
   scheduleId,
   readOnly = false,
+  onExitAnnotationMode,
 }: DefenseDocumentWorkspaceProps) {
   const isStudent = mode === 'student'
   const editable = !isStudent && !readOnly
@@ -375,6 +389,7 @@ export function DefenseDocumentWorkspace({
             backHref={backHref}
             scheduleId={scheduleId}
             readOnly={readOnly}
+            onExitAnnotationMode={onExitAnnotationMode}
           />
         )}
       </EmbedPDF>
@@ -392,6 +407,7 @@ function DefenseWorkspaceLayout({
   backHref,
   scheduleId,
   readOnly = false,
+  onExitAnnotationMode,
 }: {
   mode?: DefenseWorkspaceMode
   activeDocumentId: string | null
@@ -402,6 +418,8 @@ function DefenseWorkspaceLayout({
   backHref?: string
   scheduleId?: number
   readOnly?: boolean
+  /** See DefenseDocumentWorkspaceProps.onExitAnnotationMode. */
+  onExitAnnotationMode?: () => void
 }) {
   const isStudent = mode === 'student'
   const editable = !isStudent && !readOnly
@@ -796,6 +814,24 @@ function DefenseWorkspaceLayout({
                 </button>
               </>
             )
+          )}
+
+          {/* Done / Exit annotation mode. Secondary styling and placed after the
+              primary submit action so "Submit annotations" stays the visually
+              dominant choice — this is a way out, not an alternative to saving. */}
+          {editable && onExitAnnotationMode && (
+            <>
+              <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={onExitAnnotationMode}
+                title="Exit annotation mode and return to the read-only view. Annotations you have not submitted will be discarded."
+                className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none"
+              >
+                <Check className="size-[13px]" strokeWidth={2} />
+                Done
+              </button>
+            </>
           )}
         </div>
       </header>

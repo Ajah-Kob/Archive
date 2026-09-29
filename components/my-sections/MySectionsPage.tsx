@@ -46,8 +46,16 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <HeaderBar>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="w-full sm:w-[280px] shrink-0 py-[8px]">
+        {/* Single line, horizontally scrollable, scrollbar hidden.
+
+            Scoping note: the scrolling container has to live on THIS div, not
+            on HeaderBar's root. HeaderBar is `flex flex-wrap` and is shared by
+            13 routes; changing it there would silently rework every toolbar in
+            the app. Keeping the scroll local also keeps the clip contained --
+            Filter's listbox is `absolute` with no portal, so an overflow
+            ancestor on the shared root would cut the dropdown off. */}
+        <div className="flex items-center gap-2.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="w-[200px] sm:w-[280px] shrink-0 py-[8px]">
             <SearchBar
               value={search}
               onChange={setSearch}
@@ -61,7 +69,6 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
             options={PHASE_OPTIONS}
             onChange={setPhaseFilter}
             ariaLabel="Filter by capstone phase"
-            fullWidth
           />
         </div>
       </HeaderBar>

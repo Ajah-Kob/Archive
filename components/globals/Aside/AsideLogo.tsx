@@ -1,9 +1,10 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useAside } from '@/store/useAside'
 import { PanelLeftClose, PanelLeft } from 'lucide-react'
 
-export default function LogoAside() {
+export default function LogoAside({ trailing }: { trailing?: ReactNode }) {
   const toggleMinimize = useAside((state) => state.toggleMinimize)
   const minimize = useAside((state) => state.minimize)
 
@@ -44,17 +45,21 @@ export default function LogoAside() {
         </>
       )}
 
-      {/* Sidebar collapse/expand toggle */}
-      <button
-        onClick={toggleMinimize}
-        className="bg-white border border-[#dddff0] rounded-[15px] size-7 flex items-center justify-center shadow-[0px_1px_1.5px_rgba(0,0,0,0.05)] hover:bg-gray-50 transition-colors shrink-0"
-      >
-        {minimize ? (
-          <PanelLeft size={13} className="text-[#5a6382]" />
-        ) : (
-          <PanelLeftClose size={13} className="text-[#5a6382]" />
-        )}
-      </button>
+      {/* Trailing action — collapse toggle on the sidebar, close button on the
+          mobile drawer. Overridable so the mobile header can reuse this
+          component instead of duplicating the logo markup. */}
+      {trailing ?? (
+        <button
+          onClick={toggleMinimize}
+          className="bg-white border border-[#dddff0] rounded-[15px] size-7 flex items-center justify-center shadow-[0px_1px_1.5px_rgba(0,0,0,0.05)] hover:bg-gray-50 transition-colors shrink-0"
+        >
+          {minimize ? (
+            <PanelLeft size={13} className="text-[#5a6382]" />
+          ) : (
+            <PanelLeftClose size={13} className="text-[#5a6382]" />
+          )}
+        </button>
+      )}
     </div>
   )
 }

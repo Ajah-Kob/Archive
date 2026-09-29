@@ -1,20 +1,27 @@
 'use client'
 
-import { useDrawer } from '@/store/useDrawer'
-import { useSession } from 'next-auth/react'
+import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import Link from 'next/link'
-import { SCHOOL_NAME } from '@/config/constants'
-import { X, Users } from 'lucide-react'
+import { X } from 'lucide-react'
+import { useDrawer } from '@/store/useDrawer'
+import { NavLinks } from '@/components/globals/Aside/AsideNavLink'
+import AsideLogo from '@/components/globals/Aside/AsideLogo'
 
 export default function Drawer() {
   const open = useDrawer((state) => state.show)
   const toggle = useDrawer((state) => state.toggleShow)
-  const { data: session } = useSession()
+  const setShow = useDrawer((state) => state.setShow)
   const pathname = usePathname()
 
-  const isAdmin =
-    session?.user?.role === 'SUPERADMIN' || session?.user?.role === 'ADMIN'
+  // Close on navigation. The store isn't persisted, so a client-side route
+  // change leaves the panel open over the new page. Tracked via a ref so this
+  // fires on pathname changes only — never when the drawer is merely opened.
+  const prevPathname = useRef(pathname)
+  useEffect(() => {
+    if (prevPathname.current === pathname) return
+    prevPathname.current = pathname
+    setShow(false)
+  }, [pathname, setShow])
 
   return (
     <>
@@ -26,40 +33,28 @@ export default function Drawer() {
         onClick={toggle}
       />
 
-      {/* Drawer panel */}
+      {/* Drawer panel — same surface as the desktop sidebar */}
       <div
-        className={`fixed top-0 left-0 h-dvh w-64 z-30 animated bg-secondary md:hidden ${
+        className={`fixed top-0 left-0 h-dvh w-[240px] z-30 bg-white border-r border-[#eceef8] md:hidden flex flex-col transition-transform duration-300 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Header */}
-        <div className="px-5 border-b border-tertiary border-r">
-          <div className="flex items-center justify-between gap-3 h-16">
-            <h1 className="">
-              <Link href="/">{SCHOOL_NAME}</Link>
-            </h1>
-
-            <button className="button button--circle">
-              <X onClick={toggle} />
-            </button>
-          </div>
-        </div>
-
-        {/* Nav */}
-        {isAdmin && (
-          <nav className="p-2 flex flex-col gap-1">
-            <Link
-              href="/admin/users"
+        <AsideLogo
+          trailing={
+            <button
               onClick={toggle}
-              className={`flex items-center gap-3 px-3 py-2 rounded animated hover:bg-tertiary ${
-                pathname === '/admin/users' ? 'bg-tertiary font-medium' : ''
-              }`}
+              aria-label="Close navigation"
+              className="bg-white border border-[#dddff0] rounded-[15px] size-7 flex items-center justify-center shadow-[0px_1px_1.5px_rgba(0,0,0,0.05)] hover:bg-gray-50 transition-colors shrink-0"
             >
-              <Users size={24} />
-              <span>Users</span>
-            </Link>
-          </nav>
-        )}
+              <X size={13} className="text-[#5a6382]" />
+            </button>
+          }
+        />
+
+        {/* Nav — same component as the desktop sidebar */}
+        <nav className="flex-1 overflow-y-auto p-3">
+          <NavLinks pathname={pathname} minimize={false} />
+        </nav>
       </div>
     </>
   )

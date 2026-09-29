@@ -34,7 +34,7 @@ export function JoinRoleCard({
   const c = colorMap[color]
 
   return (
-    <div className="flex flex-col gap-[20px] bg-white rounded-[14px] shadow-[0px_2px_12px_rgba(112,125,255,0.06),0px_1px_3px_rgba(0,0,0,0.04)] p-[30px] w-full sm:w-[270px] h-fit">
+    <div className="flex flex-col gap-[20px] bg-white rounded-[14px] shadow-[0px_2px_12px_rgba(112,125,255,0.06),0px_1px_3px_rgba(0,0,0,0.04)] p-[30px] w-full sm:w-[270px] h-full">
       <div
         className={`flex items-center justify-center size-[48px] rounded-[13px] ${c.iconBg}`}
       >

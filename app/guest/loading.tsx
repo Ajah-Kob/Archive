@@ -15,21 +15,21 @@ export default function GuestHomeLoading() {
 
       <DecorativeBackground />
 
-      <div className="relative flex flex-col items-center gap-[30px]">
+      <div className="relative flex flex-col items-center gap-[30px] w-full max-w-[560px] px-4">
         {/* Banner skeleton */}
-        <div className="flex items-center gap-[10px] bg-[rgba(112,124,255,0.1)] border border-[rgba(112,125,255,0.2)] rounded-[10px] px-[17px] py-[11px]">
+        <div className="flex items-center gap-[10px] bg-[rgba(112,124,255,0.1)] border border-[rgba(112,125,255,0.2)] rounded-[10px] px-[17px] py-[11px] w-full">
           <div className="size-[14px] rounded-full bg-[rgba(112,125,255,0.2)] animate-pulse" />
-          <div className="h-[13px] w-[380px] rounded bg-[rgba(112,125,255,0.15)] animate-pulse" />
+          <div className="h-[13px] w-full max-w-[380px] rounded bg-[rgba(112,125,255,0.15)] animate-pulse" />
         </div>
 
         {/* Heading skeleton */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-[25px] w-[250px] rounded bg-[#e0e3f5] animate-pulse" />
-          <div className="h-[15px] w-[400px] rounded bg-[#e0e3f5] animate-pulse" />
+        <div className="flex flex-col items-center gap-3 w-full">
+          <div className="h-[25px] w-[250px] max-w-full rounded bg-[#e0e3f5] animate-pulse" />
+          <div className="h-[15px] w-full max-w-[400px] rounded bg-[#e0e3f5] animate-pulse" />
         </div>
 
         {/* Cards skeleton */}
-        <div className="flex flex-col sm:flex-row items-center h-fit w-fit gap-[20px]">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[20px] w-full">
           <div className="flex flex-col gap-[20px] bg-white rounded-[14px] shadow-[0px_2px_12px_rgba(112,125,255,0.06),0px_1px_3px_rgba(0,0,0,0.04)] p-[30px] w-full sm:w-[270px]">
             <div className="size-[48px] rounded-[13px] bg-[#fee2e2] animate-pulse" />
             <div className="flex flex-col gap-[10px]">

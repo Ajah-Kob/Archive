@@ -13,7 +13,10 @@ export default function GuestHomePage() {
     <div className="h-full flex flex-col items-center justify-center relative overflow-y-auto overflow-x-hidden">
       <PageLabel label="Join Archive" />
       <DecorativeBackground />
-      <div className="relative flex flex-col items-center gap-[30px]">
+      {/* Gutter + explicit max width. The column is capped rather than w-fit,
+          because a w-fit column sizes to its widest child -- the welcome copy
+          -- so the text ran edge to edge while the cards below stayed narrow. */}
+      <div className="relative flex flex-col items-center gap-[30px] w-full max-w-[560px] px-4">
         <JoinArchiveContent />
       </div>
     </div>

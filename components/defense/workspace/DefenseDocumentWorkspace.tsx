@@ -62,7 +62,6 @@ import { DefenseResubmissionVerdictModal } from '@/components/defense/workspace/
 import { useAnnotationDraft } from '@/components/defense/workspace/useAnnotationDraft'
 import { saveDefenseAnnotationDraft } from '@/lib/actions/defense-annotations'
 import { UnsavedChangesModal } from '@/components/forms/UnsavedChangesModal'
-import type { AnnotationDraftStatus } from '@/components/defense/workspace/useAnnotationDraft'
 import { isReviewAnnotation, collectReviewAuthors } from '@/components/defense/workspace/review-annotations'
 import { VersionPanel } from '@/components/defense/workspace/VersionPanel'
 import type { StudentVersionListItem } from '@/lib/actions/student-review'
@@ -429,7 +428,6 @@ function DefenseWorkspaceLayout({
   submission,
   initialAnnotations,
   initialOwnAnnotations = null,
-  draftStatus,
   versions,
   backHref,
   scheduleId,
@@ -459,7 +457,7 @@ function DefenseWorkspaceLayout({
   const viewerRef = useRef<HTMLDivElement>(null)
 
   const pendingCommentIdsRef = useRef<Set<string>>(new Set())
-  const { status: liveDraftStatus, isDirty, markClean } = useAnnotationDraft({
+  const { isDirty, markClean } = useAnnotationDraft({
     submissionId: submission.id,
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
@@ -470,15 +468,6 @@ function DefenseWorkspaceLayout({
   const { state: annotationState, provides: annotationApi } = useAnnotation(
     CURRENT_DOCUMENT_ID,
   )
-  // hasAnnotations is gone: the Save button is gated on isDirty (changed since
-  // hydration), not on annotations merely existing.
-
-  const [seededDraftStatus] = useState<AnnotationDraftStatus>(() =>
-    draftStatus === 'DRAFT' || draftStatus === 'COMMITTED' ? 'saved' : 'idle',
-  )
-  const draftSaveStatus: AnnotationDraftStatus =
-    liveDraftStatus === 'idle' ? seededDraftStatus : liveDraftStatus
-
   const { provides: annotationCapability } = useAnnotationCapability()
   const annotationCapabilityRef = useRef(annotationCapability)
   annotationCapabilityRef.current = annotationCapability
@@ -846,36 +835,18 @@ function DefenseWorkspaceLayout({
           )}
         </div>
 
-        {editable && (
+        {editable && isDirty && (
           <div className="flex items-center gap-[7px] min-w-0 shrink-0">
-            {draftSaveStatus === 'saving' ? (
-              <>
-                <Loader2
-                  className="size-[12px] animate-spin text-[#8a93b4] shrink-0"
-                  aria-hidden="true"
-                />
-                <span
-                  className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
-                  aria-live="polite"
-                >
-                  Saving…
-                </span>
-              </>
-            ) : (
+            <span
+              className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
+              aria-live="polite"
+            >
               <span
-                className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
-                aria-live="polite"
-              >
-                <Check
-                  className={`size-[12px] shrink-0 ${
-                    draftSaveStatus === 'saved' ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
-                  }`}
-                  strokeWidth={2.5}
-                  aria-hidden="true"
-                />
-                {draftSaveStatus === 'saved' ? 'Draft Saved' : 'Draft Saved'}
-              </span>
-            )}
+                className="size-[8px] rounded-full bg-[#f59e0b] shrink-0"
+                aria-hidden="true"
+              />
+              Unsaved changes
+            </span>
           </div>
         )}
 

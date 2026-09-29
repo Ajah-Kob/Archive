@@ -124,9 +124,22 @@ export default async function DefensePanelistWorkspacePage({
     ? `/faculty/defense/${detail.scheduleId}/session`
     : `/faculty/defense/${detail.scheduleId}/resubmission`
 
+  // An INITIAL document always opens read-only; Annotate is the explicit gate
+  // into edit mode. Previously the finalized view was only rendered when
+  // shouldFinalize, which is false for exactly the common case — a live,
+  // IN_REVIEW version with an unsaved DRAFT — so those panelists landed
+  // directly in DefenseDocumentWorkspace already editable, with no Annotate step
+  // and no way back out. isInitial (not version) decides initial vs
+  // resubmission, since version chains across schedules.
+  //
+  // Resubmissions keep the direct editable render: they use the Submit Review
+  // flow, and the finalized view deliberately hides Annotate for them, so
+  // routing them through it would strand the reviewer.
+  const useFinalizedGate = detail.isInitial || shouldFinalize || isHistory
+
   // History documents (past Redefense schedules) always render finalized —
   // read-only by construction, plus the workspace readOnly safety net below.
-  if (shouldFinalize || isHistory) {
+  if (useFinalizedGate) {
     return (
       <DefenseFinalizedWorkspaceView
         submission={meta}

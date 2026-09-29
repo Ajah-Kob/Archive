@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Clock, Lock, TriangleAlert } from 'lucide-react'
+import { Check, Clock, TriangleAlert } from 'lucide-react'
 import type { JourneyRow } from '@/types/milestones'
 
 const STATUS_LABEL: Record<JourneyRow['state'], string> = {
@@ -32,6 +32,37 @@ interface Tip {
   row: JourneyRow
 }
 
+/**
+ * Solid lock: filled body plus a thick solid shackle arc.
+ *
+ * Replaces lucide's `Lock`, which strokes both parts and reads as a hairline
+ * shape at 20px. The body is a filled rect; the shackle is lucide's own arc
+ * path re-stroked at width 4 (vs lucide's 2) so it holds up at the `sm` size
+ * without going back to an outline. Geometry matches lucide exactly, so the
+ * glyph sits on the same optical centre as Check/Clock/TriangleAlert.
+ */
+function LockBody({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="text-[#9ea8c6]"
+      aria-hidden="true"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path
+        d="M7 11V7a5 5 0 0 1 10 0v4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
   const [tip, setTip] = useState<Tip | null>(null)
   const s = SIZES[size]
@@ -49,8 +80,9 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
         const isMajorRevision = row.state === 'MAJOR_REVISION'
         const isPendingReview =
           row.state === 'SUBMITTED' || row.state === 'MINOR_REVISION'
-        const showActiveBadge =
-          isCurrent && (isDefenseRevision || isMajorRevision)
+        // Defense revisions render their own red circle (see branch order below),
+        // so this badge is reached only by a current MAJOR_REVISION row.
+        const showActiveBadge = isCurrent && isMajorRevision
         const connectorColor =
           i < journey.length - 1
             ? row.state === 'APPROVED'
@@ -87,6 +119,22 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     style={{ width: s.check, height: s.check }}
                   />
                 </div>
+              ) : isDefenseRevision ? (
+                <div
+                  className="flex items-center justify-center rounded-full"
+                  style={{
+                    width: s.circle,
+                    height: s.circle,
+                    backgroundColor: 'rgba(239,68,68,0.09)',
+                    border: '1px solid rgba(239,68,68,0.31)',
+                  }}
+                >
+                  <TriangleAlert
+                    className="text-[#ef4444]"
+                    strokeWidth={2.5}
+                    style={{ width: s.check, height: s.check }}
+                  />
+                </div>
               ) : showActiveBadge ? (
                 <>
                   <div
@@ -119,22 +167,6 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     />
                   </div>
                 </>
-               ) : isDefenseRevision ? (
-                 <div
-                   className="flex items-center justify-center rounded-full"
-                   style={{
-                     width: s.circle,
-                     height: s.circle,
-                     backgroundColor: 'rgba(239,68,68,0.09)',
-                     border: '1px solid rgba(239,68,68,0.31)',
-                   }}
-                 >
-                   <TriangleAlert
-                     className="text-[#ef4444]"
-                     strokeWidth={2.5}
-                     style={{ width: s.check, height: s.check }}
-                   />
-                 </div>
                ) : isMajorRevision ? (
                  <div
                    className="flex items-center justify-center rounded-full"
@@ -192,7 +224,7 @@ export function JourneyTracker({ journey, size = 'md' }: JourneyTrackerProps) {
                     border: '1px solid #dde0f0',
                   }}
                 >
-                  <Lock className="text-[#9ea8c6]" strokeWidth={2} style={{ width: s.check - 1, height: s.check - 1 }} />
+                  <LockBody size={s.check} />
                 </div>
               ) : (
                 <div

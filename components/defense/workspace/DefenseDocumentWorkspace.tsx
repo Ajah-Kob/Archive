@@ -60,6 +60,8 @@ import { DefenseSaveConfirmModal } from '@/components/defense/workspace/DefenseS
 import type { AnnotationSummary } from '@/components/defense/workspace/DefenseSaveConfirmModal'
 import { DefenseResubmissionVerdictModal } from '@/components/defense/workspace/DefenseResubmissionVerdictModal'
 import { useAnnotationDraft } from '@/components/defense/workspace/useAnnotationDraft'
+import { saveDefenseAnnotationDraft } from '@/lib/actions/defense-annotations'
+import { UnsavedChangesModal } from '@/components/forms/UnsavedChangesModal'
 import type { AnnotationDraftStatus } from '@/components/defense/workspace/useAnnotationDraft'
 import { isReviewAnnotation, collectReviewAuthors } from '@/components/defense/workspace/review-annotations'
 import { VersionPanel } from '@/components/defense/workspace/VersionPanel'
@@ -80,6 +82,15 @@ export interface DefenseDocumentWorkspaceProps {
   submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean; version?: number; verdict?: string }
   /** Saved annotation rows (serialized AnnotationTransferItem[]) for this submission. */
   initialAnnotations: unknown[] | null
+  /**
+   * This panelist's own saved annotations, excluding other panelists' committed
+   * rows. Distinct from `initialAnnotations`, which is the merged view.
+   *
+   * Used by Discard to revert the document to the state it was in when the page
+   * loaded. Reverting with the merged set would copy other reviewers'
+   * annotations into this panelist's own draft.
+   */
+  initialOwnAnnotations?: unknown[] | null
   /** Persistence status of the saved annotation row, if any. */
   draftStatus: 'DRAFT' | 'COMMITTED' | null
   /** Version list for the student Version panel (student mode only). */
@@ -183,6 +194,7 @@ export function DefenseDocumentWorkspace({
   blobUrl,
   submission,
   initialAnnotations,
+  initialOwnAnnotations = null,
   draftStatus,
   versions,
   backHref,
@@ -396,6 +408,7 @@ export function DefenseDocumentWorkspace({
             activeDocumentId={activeDocumentId}
             submission={submission}
             initialAnnotations={initialAnnotations}
+            initialOwnAnnotations={initialOwnAnnotations}
             draftStatus={draftStatus}
             versions={versions}
             backHref={backHref}
@@ -415,6 +428,7 @@ function DefenseWorkspaceLayout({
   activeDocumentId,
   submission,
   initialAnnotations,
+  initialOwnAnnotations = null,
   draftStatus,
   versions,
   backHref,
@@ -427,6 +441,8 @@ function DefenseWorkspaceLayout({
   activeDocumentId: string | null
   submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean; version?: number; verdict?: string }
   initialAnnotations: unknown[] | null
+  /** See DefenseDocumentWorkspaceProps.initialOwnAnnotations. */
+  initialOwnAnnotations?: unknown[] | null
   draftStatus: 'DRAFT' | 'COMMITTED' | null
   versions?: StudentVersionListItem[]
   backHref?: string
@@ -468,6 +484,9 @@ function DefenseWorkspaceLayout({
   annotationCapabilityRef.current = annotationCapability
 
   const [panel, setPanel] = useState<PanelId | null>(null)
+  // Guard for leaving with unsaved changes: the Back link and browser unload.
+  const [leavePromptOpen, setLeavePromptOpen] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
   // Author filter shared by the comments panel, the annotation layer, and
   // the hover overlay so list + document stay in sync. Null = all reviewers.
@@ -599,6 +618,65 @@ function DefenseWorkspaceLayout({
     pendingCommentIdsRef.current.clear()
   }
 
+  // Browser-level guard: covers tab close, reload and any navigation the in-app
+  // Back button cannot intercept. Browsers show their own generic wording — the
+  // returnValue assignment is what triggers the prompt.
+  useEffect(() => {
+    if (!isDirty) return
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty])
+
+  // Leaving via the Back link. Without changes it is a plain navigation, so this
+  // is only reachable from the prompt.
+  function leaveDocument() {
+    setLeavePromptOpen(false)
+    router.push(resolvedBackHref)
+  }
+
+  /**
+   * Revert to the state the document had when this page loaded, then leave.
+   *
+   * A genuine discard, not a cosmetic one: the debounced auto-save has already
+   * written the reviewer's edits to the database as a DRAFT, so simply navigating
+   * away would keep them. This writes back `initialOwnAnnotations` — this
+   * panelist's own saved set, WITHOUT other panelists' committed rows, which
+   * would otherwise be copied into their draft.
+   */
+  async function discardAndLeave() {
+    if (discarding) return
+    setDiscarding(true)
+    try {
+      const res = await saveDefenseAnnotationDraft(
+        submission.id,
+        initialOwnAnnotations ?? [],
+      )
+      if (!res.success) {
+        toast.error(res.message || 'Failed to discard changes.')
+        setDiscarding(false)
+        return
+      }
+      markClean()
+      leaveDocument()
+    } catch {
+      toast.error('Failed to discard changes. Please try again.')
+      setDiscarding(false)
+    }
+  }
+
+  /** Save from the leave prompt: run the normal confirm-and-save flow, then leave. */
+  function saveAndLeave() {
+    setLeavePromptOpen(false)
+    // The save modal's onSaved returns to read-only; the panelist can then leave
+    // from there, or simply continue. Navigating on completion would skip the
+    // read-only return the Save flow is specified to perform.
+    void openSave()
+  }
+
   async function openSave() {
     const cap = annotationCapabilityRef.current
     let data: unknown = null
@@ -675,13 +753,26 @@ function DefenseWorkspaceLayout({
       {activeDocumentId && <DisableTextSelection documentId={activeDocumentId} />}
 
       <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
-        <Link
-          href={resolvedBackHref}
-          className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
-        >
-          <ArrowLeft className="size-[14px]" strokeWidth={2} />
-          Back
-        </Link>
+        {/* With unsaved changes this becomes a button, not a link: navigating away
+            must not skip the prompt. Identical styling so nothing shifts. */}
+        {isDirty ? (
+          <button
+            type="button"
+            onClick={() => setLeavePromptOpen(true)}
+            className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
+          >
+            <ArrowLeft className="size-[14px]" strokeWidth={2} />
+            Back
+          </button>
+        ) : (
+          <Link
+            href={resolvedBackHref}
+            className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
+          >
+            <ArrowLeft className="size-[14px]" strokeWidth={2} />
+            Back
+          </Link>
+        )}
 
         <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
 
@@ -994,6 +1085,18 @@ function DefenseWorkspaceLayout({
             // Ensure the resubmission tab's server data is fresh (revalidated 'defense' tag)
             setTimeout(() => router.refresh(), 100)
           }}
+        />
+      )}
+
+      {/* Leaving with unsaved changes. Discard is a real revert, not a dismissal:
+          the debounced auto-save already persisted the reviewer's edits, so
+          navigating away without this would keep them. */}
+      {leavePromptOpen && (
+        <UnsavedChangesModal
+          isOpen={leavePromptOpen}
+          onSave={saveAndLeave}
+          onDiscard={() => void discardAndLeave()}
+          onClose={() => setLeavePromptOpen(false)}
         />
       )}
     </div>

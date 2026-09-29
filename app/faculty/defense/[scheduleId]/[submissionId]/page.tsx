@@ -63,6 +63,15 @@ export default async function DefensePanelistWorkspacePage({
       ? annotations.data
       : []
 
+  // This panelist's own saved annotations, WITHOUT other panelists' committed
+  // rows. Used to revert on discard, so the document returns to the state it was
+  // in when the page loaded.
+  const initialOwnAnnotations = Array.isArray(
+    (annotations as { ownData?: unknown })?.ownData,
+  )
+    ? (annotations as { ownData: unknown[] }).ownData
+    : []
+
   const chapterLabel =
     detail.type === 'FINAL'
       ? 'Final Defense'
@@ -144,6 +153,7 @@ export default async function DefensePanelistWorkspacePage({
       <DefenseFinalizedWorkspaceView
         submission={meta}
         initialAnnotations={initialAnnotations as unknown[]}
+        initialOwnAnnotations={initialOwnAnnotations as unknown[]}
         isSuperseded={!detail.isCurrent || isHistory}
         backHref={backHref}
         scheduleId={detail.scheduleId}
@@ -157,6 +167,7 @@ export default async function DefensePanelistWorkspacePage({
       blobUrl={detail.blobUrl}
       submission={meta}
       initialAnnotations={initialAnnotations as unknown[]}
+      initialOwnAnnotations={initialOwnAnnotations as unknown[]}
       draftStatus={draftStatus}
       backHref={backHref}
       scheduleId={detail.scheduleId}

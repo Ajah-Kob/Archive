@@ -31,6 +31,12 @@ export interface DefenseFinalizedWorkspaceViewProps {
   /** Committed annotations (serialized AnnotationTransferItem[] JSON). */
   initialAnnotations: unknown[] | null
   /**
+   * This panelist's own saved annotations, excluding other panelists' committed
+   * rows. Needed by the editing workspace's Discard, which reverts to it.
+   * See DefenseDocumentWorkspaceProps.initialOwnAnnotations.
+   */
+  initialOwnAnnotations?: unknown[] | null
+  /**
    * True when this tab opens a SUPERSEDED (soft-deleted) version rather than
    * the current submission — the banner wording adapts.
    */
@@ -222,6 +228,7 @@ function AnnotationHydrator({
 export function DefenseFinalizedWorkspaceView({
   submission,
   initialAnnotations,
+  initialOwnAnnotations = null,
   isSuperseded = false,
   backHref,
   scheduleId,
@@ -397,6 +404,7 @@ export function DefenseFinalizedWorkspaceView({
         initialAnnotations={initialAnnotations as unknown[]}
         draftStatus={draftStatus}
         backHref={resolvedBackHref}
+        initialOwnAnnotations={initialOwnAnnotations}
         scheduleId={scheduleId ?? submission.scheduleId}
         // Return to this component's read-only state. Without it the only way
         // out of annotation mode was the Back link, which navigates away.

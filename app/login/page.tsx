@@ -6,9 +6,6 @@ import { RedirectIfAuthed } from '@/components/auth/RedirectIfAuthed'
 export default function Login() {
   return (
     <AuthSplitLayout
-      heading1="Where Capstone"
-      heading2="Work Comes Together."
-      subtext="ARCHIVE unifies submission, review, and milestone tracking in one organized platform — for students and faculty alike."
       footer={
         <AuthCardFooter
           text="Don't have an account?"

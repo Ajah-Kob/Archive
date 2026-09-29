@@ -78,7 +78,7 @@ export default function FormResetPassword({
   // if no token and email return:
   if (!email && !token) {
     return (
-      <div className="w-full max-w-[420px] p-6 md:p-8 rounded-3xl bg-[#ffffff] shadow-[0px_4px_24px_0px_rgba(0,0,0,0.03),0px_20px_60px_-4px_rgba(112,125,255,0.16),0px_0px_0px_1px_rgba(112,125,255,0.06)] flex flex-col gap-5">
+      <div className="w-full flex flex-col gap-5">
         <div className="text-left flex flex-col gap-2.5">
           <h2 className="text-[#0F0E2E] text-[24px] font-sora non-italic font-bold leading-normal">
             Invalid reset link
@@ -89,7 +89,7 @@ export default function FormResetPassword({
         </div>
         <Link
           href="/login"
-          className="self-stretch h-9 px-3.5 py-3.5 bg-gradient-to-r from-indigo-400 via-violet-400 via-[57%] to-red-400 to-[140%] rounded-md shadow-[0px_2px_8px_0px_rgba(0,0,0,0.08),0px_4px_22px_0px_rgba(112,125,255,0.27)] inline-flex justify-center items-center transition-all hover:opacity-95"
+          className="self-stretch h-[38px] px-3.5 bg-gradient-to-r from-[#707dff] from-[0%] via-[#a178cd] via-[35%] to-[#fe6f6f] to-[150%] rounded-[7px] shadow-[0px_2px_8px_0px_rgba(0,0,0,0.08),0px_4px_22px_0px_rgba(112,125,255,0.27)] inline-flex justify-center items-center transition-all hover:opacity-95"
         >
           <span className="text-center justify-start text-white text-sm font-semibold leading-5 tracking-tight">
             Go back to Login

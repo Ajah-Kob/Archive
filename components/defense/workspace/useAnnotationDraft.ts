@@ -6,7 +6,10 @@ import { useAnnotation } from '@embedpdf/plugin-annotation/react'
 import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { deserializeAnnotations, serializeAnnotations } from '@/lib/annotations-serializer'
 import { saveDefenseAnnotationDraft } from '@/lib/actions/defense-annotations'
-import { isReviewAnnotation } from '@/components/defense/workspace/review-annotations'
+import {
+  isReviewAnnotation,
+  fingerprintAnnotations,
+} from '@/components/defense/workspace/review-annotations'
 
 /** Debounce window after the last committed annotation change (ms). */
 const DEBOUNCE_MS = 1500
@@ -59,6 +62,15 @@ export interface UseAnnotationDraftOptions {
   enabled?: boolean
 }
 
+/** Fingerprint of the server-supplied annotations — i.e. the last saved state. */
+function savedStateFingerprint(items: AnnotationTransferItem[] | null | undefined): string {
+  return fingerprintAnnotations(
+    ((items ?? []) as unknown as { annotation?: Record<string, unknown> }[])
+      .map((i) => i.annotation)
+      .filter((a): a is Record<string, unknown> => !!a),
+  )
+}
+
 /**
  * Debounced auto-save for the adviser review workspace.
  *
@@ -78,14 +90,19 @@ export function useAnnotationDraft({
 }: UseAnnotationDraftOptions): {
   status: AnnotationDraftStatus
   /**
-   * True once the reviewer has changed an annotation since this document was
-   * hydrated — created, edited, moved, or removed. Hydration does NOT count as
-   * a change, so a freshly opened document is clean and a Save button gated on
-   * this starts disabled, per the save-button-state rules.
+   * True when the CURRENT annotation state differs from the LAST SAVED state.
    *
-   * Derived from the same event stream as auto-save, so it tracks exactly the
-   * mutations that are persisted: committed events, minus the `create` events
-   * the import re-emits for already-saved annotations.
+   * A state comparison, not an event flag. That distinction is the whole point:
+   * an event flag reports a change for a delete-and-restore round trip and
+   * misses nothing else, whereas the requirement is "current ≠ last saved".
+   * Comparing states is what makes deleting the LAST annotation count as a
+   * change — the current set is then empty, which differs from the saved set —
+   * and what makes an edit that is undone stop counting.
+   *
+   * The baseline is the server-supplied initialAnnotations, i.e. what was last
+   * persisted, and markClean() moves it forward to the current state after a
+   * save. Both sides run through the same fingerprint so incidental shape
+   * differences between stored and live annotation objects cannot register.
    */
   isDirty: boolean
   /** Call after a successful save to make the document clean again. */
@@ -101,19 +118,53 @@ export function useAnnotationDraft({
 
   const [ready, setReady] = useState(false)
   const [status, setStatus] = useState<AnnotationDraftStatus>('idle')
-  const [isDirty, setIsDirty] = useState(false)
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hydratedRef = useRef(false)
   const importedIdsRef = useRef<Set<string>>(new Set())
+  // Fingerprint of the last saved state, and of the current state. Kept as state
+  // rather than refs because isDirty is read during render, and reading a ref
+  // there is exactly what react-hooks/refs flags. A document is clean on open
+  // because the store is about to hold exactly what the server sent.
+  const [baselinePrint, setBaselinePrint] = useState<string>(() =>
+    savedStateFingerprint(initialAnnotations),
+  )
+  const [currentPrint, setCurrentPrint] = useState<string | null>(null)
+
+  const computeCurrent = useCallback((): string | null => {
+    const scope = providesRef.current
+    if (!scope) return null
+    try {
+      const state = scope.getState() as unknown as {
+        byUid?: Record<string, { object?: Record<string, unknown> }>
+      }
+      const objects: Record<string, unknown>[] = []
+      for (const tracked of Object.values(state.byUid ?? {})) {
+        if (tracked?.object) objects.push(tracked.object)
+      }
+      return fingerprintAnnotations(objects, excludeIdsRef?.current)
+    } catch {
+      return null
+    }
+  }, [excludeIdsRef])
+
+  const isDirty = currentPrint !== null && currentPrint !== baselinePrint
+
+  const markClean = useCallback(() => {
+    // After a save the current state IS the last saved state. If nothing had
+    // changed there is nothing to move the baseline forward to, so keep it.
+    setBaselinePrint((prev) => (currentPrint === null ? prev : currentPrint))
+    setCurrentPrint(null)
+  }, [currentPrint])
 
   // Reset per-document state when the active document changes.
   useEffect(() => {
     hydratedRef.current = false
     importedIdsRef.current.clear()
     setStatus('idle')
-    setIsDirty(false)
-  }, [documentId])
+    setCurrentPrint(null)
+    setBaselinePrint(savedStateFingerprint(initialAnnotations))
+  }, [documentId, initialAnnotations])
 
   // Flip `ready` once the annotation scope becomes available. The scope object
   // is recreated each render, so this effect runs often but only sets state once.
@@ -239,9 +290,11 @@ export function useAnnotationDraft({
       // persisted — re-saving would flip a COMMITTED row back to DRAFT.
       if (event.type === 'create' && importedIdsRef.current.has(event.annotation.id)) return
 
-      // Past every guard, so this is a real reviewer change: hydration
-      // re-emissions and uncommitted (drag-in-progress) events never reach here.
-      setIsDirty(true)
+      // Recompute from the store rather than raising a flag. Only committed
+      // events reach here, so a mid-drag preview never flickers the Save button;
+      // the drop emits a committed event, and because the comparison is against
+      // the saved state a drag that ends where it started leaves Save disabled.
+      setCurrentPrint(computeCurrent())
 
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(flushSave, DEBOUNCE_MS)
@@ -254,11 +307,11 @@ export function useAnnotationDraft({
         timerRef.current = null
       }
     }
-  }, [enabled, ready, documentId, submissionId])
+  }, [enabled, ready, documentId, submissionId, computeCurrent])
 
   return {
     status,
     isDirty,
-    markClean: useCallback(() => setIsDirty(false), []),
+    markClean,
   }
 }

@@ -594,7 +594,11 @@ function DefenseWorkspaceLayout({
           const reviewItems = items.filter((item) =>
             isReviewAnnotation(item.annotation),
           )
-          if (reviewItems.length === 0) return
+          // An empty review set is a MEANINGFUL result, not a failure: the
+          // reviewer deleted their last annotation and that deletion has to
+          // persist. This used to bail out and leave `data` null, which handed
+          // the confirmation modal nothing to save — so deleting every
+          // annotation could never be committed. Serialize the empty list.
           const serialized = serializeAnnotations(reviewItems)
           data = serialized
           summary = summarizeAnnotations(serialized)

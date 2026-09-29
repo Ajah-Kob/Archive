@@ -103,13 +103,19 @@ function DefenseSaveConfirmHeader() {
 }
 
 function DefenseSaveConfirmSummary() {
-  const { annotationSummary, totalCount } = useDefenseSaveConfirm()
+  const { annotationSummary, totalCount, hasAnnotations } = useDefenseSaveConfirm()
   return (
     <div className="flex flex-col gap-[10px]">
       <SectionHeading>Annotation Summary</SectionHeading>
+      {/* totalCount 0 here means the reviewer removed their last annotation —
+          the modal is only reachable when something changed, and the only way
+          to reach an empty set is a deletion. Say so, rather than claiming no
+          annotations were ever made. */}
       {totalCount === 0 ? (
         <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#9ea8c6]">
-          No annotations were made on this document.
+          {hasAnnotations
+            ? 'No annotations remain on this document.'
+            : 'All annotations will be removed from this document.'}
         </p>
       ) : (
         <div className="border border-[#eceef8] rounded-[9px] divide-y divide-[#f4f5fc]">
@@ -155,7 +161,7 @@ function DefenseSaveConfirmBox() {
 }
 
 function DefenseSaveConfirmFooter() {
-  const { busy, hasAnnotations, onClose, confirm } = useDefenseSaveConfirm()
+  const { busy, onClose, confirm } = useDefenseSaveConfirm()
   return (
     <div className="flex items-center justify-end gap-[8px] px-6 py-4 border-t border-[#eceef8] bg-[#fafbff] rounded-b-[16px]">
       <button
@@ -169,7 +175,7 @@ function DefenseSaveConfirmFooter() {
       <button
         type="button"
         onClick={confirm}
-        disabled={busy || !hasAnnotations}
+        disabled={busy}
         className="flex items-center justify-center gap-[6px] h-[36px] px-[16px] rounded-[9px] bg-[#707dff] text-white font-sans font-bold text-[12px] hover:bg-[#5565ff] transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
       >
         {busy ? (

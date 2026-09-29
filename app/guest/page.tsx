@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function GuestHomePage() {
   return (
-    <div className="h-full flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="h-full flex flex-col items-center justify-center relative overflow-y-auto overflow-x-hidden">
       <PageLabel label="Join Archive" />
       <DecorativeBackground />
       <div className="relative flex flex-col items-center gap-[30px]">

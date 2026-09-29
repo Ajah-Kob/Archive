@@ -29,8 +29,8 @@ export default function GuestHomeLoading() {
         </div>
 
         {/* Cards skeleton */}
-        <div className="flex items-center h-fit w-fit gap-[20px]">
-          <div className="flex flex-col gap-[20px] bg-white rounded-[14px] shadow-[0px_2px_12px_rgba(112,125,255,0.06),0px_1px_3px_rgba(0,0,0,0.04)] p-[30px] w-[270px]">
+        <div className="flex flex-col sm:flex-row items-center h-fit w-fit gap-[20px]">
+          <div className="flex flex-col gap-[20px] bg-white rounded-[14px] shadow-[0px_2px_12px_rgba(112,125,255,0.06),0px_1px_3px_rgba(0,0,0,0.04)] p-[30px] w-full sm:w-[270px]">
             <div className="size-[48px] rounded-[13px] bg-[#fee2e2] animate-pulse" />
             <div className="flex flex-col gap-[10px]">
               <div className="h-[18px] w-[130px] rounded bg-[#e0e3f5] animate-pulse" />
@@ -40,7 +40,7 @@ export default function GuestHomeLoading() {
             <div className="h-[38px] w-full rounded-[10px] bg-gradient-to-br from-red-300 to-red-400 animate-pulse" />
           </div>
 
-          <div className="flex flex-col gap-[20px] bg-white rounded-[14px] shadow-[0px_2px_12px_rgba(112,125,255,0.06),0px_1px_3px_rgba(0,0,0,0.04)] p-[30px] w-[270px]">
+          <div className="flex flex-col gap-[20px] bg-white rounded-[14px] shadow-[0px_2px_12px_rgba(112,125,255,0.06),0px_1px_3px_rgba(0,0,0,0.04)] p-[30px] w-full sm:w-[270px]">
             <div className="size-[48px] rounded-[13px] bg-[#e0e5ff] animate-pulse" />
             <div className="flex flex-col gap-[10px]">
               <div className="h-[18px] w-[130px] rounded bg-[#e0e3f5] animate-pulse" />

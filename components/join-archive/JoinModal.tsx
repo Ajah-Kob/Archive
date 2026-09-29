@@ -90,8 +90,8 @@ function JoinModalProvider({
 
 function JoinModalFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
-      <div className="relative bg-white border border-[#eceef8] rounded-[16px] w-[420px] p-[29px] shadow-[0px_24px_64px_0px_rgba(16,20,58,0.16),0px_4px_16px_0px_rgba(0,0,0,0.06)] flex flex-col items-start">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
+      <div className="relative bg-white border border-[#eceef8] rounded-[16px] w-[420px] max-w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-[29px] shadow-[0px_24px_64px_0px_rgba(16,20,58,0.16),0px_4px_16px_0px_rgba(0,0,0,0.06)] flex flex-col items-start">
         {children}
       </div>
     </div>
@@ -182,14 +182,14 @@ function JoinModalFooter({
   onCancel: () => void
 }) {
   return (
-    <div className="flex gap-[10px] items-start pt-[20px] w-full">
+    <div className="flex flex-col sm:flex-row gap-[10px] items-stretch sm:items-start pt-[20px] w-full">
       <button
-        className="flex-1 bg-white border border-[#dddff0] rounded-[9px] py-[11px] text-center font-semibold text-[13.5px] text-[#5a6382] cursor-pointer"
+        className="flex-1 min-w-0 bg-white border border-[#dddff0] rounded-[9px] py-[11px] text-center font-semibold text-[13.5px] text-[#5a6382] cursor-pointer"
         onClick={onCancel}
       >
         Cancel
       </button>
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 min-w-0">{children}</div>
     </div>
   )
 }

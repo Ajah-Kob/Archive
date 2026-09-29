@@ -41,7 +41,7 @@ export default function JoinArchiveContent() {
     <>
       <WelcomeBanner />
       <WelcomeHeading />
-      <div className="flex items-center h-fit w-fit gap-[20px]">
+      <div className="flex flex-col sm:flex-row items-center h-fit w-fit gap-[20px]">
         <JoinRoleCard
           icon={GraduationCap}
           label="Join as Student"

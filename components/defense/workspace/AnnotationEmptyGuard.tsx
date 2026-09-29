@@ -14,9 +14,9 @@ interface AnnotationEmptyGuardProps {
  *
  * The freeText editor commits its contents on blur — if the user clears the
  * text and clicks away, the annotation is left with empty `contents` and would
- * otherwise be auto-saved as an empty annotation. This guard watches the
- * annotation state and removes such annotations immediately (before the
- * debounced auto-save can persist them).
+ * otherwise persist as a meaningless empty annotation on the next explicit
+ * Save (and count as a change for dirty tracking). This guard watches the
+ * annotation state and removes such annotations immediately.
  *
  * It is safe while editing: the store only ever sees empty contents AFTER the
  * editor blurs (the contentEditable is local until then), and the default

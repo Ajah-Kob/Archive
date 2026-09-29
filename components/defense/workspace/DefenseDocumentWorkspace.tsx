@@ -458,7 +458,6 @@ function DefenseWorkspaceLayout({
 
   const pendingCommentIdsRef = useRef<Set<string>>(new Set())
   const { isDirty, markClean } = useAnnotationDraft({
-    submissionId: submission.id,
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
     excludeIdsRef: pendingCommentIdsRef,
@@ -631,11 +630,12 @@ function DefenseWorkspaceLayout({
   /**
    * Revert to the state the document had when this page loaded, then leave.
    *
-   * A genuine discard, not a cosmetic one: the debounced auto-save has already
-   * written the reviewer's edits to the database as a DRAFT, so simply navigating
-   * away would keep them. This writes back `initialOwnAnnotations` — this
+   * A genuine discard, not a dismissal. Anything already saved — whether from
+   * an earlier visit or an explicit Save earlier in this session — stays saved
+   * unless it is written back, so this restores `initialOwnAnnotations`: this
    * panelist's own saved set, WITHOUT other panelists' committed rows, which
-   * would otherwise be copied into their draft.
+   * would otherwise be copied into their draft. Net-new work that was never
+   * saved simply vanishes with the unmount.
    */
   async function discardAndLeave() {
     if (discarding) return
@@ -1101,8 +1101,7 @@ function DefenseWorkspaceLayout({
       )}
 
       {/* Leaving with unsaved changes. Discard is a real revert, not a dismissal:
-          the debounced auto-save already persisted the reviewer's edits, so
-          navigating away without this would keep them. */}
+          anything already saved is restored from the panelist's own loaded set. */}
       {leavePromptOpen && (
         <UnsavedChangesModal
           isOpen={leavePromptOpen}

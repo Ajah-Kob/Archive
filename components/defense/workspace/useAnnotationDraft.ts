@@ -4,17 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useAnnotation } from '@embedpdf/plugin-annotation/react'
 import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
-import { deserializeAnnotations, serializeAnnotations } from '@/lib/annotations-serializer'
-import { saveDefenseAnnotationDraft } from '@/lib/actions/defense-annotations'
-import {
-  isReviewAnnotation,
-  fingerprintAnnotations,
-} from '@/components/defense/workspace/review-annotations'
-
-/** Debounce window after the last committed annotation change (ms). */
-const DEBOUNCE_MS = 1500
-
-export type AnnotationDraftStatus = 'saving' | 'saved' | 'idle'
+import { deserializeAnnotations } from '@/lib/annotations-serializer'
+import { fingerprintAnnotations } from '@/components/defense/workspace/review-annotations'
 
 /**
  * Removes duplicate annotation items by id, keeping the FIRST occurrence.
@@ -45,19 +36,21 @@ function dedupeAnnotations(
 }
 
 export interface UseAnnotationDraftOptions {
-  submissionId: number
   documentId: string
   /** Serialized AnnotationTransferItem[] from getSubmissionAnnotations, or null. */
   initialAnnotations: AnnotationTransferItem[] | null
   /**
-   * Annotation ids to exclude from auto-save — e.g. freshly created
+   * Annotation ids to exclude from change detection — e.g. freshly created
    * highlight/strikeout annotations whose comment has not been submitted yet.
-   * Pending annotations are never persisted until the user saves a comment.
+   * Pending annotations are never persisted until the user saves a comment, so
+   * they must not count as changes either: a bare highlight must not enable a
+   * Save that would persist nothing.
    */
   excludeIdsRef?: RefObject<Set<string>>
   /**
-   * When false (student read-only mode) only auto-save is disabled. Hydration
-   * still runs — saved reviewer annotations must render for the student too.
+   * When false (student read-only mode) change tracking is disabled.
+   * Hydration still runs — saved reviewer annotations must render for the
+   * student too.
    */
   enabled?: boolean
 }
@@ -72,23 +65,24 @@ function savedStateFingerprint(items: AnnotationTransferItem[] | null | undefine
 }
 
 /**
- * Debounced auto-save for the adviser review workspace.
+ * Hydration plus change tracking for the adviser review workspace.
  *
- * Subscribes to committed annotation events (create/update/delete) and, ~1.5s
- * after the last change, exports the annotations, base64-serializes stamp
- * data, and upserts them as a DRAFT via saveAnnotationDraft. Saved annotations
- * are hydrated back into the viewer on mount via importAnnotations.
+ * Saved annotations are hydrated back into the viewer on mount via
+ * importAnnotations, and committed annotation events (create/update/delete)
+ * recompute a fingerprint of the current state for comparison against the last
+ * saved state. Nothing here writes to the database: annotations persist only
+ * through the explicit Save flow (the toolbar Save button, Save-and-leave,
+ * Discard-and-leave), which export and call saveDefenseAnnotationDraft
+ * directly.
  *
  * Must be rendered inside the EmbedPDF tree (uses useAnnotation).
  */
 export function useAnnotationDraft({
-  submissionId,
   documentId,
   initialAnnotations,
   excludeIdsRef,
   enabled = true,
 }: UseAnnotationDraftOptions): {
-  status: AnnotationDraftStatus
   /**
    * True when the CURRENT annotation state differs from the LAST SAVED state.
    *
@@ -112,14 +106,12 @@ export function useAnnotationDraft({
 
   // useAnnotation rebuilds the per-document scope on every render, so keep the
   // latest scope in a ref and gate effects on stable signals — depending on the
-  // scope object directly would tear down the debounce timer on every render.
+  // scope object directly would resubscribe on every render.
   const providesRef = useRef(provides)
   providesRef.current = provides
 
   const [ready, setReady] = useState(false)
-  const [status, setStatus] = useState<AnnotationDraftStatus>('idle')
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hydratedRef = useRef(false)
   const importedIdsRef = useRef<Set<string>>(new Set())
   // Fingerprint of the last saved state, and of the current state. Kept as state
@@ -161,7 +153,6 @@ export function useAnnotationDraft({
   useEffect(() => {
     hydratedRef.current = false
     importedIdsRef.current.clear()
-    setStatus('idle')
     setCurrentPrint(null)
     setBaselinePrint(savedStateFingerprint(initialAnnotations))
   }, [documentId, initialAnnotations])
@@ -180,8 +171,8 @@ export function useAnnotationDraft({
   // annotations that are NOT already in the store.
   //
   // Runs in BOTH modes: hydration is a read — students need the reviewer's
-  // committed annotations rendered just as much as the adviser does. Only
-  // auto-save (below) is gated by `enabled`.
+  // committed annotations rendered just as much as the adviser does. Only the
+  // change-tracking subscription below is gated by `enabled`.
   useEffect(() => {
     if (!provides || hydratedRef.current) return
 
@@ -221,73 +212,24 @@ export function useAnnotationDraft({
     }
   }, [provides, initialAnnotations, documentId])
 
-  // Debounced auto-save: exportAnnotations → serializeAnnotations → saveAnnotationDraft.
+  // Change tracking only. This effect used to also debounce an auto-save that
+  // wrote a DRAFT ~1.5s after every change; that is gone on purpose. Annotations
+  // persist solely through the explicit Save flow (toolbar Save, Save-and-leave,
+  // Discard-and-leave), which export and call saveDefenseAnnotationDraft
+  // directly. Crash or kill before an explicit save loses the work in flight —
+  // that is the accepted cost of explicit-save semantics, not an oversight.
   useEffect(() => {
     if (!enabled || !ready) return
     const scope = providesRef.current
     if (!scope) return
 
-    const flushSave = () => {
-      setStatus('saving')
-      scope.exportAnnotations().wait(
-        (items) => {
-          // Nothing to persist — skip the server call entirely.
-          if (items.length === 0) {
-            setStatus('idle')
-            return
-          }
-          // Native document annotations (hyperlinks are /Link annotations,
-          // Word exports add squares/lines…) live in the same store but are
-          // NOT reviewer feedback — persisting them would make a first-time
-          // submission "contain comments". Keep only the review tools.
-          const reviewItems = items.filter((item) =>
-            isReviewAnnotation(item.annotation),
-          )
-          if (reviewItems.length === 0) {
-            setStatus('idle')
-            return
-          }
-          // Dedupe before persisting so a store that accumulated duplicates
-          // (e.g. from a hot-reload remount) heals itself on the next save.
-          const unique = dedupeAnnotations(reviewItems)
-          if (unique.length === 0) {
-            setStatus('idle')
-            return
-          }
-          // Drop pending annotations (freshly created, no comment yet) so an
-          // empty highlight is never persisted. They are included only after a
-          // comment is saved (removed from the exclude set) or removed entirely
-          // when canceled (deleted from the store).
-          const excluded = excludeIdsRef?.current
-          const filtered =
-            excluded && excluded.size > 0
-              ? unique.filter((item) => {
-                  const id = (item.annotation as { id?: string } | null)?.id
-                  return !id || !excluded.has(id)
-                })
-              : unique
-          if (filtered.length === 0) {
-            setStatus('idle')
-            return
-          }
-          const data = serializeAnnotations(filtered)
-          void saveDefenseAnnotationDraft(submissionId, data)
-            .then((result) => setStatus(result.success ? 'saved' : 'idle'))
-            .catch(() => setStatus('idle'))
-        },
-        (error) => {
-          console.error('[useAnnotationDraft] exportAnnotations failed:', error)
-          setStatus('idle')
-        },
-      )
-    }
-
     const unsub = scope.onAnnotationEvent((event) => {
       if (event.type === 'loaded') return
       if (!event.committed) return
       // The initial import commits the saved annotations to the engine, which
-      // re-emits committed `create` events for them. Those are already
-      // persisted — re-saving would flip a COMMITTED row back to DRAFT.
+      // re-emits committed `create` events for them. Those match the baseline
+      // by construction, so recomputing on them is a harmless no-op rather
+      // than a false dirty — but skip them anyway to avoid pointless renders.
       if (event.type === 'create' && importedIdsRef.current.has(event.annotation.id)) return
 
       // Recompute from the store rather than raising a flag. Only committed
@@ -295,22 +237,14 @@ export function useAnnotationDraft({
       // the drop emits a committed event, and because the comparison is against
       // the saved state a drag that ends where it started leaves Save disabled.
       setCurrentPrint(computeCurrent())
-
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(flushSave, DEBOUNCE_MS)
     })
 
     return () => {
       unsub()
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
     }
-  }, [enabled, ready, documentId, submissionId, computeCurrent])
+  }, [enabled, ready, documentId, computeCurrent])
 
   return {
-    status,
     isDirty,
     markClean,
   }

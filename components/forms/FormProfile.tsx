@@ -359,8 +359,10 @@ export default function FormProfile({
           defaultValue="false"
         />
 
-        {/* Identity header */}
-        <div className="flex items-center gap-4">
+        {/* Identity header — stacks below sm. At 96px the avatar consumed 36%
+            of a 267px content column, and since the name truncates while the
+            role pill is shrink-0, a long name collapsed to a few characters. */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex shrink-0 flex-col items-center gap-2">
             <div className="relative">
               <div className="block size-24 overflow-hidden rounded-full bg-[#f4f6ff] drop-shadow-[0_2px_2px_rgba(0,0,0,0.14)]">

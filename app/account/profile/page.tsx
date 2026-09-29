@@ -10,10 +10,12 @@ export default async function AccountProfilePage() {
   if (!me) redirect('/login')
 
   return (
-    <section className="min-h-full flex flex-col pt-[30px] px-[30px] pb-[30px]">
+    <section className="min-h-full flex flex-col pt-[30px] px-4 sm:px-[30px] pb-[30px]">
       <PageLabel label="Profile" />
 
-      <div className="flex flex-1 items-center justify-center py-6">
+      {/* Scrolls rather than centres-and-clips: the card is ~420px tall, so a
+          landscape phone in the old overflow-hidden chain lost the Save row. */}
+      <div className="flex flex-1 items-center justify-center py-6 overflow-y-auto">
         <FormProfile m={me} className="w-full max-w-xl" />
       </div>
     </section>

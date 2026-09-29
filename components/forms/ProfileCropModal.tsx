@@ -4,12 +4,35 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, X, ZoomIn } from 'lucide-react'
 
-// Crop workspace geometry (display px).
-const AREA = 320
-const CIRCLE = 200
+// Crop workspace geometry. AREA and CIRCLE are defaults only — both are
+// measured from the DOM at runtime (see `useElementSize`), because the modal
+// is capped by the viewport and the previous hard-coded 320 meant the crop math
+// ran against a 320px coordinate space inside a box that was actually narrower.
+const DEFAULT_AREA = 320
+const CIRCLE_RATIO = 0.625
 const MIN_ZOOM = 1
 const MAX_ZOOM = 3
 const OUTPUT_SIZE = 512
+
+/** Tracks an element's rendered box so layout-driven math can follow CSS. */
+function useElementSize<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null)
+  const [size, setSize] = useState(0)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const measure = () => setSize(el.getBoundingClientRect().width)
+    measure()
+
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  return [ref, size] as const
+}
 
 interface LoadedImage {
   source: ImageBitmap | HTMLImageElement
@@ -64,6 +87,11 @@ export function ProfileCropModal({
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null)
+  const [areaRef, measuredArea] = useElementSize<HTMLDivElement>()
+
+  // Fall back to the default until the first measurement lands, then track CSS.
+  const AREA = measuredArea || DEFAULT_AREA
+  const CIRCLE = AREA * CIRCLE_RATIO
 
   useEffect(() => {
     let cancelled = false
@@ -102,7 +130,7 @@ export function ProfileCropModal({
         y: Math.min(maxY, Math.max(-maxY, y)),
       }
     },
-    [scaledW, scaledH],
+    [scaledW, scaledH, CIRCLE],
   )
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
@@ -193,7 +221,8 @@ export function ProfileCropModal({
         </div>
 
         <div
-          className={`relative mx-auto mt-[16px] size-[320px] max-w-full touch-none overflow-hidden rounded-[12px] bg-[#10133a] ${
+          ref={areaRef}
+          className={`relative mx-auto mt-[16px] w-full max-w-[320px] aspect-square touch-none overflow-hidden rounded-[12px] bg-[#10133a] ${
             dragging ? 'cursor-grabbing' : 'cursor-grab'
           }`}
           onPointerDown={handlePointerDown}

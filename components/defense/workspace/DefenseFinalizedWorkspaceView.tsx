@@ -18,6 +18,7 @@ import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
 import { StatusPill } from '@/components/defense/DefenseDocumentCard/StatusPill'
 import { deserializeAnnotations } from '@/lib/annotations-serializer'
+import { isPrivateBlobUrl, toSignedBlobPath } from '@/lib/blob'
 import type { SubmissionMeta } from '@/types/milestones'
 import { DefenseDocumentWorkspace } from '@/components/defense/workspace/DefenseDocumentWorkspace'
 import { WorkspacePanel } from '@/components/defense/workspace/WorkspacePanel'
@@ -261,13 +262,89 @@ export function DefenseFinalizedWorkspaceView({
 
   const { engine, isLoading, error } = usePdfiumEngine()
   const annotationAuthor = submission.reviewedBy ?? 'Panelist'
+
+  // Private defense blobs must be fetched through the auth-gated route
+  // /api/blob/... — never hand the raw `.private.blob.vercel-storage.com` URL to
+  // the viewer. The browser cannot fetch that URL (it needs a token), so the
+  // plugin's own fetch failed and DocumentContent reported isError, rendering
+  // "Failed to load this document." even though the route itself returned 200.
+  // This is the read-only twin of the same conversion DefenseDocumentWorkspace
+  // does; the editing path was already correct, which is why clicking Annotate
+  // made the document appear.
+  const isPrivate = isPrivateBlobUrl(submission.blobUrl)
+  const [privateObjectUrl, setPrivateObjectUrl] = useState<string | null>(null)
+  const [privateError, setPrivateError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Nothing to do for a public blob: documentUrl falls through to the stored
+    // URL at render time. Returning before any setState also keeps this file
+    // free of set-state-in-effect.
+    if (!isPrivate) return
+    let cancelled = false
+    let current: string | null = null
+    async function loadPrivate() {
+      // Drop the previous document's object URL first, so switching versions
+      // never paints the old one while the new bytes stream in.
+      setPrivateObjectUrl(null)
+      setPrivateError(null)
+      const signed = toSignedBlobPath(submission.blobUrl)
+      if (!signed) {
+        setPrivateError('Invalid document link.')
+        return
+      }
+      try {
+        const res = await fetch(signed, {
+          credentials: 'include',
+          headers: { Accept: 'application/pdf' },
+        })
+        if (cancelled) return
+        if (res.status === 401) {
+          setPrivateError('Please sign in to view this document.')
+          return
+        }
+        if (res.status === 403) {
+          setPrivateError('You do not have access to this document.')
+          return
+        }
+        if (!res.ok) {
+          setPrivateError(`Failed to load document. (signed fetch ${res.status})`)
+          return
+        }
+        const blob = await res.blob()
+        const objectUrl = URL.createObjectURL(blob)
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl)
+          return
+        }
+        current = objectUrl
+        setPrivateObjectUrl(objectUrl)
+      } catch {
+        if (!cancelled) setPrivateError('Failed to load document. Please try again.')
+      }
+    }
+    void loadPrivate()
+    return () => {
+      cancelled = true
+      if (current) URL.revokeObjectURL(current)
+    }
+  }, [isPrivate, submission.blobUrl])
+
+  // Public blob (or not yet resolved): fall back to the stored URL, which is
+  // what DocumentContent was always given.
+  const documentUrl = isPrivate ? privateObjectUrl : submission.blobUrl
+  // Derived, not stored: a private blob is in flight exactly while it has
+  // neither an object URL nor an error yet.
+  const privateStillLoading = isPrivate && !privateObjectUrl && !privateError
+
   // Read-only must fully disable drag/resize/rotate for ALL annotation tools
   // (pen/ink and freeText were still movable because the plugin defaults are draggable).
   // We mirror the student-mode overrides here and keep isDraggable false for every tool.
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url: submission.blobUrl }],
+        // Hold registration until the private fetch resolves, so the plugin is
+        // never handed a URL the browser cannot load.
+        initialDocuments: documentUrl ? [{ url: documentUrl }] : [],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),
@@ -301,7 +378,7 @@ export function DefenseFinalizedWorkspaceView({
         ],
       }),
     ],
-    [submission.blobUrl, annotationAuthor],
+    [documentUrl, annotationAuthor],
   )
 
   if (isEditing && canAnnotate) {
@@ -326,11 +403,20 @@ export function DefenseFinalizedWorkspaceView({
     )
   }
 
-  if (isLoading || !engine) {
+  if (isLoading || !engine || privateStillLoading) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
         <Loader2 className="size-6 animate-spin text-[#707dff]" />
         <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading PDF engine…</p>
+      </div>
+    )
+  }
+
+  if (isPrivate && privateError) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <TriangleAlert className="size-6 text-[#d97706]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">{privateError}</p>
       </div>
     )
   }

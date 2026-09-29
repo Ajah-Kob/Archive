@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useAnnotation } from '@embedpdf/plugin-annotation/react'
 import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
@@ -75,7 +75,22 @@ export function useAnnotationDraft({
   initialAnnotations,
   excludeIdsRef,
   enabled = true,
-}: UseAnnotationDraftOptions): { status: AnnotationDraftStatus } {
+}: UseAnnotationDraftOptions): {
+  status: AnnotationDraftStatus
+  /**
+   * True once the reviewer has changed an annotation since this document was
+   * hydrated — created, edited, moved, or removed. Hydration does NOT count as
+   * a change, so a freshly opened document is clean and a Save button gated on
+   * this starts disabled, per the save-button-state rules.
+   *
+   * Derived from the same event stream as auto-save, so it tracks exactly the
+   * mutations that are persisted: committed events, minus the `create` events
+   * the import re-emits for already-saved annotations.
+   */
+  isDirty: boolean
+  /** Call after a successful save to make the document clean again. */
+  markClean: () => void
+} {
   const { provides } = useAnnotation(documentId)
 
   // useAnnotation rebuilds the per-document scope on every render, so keep the
@@ -86,6 +101,7 @@ export function useAnnotationDraft({
 
   const [ready, setReady] = useState(false)
   const [status, setStatus] = useState<AnnotationDraftStatus>('idle')
+  const [isDirty, setIsDirty] = useState(false)
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hydratedRef = useRef(false)
@@ -96,6 +112,7 @@ export function useAnnotationDraft({
     hydratedRef.current = false
     importedIdsRef.current.clear()
     setStatus('idle')
+    setIsDirty(false)
   }, [documentId])
 
   // Flip `ready` once the annotation scope becomes available. The scope object
@@ -222,6 +239,10 @@ export function useAnnotationDraft({
       // persisted — re-saving would flip a COMMITTED row back to DRAFT.
       if (event.type === 'create' && importedIdsRef.current.has(event.annotation.id)) return
 
+      // Past every guard, so this is a real reviewer change: hydration
+      // re-emissions and uncommitted (drag-in-progress) events never reach here.
+      setIsDirty(true)
+
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(flushSave, DEBOUNCE_MS)
     })
@@ -235,5 +256,9 @@ export function useAnnotationDraft({
     }
   }, [enabled, ready, documentId, submissionId])
 
-  return { status }
+  return {
+    status,
+    isDirty,
+    markClean: useCallback(() => setIsDirty(false), []),
+  }
 }

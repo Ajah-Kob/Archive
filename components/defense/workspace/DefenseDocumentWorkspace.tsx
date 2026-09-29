@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   Check,
@@ -427,7 +428,7 @@ function DefenseWorkspaceLayout({
   const viewerRef = useRef<HTMLDivElement>(null)
 
   const pendingCommentIdsRef = useRef<Set<string>>(new Set())
-  const { status: liveDraftStatus } = useAnnotationDraft({
+  const { status: liveDraftStatus, isDirty, markClean } = useAnnotationDraft({
     submissionId: submission.id,
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
@@ -438,7 +439,8 @@ function DefenseWorkspaceLayout({
   const { state: annotationState, provides: annotationApi } = useAnnotation(
     CURRENT_DOCUMENT_ID,
   )
-  const hasAnnotations = Object.keys(annotationState.byUid).length > 0
+  // hasAnnotations is gone: the Save button is gated on isDirty (changed since
+  // hydration), not on annotations merely existing.
 
   const [seededDraftStatus] = useState<AnnotationDraftStatus>(() =>
     draftStatus === 'DRAFT' || draftStatus === 'COMMITTED' ? 'saved' : 'idle',
@@ -798,40 +800,28 @@ function DefenseWorkspaceLayout({
             editable && (
               <>
                 <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+                {/* Single Save action for the initial document: it replaces both
+                    the old "Submit annotations" and the "Done" button. Saving is
+                    the only way out of annotation mode — it persists, returns the
+                    panelist to the read-only view, and stays on this document.
+                    Gated on isDirty, not on whether annotations merely exist, so
+                    it starts disabled on a freshly opened document. */}
                 <button
                   type="button"
                   onClick={openSave}
-                  disabled={!hasAnnotations}
+                  disabled={!isDirty}
                   title={
-                    hasAnnotations
-                      ? 'Submit your annotations for this defense submission'
-                      : 'Add annotations before submitting'
+                    isDirty
+                      ? 'Save your annotation changes and return to the read-only view'
+                      : 'No unsaved changes — add, edit, move or remove an annotation to enable Save'
                   }
                   className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#707dff] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#707dff]"
                 >
-                  <Send className="size-[13px]" />
-                  Submit annotations
+                  <Check className="size-[13px]" strokeWidth={2} />
+                  Save
                 </button>
               </>
             )
-          )}
-
-          {/* Done / Exit annotation mode. Secondary styling and placed after the
-              primary submit action so "Submit annotations" stays the visually
-              dominant choice — this is a way out, not an alternative to saving. */}
-          {editable && onExitAnnotationMode && (
-            <>
-              <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
-              <button
-                type="button"
-                onClick={onExitAnnotationMode}
-                title="Exit annotation mode and return to the read-only view. Annotations you have not submitted will be discarded."
-                className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none"
-              >
-                <Check className="size-[13px]" strokeWidth={2} />
-                Done
-              </button>
-            </>
           )}
         </div>
       </header>
@@ -955,19 +945,15 @@ function DefenseWorkspaceLayout({
           annotationData={saveState.data}
           onClose={() => setSaveState(null)}
           onSaved={() => {
-            // Return to the session list. The save wrote a DRAFT, so the
-            // document does NOT finalize - reopening it from the session list
-            // keeps it editable for more annotation, and getDefenseAnnotations
-            // returns the panelist's own draft rows on reload.
-            // No router.refresh(): saveDefenseAnnotationDraft already
-            // revalidated the detail/annotation/defense tags server-side, and
-            // these routes are dynamic so the client Router Cache will not
-            // serve a stale payload.
-            if (!resolvedScheduleId) return
-            const target = isResubmission
-              ? `/faculty/defense/${resolvedScheduleId}/resubmission`
-              : `/faculty/defense/${resolvedScheduleId}/session`
-            router.push(target)
+            // Save is the single exit from annotation mode. Persist, drop the
+            // dirty flag, hand control back to the read-only view, and leave the
+            // panelist on this same document — no redirect.
+            // No router.refresh(): saveDefenseAnnotationDraft already revalidated
+            // the detail/annotation/defense tags server-side, and these routes are
+            // dynamic so the client Router Cache will not serve a stale payload.
+            markClean()
+            toast.success('Annotations saved.')
+            onExitAnnotationMode?.()
           }}
         />
       )}

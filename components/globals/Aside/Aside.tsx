@@ -12,7 +12,7 @@ export default function Aside() {
   return (
     // Sidebar container
     <aside
-      className={`hidden md:flex flex-col bg-white border-r border-[#eceef8] transition-all duration-300 ${
+      className={`hidden lg:flex flex-col bg-white border-r border-[#eceef8] transition-all duration-300 ${
         minimize ? 'w-[64px]' : 'w-[240px]'
       }`}
     >

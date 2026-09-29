@@ -10,7 +10,7 @@ export default function ButtonDrawer() {
   return (
     <button
       onClick={toggleShow}
-      className=" button button--circle md:hidden! -ml-3"
+        className=" button button--circle lg:hidden! -ml-3"
     >
       <Menu className="inline" />
     </button>

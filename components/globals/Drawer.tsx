@@ -27,7 +27,7 @@ export default function Drawer() {
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-20 bg-black/50 md:hidden transition-opacity duration-300 ${
+        className={`fixed inset-0 z-20 bg-black/50 lg:hidden transition-opacity duration-300 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={toggle}
@@ -35,7 +35,7 @@ export default function Drawer() {
 
       {/* Drawer panel — same surface as the desktop sidebar */}
       <div
-        className={`fixed top-0 left-0 h-dvh w-[240px] z-30 bg-white border-r border-[#eceef8] md:hidden flex flex-col transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-dvh w-[240px] z-30 bg-white border-r border-[#eceef8] lg:hidden flex flex-col transition-transform duration-300 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

@@ -2,13 +2,7 @@ import TopBar from '@/components/globals/TopBar'
 import Aside from '@/components/globals/Aside/Aside'
 import Drawer from '@/components/globals/Drawer'
 
-export default async function TemplateMain({
-  children,
-  padded = true,
-}: {
-  children: React.ReactNode
-  padded?: boolean
-}) {
+export default async function TemplateMain({ children }: { children: React.ReactNode }) {
   return (
     <>
       <section className="flex h-dvh">

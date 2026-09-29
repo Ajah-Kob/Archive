@@ -487,6 +487,7 @@ function DefenseWorkspaceLayout({
   // Guard for leaving with unsaved changes: the Back link and browser unload.
   const [leavePromptOpen, setLeavePromptOpen] = useState(false)
   const [discarding, setDiscarding] = useState(false)
+  const [savingLeave, setSavingLeave] = useState(false)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
   // Author filter shared by the comments panel, the annotation layer, and
   // the hover overlay so list + document stay in sync. Null = all reviewers.
@@ -668,40 +669,80 @@ function DefenseWorkspaceLayout({
     }
   }
 
-  /** Save from the leave prompt: run the normal confirm-and-save flow, then leave. */
-  function saveAndLeave() {
-    setLeavePromptOpen(false)
-    // The save modal's onSaved returns to read-only; the panelist can then leave
-    // from there, or simply continue. Navigating on completion would skip the
-    // read-only return the Save flow is specified to perform.
-    void openSave()
+  /**
+   * Export the current review annotations in the same serialized shape the save
+   * path persists. An empty review set is a MEANINGFUL result, not a failure:
+   * the reviewer deleted their last annotation and that deletion has to persist.
+   */
+  async function exportCurrentReviewAnnotations(): Promise<{
+    ok: boolean
+    data: unknown
+    summary: AnnotationSummary
+  }> {
+    const cap = annotationCapabilityRef.current
+    if (!cap) return { ok: false, data: [], summary: {} }
+    let data: unknown = []
+    let summary: AnnotationSummary = {}
+    let failed = false
+    await cap.exportAnnotations(undefined, CURRENT_DOCUMENT_ID).wait(
+      (items) => {
+        const reviewItems = items.filter((item) =>
+          isReviewAnnotation(item.annotation),
+        )
+        const serialized = serializeAnnotations(reviewItems)
+        data = serialized
+        summary = summarizeAnnotations(serialized)
+      },
+      (error) => {
+        console.error('[DefenseDocumentWorkspace] exportAnnotations failed:', error)
+        failed = true
+      },
+    )
+    if (failed) return { ok: false, data: [], summary: {} }
+    return { ok: true, data, summary }
+  }
+
+  /**
+   * Save from the leave prompt: persist the current annotations directly, then
+   * leave. This must NOT open the Submit annotations confirmation modal — the
+   * panelist already chose Save in the leave prompt.
+   */
+  async function saveAndLeave() {
+    if (savingLeave || discarding) return
+    setSavingLeave(true)
+    try {
+      const exported = await exportCurrentReviewAnnotations()
+      if (!exported.ok) {
+        toast.error('Failed to read annotations. Please try again.')
+        setSavingLeave(false)
+        return
+      }
+      const payload = (exported.data ?? []) as unknown[]
+      const res = await saveDefenseAnnotationDraft(submission.id, payload)
+      if (!res.success) {
+        toast.error(res.message || 'Failed to save annotations.')
+        setSavingLeave(false)
+        return
+      }
+      markClean()
+      onSavedAnnotations?.(payload)
+      toast.success(res.message || 'Annotations saved.')
+      setSavingLeave(false)
+      leaveDocument()
+    } catch (error) {
+      console.error('[DefenseDocumentWorkspace] save-and-leave failed:', error)
+      toast.error('Failed to save annotations. Please try again.')
+      setSavingLeave(false)
+    }
   }
 
   async function openSave() {
-    const cap = annotationCapabilityRef.current
-    let data: unknown = null
-    let summary: AnnotationSummary = {}
-    if (cap) {
-      await cap.exportAnnotations(undefined, CURRENT_DOCUMENT_ID).wait(
-        (items) => {
-          const reviewItems = items.filter((item) =>
-            isReviewAnnotation(item.annotation),
-          )
-          // An empty review set is a MEANINGFUL result, not a failure: the
-          // reviewer deleted their last annotation and that deletion has to
-          // persist. This used to bail out and leave `data` null, which handed
-          // the confirmation modal nothing to save — so deleting every
-          // annotation could never be committed. Serialize the empty list.
-          const serialized = serializeAnnotations(reviewItems)
-          data = serialized
-          summary = summarizeAnnotations(serialized)
-        },
-        (error) => {
-          console.error('[DefenseDocumentWorkspace] exportAnnotations failed:', error)
-        },
-      )
+    const exported = await exportCurrentReviewAnnotations()
+    if (!exported.ok) {
+      toast.error('Failed to read annotations. Please try again.')
+      return
     }
-    setSaveState({ summary, data })
+    setSaveState({ summary: exported.summary, data: exported.data })
   }
 
   async function openSubmitResubmissionReview() {
@@ -1094,9 +1135,14 @@ function DefenseWorkspaceLayout({
       {leavePromptOpen && (
         <UnsavedChangesModal
           isOpen={leavePromptOpen}
-          onSave={saveAndLeave}
+          onSave={() => void saveAndLeave()}
           onDiscard={() => void discardAndLeave()}
-          onClose={() => setLeavePromptOpen(false)}
+          onClose={() => {
+            if (savingLeave || discarding) return
+            setLeavePromptOpen(false)
+          }}
+          busy={savingLeave || discarding}
+          busyLabel={savingLeave ? 'Saving...' : 'Discarding...'}
         />
       )}
     </div>

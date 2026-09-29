@@ -58,7 +58,7 @@ Every number derives from existing tables.
 | Section Overview | `Section.count({deletedAt:null})`; `coordinatorId != null`; `coordinatorId == null` |
 | Faculty Capacity | `Group.adviserId` grouped by adviser, cap = `ADVISER_CAP` (8) |
 | Section Phase Spread | `MilestoneAvailability.openedAt` per section — Capstone 2 when its key is opened |
-| Calendar | `DefenseSchedule.date`; `ArchivingSubmission` deadlines |
+| Calendar | `DefenseSchedule.date` + `CalendarEvent.startsAt` |
 | Defense Overview | `DefenseSchedule.verdict`, `.date`, `.type` |
 
 ### Bucket thresholds
@@ -95,9 +95,9 @@ Five cached reads, all `'use cache'` + `cacheTag('chair-dashboard')` +
 |---|---|
 | `getSectionOverview()` | `{ total, assigned, unassigned }` |
 | `getFacultyCapacity()` | `{ totalAdvisers, available, loaded, fullLoad, cap }` |
-| `getSectionPhaseSpread()` | `{ capstone1, capstone2, total }` |
+| `getSectionPhaseSpread()` | `{ capstone1, capstone2, total }` — a section with no Capstone 2 gate opened counts as Capstone 1 |
 | `getDefenseOverview()` | `{ forDefense, completed, outcomes, upcoming }` |
-| `getDefenseDeadlines()` | `{ date, label, kind }[]` for the calendar |
+| `getCalendarDeadlines()` | Merged, date-sorted list from `DefenseSchedule` + `CalendarEvent` |
 
 Every query filters `deletedAt: null`. Reads only — **no mutations, no writes.**
 
@@ -148,14 +148,28 @@ asserting, and they are three comparisons. Verification is:
 
 ---
 
-## 8. Open questions
+## 8. Resolved
 
 1. **Unassigned sections count** — confirmed as the third column in Section
    Overview. Shows sections with `coordinatorId == null`. The mock renders it with
    a green check icon, which reads as *good*; an unstaffed section is a problem.
-   Recommend an amber or red icon instead. Awaiting sign-off.
-2. **A section that has never opened Capstone 2** — is it Capstone 1, or a third
-   "Not started" state? Proposal: treat as Capstone 1, since the phase gate is
-   closed rather than absent.
-3. **Calendar deadline sources** — which `MilestoneAvailability` keys surface as
-   deadline dots, and where the "3 DEADLINES" rows are sourced from.
+   **Open:** recommend an amber or red icon instead. Awaiting sign-off.
+
+2. **Phase classification** — a section that never opened its Capstone 2 gate
+   counts as **Capstone 1**. The gate is closed rather than absent, so there is no
+   third bucket and no risk of a "not started" state inflating either bar.
+
+3. **Calendar sources** — **`DefenseSchedule` and `CalendarEvent` only.** The mock's
+   "Chapter 3 Submission" row is therefore illustrative, not reproducible: chapter
+   deadlines live on `Milestone`, not on either of these tables. Deadline rows are
+   built from what exists:
+
+   | Source | Row label | Marker |
+   |---|---|---|
+   | `DefenseSchedule` | `Proposal Defense` / `Final Defense` + section name | numbered day |
+   | `CalendarEvent` | `title` (already free-text) | numbered day |
+
+   `CalendarEventAudience` is not filtered — a chair sees the whole program.
+   `MilestoneAvailability` is **not** a deadline source; those are open dates, not
+   due dates.
+

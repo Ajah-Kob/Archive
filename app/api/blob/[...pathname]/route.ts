@@ -14,7 +14,8 @@ const ADMIN_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
  * This route stays outside proxy.ts (does its own getServerSession) and
  * branches by prefix:
  *   templates/* → role !== GUEST
- *   chapter/*, defense/*, archiving/* → group member | adviser | coordinator-of-section | chair/admin
+ *   chapter/*, archiving/* → group member | adviser | coordinator-of-section | chair/admin
+ *   defense/* → the above, PLUS a panelist assigned to that specific schedule
  *   archives/* → any signed-in user, any role (GUEST included)
  *   user/* (avatars) → any signed-in user
  *   invalid prefix → 404
@@ -46,6 +47,27 @@ async function isCoordinatorOfSection(userId: number, sectionId: number): Promis
     select: { id: true },
   })
   return !!sec
+}
+
+/**
+ * Whether the user is a panelist assigned to THIS schedule.
+ *
+ * `authorizeGroupAccess` cannot grant this, and the omission was a real bug: a
+ * panelist hangs off the schedule via `DefensePanelist`, not off the group as
+ * adviser or section coordinator. So a panelist who was none of the
+ * group-scoped identities was denied with a 403 and the document viewer rendered
+ * "Failed to load this document." — a panelist could not open the very document
+ * they were assigned to review.
+ *
+ * Scoped to one schedule on purpose: a panelist on schedule 1 must not thereby
+ * gain read access to schedule 2's documents, even for the same group.
+ */
+async function isPanelistOnSchedule(scheduleId: number, userId: number): Promise<boolean> {
+  const row = await prisma.defensePanelist.findFirst({
+    where: { defenseScheduleId: scheduleId, userId, deletedAt: null },
+    select: { id: true },
+  })
+  return !!row
 }
 
 async function getGroupForId(groupId: number) {
@@ -224,7 +246,11 @@ async function handleRequest(
     if (!schedule) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
-    const allowed = await authorizeGroupAccess(schedule.groupId, userId, role)
+    // A panelist assigned to this schedule may read it, in addition to the
+    // group-scoped identities below. Evaluated first so the common panelist
+    // case costs one indexed lookup.
+    const isPanelist = await isPanelistOnSchedule(scheduleId, userId)
+    const allowed = isPanelist || (await authorizeGroupAccess(schedule.groupId, userId, role))
     if (!allowed) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }

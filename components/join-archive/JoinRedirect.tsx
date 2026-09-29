@@ -26,7 +26,7 @@ export function JoinRedirect({ to }: { to: string }) {
   }, [router, to, update])
 
   return (
-    <div className="bg-[#f4f6ff] min-h-dvh flex flex-col items-center justify-center px-5 py-16">
+    <div className="bg-[#f4f6ff] min-h-svh flex flex-col items-center justify-center px-5 py-16">
       <div className="size-8 border-[3px] border-[#707dff]/30 border-t-[#707dff] rounded-full animate-spin" />
       <p className="mt-4 font-sans font-medium text-[13px] text-[#8a93b4]">
         Joining, taking you to your workspace…

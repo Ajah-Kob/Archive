@@ -9,7 +9,7 @@ export default async function Home() {
   const home = role ? roleHome(role) : '/guest'
 
   return (
-    <div className="min-h-dvh w-full bg-[#f4f6ff] flex flex-col relative overflow-hidden">
+    <div className="min-h-svh w-full bg-[#f4f6ff] flex flex-col relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-24 -right-24 size-[420px] bg-[#a5b4fc]/22 rounded-full blur-[80px]" />
         <div className="absolute -bottom-32 -left-32 size-[460px] bg-[#fe6f6f]/18 rounded-full blur-[85px]" />

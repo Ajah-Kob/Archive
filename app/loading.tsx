@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <main className="bg-primary min-h-dvh">
+    <main className="bg-primary min-h-svh">
       <section className="animate-pulse">
         <div className="container">
           <div className="flex flex-col gap-5">

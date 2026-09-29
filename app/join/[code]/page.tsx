@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 function ExpiredInvite({ message }: { message?: string }) {
   return (
-    <div className="bg-[#f4f6ff] min-h-dvh flex flex-col items-center justify-center px-5 py-16">
+    <div className="bg-[#f4f6ff] min-h-svh flex flex-col items-center justify-center px-5 py-16">
       <div className="w-full max-w-[420px] bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] p-8 flex flex-col items-center text-center gap-3">
         <div className="size-12 rounded-full bg-red-50 flex items-center justify-center">
           <AlertTriangle className="size-5 text-[#ef4444]" strokeWidth={2} />

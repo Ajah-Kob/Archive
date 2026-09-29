@@ -106,6 +106,16 @@ export interface DefenseDocumentWorkspaceProps {
    * from the server-supplied `initialAnnotations`, never from local state.
    */
   onExitAnnotationMode?: () => void
+  /**
+   * Called with the annotation set that was just saved.
+   *
+   * The parent swaps back to its read-only view on exit, and that view hydrates
+   * from the `initialAnnotations` prop it was rendered with — the server payload
+   * from when the page first loaded. After a save that prop is stale, so a
+   * deleted annotation would reappear on the document. Handing the saved set up
+   * lets the parent show what was actually persisted.
+   */
+  onSavedAnnotations?: (data: unknown) => void
 }
 
 /** Which right slide-over panel is open (if any). */
@@ -179,6 +189,7 @@ export function DefenseDocumentWorkspace({
   scheduleId,
   readOnly = false,
   onExitAnnotationMode,
+  onSavedAnnotations,
 }: DefenseDocumentWorkspaceProps) {
   const isStudent = mode === 'student'
   const editable = !isStudent && !readOnly
@@ -391,6 +402,7 @@ export function DefenseDocumentWorkspace({
             scheduleId={scheduleId}
             readOnly={readOnly}
             onExitAnnotationMode={onExitAnnotationMode}
+            onSavedAnnotations={onSavedAnnotations}
           />
         )}
       </EmbedPDF>
@@ -409,6 +421,7 @@ function DefenseWorkspaceLayout({
   scheduleId,
   readOnly = false,
   onExitAnnotationMode,
+  onSavedAnnotations,
 }: {
   mode?: DefenseWorkspaceMode
   activeDocumentId: string | null
@@ -421,6 +434,8 @@ function DefenseWorkspaceLayout({
   readOnly?: boolean
   /** See DefenseDocumentWorkspaceProps.onExitAnnotationMode. */
   onExitAnnotationMode?: () => void
+  /** See DefenseDocumentWorkspaceProps.onSavedAnnotations. */
+  onSavedAnnotations?: (data: unknown) => void
 }) {
   const isStudent = mode === 'student'
   const editable = !isStudent && !readOnly
@@ -948,14 +963,17 @@ function DefenseWorkspaceLayout({
           annotationSummary={saveState.summary}
           annotationData={saveState.data}
           onClose={() => setSaveState(null)}
-          onSaved={() => {
+          onSaved={(savedData) => {
             // Save is the single exit from annotation mode. Persist, drop the
             // dirty flag, hand control back to the read-only view, and leave the
             // panelist on this same document — no redirect.
-            // No router.refresh(): saveDefenseAnnotationDraft already revalidated
-            // the detail/annotation/defense tags server-side, and these routes are
-            // dynamic so the client Router Cache will not serve a stale payload.
             markClean()
+            // Hand the persisted set up BEFORE exiting. The read-only view
+            // hydrates from the initialAnnotations prop, which is the server
+            // payload from when the page first loaded and is stale the moment we
+            // save — without this a deleted annotation is re-imported and
+            // reappears on the document.
+            onSavedAnnotations?.(savedData)
             toast.success('Annotations saved.')
             onExitAnnotationMode?.()
           }}

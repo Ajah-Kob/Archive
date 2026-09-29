@@ -34,7 +34,15 @@ interface DefenseSaveConfirmModalProps {
   annotationSummary?: DefenseAnnotationSummary
   annotationData: unknown | null
   onClose: () => void
-  onSaved: () => void
+  /**
+   * Fired with the payload that was just persisted.
+   *
+   * The caller needs the saved set, not just a "done" signal: the panelist stays
+   * on this document and the parent swaps back to its read-only view, which
+   * otherwise re-hydrates from the server props captured when the page first
+   * rendered — putting a deleted annotation straight back on the page.
+   */
+  onSaved: (savedData: unknown) => void
 }
 
 interface DefenseSaveConfirmContextValue {
@@ -225,7 +233,7 @@ function DefenseSaveConfirmProvider({
         return
       }
       toast.success(result.message || 'Annotations saved.')
-      onSaved()
+      onSaved(payload)
       onClose()
       return
     } catch (error) {

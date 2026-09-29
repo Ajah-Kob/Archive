@@ -229,8 +229,16 @@ export function DefenseFinalizedWorkspaceView({
 }: DefenseFinalizedWorkspaceViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [showComments, setShowComments] = useState(false)
+  // Annotation set as last persisted DURING this visit. `initialAnnotations` is
+  // the server payload from when the page first rendered and never changes on a
+  // client-side toggle, so returning here from annotation mode would re-hydrate
+  // whatever the reviewer had just deleted and put it straight back on the
+  // document. Once a save happens, this wins over the prop.
+  const [savedAnnotations, setSavedAnnotations] = useState<unknown[] | null>(null)
 
-  const annotations = deserializeAnnotations(initialAnnotations ?? [])
+  const annotations = deserializeAnnotations(
+    (savedAnnotations ?? initialAnnotations ?? []) as never,
+  )
   // isInitial is the authority for "is this a resubmission". `version` is NOT
   // a valid substitute: the counter spans the group's whole submission chain, so
   // a re-defense produces a brand-new initial submission that still carries a
@@ -393,6 +401,11 @@ export function DefenseFinalizedWorkspaceView({
         // Return to this component's read-only state. Without it the only way
         // out of annotation mode was the Back link, which navigates away.
         onExitAnnotationMode={() => setIsEditing(false)}
+        // Adopt the set that was just saved, so this view does not re-hydrate
+        // the pre-save prop and resurrect deleted annotations.
+        onSavedAnnotations={(data) =>
+          setSavedAnnotations(Array.isArray(data) ? data : [])
+        }
       />
     )
   }

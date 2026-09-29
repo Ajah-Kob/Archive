@@ -81,8 +81,8 @@ export function ChairCalendarCard({
         </p>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-2 px-[20px] pb-[10px]">
-            <span className="font-['Sora',sans-serif] font-bold text-[13px] leading-[18px] tracking-[-0.1px] text-[#1e2145]">
+          <div className="flex items-center justify-between gap-2 px-[20px] pb-[12px]">
+            <span className="font-['Sora',sans-serif] font-bold text-[13.5px] leading-[19px] tracking-[-0.1px] text-[#1e2145]">
               {view.label}
             </span>
             <span className="font-sans font-bold text-[9.5px] leading-[14px] uppercase tracking-[0.9px] text-[#b0b8d4]">
@@ -91,11 +91,11 @@ export function ChairCalendarCard({
           </div>
 
           <div className="px-[14px]">
-            <div className="grid grid-cols-7 gap-y-[2px]">
+            <div className="grid grid-cols-7 gap-y-[6px]">
               {WEEKDAYS.map((d, i) => (
                 <span
                   key={`${d}-${i}`}
-                  className="text-center font-sans font-semibold text-[9.5px] leading-[14px] text-[#b0b8d4]"
+                  className="pb-[2px] text-center font-sans font-semibold text-[9.5px] leading-[14px] text-[#b0b8d4]"
                 >
                   {d}
                 </span>
@@ -118,10 +118,10 @@ export function ChairCalendarCard({
                   <span
                     key={day}
                     title={entries?.map((e) => e.label).join('\n') ?? undefined}
-                    className="relative flex h-[22px] items-center justify-center"
+                    className="relative flex h-[32px] items-center justify-center"
                   >
                     <span
-                      className={`flex size-[19px] items-center justify-center rounded-full font-sans font-medium text-[10px] leading-[14px] tabular-nums ${
+                      className={`flex size-[22px] items-center justify-center rounded-full font-sans font-medium text-[10.5px] leading-[15px] tabular-nums ${
                         isToday
                           ? 'bg-[#ef4444] font-bold text-white'
                           : count > 0
@@ -132,7 +132,7 @@ export function ChairCalendarCard({
                       {day}
                     </span>
                     {count > 0 && !isToday && (
-                      <span className="absolute -bottom-[1px] right-[3px] flex size-[12px] items-center justify-center rounded-full bg-[#707dff] font-sans font-bold text-[8px] leading-[12px] text-white">
+                      <span className="absolute -bottom-[1px] right-[2px] flex size-[13px] items-center justify-center rounded-full bg-[#707dff] font-sans font-bold text-[8.5px] leading-[13px] text-white">
                         {count}
                       </span>
                     )}
@@ -142,11 +142,11 @@ export function ChairCalendarCard({
             </div>
           </div>
 
-          <div className="mt-[12px] flex flex-col gap-[7px] border-t border-[#f0f2fa] px-[20px] pt-[12px] pb-[16px]">
+          <div className="mt-[14px] flex flex-col gap-[9px] border-t border-[#f0f2fa] px-[20px] pt-[14px] pb-[18px]">
             {view.upcoming.slice(0, LIST_LIMIT).map((d) => (
               <div key={d.id} className="flex items-center gap-[9px]">
                 <span
-                  className={`flex size-[22px] shrink-0 items-center justify-center rounded-[6px] font-sans font-bold text-[9.5px] leading-[14px] tabular-nums ${
+                  className={`flex size-[24px] shrink-0 items-center justify-center rounded-[6px] font-sans font-bold text-[10px] leading-[15px] tabular-nums ${
                     d.kind === 'DEFENSE'
                       ? 'bg-[#eef2ff] text-[#707dff]'
                       : 'bg-[#fdf2f8] text-[#db2777]'
@@ -166,7 +166,7 @@ export function ChairCalendarCard({
             ))}
 
             {view.upcoming.length > LIST_LIMIT && (
-              <p className="pl-[31px] font-sans font-medium text-[10px] leading-[15px] text-[#8a93b4]">
+              <p className="pl-[33px] font-sans font-medium text-[10px] leading-[15px] text-[#8a93b4]">
                 +{view.upcoming.length - LIST_LIMIT} more
               </p>
             )}

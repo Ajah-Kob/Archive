@@ -6,10 +6,10 @@ import { ChairCard, ChairLabel } from '@/components/chair/ChairCard'
 const DEFENSE = '/faculty/defense'
 
 const OUTCOME_ROWS = [
-  { key: 'approved', label: 'Approved', color: '#22c55e' },
-  { key: 'minorRevision', label: 'Minor Revisions', color: '#f59e0b' },
-  { key: 'majorRevision', label: 'Major Revisions', color: '#f97316' },
-  { key: 'redefense', label: 'Redefense Required', color: '#ef4444' },
+  { key: 'approved', label: 'Approved', short: 'Approved', color: '#22c55e' },
+  { key: 'minorRevision', label: 'Minor Revisions', short: 'Minor', color: '#f59e0b' },
+  { key: 'majorRevision', label: 'Major Revisions', short: 'Major', color: '#f97316' },
+  { key: 'redefense', label: 'Redefense Required', short: 'Redefense', color: '#ef4444' },
 ] as const
 
 function formatDate(date: Date): string {
@@ -36,6 +36,12 @@ export function ChairDefenseOverviewCard({
   data: DefenseOverview | null
   message?: string
 }) {
+  // Tallest column fills the plot, so the chart uses its full height even when
+  // the largest outcome is a small share of the total.
+  const maxOutcome = data
+    ? Math.max(...OUTCOME_ROWS.map((r) => data.outcomes[r.key]))
+    : 0
+
   return (
     <ChairCard icon={Shield} title="Defense Overview" href={DEFENSE}>
       {!data ? (
@@ -66,32 +72,39 @@ export function ChairDefenseOverviewCard({
                 {data.outcomes.total} total
               </span>
             </div>
-            {OUTCOME_ROWS.map((row) => {
-              const count = data.outcomes[row.key]
-              const pct =
-                data.outcomes.total > 0 ? Math.round((count / data.outcomes.total) * 100) : 0
-              return (
-                <div key={row.key} className="flex items-center gap-2">
-                  <span
-                    className="size-[6px] shrink-0 rounded-full"
-                    style={{ backgroundColor: row.color }}
-                    aria-hidden
-                  />
-                  <span className="w-[96px] shrink-0 truncate font-sans font-medium text-[11px] leading-[16px] text-[#5a6382]">
-                    {row.label}
-                  </span>
-                  <span className="flex-1 min-w-0 h-[6px] rounded-[3px] bg-[#eff1fa] overflow-hidden">
-                    <span
-                      className="block h-full rounded-[3px] transition-all"
-                      style={{ width: `${pct}%`, backgroundColor: row.color }}
-                    />
-                  </span>
-                  <span className="w-[18px] shrink-0 text-right font-sans font-semibold text-[11px] leading-[16px] text-[#1e2145] tabular-nums">
-                    {count}
-                  </span>
-                </div>
-              )
-            })}
+            {/* Columns rather than stacked progress bars: outcomes are a
+                composition of one total, and a column chart reads that at a
+                glance. The progress bars left 43% of the track empty on the
+                tallest row, so the card looked emptier than the data was.
+                Bars are scaled to the largest outcome so the tallest column
+                always fills the plot, while the "N total" readout above keeps
+                the share-of-whole honest. */}
+            <div className="grid grid-cols-4 gap-[10px]">
+              {OUTCOME_ROWS.map((row) => {
+                const count = data.outcomes[row.key]
+                const pct =
+                  maxOutcome > 0 ? Math.round((count / maxOutcome) * 100) : 0
+                return (
+                  <div key={row.key} className="flex flex-col items-center gap-[5px] min-w-0">
+                    <span className="font-['Sora',sans-serif] font-extrabold text-[15px] leading-[19px] text-[#1e2145] tabular-nums">
+                      {count}
+                    </span>
+                    <span className="flex h-[68px] w-full items-end justify-center">
+                      <span
+                        className={`block w-full max-w-[34px] rounded-t-[5px] transition-all ${count > 0 ? '' : 'opacity-0'}`}
+                        style={{
+                          height: `${Math.max(pct, count > 0 ? 6 : 0)}%`,
+                          backgroundColor: row.color,
+                        }}
+                      />
+                    </span>
+                    <span className="text-center font-sans font-medium text-[9.5px] leading-[13px] text-[#5a6382] leading-[13px]">
+                      {row.short}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           {data.upcoming.length > 0 && (

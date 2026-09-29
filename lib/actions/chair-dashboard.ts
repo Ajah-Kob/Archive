@@ -80,6 +80,24 @@ export type CalendarDeadline = {
   kind: 'DEFENSE' | 'EVENT'
 }
 
+/**
+ * A single "needs my click" row. `tone` drives colour only — every alert
+ * links to the page where the chair can act, so the card is a work queue
+ * rather than a status readout.
+ */
+export type ChairAlert = {
+  id: string
+  message: string
+  detail: string | null
+  href: string
+  tone: 'critical' | 'warning' | 'info'
+}
+
+export type AlertsSummary = {
+  alerts: ChairAlert[]
+  criticalCount: number
+}
+
 /* ── Section overview ─────────────────────────────────────────────────────── */
 
 async function getSectionOverviewData(): Promise<SectionOverview> {
@@ -325,5 +343,112 @@ export async function getCalendarDeadlines(): Promise<{
     return { success: true, payload: await getCalendarDeadlinesData() }
   } catch {
     return { success: false, payload: null, message: 'Failed to load calendar deadlines' }
+  }
+}
+
+/* ── Alerts ───────────────────────────────────────────────────────────────── */
+
+async function getAlertsData(): Promise<AlertsSummary> {
+  'use cache'
+  cacheTag(CACHE_TAG)
+  cacheLife('hours')
+
+  const [unassignedSections, advisers, pendingDefense, staleDefense, defenseSoon] =
+    await prisma.$transaction([
+      prisma.section.count({ where: { deletedAt: null, coordinatorId: null } }),
+      prisma.adviser.findMany({
+        where: { deletedAt: null },
+        select: { _count: { select: { groups: { where: { deletedAt: null } } } } },
+      }),
+      prisma.defenseSchedule.count({ where: { deletedAt: null, verdict: 'PENDING' } }),
+      prisma.defenseSchedule.count({
+        where: { deletedAt: null, verdict: 'PENDING', date: { lt: new Date() } },
+      }),
+      prisma.defenseSchedule.count({
+        where: { deletedAt: null, date: { gte: new Date(), lte: inDays(7) } },
+      }),
+    ])
+
+  // Bucketed after the fetch because the threshold is a runtime constant.
+  const atCapacity = advisers.filter((a) => a._count.groups >= ADVISER_CAP).length
+  const alerts: ChairAlert[] = []
+
+  if (unassignedSections > 0) {
+    alerts.push({
+      id: 'sections-unassigned',
+      message: plural(unassignedSections, 'Section has', 'Sections have'),
+      detail: 'no coordinator',
+      href: '/faculty/section-management',
+      tone: 'critical',
+    })
+  }
+
+  if (atCapacity > 0) {
+    alerts.push({
+      id: 'advisers-at-capacity',
+      message: plural(atCapacity, 'Adviser at', 'Advisers at'),
+      detail: `full capacity (${ADVISER_CAP} groups)`,
+      href: '/faculty/faculty-management/advisers',
+      tone: 'warning',
+    })
+  }
+
+  // A defense whose date has passed without a verdict is the one nobody is
+  // chasing, so it outranks everything else.
+  if (staleDefense > 0) {
+    alerts.push({
+      id: 'defense-stale',
+      message: plural(staleDefense, 'Defense is', 'Defenses are'),
+      detail: 'past date with no verdict',
+      href: '/faculty/defense',
+      tone: 'critical',
+    })
+  } else if (pendingDefense > 0) {
+    alerts.push({
+      id: 'defense-pending',
+      message: plural(pendingDefense, 'Defense is', 'Defenses are'),
+      detail: 'awaiting a verdict',
+      href: '/faculty/defense',
+      tone: 'info',
+    })
+  }
+
+  if (defenseSoon > 0) {
+    alerts.push({
+      id: 'defense-week',
+      message: plural(defenseSoon, 'Defense in', 'Defenses within'),
+      detail: 'the next 7 days',
+      href: '/faculty/defense?tab=upcoming',
+      tone: 'info',
+    })
+  }
+
+  const criticalCount = alerts.filter((a) => a.tone === 'critical').length
+
+  return { alerts, criticalCount }
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`
+}
+
+function inDays(days: number): Date {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d
+}
+
+export async function getAlerts(): Promise<{
+  success: boolean
+  payload: AlertsSummary | null
+  message?: string
+}> {
+  if (!(await requireAdminOrProgramChair())) {
+    return { ...unauthorized, payload: null }
+  }
+  try {
+    return { success: true, payload: await getAlertsData() }
+  } catch {
+    return { success: false, payload: null, message: 'Failed to load alerts' }
   }
 }

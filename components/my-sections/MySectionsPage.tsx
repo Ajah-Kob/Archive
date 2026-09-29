@@ -47,7 +47,7 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
     <div className="flex flex-col flex-1 min-h-0">
       <HeaderBar>
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="w-[280px] shrink-0 py-[8px]">
+          <div className="w-full sm:w-[280px] shrink-0 py-[8px]">
             <SearchBar
               value={search}
               onChange={setSearch}
@@ -61,11 +61,12 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
             options={PHASE_OPTIONS}
             onChange={setPhaseFilter}
             ariaLabel="Filter by capstone phase"
+            fullWidth
           />
         </div>
       </HeaderBar>
 
-      <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
+      <div className="flex-1 min-h-0 pt-[16px] px-4 sm:px-8 flex flex-col">
         {filtered.length === 0 ? (
           <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden w-full">
             <EmptyState

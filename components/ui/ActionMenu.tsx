@@ -20,6 +20,11 @@ interface ActionMenuProps {
  * so it is never clipped by overflow:auto/hidden ancestors (scrollable table
  * bodies). Closes on outside click and on any scroll (the anchor would detach).
  */
+
+/** Ceiling for the panel's max-h. Keep in sync with the class on the panel. */
+const MENU_MAX_H = 320
+/** Smallest gap we allow between the panel and the viewport edge. 2rem. */
+const MENU_VIEWPORT_INSET = 32
 export function ActionMenu({ items }: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
@@ -43,8 +48,12 @@ export function ActionMenu({ items }: ActionMenuProps) {
   const toggle = () => {
     if (!isOpen && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
-      // Rough menu height (rows ~38px + padding) to flip upward near the viewport bottom.
-      const estimated = items.length * 38 + 8
+      // Rough menu height (rows ~38px + padding) to flip upward near the viewport
+      // bottom. Clamped to the same ceiling the panel is capped at below —
+      // without this a long menu positions as though it were short and runs off
+      // the bottom of a short viewport.
+      const capped = Math.min(MENU_MAX_H, window.innerHeight - MENU_VIEWPORT_INSET)
+      const estimated = Math.min(items.length * 38 + 8, capped)
       const opensBelow = rect.bottom + 4 + estimated <= window.innerHeight
       setPos({
         top: opensBelow ? rect.bottom + 4 : Math.max(8, rect.top - estimated - 4),
@@ -94,7 +103,7 @@ export function ActionMenu({ items }: ActionMenuProps) {
             ref={menuRef}
             style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 50 }}
           >
-            <div className="bg-white border border-[#eceef8] rounded-[10px] w-[148px] py-1 shadow-[0_8px_24px_rgba(112,125,255,0.14),0_2px_6px_rgba(0,0,0,0.06)]">
+            <div className="bg-white border border-[#eceef8] rounded-[10px] w-[148px] max-w-[calc(100vw-2rem)] max-h-[min(320px,calc(100vh-2rem))] overflow-y-auto overscroll-contain py-1 shadow-[0_8px_24px_rgba(112,125,255,0.14),0_2px_6px_rgba(0,0,0,0.06)]">
               {items.map((item, index) => {
                 const isPending = pendingIndex === index
                 return (

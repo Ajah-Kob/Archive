@@ -86,7 +86,7 @@ export default function DrawerProfile() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-60 bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_20px_60px_0px_rgba(16,20,58,0.18),0px_4px_16px_0px_rgba(0,0,0,0.06)] z-50">
+        <div className="absolute right-0 mt-2 w-60 max-w-[calc(100vw-2rem)] bg-white border border-[#eceef8] rounded-[14px] shadow-[0px_20px_60px_0px_rgba(16,20,58,0.18),0px_4px_16px_0px_rgba(0,0,0,0.06)] z-50">
           <div className="px-3 pt-3 pb-[13px] border-b border-[#eceef8]">
             <div className="flex gap-3 items-center">
               <div className="size-10 rounded-full overflow-hidden shrink-0">

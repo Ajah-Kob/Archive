@@ -16,8 +16,8 @@ export function EmptyState({ heading, description, variant = 'table', children }
     <div
       className={
         isTable
-          ? 'flex-1 flex flex-col items-center justify-center px-10 py-16 text-center min-h-0'
-          : 'flex flex-col items-center justify-center px-10 py-16 text-center'
+          ? 'flex-1 flex flex-col items-center justify-center px-5 sm:px-10 py-10 sm:py-16 text-center min-h-0'
+          : 'flex flex-col items-center justify-center px-5 sm:px-10 py-10 sm:py-16 text-center'
       }
     >
       <div className="mb-5">

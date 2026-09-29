@@ -8,6 +8,8 @@ interface UnsavedChangesModalProps {
   onSave: () => void
   onDiscard: () => void
   onClose: () => void
+  busy?: boolean
+  busyLabel?: string
 }
 
 export function UnsavedChangesModal({
@@ -15,6 +17,8 @@ export function UnsavedChangesModal({
   onSave,
   onDiscard,
   onClose,
+  busy = false,
+  busyLabel = 'Saving...',
 }: UnsavedChangesModalProps) {
   if (!isOpen) return null
 
@@ -28,8 +32,9 @@ export function UnsavedChangesModal({
           <button
             type="button"
             onClick={onClose}
+            disabled={busy}
             aria-label="Stay on this page"
-            className="flex size-7 items-center justify-center rounded-lg bg-violet-50 outline outline-1 outline-offset-[-1px] outline-violet-100 transition-colors hover:bg-violet-100"
+            className="flex size-7 items-center justify-center rounded-lg bg-violet-50 outline outline-1 outline-offset-[-1px] outline-violet-100 transition-colors hover:bg-violet-100 disabled:opacity-60"
           >
             <X className="size-4 text-slate-400" />
           </button>
@@ -43,17 +48,19 @@ export function UnsavedChangesModal({
           <button
             type="button"
             onClick={onDiscard}
-            className="rounded-[9px] border border-[#dddff0] bg-[#f0f2fa] px-[19px] py-[10px] font-sans text-[13px] font-semibold leading-[19.5px] text-[#5a6382] transition-colors hover:bg-[#e9ebf6]"
+            disabled={busy}
+            className="rounded-[9px] border border-[#dddff0] bg-[#f0f2fa] px-[19px] py-[10px] font-sans text-[13px] font-semibold leading-[19.5px] text-[#5a6382] transition-colors hover:bg-[#e9ebf6] disabled:opacity-60"
           >
             Discard
           </button>
           <button
             type="button"
             onClick={onSave}
-            className="flex items-center gap-[7px] rounded-[9px] border border-[#707dff] bg-[#707dff] px-[19px] py-[10px] font-sans text-[13px] font-bold leading-[19.5px] text-white shadow-[0_2px_8px_rgba(112,125,255,0.35)] transition-colors hover:bg-[#5a67ff]"
+            disabled={busy}
+            className="flex items-center gap-[7px] rounded-[9px] border border-[#707dff] bg-[#707dff] px-[19px] py-[10px] font-sans text-[13px] font-bold leading-[19.5px] text-white shadow-[0_2px_8px_rgba(112,125,255,0.35)] transition-colors hover:bg-[#5a67ff] disabled:opacity-60"
           >
             <Save className="size-4" />
-            Save
+            {busy ? busyLabel : 'Save'}
           </button>
         </div>
       </div>

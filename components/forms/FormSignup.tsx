@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { signupUser } from '@/lib/actions/user'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { safeNextPath } from '@/lib/helper'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { AuthSubmitButton } from '@/components/ui/AuthSubmitButton'
@@ -37,6 +38,16 @@ export default function FormSignup({ className }: { className?: string }) {
     if (input?.email != null) setEmail(input.email)
   }, [state])
 
+  // Success is a toast; the 1000ms redirect below is left in place as-is.
+  // One-shot guard because `state` persists across the reset/redirect window
+  // and the effect would otherwise re-fire on each re-render.
+  const successToastRef = useRef(false)
+  useEffect(() => {
+    if (!state?.success || successToastRef.current) return
+    successToastRef.current = true
+    toast.success(state?.message || 'Account created successfully.')
+  }, [state?.success, state?.message])
+
   useEffect(() => {
     if (state?.success && formRef.current) {
       formRef.current.reset()
@@ -67,15 +78,9 @@ export default function FormSignup({ className }: { className?: string }) {
         </p>
       </div>
 
-      {/* Error/Success Alert Banner */}
-      {state?.message && (
-        <div
-          className={`alert ${
-            state.success ? `alert--success` : `alert--danger`
-          }`}
-        >
-          {state?.message}
-        </div>
+      {/* Errors only — success is a toast. */}
+      {state?.message && !state.success && (
+        <div className="alert alert--danger">{state?.message}</div>
       )}
 
       <div className="flex flex-col gap-4">

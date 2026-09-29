@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Plus } from 'lucide-react'
 import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import TemplateTable from '@/components/templates/main/TemplatesTable'
@@ -105,7 +106,12 @@ export default function TemplatesPage({
     if (file.fileUrl && file.fileUrl !== '#') {
       window.open(file.fileUrl, '_blank')
     } else {
-      alert(`Viewing ${file.name}`)
+      // Unreachable today: Template.blobUrl is non-nullable in the schema and
+      // getTemplates maps it straight through, so fileUrl is always a real blob
+      // URL. Kept as a guard against a template row without an attached file.
+      // Was a native alert() with stub copy ("Viewing <name>"), which would
+      // have read as a bug had it ever fired.
+      toast.error(`No file is attached to "${file.name}".`)
     }
   }
 

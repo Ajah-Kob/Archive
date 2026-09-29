@@ -160,15 +160,9 @@ export default function FormResetPassword({
         </p>
       )}
 
-      {/* Alert */}
-      {state.message && showErrors && (
-        <div
-          className={`alert ${
-            state.success ? 'alert--success' : 'alert--danger'
-          }`}
-        >
-          {state.message}
-        </div>
+      {/* Errors only — success is already a toast above. */}
+      {state.message && showErrors && !state.success && (
+        <div className="alert alert--danger">{state.message}</div>
       )}
 
       <AuthSubmitButton

@@ -171,13 +171,13 @@ export function DefenseMilestoneView({
   const milestoneSlug = data.type === 'FINAL' ? 'final-defense' : 'proposal-defense'
 
   const actions: DefenseUploadActions = {
-    requestUploadToken: uploadDefenseToken,
+    requestUploadToken: (name) => uploadDefenseToken(name, data.type),
     submitDocument: (d) =>
-      submitDefenseDocument({ ...d, mimeType: 'application/pdf' }),
+      submitDefenseDocument({ ...d, mimeType: 'application/pdf', defenseType: data.type }),
     resubmitDocument: (d) =>
-      resubmitDefenseDocument({ ...d, mimeType: 'application/pdf' }),
+      resubmitDefenseDocument({ ...d, mimeType: 'application/pdf', defenseType: data.type }),
     replaceDocument: (d) =>
-      replaceDefenseDocument({ ...d, mimeType: 'application/pdf' }),
+      replaceDefenseDocument({ ...d, mimeType: 'application/pdf', defenseType: data.type }),
   }
 
   const reviewedAt = (data as unknown as { verdictSubmittedAt?: string | null }).verdictSubmittedAt ?? null

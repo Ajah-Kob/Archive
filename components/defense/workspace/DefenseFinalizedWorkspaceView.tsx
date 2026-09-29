@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, CalendarDays, FolderOpen, Loader2, Lock, MessageSquareText, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Loader2, Lock, MessageSquareText, Pencil, TriangleAlert } from 'lucide-react'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
@@ -18,6 +18,7 @@ import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
 import { StatusPill } from '@/components/defense/DefenseDocumentCard/StatusPill'
 import { deserializeAnnotations } from '@/lib/annotations-serializer'
+import { isPrivateBlobUrl, toSignedBlobPath } from '@/lib/blob'
 import type { SubmissionMeta } from '@/types/milestones'
 import { DefenseDocumentWorkspace } from '@/components/defense/workspace/DefenseDocumentWorkspace'
 import { WorkspacePanel } from '@/components/defense/workspace/WorkspacePanel'
@@ -30,6 +31,12 @@ export interface DefenseFinalizedWorkspaceViewProps {
   /** Committed annotations (serialized AnnotationTransferItem[] JSON). */
   initialAnnotations: unknown[] | null
   /**
+   * This panelist's own saved annotations, excluding other panelists' committed
+   * rows. Needed by the editing workspace's Discard, which reverts to it.
+   * See DefenseDocumentWorkspaceProps.initialOwnAnnotations.
+   */
+  initialOwnAnnotations?: unknown[] | null
+  /**
    * True when this tab opens a SUPERSEDED (soft-deleted) version rather than
    * the current submission — the banner wording adapts.
    */
@@ -38,7 +45,7 @@ export interface DefenseFinalizedWorkspaceViewProps {
   backHref?: string
   /** Defense schedule id for fallback backHref (/faculty/defense/[scheduleId]). */
   scheduleId?: number
-  /** Draft status of the viewer's own annotation row — COMMITTED enables re-edit via Open. */
+  /** Draft status of the viewer's own annotation row — COMMITTED enables re-edit via Annotate. */
   draftStatus?: 'DRAFT' | 'COMMITTED' | null
 }
 
@@ -59,15 +66,15 @@ function FinalizedBadge({ isSuperseded }: { isSuperseded: boolean }) {
   )
 }
 
-function OpenButton({ onClick }: { onClick: () => void }) {
+function AnnotateButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex items-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#707dff] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none shrink-0"
     >
-      <FolderOpen className="size-[13px]" strokeWidth={2} />
-      Open
+      <Pencil className="size-[13px]" strokeWidth={2} />
+      Annotate
     </button>
   )
 }
@@ -210,7 +217,7 @@ function AnnotationHydrator({
  *
  * Re-edit flow: while the current version is still IN_REVIEW and not
  * superseded (`!isSuperseded && status === 'IN_REVIEW'`) the header shows an
- * Open button next to the Lock badge. It is not gated on this panelist's own
+ * Annotate button next to the Lock badge. It is not gated on this panelist's own
  * annotation status — a panelist who has not started yet must be able to open
  * the document in order to start. Clicking it
  * toggles this component into edit mode by rendering the full
@@ -221,6 +228,7 @@ function AnnotationHydrator({
 export function DefenseFinalizedWorkspaceView({
   submission,
   initialAnnotations,
+  initialOwnAnnotations = null,
   isSuperseded = false,
   backHref,
   scheduleId,
@@ -228,8 +236,16 @@ export function DefenseFinalizedWorkspaceView({
 }: DefenseFinalizedWorkspaceViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [showComments, setShowComments] = useState(false)
+  // Annotation set as last persisted DURING this visit. `initialAnnotations` is
+  // the server payload from when the page first rendered and never changes on a
+  // client-side toggle, so returning here from annotation mode would re-hydrate
+  // whatever the reviewer had just deleted and put it straight back on the
+  // document. Once a save happens, this wins over the prop.
+  const [savedAnnotations, setSavedAnnotations] = useState<unknown[] | null>(null)
 
-  const annotations = deserializeAnnotations(initialAnnotations ?? [])
+  const annotations = deserializeAnnotations(
+    (savedAnnotations ?? initialAnnotations ?? []) as never,
+  )
   // isInitial is the authority for "is this a resubmission". `version` is NOT
   // a valid substitute: the counter spans the group's whole submission chain, so
   // a re-defense produces a brand-new initial submission that still carries a
@@ -249,7 +265,7 @@ export function DefenseFinalizedWorkspaceView({
         : '/faculty/defense')
   // Only the current COMMITTED IN_REVIEW version is re-editable. Superseded
   // (historical) versions and non-IN_REVIEW (APPROVED/NEEDS_REVISION) stay
-  // strictly read-only — no Open affordance. Resubmissions use the Submit
+  // strictly read-only — no Annotate affordance. Resubmissions use the Submit
   // Review flow, not re-editing.
   //
   // Deliberately not gated on draftStatus: that is a per-panelist value, and
@@ -261,13 +277,89 @@ export function DefenseFinalizedWorkspaceView({
 
   const { engine, isLoading, error } = usePdfiumEngine()
   const annotationAuthor = submission.reviewedBy ?? 'Panelist'
+
+  // Private defense blobs must be fetched through the auth-gated route
+  // /api/blob/... — never hand the raw `.private.blob.vercel-storage.com` URL to
+  // the viewer. The browser cannot fetch that URL (it needs a token), so the
+  // plugin's own fetch failed and DocumentContent reported isError, rendering
+  // "Failed to load this document." even though the route itself returned 200.
+  // This is the read-only twin of the same conversion DefenseDocumentWorkspace
+  // does; the editing path was already correct, which is why clicking Annotate
+  // made the document appear.
+  const isPrivate = isPrivateBlobUrl(submission.blobUrl)
+  const [privateObjectUrl, setPrivateObjectUrl] = useState<string | null>(null)
+  const [privateError, setPrivateError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Nothing to do for a public blob: documentUrl falls through to the stored
+    // URL at render time. Returning before any setState also keeps this file
+    // free of set-state-in-effect.
+    if (!isPrivate) return
+    let cancelled = false
+    let current: string | null = null
+    async function loadPrivate() {
+      // Drop the previous document's object URL first, so switching versions
+      // never paints the old one while the new bytes stream in.
+      setPrivateObjectUrl(null)
+      setPrivateError(null)
+      const signed = toSignedBlobPath(submission.blobUrl)
+      if (!signed) {
+        setPrivateError('Invalid document link.')
+        return
+      }
+      try {
+        const res = await fetch(signed, {
+          credentials: 'include',
+          headers: { Accept: 'application/pdf' },
+        })
+        if (cancelled) return
+        if (res.status === 401) {
+          setPrivateError('Please sign in to view this document.')
+          return
+        }
+        if (res.status === 403) {
+          setPrivateError('You do not have access to this document.')
+          return
+        }
+        if (!res.ok) {
+          setPrivateError(`Failed to load document. (signed fetch ${res.status})`)
+          return
+        }
+        const blob = await res.blob()
+        const objectUrl = URL.createObjectURL(blob)
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl)
+          return
+        }
+        current = objectUrl
+        setPrivateObjectUrl(objectUrl)
+      } catch {
+        if (!cancelled) setPrivateError('Failed to load document. Please try again.')
+      }
+    }
+    void loadPrivate()
+    return () => {
+      cancelled = true
+      if (current) URL.revokeObjectURL(current)
+    }
+  }, [isPrivate, submission.blobUrl])
+
+  // Public blob (or not yet resolved): fall back to the stored URL, which is
+  // what DocumentContent was always given.
+  const documentUrl = isPrivate ? privateObjectUrl : submission.blobUrl
+  // Derived, not stored: a private blob is in flight exactly while it has
+  // neither an object URL nor an error yet.
+  const privateStillLoading = isPrivate && !privateObjectUrl && !privateError
+
   // Read-only must fully disable drag/resize/rotate for ALL annotation tools
   // (pen/ink and freeText were still movable because the plugin defaults are draggable).
   // We mirror the student-mode overrides here and keep isDraggable false for every tool.
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url: submission.blobUrl }],
+        // Hold registration until the private fetch resolves, so the plugin is
+        // never handed a URL the browser cannot load.
+        initialDocuments: documentUrl ? [{ url: documentUrl }] : [],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),
@@ -301,7 +393,7 @@ export function DefenseFinalizedWorkspaceView({
         ],
       }),
     ],
-    [submission.blobUrl, annotationAuthor],
+    [documentUrl, annotationAuthor],
   )
 
   if (isEditing && canAnnotate) {
@@ -312,7 +404,16 @@ export function DefenseFinalizedWorkspaceView({
         initialAnnotations={initialAnnotations as unknown[]}
         draftStatus={draftStatus}
         backHref={resolvedBackHref}
+        initialOwnAnnotations={initialOwnAnnotations}
         scheduleId={scheduleId ?? submission.scheduleId}
+        // Return to this component's read-only state. Without it the only way
+        // out of annotation mode was the Back link, which navigates away.
+        onExitAnnotationMode={() => setIsEditing(false)}
+        // Adopt the set that was just saved, so this view does not re-hydrate
+        // the pre-save prop and resurrect deleted annotations.
+        onSavedAnnotations={(data) =>
+          setSavedAnnotations(Array.isArray(data) ? data : [])
+        }
       />
     )
   }
@@ -326,11 +427,20 @@ export function DefenseFinalizedWorkspaceView({
     )
   }
 
-  if (isLoading || !engine) {
+  if (isLoading || !engine || privateStillLoading) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
         <Loader2 className="size-6 animate-spin text-[#707dff]" />
         <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading PDF engine…</p>
+      </div>
+    )
+  }
+
+  if (isPrivate && privateError) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <TriangleAlert className="size-6 text-[#d97706]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">{privateError}</p>
       </div>
     )
   }
@@ -394,7 +504,7 @@ export function DefenseFinalizedWorkspaceView({
                   <MessageSquareText className="size-[13px]" strokeWidth={1.75} />
                   Comments
                 </button>
-                {!isResubmission && canAnnotate && <OpenButton onClick={() => setIsEditing(true)} />}
+                {!isResubmission && canAnnotate && <AnnotateButton onClick={() => setIsEditing(true)} />}
                 {submission.reviewedAt && (
                   <span className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
                     <CalendarDays className="size-[12px] text-[#9ea8c6]" strokeWidth={1.75} />

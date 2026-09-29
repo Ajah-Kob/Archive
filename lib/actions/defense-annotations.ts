@@ -242,7 +242,15 @@ async function getDefenseAnnotationsData(
     return {
       success: true,
       message: '',
-      payload: { data, status: own?.status ?? null },
+      // `data` is the MERGED view (own row + other panelists' COMMITTED rows).
+      // `ownData` is this panelist's row alone, which is what a revert must write
+      // back: saving the merged set would copy other reviewers' committed
+      // annotations into this panelist's own draft.
+      payload: {
+        data,
+        status: own?.status ?? null,
+        ownData: Array.isArray(own?.data) ? own.data : [],
+      },
     }
   } catch (error) {
     console.error('[getDefenseAnnotations | Error]:', error)

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   Check,
@@ -59,7 +60,8 @@ import { DefenseSaveConfirmModal } from '@/components/defense/workspace/DefenseS
 import type { AnnotationSummary } from '@/components/defense/workspace/DefenseSaveConfirmModal'
 import { DefenseResubmissionVerdictModal } from '@/components/defense/workspace/DefenseResubmissionVerdictModal'
 import { useAnnotationDraft } from '@/components/defense/workspace/useAnnotationDraft'
-import type { AnnotationDraftStatus } from '@/components/defense/workspace/useAnnotationDraft'
+import { saveDefenseAnnotationDraft } from '@/lib/actions/defense-annotations'
+import { UnsavedChangesModal } from '@/components/forms/UnsavedChangesModal'
 import { isReviewAnnotation, collectReviewAuthors } from '@/components/defense/workspace/review-annotations'
 import { VersionPanel } from '@/components/defense/workspace/VersionPanel'
 import type { StudentVersionListItem } from '@/lib/actions/student-review'
@@ -79,6 +81,15 @@ export interface DefenseDocumentWorkspaceProps {
   submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean; version?: number; verdict?: string }
   /** Saved annotation rows (serialized AnnotationTransferItem[]) for this submission. */
   initialAnnotations: unknown[] | null
+  /**
+   * This panelist's own saved annotations, excluding other panelists' committed
+   * rows. Distinct from `initialAnnotations`, which is the merged view.
+   *
+   * Used by Discard to revert the document to the state it was in when the page
+   * loaded. Reverting with the merged set would copy other reviewers'
+   * annotations into this panelist's own draft.
+   */
+  initialOwnAnnotations?: unknown[] | null
   /** Persistence status of the saved annotation row, if any. */
   draftStatus: 'DRAFT' | 'COMMITTED' | null
   /** Version list for the student Version panel (student mode only). */
@@ -88,10 +99,33 @@ export interface DefenseDocumentWorkspaceProps {
   /** Defense schedule id for post-submit navigation. Falls back to submission.scheduleId. */
   scheduleId?: number
   /**
-   * History mode — hides every mutation affordance (toolbar actions, tools,
+   * History mode - hides every mutation affordance (toolbar actions, tools,
    * drafts) and forces annotation layers read-only. Viewing UI is unchanged.
    */
   readOnly?: boolean
+  /**
+   * Render a "Done" action that leaves annotation mode and returns to the
+   * read-only view, instead of making Back the only exit.
+   *
+   * Only passed by DefenseFinalizedWorkspaceView, which owns the read-only ⇄ edit
+   * switch. Left undefined elsewhere (student mode, direct links) so no other
+   * entry point grows an action it cannot honour.
+   *
+   * Exiting unmounts this component, so any annotations not yet submitted are
+   * discarded — the same as navigating away via Back today. Re-entering remounts
+   * from the server-supplied `initialAnnotations`, never from local state.
+   */
+  onExitAnnotationMode?: () => void
+  /**
+   * Called with the annotation set that was just saved.
+   *
+   * The parent swaps back to its read-only view on exit, and that view hydrates
+   * from the `initialAnnotations` prop it was rendered with — the server payload
+   * from when the page first loaded. After a save that prop is stale, so a
+   * deleted annotation would reappear on the document. Handing the saved set up
+   * lets the parent show what was actually persisted.
+   */
+  onSavedAnnotations?: (data: unknown) => void
 }
 
 /** Which right slide-over panel is open (if any). */
@@ -159,11 +193,14 @@ export function DefenseDocumentWorkspace({
   blobUrl,
   submission,
   initialAnnotations,
+  initialOwnAnnotations = null,
   draftStatus,
   versions,
   backHref,
   scheduleId,
   readOnly = false,
+  onExitAnnotationMode,
+  onSavedAnnotations,
 }: DefenseDocumentWorkspaceProps) {
   const isStudent = mode === 'student'
   const editable = !isStudent && !readOnly
@@ -370,11 +407,14 @@ export function DefenseDocumentWorkspace({
             activeDocumentId={activeDocumentId}
             submission={submission}
             initialAnnotations={initialAnnotations}
+            initialOwnAnnotations={initialOwnAnnotations}
             draftStatus={draftStatus}
             versions={versions}
             backHref={backHref}
             scheduleId={scheduleId}
             readOnly={readOnly}
+            onExitAnnotationMode={onExitAnnotationMode}
+            onSavedAnnotations={onSavedAnnotations}
           />
         )}
       </EmbedPDF>
@@ -387,21 +427,29 @@ function DefenseWorkspaceLayout({
   activeDocumentId,
   submission,
   initialAnnotations,
-  draftStatus,
+  initialOwnAnnotations = null,
   versions,
   backHref,
   scheduleId,
   readOnly = false,
+  onExitAnnotationMode,
+  onSavedAnnotations,
 }: {
   mode?: DefenseWorkspaceMode
   activeDocumentId: string | null
   submission: SubmissionMeta & { scheduleId?: number; isInitial?: boolean; version?: number; verdict?: string }
   initialAnnotations: unknown[] | null
+  /** See DefenseDocumentWorkspaceProps.initialOwnAnnotations. */
+  initialOwnAnnotations?: unknown[] | null
   draftStatus: 'DRAFT' | 'COMMITTED' | null
   versions?: StudentVersionListItem[]
   backHref?: string
   scheduleId?: number
   readOnly?: boolean
+  /** See DefenseDocumentWorkspaceProps.onExitAnnotationMode. */
+  onExitAnnotationMode?: () => void
+  /** See DefenseDocumentWorkspaceProps.onSavedAnnotations. */
+  onSavedAnnotations?: (data: unknown) => void
 }) {
   const isStudent = mode === 'student'
   const editable = !isStudent && !readOnly
@@ -409,7 +457,7 @@ function DefenseWorkspaceLayout({
   const viewerRef = useRef<HTMLDivElement>(null)
 
   const pendingCommentIdsRef = useRef<Set<string>>(new Set())
-  const { status: liveDraftStatus } = useAnnotationDraft({
+  const { isDirty, markClean } = useAnnotationDraft({
     submissionId: submission.id,
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
@@ -420,19 +468,15 @@ function DefenseWorkspaceLayout({
   const { state: annotationState, provides: annotationApi } = useAnnotation(
     CURRENT_DOCUMENT_ID,
   )
-  const hasAnnotations = Object.keys(annotationState.byUid).length > 0
-
-  const [seededDraftStatus] = useState<AnnotationDraftStatus>(() =>
-    draftStatus === 'DRAFT' || draftStatus === 'COMMITTED' ? 'saved' : 'idle',
-  )
-  const draftSaveStatus: AnnotationDraftStatus =
-    liveDraftStatus === 'idle' ? seededDraftStatus : liveDraftStatus
-
   const { provides: annotationCapability } = useAnnotationCapability()
   const annotationCapabilityRef = useRef(annotationCapability)
   annotationCapabilityRef.current = annotationCapability
 
   const [panel, setPanel] = useState<PanelId | null>(null)
+  // Guard for leaving with unsaved changes: the Back link and browser unload.
+  const [leavePromptOpen, setLeavePromptOpen] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
+  const [savingLeave, setSavingLeave] = useState(false)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
   // Author filter shared by the comments panel, the annotation layer, and
   // the hover overlay so list + document stay in sync. Null = all reviewers.
@@ -564,27 +608,130 @@ function DefenseWorkspaceLayout({
     pendingCommentIdsRef.current.clear()
   }
 
-  async function openSave() {
-    const cap = annotationCapabilityRef.current
-    let data: unknown = null
-    let summary: AnnotationSummary = {}
-    if (cap) {
-      await cap.exportAnnotations(undefined, CURRENT_DOCUMENT_ID).wait(
-        (items) => {
-          const reviewItems = items.filter((item) =>
-            isReviewAnnotation(item.annotation),
-          )
-          if (reviewItems.length === 0) return
-          const serialized = serializeAnnotations(reviewItems)
-          data = serialized
-          summary = summarizeAnnotations(serialized)
-        },
-        (error) => {
-          console.error('[DefenseDocumentWorkspace] exportAnnotations failed:', error)
-        },
-      )
+  // Browser-level guard: covers tab close, reload and any navigation the in-app
+  // Back button cannot intercept. Browsers show their own generic wording — the
+  // returnValue assignment is what triggers the prompt.
+  useEffect(() => {
+    if (!isDirty) return
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault()
+      e.returnValue = ''
     }
-    setSaveState({ summary, data })
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty])
+
+  // Leaving via the Back link. Without changes it is a plain navigation, so this
+  // is only reachable from the prompt.
+  function leaveDocument() {
+    setLeavePromptOpen(false)
+    router.push(resolvedBackHref)
+  }
+
+  /**
+   * Revert to the state the document had when this page loaded, then leave.
+   *
+   * A genuine discard, not a cosmetic one: the debounced auto-save has already
+   * written the reviewer's edits to the database as a DRAFT, so simply navigating
+   * away would keep them. This writes back `initialOwnAnnotations` — this
+   * panelist's own saved set, WITHOUT other panelists' committed rows, which
+   * would otherwise be copied into their draft.
+   */
+  async function discardAndLeave() {
+    if (discarding) return
+    setDiscarding(true)
+    try {
+      const res = await saveDefenseAnnotationDraft(
+        submission.id,
+        initialOwnAnnotations ?? [],
+      )
+      if (!res.success) {
+        toast.error(res.message || 'Failed to discard changes.')
+        setDiscarding(false)
+        return
+      }
+      markClean()
+      leaveDocument()
+    } catch {
+      toast.error('Failed to discard changes. Please try again.')
+      setDiscarding(false)
+    }
+  }
+
+  /**
+   * Export the current review annotations in the same serialized shape the save
+   * path persists. An empty review set is a MEANINGFUL result, not a failure:
+   * the reviewer deleted their last annotation and that deletion has to persist.
+   */
+  async function exportCurrentReviewAnnotations(): Promise<{
+    ok: boolean
+    data: unknown
+    summary: AnnotationSummary
+  }> {
+    const cap = annotationCapabilityRef.current
+    if (!cap) return { ok: false, data: [], summary: {} }
+    let data: unknown = []
+    let summary: AnnotationSummary = {}
+    let failed = false
+    await cap.exportAnnotations(undefined, CURRENT_DOCUMENT_ID).wait(
+      (items) => {
+        const reviewItems = items.filter((item) =>
+          isReviewAnnotation(item.annotation),
+        )
+        const serialized = serializeAnnotations(reviewItems)
+        data = serialized
+        summary = summarizeAnnotations(serialized)
+      },
+      (error) => {
+        console.error('[DefenseDocumentWorkspace] exportAnnotations failed:', error)
+        failed = true
+      },
+    )
+    if (failed) return { ok: false, data: [], summary: {} }
+    return { ok: true, data, summary }
+  }
+
+  /**
+   * Save from the leave prompt: persist the current annotations directly, then
+   * leave. This must NOT open the Submit annotations confirmation modal — the
+   * panelist already chose Save in the leave prompt.
+   */
+  async function saveAndLeave() {
+    if (savingLeave || discarding) return
+    setSavingLeave(true)
+    try {
+      const exported = await exportCurrentReviewAnnotations()
+      if (!exported.ok) {
+        toast.error('Failed to read annotations. Please try again.')
+        setSavingLeave(false)
+        return
+      }
+      const payload = (exported.data ?? []) as unknown[]
+      const res = await saveDefenseAnnotationDraft(submission.id, payload)
+      if (!res.success) {
+        toast.error(res.message || 'Failed to save annotations.')
+        setSavingLeave(false)
+        return
+      }
+      markClean()
+      onSavedAnnotations?.(payload)
+      toast.success(res.message || 'Annotations saved.')
+      setSavingLeave(false)
+      leaveDocument()
+    } catch (error) {
+      console.error('[DefenseDocumentWorkspace] save-and-leave failed:', error)
+      toast.error('Failed to save annotations. Please try again.')
+      setSavingLeave(false)
+    }
+  }
+
+  async function openSave() {
+    const exported = await exportCurrentReviewAnnotations()
+    if (!exported.ok) {
+      toast.error('Failed to read annotations. Please try again.')
+      return
+    }
+    setSaveState({ summary: exported.summary, data: exported.data })
   }
 
   async function openSubmitResubmissionReview() {
@@ -636,13 +783,26 @@ function DefenseWorkspaceLayout({
       {activeDocumentId && <DisableTextSelection documentId={activeDocumentId} />}
 
       <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
-        <Link
-          href={resolvedBackHref}
-          className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
-        >
-          <ArrowLeft className="size-[14px]" strokeWidth={2} />
-          Back
-        </Link>
+        {/* With unsaved changes this becomes a button, not a link: navigating away
+            must not skip the prompt. Identical styling so nothing shifts. */}
+        {isDirty ? (
+          <button
+            type="button"
+            onClick={() => setLeavePromptOpen(true)}
+            className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
+          >
+            <ArrowLeft className="size-[14px]" strokeWidth={2} />
+            Back
+          </button>
+        ) : (
+          <Link
+            href={resolvedBackHref}
+            className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
+          >
+            <ArrowLeft className="size-[14px]" strokeWidth={2} />
+            Back
+          </Link>
+        )}
 
         <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
 
@@ -675,36 +835,18 @@ function DefenseWorkspaceLayout({
           )}
         </div>
 
-        {editable && (
+        {editable && isDirty && (
           <div className="flex items-center gap-[7px] min-w-0 shrink-0">
-            {draftSaveStatus === 'saving' ? (
-              <>
-                <Loader2
-                  className="size-[12px] animate-spin text-[#8a93b4] shrink-0"
-                  aria-hidden="true"
-                />
-                <span
-                  className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
-                  aria-live="polite"
-                >
-                  Saving…
-                </span>
-              </>
-            ) : (
+            <span
+              className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
+              aria-live="polite"
+            >
               <span
-                className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
-                aria-live="polite"
-              >
-                <Check
-                  className={`size-[12px] shrink-0 ${
-                    draftSaveStatus === 'saved' ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
-                  }`}
-                  strokeWidth={2.5}
-                  aria-hidden="true"
-                />
-                {draftSaveStatus === 'saved' ? 'Draft Saved' : 'Draft Saved'}
-              </span>
-            )}
+                className="size-[8px] rounded-full bg-[#f59e0b] shrink-0"
+                aria-hidden="true"
+              />
+              Unsaved changes
+            </span>
           </div>
         )}
 
@@ -780,19 +922,25 @@ function DefenseWorkspaceLayout({
             editable && (
               <>
                 <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+                {/* Single Save action for the initial document: it replaces both
+                    the old "Submit annotations" and the "Done" button. Saving is
+                    the only way out of annotation mode — it persists, returns the
+                    panelist to the read-only view, and stays on this document.
+                    Gated on isDirty, not on whether annotations merely exist, so
+                    it starts disabled on a freshly opened document. */}
                 <button
                   type="button"
                   onClick={openSave}
-                  disabled={!hasAnnotations}
+                  disabled={!isDirty}
                   title={
-                    hasAnnotations
-                      ? 'Submit your annotations for this defense submission'
-                      : 'Add annotations before submitting'
+                    isDirty
+                      ? 'Save your annotation changes and return to the read-only view'
+                      : 'No unsaved changes — add, edit, move or remove an annotation to enable Save'
                   }
                   className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#707dff] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#707dff]"
                 >
-                  <Send className="size-[13px]" />
-                  Submit annotations
+                  <Check className="size-[13px]" strokeWidth={2} />
+                  Save
                 </button>
               </>
             )
@@ -918,20 +1066,19 @@ function DefenseWorkspaceLayout({
           annotationSummary={saveState.summary}
           annotationData={saveState.data}
           onClose={() => setSaveState(null)}
-          onSaved={() => {
-            // Return to the session list. The save wrote a DRAFT, so the
-            // document does NOT finalize - reopening it from the session list
-            // keeps it editable for more annotation, and getDefenseAnnotations
-            // returns the panelist's own draft rows on reload.
-            // No router.refresh(): saveDefenseAnnotationDraft already
-            // revalidated the detail/annotation/defense tags server-side, and
-            // these routes are dynamic so the client Router Cache will not
-            // serve a stale payload.
-            if (!resolvedScheduleId) return
-            const target = isResubmission
-              ? `/faculty/defense/${resolvedScheduleId}/resubmission`
-              : `/faculty/defense/${resolvedScheduleId}/session`
-            router.push(target)
+          onSaved={(savedData) => {
+            // Save is the single exit from annotation mode. Persist, drop the
+            // dirty flag, hand control back to the read-only view, and leave the
+            // panelist on this same document — no redirect.
+            markClean()
+            // Hand the persisted set up BEFORE exiting. The read-only view
+            // hydrates from the initialAnnotations prop, which is the server
+            // payload from when the page first loaded and is stale the moment we
+            // save — without this a deleted annotation is re-imported and
+            // reappears on the document.
+            onSavedAnnotations?.(savedData)
+            toast.success('Annotations saved.')
+            onExitAnnotationMode?.()
           }}
         />
       )}
@@ -950,6 +1097,23 @@ function DefenseWorkspaceLayout({
             // Ensure the resubmission tab's server data is fresh (revalidated 'defense' tag)
             setTimeout(() => router.refresh(), 100)
           }}
+        />
+      )}
+
+      {/* Leaving with unsaved changes. Discard is a real revert, not a dismissal:
+          the debounced auto-save already persisted the reviewer's edits, so
+          navigating away without this would keep them. */}
+      {leavePromptOpen && (
+        <UnsavedChangesModal
+          isOpen={leavePromptOpen}
+          onSave={() => void saveAndLeave()}
+          onDiscard={() => void discardAndLeave()}
+          onClose={() => {
+            if (savingLeave || discarding) return
+            setLeavePromptOpen(false)
+          }}
+          busy={savingLeave || discarding}
+          busyLabel={savingLeave ? 'Saving...' : 'Discarding...'}
         />
       )}
     </div>

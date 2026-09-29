@@ -148,14 +148,18 @@ export function DefenseTabPanel({ data, defenseType }: DefenseTabPanelProps) {
       data.verdict === 'MAJOR_REVISION') &&
     data.submissions.filter((s) => !s.isInitial).length === 0
 
+  // defenseType is bound here, not read from the group: a group can hold both a
+  // PROPOSAL and a FINAL schedule, so the server cannot infer which one this tab
+  // is uploading for. See findStudentScheduleByType.
+  const defenseTypeForUpload = defenseType as DefenseType
   const actions: DefenseUploadActions = {
-    requestUploadToken: uploadDefenseToken,
+    requestUploadToken: (name) => uploadDefenseToken(name, defenseTypeForUpload),
     submitDocument: (d) =>
-      submitDefenseDocument({ ...d, mimeType: 'application/pdf' }),
+      submitDefenseDocument({ ...d, mimeType: 'application/pdf', defenseType: defenseTypeForUpload }),
     resubmitDocument: (d) =>
-      resubmitDefenseDocument({ ...d, mimeType: 'application/pdf' }),
+      resubmitDefenseDocument({ ...d, mimeType: 'application/pdf', defenseType: defenseTypeForUpload }),
     replaceDocument: (d) =>
-      replaceDefenseDocument({ ...d, mimeType: 'application/pdf' }),
+      replaceDefenseDocument({ ...d, mimeType: 'application/pdf', defenseType: defenseTypeForUpload }),
   }
 
   const handleSubmitted = () => {

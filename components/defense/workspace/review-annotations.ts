@@ -94,3 +94,76 @@ export function collectReviewAuthors(items: unknown): string[] {
   }
   return [...names].sort((a, b) => a.localeCompare(b))
 }
+
+// ─────────────────────── change detection (last saved vs current) ───────────────────────
+
+/**
+ * Geometry is rounded before comparison. Drag and resize produce float noise, and
+ * a hairline difference that the panelist cannot see must not flip Save from
+ * disabled to enabled.
+ */
+function roundCoord(n: unknown): number | null {
+  return typeof n === 'number' && Number.isFinite(n) ? Math.round(n * 100) / 100 : null
+}
+
+function normalizeRect(rect: unknown): string {
+  const r = (rect ?? {}) as Record<string, unknown>
+  return [roundCoord(r.x), roundCoord(r.y), roundCoord(r.width), roundCoord(r.height)].join(',')
+}
+
+function normalizeSegments(segments: unknown): string {
+  if (!Array.isArray(segments)) return ''
+  return segments
+    .map(normalizeRect)
+    .sort()
+    .join(';')
+}
+
+/**
+ * Canonical, order-independent fingerprint of one annotation's persisted meaning.
+ *
+ * Deliberately an allowlist of semantically meaningful fields rather than a dump
+ * of the whole object: the live plugin state and the server-serialized props
+ * differ in incidental fields, and comparing those directly would report a
+ * permanent difference. Everything a reviewer can actually change is here —
+ * identity, type, author, text, colour, opacity and geometry (the union /Rect
+ * plus the authoritative per-fragment segmentRects for text markup).
+ */
+function fingerprintOne(annotation: Record<string, unknown>): string {
+  return JSON.stringify([
+    annotation.id ?? null,
+    annotation.type ?? null,
+    annotation.author ?? '',
+    annotation.contents ?? '',
+    annotation.color ?? null,
+    annotation.opacity ?? null,
+    normalizeRect(annotation.rect),
+    normalizeSegments(annotation.segmentRects),
+  ])
+}
+
+/**
+ * Fingerprint a set of annotations for change detection.
+ *
+ * `excludeIds` must mirror whatever the save path filters out, so the dirty
+ * check and the persisted set can never disagree — otherwise a freshly created
+ * highlight with no comment yet would enable Save while saving would persist
+ * nothing.
+ *
+ * Returns '' for an empty set, which is a meaningful value: 'was 1, now 0' is a
+ * deletion and must compare unequal to the saved fingerprint.
+ */
+export function fingerprintAnnotations(
+  annotations: Iterable<Record<string, unknown>>,
+  excludeIds?: ReadonlySet<string>,
+): string {
+  const rows: string[] = []
+  for (const annotation of annotations) {
+    if (!annotation) continue
+    if (excludeIds?.has(String(annotation.id ?? ''))) continue
+    if (!isReviewAnnotation(annotation as Pick<PdfAnnotationObject, 'type'>)) continue
+    rows.push(fingerprintOne(annotation))
+  }
+  rows.sort()
+  return rows.join('||')
+}

@@ -131,7 +131,7 @@ export function ResubmissionUploadCard({
     setDraft({ file, status: 'uploading', progress: 0 })
     setError(null)
 
-    const tokenRes = await uploadDefenseToken(file.name)
+    const tokenRes = await uploadDefenseToken(file.name, defenseType)
     if (!tokenRes.success || !tokenRes.payload) {
       setDraft(null)
       setError(tokenRes.message)
@@ -213,6 +213,7 @@ export function ResubmissionUploadCard({
       fileName: draft.file.name,
       size: draft.file.size,
       mimeType: 'application/pdf',
+      defenseType,
     })
     setSubmitting(false)
     if (!res.success) {

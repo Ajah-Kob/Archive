@@ -16,6 +16,47 @@ import type {
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024
 
+const DEFENSE_TYPES = new Set<string>(['PROPOSAL', 'FINAL'])
+
+/** The client supplies the defense type; never trust it unvalidated. */
+function isDefenseType(value: unknown): value is DefenseType {
+  return typeof value === 'string' && DEFENSE_TYPES.has(value)
+}
+
+/**
+ * Resolve the caller's defense schedule for ONE defense type.
+ *
+ * Type-scoped on purpose. These four upload actions used to resolve the schedule
+ * with a group-only `findFirst` and no `type` filter, so any group holding both
+ * a PROPOSAL and a FINAL schedule got an arbitrary one. The document was then
+ * written to the WRONG defense: the row landed in the database, but the
+ * milestone page (which filters by type, as getStudentDefenseSessionData has
+ * always done) showed nothing, and the faculty page missed it too because it
+ * reads by scheduleId. Every upload action goes through here so they cannot
+ * drift apart again.
+ */
+async function findStudentScheduleByType(
+  userId: number,
+  defenseType: DefenseType,
+): Promise<{ id: number; groupId: number; verdict: DefenseVerdict } | null> {
+  return prisma.defenseSchedule.findFirst({
+    where: {
+      deletedAt: null,
+      type: defenseType,
+      group: {
+        deletedAt: null,
+        students: { some: { userId, deletedAt: null } },
+      },
+    },
+    select: { id: true, groupId: true, verdict: true },
+  })
+}
+
+/** Shared guard for the four actions that need a type-scoped schedule. */
+function missingScheduleMessage() {
+  return 'No defense schedule found for your group.'
+}
+
 // ───────────────────────────── Types ─────────────────────────────
 
 export interface DefenseDocumentUpload {
@@ -23,6 +64,12 @@ export interface DefenseDocumentUpload {
   fileName: string
   size: number
   mimeType: string
+  /**
+   * Which defense this document belongs to. Required: a group can hold both a
+   * PROPOSAL and a FINAL schedule, so the schedule cannot be inferred from the
+   * group alone. See findStudentScheduleByType.
+   */
+  defenseType: DefenseType
 }
 
 export interface DefenseSubmissionReviewItem {
@@ -428,24 +475,17 @@ export async function submitDefenseDocument(
 }> {
   const session = await requireStudent()
   if (!session?.user?.id) return unauthorized
+  if (!isDefenseType(upload?.defenseType)) {
+    return { success: false, message: 'Unknown defense type.' }
+  }
 
-  // Find the defense schedule for the student's group.
-  const schedule = await prisma.defenseSchedule.findFirst({
-    where: {
-      deletedAt: null,
-      group: {
-        deletedAt: null,
-        students: {
-          some: { userId: +session.user.id, deletedAt: null },
-        },
-      },
-    },
-    select: { id: true, groupId: true },
-  })
+  // Find the defense schedule for the student's group, scoped to THIS defense
+  // type so a group with both a PROPOSAL and a FINAL schedule cannot mismatch.
+  const schedule = await findStudentScheduleByType(+session.user.id, upload.defenseType)
   if (!schedule) {
     return {
       success: false,
-      message: 'No defense schedule found for your group.',
+      message: missingScheduleMessage(),
     }
   }
 
@@ -527,24 +567,16 @@ export async function resubmitDefenseDocument(
 }> {
   const session = await requireStudent()
   if (!session?.user?.id) return unauthorized
+  if (!isDefenseType(upload?.defenseType)) {
+    return { success: false, message: 'Unknown defense type.' }
+  }
 
-  // Find the defense schedule for the student's group.
-  const schedule = await prisma.defenseSchedule.findFirst({
-    where: {
-      deletedAt: null,
-      group: {
-        deletedAt: null,
-        students: {
-          some: { userId: +session.user.id, deletedAt: null },
-        },
-      },
-    },
-    select: { id: true, verdict: true },
-  })
+  // Type-scoped, same reason as submitDefenseDocument.
+  const schedule = await findStudentScheduleByType(+session.user.id, upload.defenseType)
   if (!schedule) {
     return {
       success: false,
-      message: 'No defense schedule found for your group.',
+      message: missingScheduleMessage(),
     }
   }
 
@@ -683,24 +715,16 @@ export async function replaceDefenseDocument(
 ): Promise<{ success: boolean; message: string }> {
   const session = await requireStudent()
   if (!session?.user?.id) return unauthorized
+  if (!isDefenseType(upload?.defenseType)) {
+    return { success: false, message: 'Unknown defense type.' }
+  }
 
-  // Find the defense schedule for the student's group.
-  const schedule = await prisma.defenseSchedule.findFirst({
-    where: {
-      deletedAt: null,
-      group: {
-        deletedAt: null,
-        students: {
-          some: { userId: +session.user.id, deletedAt: null },
-        },
-      },
-    },
-    select: { id: true },
-  })
+  // Type-scoped, same reason as submitDefenseDocument.
+  const schedule = await findStudentScheduleByType(+session.user.id, upload.defenseType)
   if (!schedule) {
     return {
       success: false,
-      message: 'No defense schedule found for your group.',
+      message: missingScheduleMessage(),
     }
   }
 
@@ -756,6 +780,7 @@ export async function replaceDefenseDocument(
  */
 export async function uploadDefenseToken(
   fileName: string,
+  defenseType: unknown,
 ): Promise<{
   success: boolean
   message: string
@@ -771,24 +796,20 @@ export async function uploadDefenseToken(
   ) {
     return { success: false, message: 'Invalid file name.' }
   }
+  if (!isDefenseType(defenseType)) {
+    return { success: false, message: 'Unknown defense type.' }
+  }
 
-  // Find the defense schedule for the student's group.
-  const schedule = await prisma.defenseSchedule.findFirst({
-    where: {
-      deletedAt: null,
-      group: {
-        deletedAt: null,
-        students: {
-          some: { userId: +session.user.id, deletedAt: null },
-        },
-      },
-    },
-    select: { id: true },
-  })
+  // Type-scoped, and deliberately the SAME resolver the submit actions use: the
+  // token is pinned to `defense/{scheduleId}/...` and verifyDefenseUpload then
+  // checks the uploaded pathname against that same id. If these two ever
+  // resolved different schedules, the upload would be rejected after the user had
+  // already waited for the bytes to land.
+  const schedule = await findStudentScheduleByType(+session.user.id, defenseType)
   if (!schedule) {
     return {
       success: false,
-      message: 'No defense schedule found for your group.',
+      message: missingScheduleMessage(),
     }
   }
 

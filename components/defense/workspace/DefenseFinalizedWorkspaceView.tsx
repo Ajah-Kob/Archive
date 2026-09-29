@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, CalendarDays, FolderOpen, Loader2, Lock, MessageSquareText, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Loader2, Lock, MessageSquareText, Pencil, TriangleAlert } from 'lucide-react'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
@@ -38,7 +38,7 @@ export interface DefenseFinalizedWorkspaceViewProps {
   backHref?: string
   /** Defense schedule id for fallback backHref (/faculty/defense/[scheduleId]). */
   scheduleId?: number
-  /** Draft status of the viewer's own annotation row — COMMITTED enables re-edit via Open. */
+  /** Draft status of the viewer's own annotation row — COMMITTED enables re-edit via Annotate. */
   draftStatus?: 'DRAFT' | 'COMMITTED' | null
 }
 
@@ -59,15 +59,15 @@ function FinalizedBadge({ isSuperseded }: { isSuperseded: boolean }) {
   )
 }
 
-function OpenButton({ onClick }: { onClick: () => void }) {
+function AnnotateButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex items-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#707dff] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none shrink-0"
     >
-      <FolderOpen className="size-[13px]" strokeWidth={2} />
-      Open
+      <Pencil className="size-[13px]" strokeWidth={2} />
+      Annotate
     </button>
   )
 }
@@ -210,7 +210,7 @@ function AnnotationHydrator({
  *
  * Re-edit flow: while the current version is still IN_REVIEW and not
  * superseded (`!isSuperseded && status === 'IN_REVIEW'`) the header shows an
- * Open button next to the Lock badge. It is not gated on this panelist's own
+ * Annotate button next to the Lock badge. It is not gated on this panelist's own
  * annotation status — a panelist who has not started yet must be able to open
  * the document in order to start. Clicking it
  * toggles this component into edit mode by rendering the full
@@ -249,7 +249,7 @@ export function DefenseFinalizedWorkspaceView({
         : '/faculty/defense')
   // Only the current COMMITTED IN_REVIEW version is re-editable. Superseded
   // (historical) versions and non-IN_REVIEW (APPROVED/NEEDS_REVISION) stay
-  // strictly read-only — no Open affordance. Resubmissions use the Submit
+  // strictly read-only — no Annotate affordance. Resubmissions use the Submit
   // Review flow, not re-editing.
   //
   // Deliberately not gated on draftStatus: that is a per-panelist value, and
@@ -394,7 +394,7 @@ export function DefenseFinalizedWorkspaceView({
                   <MessageSquareText className="size-[13px]" strokeWidth={1.75} />
                   Comments
                 </button>
-                {!isResubmission && canAnnotate && <OpenButton onClick={() => setIsEditing(true)} />}
+                {!isResubmission && canAnnotate && <AnnotateButton onClick={() => setIsEditing(true)} />}
                 {submission.reviewedAt && (
                   <span className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
                     <CalendarDays className="size-[12px] text-[#9ea8c6]" strokeWidth={1.75} />

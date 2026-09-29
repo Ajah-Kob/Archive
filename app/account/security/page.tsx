@@ -10,7 +10,7 @@ export default async function AccountSecurityPage() {
   if (!me) redirect('/login')
 
   return (
-    <section className="min-h-full flex flex-col pt-[30px] px-[30px] pb-[30px]">
+    <section className="min-h-full flex flex-col pt-[30px] px-4 sm:px-[30px] pb-[30px] overflow-y-auto">
       <PageLabel label="Security" />
 
       <div className="flex flex-col">
@@ -23,7 +23,7 @@ export default async function AccountSecurityPage() {
       </div>
 
       <div className="flex-1 mt-6">
-        <FormSecurity className="w-full max-w-80" />
+        <FormSecurity className="w-full max-w-md" />
       </div>
     </section>
   )

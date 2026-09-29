@@ -27,7 +27,7 @@ export default function FormSecurity({ className }: { className?: string }) {
     <form
       ref={formRef}
       action={handleSubmit}
-      className={`bg-white p-5 md:p-10 mx-auto flex justify-center ${className}`}
+      className={`bg-white border border-[#eceef8] rounded-[14px] p-4 sm:p-6 md:p-8 shadow-[0px_4px_24px_0px_rgba(0,0,0,0.03),0px_20px_60px_-4px_rgba(112,125,255,0.16),0px_0px_0px_1px_rgba(112,125,255,0.06)] mx-auto flex justify-center ${className}`}
       noValidate
       data-loading={isPending}
     >
@@ -40,8 +40,10 @@ export default function FormSecurity({ className }: { className?: string }) {
                 required
                 name="current_password"
                 type="password"
-                className={`w-full ${
-                  state.errors?.current_password ? 'has-errors' : ''
+                className={`w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors ${
+                  state.errors?.current_password
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : ''
                 }`}
                 placeholder="**************"
               />
@@ -59,8 +61,10 @@ export default function FormSecurity({ className }: { className?: string }) {
                 required
                 name="new_password"
                 type="password"
-                className={`w-full ${
-                  state.errors?.new_password ? 'has-errors' : ''
+                className={`w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors ${
+                  state.errors?.new_password
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : ''
                 }`}
                 placeholder="**************"
               />
@@ -78,8 +82,10 @@ export default function FormSecurity({ className }: { className?: string }) {
                 required
                 name="confirm_password"
                 type="password"
-                className={`w-full ${
-                  state.errors?.confirm_password ? 'has-errors' : ''
+                className={`w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors ${
+                  state.errors?.confirm_password
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : ''
                 }`}
                 placeholder="**************"
               />

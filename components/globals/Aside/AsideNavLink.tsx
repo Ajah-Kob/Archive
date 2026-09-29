@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import {
   LayoutDashboard,
   FileText,
+  Gauge,
   BookMarked,
   Layers,
   ClipboardCheck,
@@ -77,6 +78,14 @@ export function NavLinks({
       label: 'OVERVIEW',
       items: [
         { label: 'Dashboard', href: dashboardHref, icon: LayoutDashboard, show: !isGuest && !isStudent },
+        // Program Chair gets the program-wide dashboard; everyone else keeps
+        // their role home as the dashboard link.
+        {
+          label: 'Chair Dashboard',
+          href: '/faculty/dashboard',
+          icon: Gauge,
+          show: isProgramChair,
+        },
         { label: 'Join Archive', href: '/guest', icon: UserPlus, show: isGuest },
       ],
     },

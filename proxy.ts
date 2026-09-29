@@ -89,6 +89,10 @@ export async function proxy(req: NextRequest) {
         if (token.isCoordinator !== true) return redirectHome()
         break
       case 'archiving':
+      // Program Chair dashboard — same audience as archiving. The page's
+      // server actions re-verify the role against the DB, so this is the fast
+      // gate rather than the authority.
+      case 'dashboard':
         if (!isAdminOrProgramChair(token)) return redirectHome()
         break
       default:

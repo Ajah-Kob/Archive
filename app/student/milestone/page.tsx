@@ -144,7 +144,7 @@ export default async function MilestonePage() {
       <JoinedToast message="You've joined your section." />
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <div className="flex-1 min-h-0 overflow-y-auto p-8">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:p-8">
           <div className="min-h-full">
             <div className="z-0 flex min-w-0 flex-col gap-4">
               <div className="relative flex min-w-0 flex-col gap-4">
@@ -158,7 +158,7 @@ export default async function MilestonePage() {
                   <div key={header} className="flex flex-col gap-4">
                     {/* Capstone header — checkered finish-line treatment, aligned with the cards */}
                     <div className="flex w-full bg-[#eef0f6]">
-                      <p className="flex items-center py-2 font-heading p-12 font-bold text-[15px] leading-[22px] text-[#1e2145]">
+                      <p className="flex items-center py-2 px-4 sm:px-8 font-heading font-bold text-[15px] leading-[22px] text-[#1e2145]">
                         {header === 'CAPSTONE 1' ? 'Capstone 1' : 'Capstone 2'}
                       </p>
                     </div>

@@ -37,8 +37,8 @@ export function FinalTopicModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
-      <div className="relative bg-white border border-[#eceef8] rounded-[16px] w-[420px] px-[24px] pt-[26px] pb-[22px] shadow-[0px_24px_64px_0px_rgba(16,20,58,0.16),0px_4px_16px_0px_rgba(0,0,0,0.06)] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] p-4">
+      <div className="relative bg-white border border-[#eceef8] rounded-[16px] max-w-full w-[420px] px-[24px] pt-[26px] pb-[22px] shadow-[0px_24px_64px_0px_rgba(16,20,58,0.16),0px_4px_16px_0px_rgba(0,0,0,0.06)] flex flex-col">
         <button
           onClick={onClose}
           aria-label="Close"

@@ -317,7 +317,7 @@ export function ResubmittedDocumentCard({
                 </p>
               )}
             </div>
-            <div className="flex items-start gap-[10px] shrink-0">
+            <div className="flex items-start gap-[10px] shrink-0 max-sm:shrink max-sm:flex-wrap">
               {href ? (
                 <a
                   href={href}

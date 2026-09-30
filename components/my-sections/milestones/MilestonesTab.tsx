@@ -126,7 +126,7 @@ export function MilestonesTab({ sectionId, initial, capstone1Open: initialCap1Op
     const isLocked = !gateOpen
     return (
       <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] flex flex-col min-w-0 overflow-hidden">
-        <div className="px-5 py-[12px] border-b border-[#f0f2fa] flex items-center justify-between gap-3">
+        <div className="px-4 sm:px-5 py-[12px] border-b border-[#f0f2fa] flex items-center justify-between gap-3">
           <h4 className="font-heading font-bold text-[13px] leading-[19.5px] text-[#1e3a8a] tracking-[-0.14px]">{title}</h4>
           <span className="flex items-center gap-2 shrink-0">
             {gateOpen ? (
@@ -154,7 +154,7 @@ export function MilestonesTab({ sectionId, initial, capstone1Open: initialCap1Op
         </div>
         <div className="relative flex flex-col py-[4px]">
           {phaseItems.map((item) => (
-            <div key={item.key} className="flex items-center justify-between gap-[10px] px-5 py-[8px]">
+            <div key={item.key} className="flex items-center justify-between gap-[10px] px-4 sm:px-5 py-[8px]">
               <span className="min-w-0 truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#1e2145]">{item.label}</span>
               <span className="flex items-center gap-[10px] shrink-0">
                 <StatusDot open={item.open} />
@@ -163,7 +163,7 @@ export function MilestonesTab({ sectionId, initial, capstone1Open: initialCap1Op
                   onClick={() => setPendingMilestone({ item, willOpen: !item.open })}
                   disabled={!!busyKey || !!busyPhase || isLocked}
                   aria-label={item.open ? `Lock ${item.label}` : `Unlock ${item.label}`}
-                  className={`flex items-center justify-center size-[26px] rounded-[7px] transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${item.open ? 'bg-white border border-[#dddff0] text-[#8a93b4] hover:bg-gray-50 hover:text-[#5a6382]' : 'bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#eeefff]'}`}
+                  className={`flex items-center justify-center size-[34px] sm:size-[26px] rounded-[7px] transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${item.open ? 'bg-white border border-[#dddff0] text-[#8a93b4] hover:bg-gray-50 hover:text-[#5a6382]' : 'bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#eeefff]'}`}
                 >
                   {busyKey === item.key ? <Loader2 className="size-[12px] animate-spin" /> : item.open ? <Lock className="size-[12px]" strokeWidth={2.25} /> : <Unlock className="size-[12px]" strokeWidth={2.25} />}
                 </button>

@@ -223,6 +223,23 @@ export function derivePanelistResubmissionState(
   return { status: 'FOR_REVIEW', approvedVersion: null, carriedForward: false }
 }
 
+/**
+ * The submission a panelist actually approved, looked up by version.
+ *
+ * Must be driven by `derivePanelistResubmissionState().approvedVersion`, which
+ * resolves the version from the decision timestamp. Scanning for the newest
+ * version carrying an APPROVED review instead pins the card to the wrong file:
+ * a carry-forward copies APPROVED onto the newer submission, so the scan finds
+ * a document this panelist never opened. Newer versions stay in History.
+ */
+export function resolveApprovedVersion<T extends { version: number }>(
+  versions: T[],
+  approvedVersion: number | null,
+): T | null {
+  if (approvedVersion == null) return null
+  return versions.find((v) => v.version === approvedVersion) ?? null
+}
+
 type VersionLike = {
   version: number
   dateSubmitted?: string

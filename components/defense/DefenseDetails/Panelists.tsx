@@ -83,7 +83,7 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
 
   return (
     <div
-      className={`bg-white ${border} ${radius} grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)] max-sm:grid-cols-1 max-sm:gap-2 items-center px-[17px] py-[6px] min-h-[61px] gap-2`}
+      className={`bg-white ${border} ${radius} grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)] max-sm:grid-cols-1 max-sm:gap-2 items-center px-[17px] py-[6px] min-h-[61px] gap-2`}
     >
       {/* Col1: UserProfile avatar 35px gradient #1e3a8a→#2d52b8, name + email + Me */}
       <div className="flex items-center gap-2.5 min-w-0 sm:h-[50px] w-full">
@@ -96,19 +96,24 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
         />
         {isMe ? <MeBadge /> : null}
       </div>
-      {/* Col2 center: panelist→panelist status (Pending vs Finished) */}
-      <div className="flex items-center justify-center sm:h-[50px] sm:px-2 min-w-0 w-full">
+
+      {/* Col2: role pill — kept beside the identity it describes, rather than
+          pushed to the far edge away from the name it belongs to. */}
+      <div className="flex items-center justify-start sm:h-[50px] shrink-0 w-full sm:w-auto">
+        <PanelPill role={panelist.role} />
+      </div>
+
+      {/* Col3: panelist→panelist feedback status, right-aligned. This is the
+          column you scan down, so it gets the edge. Left-aligned below sm to
+          match the stacked order. */}
+      <div className="flex items-center justify-end sm:h-[50px] sm:pl-2 min-w-0 w-full">
         <p
-          className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-center ${
+          className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-left sm:text-right ${
             centerText.startsWith('✓') ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
           }`}
         >
           {centerText}
         </p>
-      </div>
-      {/* Col3 right: pill Chair amber vs Member indigo */}
-      <div className="flex items-center justify-end sm:h-[50px] shrink-0 w-full sm:w-auto">
-        <PanelPill role={panelist.role} />
       </div>
     </div>
   )

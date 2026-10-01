@@ -22,7 +22,7 @@ export default async function MyTeamPage() {
     <section className="h-full flex min-h-0">
       <PageLabel label="My Team" />
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
+        <div className="flex-1 min-h-0 px-4 sm:px-8 py-[30px] flex flex-col">
           <MilestonesView data={workspace} />
         </div>
       </div>

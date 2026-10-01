@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Metadata } from 'next'
-import { ArrowLeft } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { getServerSession } from 'next-auth'
 import { notFound, redirect } from 'next/navigation'
 import { authOptions } from '@/lib/authOptions'
@@ -106,7 +106,7 @@ export default async function MilestoneDetailPage({
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
-          <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 px-4 py-4 sm:px-8 sm:py-[30px] flex flex-col overflow-hidden">
             {isLocked ? (
               <LockedChapterPlaceholder chapterLabel="Archiving" />
             ) : (
@@ -135,7 +135,7 @@ export default async function MilestoneDetailPage({
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <GroupContext />
 
-          <div className="flex-1 min-h-0 px-8 py-[30px] flex flex-col">
+          <div className="flex-1 min-h-0 px-4 py-4 sm:px-8 sm:py-[30px] flex flex-col">
             <ChapterSubmissionView payload={data} />
           </div>
         </div>
@@ -154,17 +154,20 @@ export default async function MilestoneDetailPage({
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <GroupContext />
 
-        <div className="flex-1 min-h-0 p-8 flex flex-col gap-3">
+        <div className="flex-1 min-h-0 p-4 sm:p-8 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 className="font-heading font-bold text-[22px] leading-[33px] text-[#10133a] tracking-[-0.135px]">
               {row?.label ?? 'Workspace'}
             </h2>
+            {/* Matches the coordinator back link in SectionTabs -- plain muted
+                text, no pill. Icon is centered on the x-height, so drop the
+                negative margin rather than nudging the row with padding. */}
             <Link
               href="/student/milestone"
-              className="flex gap-[7px] items-center h-[30px] px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
+              className="inline-flex items-center gap-0.5 font-sans font-semibold text-[13px] text-[#8a93b4] hover:text-[#5a6382] hover:bg-white/60 active:text-[#5a6382] active:bg-white/60 rounded-full px-2 py-1 transition-colors shrink-0"
             >
-              <ArrowLeft className="size-3.5" />
-              Back to Milestones
+              <ChevronLeft className="size-4" />
+              Back
             </Link>
           </div>
           <p className="font-sans font-medium text-[13.5px] text-[#8a93b4] -mt-1">{row?.header} workspace</p>

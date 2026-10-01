@@ -144,7 +144,9 @@ export default async function MilestonePage() {
       <JoinedToast message="You've joined your section." />
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:p-8">
+        {/* Square padding: p-4 keeps the vertical inset equal to the 16px
+              side gutter on mobile, where sm:p-8 has not kicked in yet. */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8">
           <div className="min-h-full">
             <div className="z-0 flex min-w-0 flex-col gap-4">
               <div className="relative flex min-w-0 flex-col gap-4">
@@ -158,7 +160,12 @@ export default async function MilestonePage() {
                   <div key={header} className="flex flex-col gap-4">
                     {/* Capstone header — checkered finish-line treatment, aligned with the cards */}
                     <div className="flex w-full bg-[#eef0f6]">
-                      <p className="flex items-center py-2 px-4 sm:px-8 font-heading font-bold text-[15px] leading-[22px] text-[#1e2145]">
+                      {/* Left padding clears the 30px progress line, which sits
+                          behind this header as a white bar -- too little and it
+                          erases the first letters. 46px also lines the header up
+                          with the cards' left edge (30px icon column + 16px gap).
+                          sm:px-12 keeps the desktop inset unchanged. */}
+                      <p className="flex items-center py-2 pl-[46px] pr-4 sm:px-12 font-heading font-bold text-[15px] leading-[22px] text-[#1e2145]">
                         {header === 'CAPSTONE 1' ? 'Capstone 1' : 'Capstone 2'}
                       </p>
                     </div>

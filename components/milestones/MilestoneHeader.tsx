@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ArrowLeft, History } from 'lucide-react'
+import { ChevronLeft, History } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 
 interface MilestoneHeaderProps {
@@ -62,9 +62,9 @@ export function MilestoneHeader({ onDocumentHistory }: MilestoneHeaderProps) {
           <button
             type="button"
             onClick={() => router.push('/student/milestone')}
-            className="flex items-center gap-[7px] h-[30px] px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
+            className="inline-flex items-center gap-0.5 font-sans font-semibold text-[13px] text-[#8a93b4] hover:text-[#5a6382] hover:bg-white/60 active:text-[#5a6382] active:bg-white/60 rounded-full px-2 py-1 transition-colors shrink-0"
           >
-            <ArrowLeft className="size-3.5" />
+            <ChevronLeft className="size-4" />
             Back
           </button>
         </>

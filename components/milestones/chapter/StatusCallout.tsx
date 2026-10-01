@@ -79,33 +79,35 @@ export function StatusCallout({
   return (
     <section
       aria-live="polite"
-      className={`rounded-[14px] border px-[16px] py-[14px] sm:flex sm:items-center sm:gap-[16px] sm:px-[22px] sm:py-[18px] ${hero.boxClass}`}
+      className={`flex flex-col gap-[12px] sm:flex-row sm:items-center sm:gap-[16px] rounded-[14px] border px-[18px] py-[16px] sm:px-[22px] sm:py-[18px] ${hero.boxClass}`}
     >
-      {/* Mobile stacks icon / title / message / button on their own rows; from sm
-          up the flex row below restores the original desktop layout exactly. */}
-      <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:gap-[16px] sm:min-w-0 sm:flex-1">
+      {/* Mirrors VerdictCallout's CalloutShell: icon and text stay side by side
+          on every width, and only the action drops to its own full-width row
+          below sm. */}
+      <div className="flex items-center gap-[12px] sm:gap-[16px] min-w-0 flex-1">
         <div
           className={`flex size-[40px] items-center justify-center rounded-[12px] border shrink-0 ${hero.boxClass}`}
         >
           <Icon className={`size-[20px] ${hero.iconClass}`} strokeWidth={2} />
         </div>
 
-        <h2 className={`font-sora text-[15px] font-semibold min-w-0 sm:flex-none ${hero.iconClass}`}>
-          {hero.headline(chapterLabel)}
-        </h2>
-
-        <p className="text-[13px] text-[#5a6382] min-w-0 sm:flex-1">{hero.context(current)}</p>
-
-        {state === 'NEEDS_REVISION' && onReviewFeedback && (
-          <button
-            type="button"
-            onClick={onReviewFeedback}
-            className="w-full shrink-0 rounded-[9px] border border-[rgba(225,29,72,0.4)] bg-[#e11d48] px-[18px] py-[9px] font-sora text-[13px] font-medium text-white shadow-[0px_2px_4px_rgba(225,29,72,0.2)] transition-all hover:bg-[#c91a40] sm:ml-auto sm:w-auto"
-          >
-            Review feedback
-          </button>
-        )}
+        <div className="min-w-0 flex-1">
+          <h2 className={`font-sora text-[15px] font-semibold ${hero.iconClass}`}>
+            {hero.headline(chapterLabel)}
+          </h2>
+          <p className="text-[13px] text-[#5a6382]">{hero.context(current)}</p>
+        </div>
       </div>
+
+      {state === 'NEEDS_REVISION' && onReviewFeedback && (
+        <button
+          type="button"
+          onClick={onReviewFeedback}
+          className="flex w-full sm:w-auto shrink-0 items-center justify-center rounded-[9px] border border-[rgba(225,29,72,0.4)] bg-[#e11d48] px-[18px] py-[9px] font-sora text-[13px] font-medium text-white shadow-[0px_2px_4px_rgba(225,29,72,0.2)] transition-all hover:bg-[#c91a40]"
+        >
+          Review feedback
+        </button>
+      )}
     </section>
   )
 }

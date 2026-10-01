@@ -139,8 +139,8 @@ export default function TemplatesPage({
             ) : undefined
           }
         >
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="w-[280px] shrink-0 py-[8px]">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <div className="w-full sm:w-[280px] sm:shrink-0 sm:py-[8px]">
               <SearchBar
                 value={searchTerm}
                 onChange={setSearchTerm}

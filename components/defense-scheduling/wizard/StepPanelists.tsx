@@ -19,6 +19,10 @@ interface SlotZoneProps {
   onDragEnd: () => void
   onZoneClick: () => void
   onRemoveMember: (memberId: number) => void
+  /** Ids currently held by a zone, so an assigned card can show the same
+   *  selected ring as a card in the pool. */
+  selectedMemberId: number | null
+  onSelectMember: (memberId: number) => void
 }
 
 function SlotZone({
@@ -34,6 +38,8 @@ function SlotZone({
   onDragEnd,
   onZoneClick,
   onRemoveMember,
+  selectedMemberId,
+  onSelectMember,
 }: SlotZoneProps) {
   const icon = isChair ? (
     <Crown className="size-[13px] text-[#f59e0b] shrink-0" />
@@ -77,8 +83,30 @@ function SlotZone({
               draggable
               onDragStart={(e) => onDragStart(e, member.id)}
               onDragEnd={onDragEnd}
-              title="Drag to change role"
-              className="group flex w-full h-fit items-center justify-between gap-[8px] px-[12px] py-[8px] rounded-[10px] bg-[#f4f5fc] border border-[#e8ebf8] hover:border-[rgba(112,125,255,0.5)] transition-colors cursor-grab active:cursor-grabbing select-none"
+              // Tap to select, then tap a zone to change role. Without this an
+              // assigned member could only be moved by dragging, which never
+              // fires on touch. stopPropagation because the click would
+              // otherwise reach the zone and reassign them to where they
+              // already are.
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelectMember(member.id)
+              }}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selectedMemberId === member.id}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return
+                e.preventDefault()
+                e.stopPropagation()
+                onSelectMember(member.id)
+              }}
+              title="Tap to select, then tap a slot — or drag"
+              className={`group flex w-full h-fit items-center justify-between gap-[8px] px-[12px] py-[8px] rounded-[10px] bg-[#f4f5fc] border transition-colors cursor-pointer select-none ${
+                selectedMemberId === member.id
+                  ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.35)]'
+                  : 'border-[#e8ebf8] hover:border-[rgba(112,125,255,0.5)]'
+              }`}
             >
               <UserProfile
                 initials={getInitials(member.name)}
@@ -87,7 +115,13 @@ function SlotZone({
               />
               <button
                 type="button"
-                onClick={() => onRemoveMember(member.id)}
+                onClick={(e) => {
+                  // Must not bubble: the zone's own click handler would read
+                  // this as "assign the selected member to this zone".
+                  e.stopPropagation()
+                  onRemoveMember(member.id)
+                }}
+                aria-label={`Remove ${member.name} from ${label}`}
                 title="Remove"
                 className="shrink-0 rounded-[6px] p-[2px] hover:bg-[rgba(239,68,68,0.1)] transition-colors cursor-pointer"
               >
@@ -177,7 +211,14 @@ export function StepPanelists({
     assignToMembers(member)
   }
 
-  // Click fallback: assign the selected faculty card to a zone.
+  // Tapping a card toggles it. One toggle for both the pool and the assigned
+  // slots, so the same gesture means the same thing wherever the card is.
+  function selectMember(memberId: number) {
+    setSelectedId((prev) => (prev === memberId ? null : memberId))
+  }
+
+  // Click fallback: assign or move the selected member to a zone. Works on
+  // touch, where drag-and-drop never fires, and doubles as the keyboard path.
   function handleZoneClick(slot: PanelSlot) {
     if (selectedId == null) return
     const member = faculty.find((f) => f.id === selectedId)
@@ -209,11 +250,18 @@ export function StepPanelists({
   )
 
   return (
-    <div className="w-[700px] grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-[20px] max-sm:grid-cols-1">
+    <div className="w-full max-w-[700px] grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-[20px] max-sm:grid-cols-1">
       <div className="flex flex-col w-full gap-[10px] h-full">
         <span className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
           Faculty
         </span>
+        {/* Visible on every viewport. The `title` tooltips this replaces only
+            appeared on hover, so on touch the tap-to-assign gesture was
+            undiscoverable. */}
+        <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4] -mt-[4px]">
+          Tap a name to select it, then tap a slot. You can also drag on a
+          desktop.
+        </p>
         <div className="flex flex-col gap-[8px] h-[300px] overflow-y-auto pr-[4px]">
           {available.length === 0 ? (
             <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#a0a8c4]">
@@ -232,8 +280,16 @@ export function StepPanelists({
                 onClick={() =>
                   setSelectedId((prev) => (prev === member.id ? null : member.id))
                 }
-                title="Click to select, then click a slot — or drag"
-                className={`flex items-center h-fit gap-[8px] px-[12px] py-[8px] rounded-[10px] border bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] cursor-pointer select-none hover:border-[rgba(112,125,255,0.5)] hover:shadow-[0px_2px_8px_rgba(112,125,255,0.12)] transition-all ${
+            title="Tap to select, then tap a slot — or drag"
+            role="button"
+            tabIndex={0}
+            aria-pressed={selectedId === member.id}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return
+              e.preventDefault()
+              selectMember(member.id)
+            }}
+            className={`flex items-center h-fit gap-[8px] px-[12px] py-[8px] rounded-[10px] border bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] cursor-pointer select-none hover:border-[rgba(112,125,255,0.5)] hover:shadow-[0px_2px_8px_rgba(112,125,255,0.12)] transition-all ${
                   selectedId === member.id
                     ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.35)]'
                     : 'border-[#e8ebf8]'
@@ -264,6 +320,8 @@ export function StepPanelists({
           onDragEnd={handleDragEnd}
           onZoneClick={() => handleZoneClick('chair')}
           onRemoveMember={() => onRemove('chair')}
+          selectedMemberId={selectedId}
+          onSelectMember={selectMember}
         />
         <SlotZone
           label="Panel Members"
@@ -281,6 +339,8 @@ export function StepPanelists({
             if (slots.member1?.id === id) onRemove('member1')
             else if (slots.member2?.id === id) onRemove('member2')
           }}
+          selectedMemberId={selectedId}
+          onSelectMember={selectMember}
         />
       </div>
     </div>

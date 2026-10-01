@@ -109,7 +109,63 @@ export default function TemplateTable({
         }
       `}</style>
       <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="overflow-x-auto flex-1 min-h-0 templates-grid-scroll">
+        {/* Mobile: one card per template, so all five columns are readable
+            without a sideways swipe. Desktop grid below is untouched. */}
+        <div className="sm:hidden flex-1 min-h-0 overflow-y-auto p-3">
+          {loading ? (
+            <TableSkeleton />
+          ) : error ? (
+            <EmptyState heading="Failed to Load Templates" description={error} variant="table" />
+          ) : templates.length === 0 ? (
+            <EmptyState
+              heading={isEmpty ? 'No Templates Uploaded Yet' : 'No Templates Found'}
+              description={
+                isEmpty
+                  ? 'Wait for the template uploads.'
+                  : "We couldn't find any documents matching your current search."
+              }
+              variant="table"
+            />
+          ) : (
+            templates.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-col gap-[10px] mb-[10px] last:mb-0 rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px]"
+              >
+                <div className="flex items-center gap-[12px] min-w-0">
+                  <FileIcon filename={item.name} />
+                  <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
+                    {item.name}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[6px]">
+                  <span className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+                    {item.dateUploaded}
+                  </span>
+                  <span className="text-[#c4cadf] text-[12px]">·</span>
+                  <span className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#5a6382]">
+                    {item.size}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-[10px]">
+                  <div className="min-w-0">
+                    <UserProfile
+                      initials={getInitials(item.uploadedBy)}
+                      name={item.uploadedBy}
+                      email={item.uploadedByEmail}
+                    />
+                  </div>
+                  {getRowActions && <ActionMenu items={getRowActions(item)} />}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop: the original five-column grid. */}
+        <div className="hidden sm:flex flex-col flex-1 min-h-0 overflow-x-auto templates-grid-scroll">
           {/* min-w keeps columns readable on small screens — name (1.9fr) stays widest */}
           <div className="min-w-[720px] flex flex-col min-h-full">
             {/* Header row — font style matches defense scheduling */}

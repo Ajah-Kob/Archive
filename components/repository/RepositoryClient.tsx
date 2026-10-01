@@ -302,13 +302,13 @@ export function RepositoryClient({
           ) : undefined
         }
       >
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <SearchBar
             value={searchTerm}
             onChange={setSearchTerm}
             placeholder="Search by title, keyword, author, or section..."
             ariaLabel="Search repository"
-            className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+            className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
             clearable
           />
 
@@ -317,7 +317,7 @@ export function RepositoryClient({
               top-right. HeaderBar flex-wraps, so below ~1024px this drops to
               a second line instead of overflowing. */}
           <div
-            className="w-[300px] max-w-full shrink-0"
+            className="w-full sm:w-[300px] sm:shrink-0"
             role="group"
             aria-label="Filter by published date range"
           >

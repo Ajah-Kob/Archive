@@ -69,10 +69,10 @@ export function RepositorySkeleton() {
   return (
     <div className="flex flex-col flex-1 min-h-0 animate-pulse motion-reduce:animate-none">
       {/* HeaderBar strip — real: px-8 bg-[#eef2ff] border-b min-h-[56px] */}
-      <div className="flex flex-wrap h-fit items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+      <div className="flex flex-wrap h-fit items-center justify-between gap-x-[16px] gap-y-[10px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
         <div className="flex flex-wrap items-center gap-1 min-w-0">
-          {/* SearchBar is flex-[0_0_320px] in the real header */}
-          <div className="flex-[0_0_320px] max-w-[320px] min-w-[180px] h-[37.5px] rounded-lg bg-[#dfe3fb]" />
+          {/* SearchBar is w-full sm:flex-[0_0_320px] in the real header */}
+          <div className="w-full sm:flex-[0_0_320px] sm:max-w-[320px] h-[37.5px] rounded-lg bg-[#dfe3fb]" />
           {/* published-date range pair — w-[300px] grid-cols-2 in the real header */}
           <div className="w-[300px] max-w-full shrink-0 grid grid-cols-2 gap-[12px]">
             <div className="h-[40px] rounded-md bg-white border border-[#e4e7f6]" />

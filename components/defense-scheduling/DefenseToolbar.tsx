@@ -95,7 +95,7 @@ export default function DefenseToolbar({
         onChange={onSearchChange}
         placeholder="Search schedules..."
         ariaLabel="Search defense schedules"
-        className="flex-1 min-w-[200px] max-w-[320px]"
+        className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[320px]"
       />
 
       <Filter

@@ -124,17 +124,17 @@ export function FacultyList({ advisersOnly = false }: { advisersOnly?: boolean }
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+        <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
           {loading ? (
             <>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="h-[37.5px] w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                <div className="h-[37.5px] w-full sm:w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
               </div>
               <div className="h-[37.5px] w-[150px] rounded-[9px] bg-[#dfe3fb] animate-pulse" />
             </>
           ) : (
             <>
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
                 <SearchBar
                   value={search}
                   onChange={setSearch}
@@ -144,7 +144,7 @@ export function FacultyList({ advisersOnly = false }: { advisersOnly?: boolean }
                   ariaLabel={
                     advisersOnly ? 'Search advisers' : 'Search faculty'
                   }
-                  className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+                  className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
                 />
               </div>
               {viewerCanManage && !advisersOnly ? <CopyJoinCode /> : null}
@@ -152,7 +152,7 @@ export function FacultyList({ advisersOnly = false }: { advisersOnly?: boolean }
           )}
         </div>
 
-        <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
+        <div className="flex-1 min-h-0 pt-[16px] px-4 pb-[30px] sm:px-8 flex flex-col">
           <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
             {loading ? (
               <FacultyTableSkeleton />

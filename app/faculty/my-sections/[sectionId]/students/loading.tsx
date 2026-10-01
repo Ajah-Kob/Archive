@@ -7,7 +7,7 @@ export default function SectionStudentsLoading() {
     <div className="flex flex-col flex-1 min-h-0 animate-pulse">
       <div className="w-full flex flex-wrap items-center gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className={`h-[37.5px] w-[320px] max-w-[320px] min-w-[180px] rounded-lg ${BAR}`} />
+          <div className={`h-[37.5px] w-full sm:w-[320px] sm:max-w-[320px] rounded-lg ${BAR}`} />
           <div className={`h-[37.5px] w-[148px] rounded-lg ${BAR}`} />
         </div>
       </div>

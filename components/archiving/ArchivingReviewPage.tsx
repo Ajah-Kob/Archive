@@ -68,13 +68,13 @@ export function ArchivingReviewPage({ submissions }: ArchivingReviewPageProps) {
   return (
     <>
       <HeaderBar>
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <SearchBar
             value={search}
             onChange={setSearch}
             placeholder="Search group, section, title, authors…"
             ariaLabel="Search archiving submissions"
-            className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+            className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
           />
           <Filter
             value={statusFilter}

@@ -24,14 +24,14 @@ export function StudentsActionBar({
   onDeleteClick,
 }: StudentsActionBarProps) {
   return (
-    <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
-      <div className="flex flex-wrap items-center gap-2.5">
+    <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+      <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
         <SearchBar
           value={search}
           onChange={onSearchChange}
           placeholder="Search students…"
           ariaLabel="Search students"
-          className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+          className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
         />
         <Filter
           value={filter}

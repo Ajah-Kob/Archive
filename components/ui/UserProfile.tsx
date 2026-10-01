@@ -4,6 +4,12 @@ interface UserProfileProps {
   email?: string
   /** Details line below name — when omitted, no details row is rendered. Alias for email for backward compat. */
   details?: string
+  /**
+   * Custom content for the line below the name, taking precedence over
+   * `details`/`email`. For details that are not plain text — an icon plus a
+   * role, for instance. Omit both to render no second line.
+   */
+  detailsNode?: React.ReactNode
   gradient?: string
   badge?: string
   /** Override avatar tile size — panelist checklist uses 35px (Figma 1470:5094). Defaults to 32px (size-8) for backward compat. */
@@ -18,12 +24,13 @@ export function UserProfile({
   name,
   email,
   details,
+  detailsNode,
   gradient,
   badge,
   avatarClassName,
 }: UserProfileProps) {
   const detailsText = (details ?? email)?.trim() ?? ''
-  const showDetails = detailsText.length > 0
+  const showDetails = Boolean(detailsNode) || detailsText.length > 0
 
   return (
     <div className="flex gap-2.5 items-center min-w-0">
@@ -50,11 +57,12 @@ export function UserProfile({
             </span>
           )}
         </div>
-        {showDetails && (
-          <p className="font-sans font-medium text-[11.5px] leading-[17.25px] text-[#8a93b4] truncate">
-            {detailsText}
-          </p>
-        )}
+        {showDetails &&
+          (detailsNode ?? (
+            <p className="font-sans font-medium text-[11.5px] leading-[17.25px] text-[#8a93b4] truncate">
+              {detailsText}
+            </p>
+          ))}
       </div>
     </div>
   )

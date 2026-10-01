@@ -75,7 +75,7 @@ function DetailsCard({
   const badgeLabel = resolveBadgeLabel(schedule?.type)
 
   return (
-    <div className="bg-white border border-[#eceef8] rounded-[14px] drop-shadow-[0px_2px_6px_rgba(112,125,255,0.05)] flex items-start px-[16px] py-[8px] w-full flex-col lg:flex-row gap-0">
+    <div className="bg-white border border-[#eceef8] rounded-[14px] drop-shadow-[0px_2px_6px_rgba(112,125,255,0.05)] flex items-start px-[16px] py-[8px] w-full flex-col lg:flex-row gap-0 overflow-hidden">
       {/* Group and Section Info — hugs content, extends with the name */}
       <div className="w-fit max-w-full p-[10px] shrink-0 flex flex-col gap-[2px]">
         <p className="font-['Sora',sans-serif] font-extrabold text-[20px] leading-[normal] tracking-[-0.44px] text-[#10133a] whitespace-nowrap">

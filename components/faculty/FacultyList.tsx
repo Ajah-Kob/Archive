@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { FacultyTable, type FacultyMember } from './FacultyTable'
 import { CopyJoinCode } from '@/components/faculty/CopyJoinCode'
+import { ScrollFadeRegion } from '@/components/ui/ScrollFadeRegion'
 import { FacultyProfileDrawer } from '@/components/faculty/drawer/FacultyProfileDrawer'
 import { RemoveFacultyModal } from '@/components/faculty/modal/RemoveFacultyModal'
 import { useFacultyDrawer } from '@/store/useFacultyDrawer'
@@ -124,31 +125,28 @@ export function FacultyList({ advisersOnly = false }: { advisersOnly?: boolean }
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+        <div className="w-full flex flex-nowrap items-center gap-x-[16px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+          {/* Single line: search and the join-code control scroll together. */}
           {loading ? (
-            <>
-              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-                <div className="h-[37.5px] w-full sm:w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
-              </div>
-              <div className="h-[37.5px] w-[150px] rounded-[9px] bg-[#dfe3fb] animate-pulse" />
-            </>
+            <ScrollFadeRegion className="flex items-center gap-2.5 flex-1">
+              <div className="h-[37.5px] w-[280px] sm:w-[320px] shrink-0 rounded-lg bg-[#dfe3fb] animate-pulse" />
+              <div className="h-[37.5px] w-[150px] shrink-0 rounded-[9px] bg-[#dfe3fb] animate-pulse" />
+            </ScrollFadeRegion>
           ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-                <SearchBar
-                  value={search}
-                  onChange={setSearch}
-                  placeholder={
-                    advisersOnly ? 'Search advisers…' : 'Search faculty…'
-                  }
-                  ariaLabel={
-                    advisersOnly ? 'Search advisers' : 'Search faculty'
-                  }
-                  className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
-                />
-              </div>
+            <ScrollFadeRegion className="flex items-center gap-2.5 flex-1">
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder={
+                  advisersOnly ? 'Search advisers…' : 'Search faculty…'
+                }
+                ariaLabel={
+                  advisersOnly ? 'Search advisers' : 'Search faculty'
+                }
+                className="w-[280px] sm:flex-[0_0_320px] sm:max-w-[320px] shrink-0"
+              />
               {viewerCanManage && !advisersOnly ? <CopyJoinCode /> : null}
-            </>
+            </ScrollFadeRegion>
           )}
         </div>
 

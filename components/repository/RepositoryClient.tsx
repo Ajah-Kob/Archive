@@ -302,22 +302,24 @@ export function RepositoryClient({
           ) : undefined
         }
       >
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+        {/* Single line: search, date range, clear and favourites scroll together
+            inside HeaderBar's strip rather than wrapping onto a second row. */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <SearchBar
             value={searchTerm}
             onChange={setSearchTerm}
             placeholder="Search by title, keyword, author, or section..."
             ariaLabel="Search repository"
-            className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
+            className="w-[280px] sm:flex-[0_0_320px] sm:max-w-[320px] shrink-0"
             clearable
           />
 
           {/* Published-date range. Shares the children row (rather than the
               actions slot) so the admin Upload Research CTA keeps the
-              top-right. HeaderBar flex-wraps, so below ~1024px this drops to
-              a second line instead of overflowing. */}
+              top-right. Capped rather than w-full because the bar is a single
+              line -- a full-width action would collapse the tab strip. */}
           <div
-            className="w-full sm:w-[300px] sm:shrink-0"
+            className="w-[280px] sm:w-[300px] shrink-0"
             role="group"
             aria-label="Filter by published date range"
           >
@@ -346,7 +348,7 @@ export function RepositoryClient({
             disabled={!canFavorite}
             aria-pressed={favoritesOnly}
             title={canFavorite ? undefined : 'Sign in to save favorites'}
-            className={`inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border text-[12.5px] font-sans font-semibold transition-colors disabled:opacity-45 disabled:cursor-not-allowed ${
+            className={`inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border text-[12.5px] font-sans font-semibold transition-colors shrink-0 disabled:opacity-45 disabled:cursor-not-allowed ${
               favoritesOnly
                 ? 'bg-[#fff8e6] border-[#f0d189] text-[#a5730a]'
                 : 'bg-white border-[#dfe3fb] text-[#5a6382] hover:bg-[#f8f9ff]'

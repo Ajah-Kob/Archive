@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ScrollFadeRegion } from '@/components/ui/ScrollFadeRegion'
 import { ChevronDown, ChevronUp, ClipboardCheck, FileText } from 'lucide-react'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
@@ -211,14 +212,16 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="w-full flex flex-wrap items-center gap-2.5 px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="Search teams, chapters…"
-          ariaLabel="Search teams and chapters"
-          className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
-        />
+      <div className="w-full flex flex-nowrap items-center gap-2.5 px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+        {/* Single line: search and the three filters scroll sideways together. */}
+        <ScrollFadeRegion className="flex items-center gap-2.5 flex-1">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search teams, chapters…"
+            ariaLabel="Search teams and chapters"
+            className="w-[280px] sm:flex-[0_0_320px] sm:max-w-[320px] shrink-0"
+          />
 
         <Filter
           value={teamFilter}
@@ -238,13 +241,100 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
           onChange={(v) => setStatusFilter(v as StatusFilter)}
           ariaLabel="Filter by status"
         />
+        </ScrollFadeRegion>
       </div>
 
       <div className="flex-1 min-h-0 pt-[16px] px-4 pb-[30px] sm:px-8 flex flex-col">
         <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="flex-1 min-h-0 overflow-y-auto">
+          {/* Mobile: one card per submission so all six columns are readable
+              without a sideways swipe. The desktop grid below is untouched. */}
+          <div className="sm:hidden p-3">
+            {filtered.length === 0 ? (
+              <EmptyState
+                heading="No Evaluations Found"
+                description="No submissions match your search or filter."
+                variant="table"
+              />
+            ) : (
+              filtered.map((item) => (
+                // Same pattern as the desktop row: a div carrying the button role
+                // rather than a real <button>, so the Evaluate action inside it
+                // is not nested interactive content.
+                <div
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open details for ${item.groupName} ${item.chapter}`}
+                  onClick={() => setDetailsTarget(item)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    setDetailsTarget(item)
+                  }}
+                  className="flex flex-col gap-[10px] w-full mb-[10px] last:mb-0 rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px] text-left transition-colors hover:bg-slate-50/60 cursor-pointer"
+                >
+                  <div className="flex flex-col gap-[5px]">
+                    <div className="flex items-start justify-between gap-[10px]">
+                      <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
+                        {item.groupName}
+                      </span>
+                      <span className="bg-[#f4f6ff] border border-[#e5e8ff] rounded-[6px] px-[7px] py-[2px] font-sans font-bold text-[10px] text-[#707dff] shrink-0">
+                        v{item.version}
+                      </span>
+                    </div>
+                    <span className="truncate font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4]">
+                      {item.fileName} · {formatSize(item.size)}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[6px]">
+                    <span className="truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3d4566]">
+                      {item.chapter}
+                    </span>
+                    <span className="font-sans font-medium text-[11px] leading-[16px] text-[#9ea8c6]">
+                      {item.phase}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[6px]">
+                    <span className="font-sans font-medium text-[11px] leading-[16px] text-[#9ea8c6] uppercase tracking-[0.6px] shrink-0">
+                      By
+                    </span>
+                    <span className="truncate font-sans font-semibold text-[12.5px] leading-[18.75px] text-[#3d4566]">
+                      {item.submittedBy || 'Unknown'}
+                    </span>
+                    <span className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
+                      {formatDate(item.dateSubmitted)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-[10px]">
+                    <TeamsStatusBadge status={item.status} />
+                    {item.status === 'PENDING' ? (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          router.push(`/faculty/document-review/${item.id}`)
+                        }}
+                        className="flex items-center gap-[5px] h-[28px] px-[11px] bg-[#707dff] rounded-[7px] font-sans font-semibold text-[11px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] focus-visible:ring-offset-1"
+                      >
+                        <ClipboardCheck className="size-[12px]" strokeWidth={2.25} />
+                        Evaluate Document
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop: the original six-column grid. */}
+          <div className="hidden sm:block">
           <div
-            className={`grid ${GRID_COLS} items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0`}
+            className={`grid ${GRID_COLS} items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0 z-10`}
           >
             {Object.entries(SORT_LABELS).map(([key, label]) => (
               <SortHeader
@@ -361,6 +451,7 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
           )}
           </div>
         </div>
+          </div>
       </div>
 
       <SubmissionDetailsDrawer

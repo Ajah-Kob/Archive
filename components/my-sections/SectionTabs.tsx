@@ -49,10 +49,9 @@ export function SectionTabs({ sectionId, actions, children }: SectionTabsProps) 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <HeaderBar
-        /* Single line: the back button stays pinned right and the tab strip
-           scrolls sideways instead of the bar wrapping onto two rows.
-           flex-nowrap! is needed because HeaderBar defaults to flex-wrap. */
-        className="sticky top-0 z-30 flex-nowrap!"
+        /* HeaderBar is single-line with a scrollable tab strip by default, so
+           only the sticky positioning is needed here. */
+        className="sticky top-0 z-30"
         actions={actions ? <>{actions}{backButton}</> : backButton}
       >
         {TABS.map((t) => {
@@ -77,7 +76,9 @@ export function SectionTabs({ sectionId, actions, children }: SectionTabsProps) 
         className={
           activeKey === 'students'
             ? 'flex-1 min-h-0 flex flex-col overflow-hidden'
-            : 'flex-1 min-h-0 pt-[16px] px-8 pb-6 flex flex-col overflow-y-auto'
+            : // Gutter steps down below sm; 64px left the card layout only
+              // ~247px of a 375px screen.
+              'flex-1 min-h-0 pt-[16px] px-4 pb-4 sm:px-8 sm:pb-6 flex flex-col overflow-y-auto'
         }
       >
         {children}

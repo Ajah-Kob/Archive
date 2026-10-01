@@ -98,6 +98,40 @@ export function MembersTable({
 
   return (
     <div className="w-full">
+      {/* Mobile: one card per member; desktop grid untouched from sm up. */}
+      <div className="sm:hidden flex flex-col gap-[10px] p-3">
+        {members.map((member) => (
+          <div
+            key={member.id}
+            className="flex items-start gap-[10px] rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px]"
+          >
+            <div className="min-w-0 flex-1 flex flex-col gap-[8px]">
+              <UserProfile
+                initials={member.initials}
+                name={member.name}
+                email={member.email}
+                gradient={member.avatarGradient}
+                badge={member.userId === viewerUserId ? 'You' : undefined}
+              />
+              <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[8px]">
+                <ActivityStatus status={member.activityStatus} />
+              </div>
+            </div>
+            <ActionMenu
+              items={[
+                {
+                  label: 'Remove Faculty',
+                  onClick: () => setRemoving(member),
+                  variant: 'danger',
+                },
+              ]}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: the original grid table. */}
+      <div className="hidden sm:block">
       {/* Header Row */}
       <div
         className="grid items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]"
@@ -168,6 +202,7 @@ export function MembersTable({
           </div>
         ))
       )}
+      </div>
 
       <RemoveFacultyModal
         isOpen={removing !== null}

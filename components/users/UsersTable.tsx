@@ -126,9 +126,11 @@ export default function UsersTable({
         </button>
       </div>
 
-      {/* Table */}
+      {/* min-w-full resolves to 100% of the wrapper, so it is not a floor and the
+          table still compresses on narrow viewports. 720px keeps the six
+          columns legible and lets the wrapper scroll sideways instead. */}
       <div className="overflow-x-auto">
-        <table className="min-w-full border border-secondary">
+        <table className="min-w-[720px] border border-secondary">
           <thead>
             <tr className="bg-primary border-b border-secondary">
               <th className="text-left py-2 px-3 font-medium">ID</th>

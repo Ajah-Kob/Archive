@@ -26,7 +26,56 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
           />
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1.6fr] items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0 rounded-t-[14px]">
+          {/* Mobile: a card per group, so Team / Members / Adviser / Journey
+              are all readable without a sideways swipe. */}
+          <div className="sm:hidden flex flex-col gap-[10px] p-3">
+            {groups.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => setActiveGroupId(group.id)}
+                className="flex flex-col gap-[10px] w-full rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px] text-left transition-colors hover:bg-slate-50/40"
+              >
+                <div className="flex items-start justify-between gap-[10px]">
+                  <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
+                    {group.name}
+                  </span>
+                  <span className="shrink-0 font-sans text-[11px] leading-[16.5px] text-[#9ea8c6] uppercase tracking-[0.6px]">
+                    {group.memberCount}{' '}
+                    {group.memberCount === 1 ? 'member' : 'members'}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-[6px]">
+                  <span className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] uppercase tracking-[0.6px]">
+                    Adviser
+                  </span>
+                  {group.adviser ? (
+                    <UserProfile
+                      initials={getInitials(group.adviser.name)}
+                      name={group.adviser.name}
+                      email={group.adviser.email}
+                    />
+                  ) : (
+                    <span className="font-sans font-medium italic text-[12px] leading-[18px] text-[#c4cadf]">
+                      None
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-[6px]">
+                  <span className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] uppercase tracking-[0.6px]">
+                    Journey
+                  </span>
+                  <JourneyTracker journey={group.journey} size="sm" />
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop: the original four-column grid. */}
+          <div className="hidden sm:flex flex-col">
+          <div className="grid grid-cols-[1.4fr_0.8fr_1fr_1.6fr] items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] sticky top-0 z-10 rounded-t-[14px]">
             <span className="font-sans font-bold text-[11px] leading-[16.5px] uppercase tracking-[0.6px] text-[#9ea8c6]">
               Team
             </span>
@@ -78,6 +127,7 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
             </button>
           ))}
           </div>
+        </div>
         )}
       </div>
 

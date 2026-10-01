@@ -2,7 +2,7 @@
 
 import { Crown, User } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import type { DefenseVerdict, PanelistRole } from '@prisma/client'
+import type { DefenseVerdict } from '@prisma/client'
 import type { DefensePanelistPayload } from '@/lib/actions/defense'
 import { getInitials } from '@/lib/helper'
 import {
@@ -21,21 +21,24 @@ function MeBadge() {
   )
 }
 
-// ── Pills ────────────────────────────────────────────────────────────────────
+// ── Role ──────────────────────────────────────────────────────────────────────
 
-function PanelPill({ role }: { role: PanelistRole }) {
-  if (role === 'CHAIR') {
-    return (
-      <span className="inline-flex items-center gap-[5px] rounded-[20px] bg-[rgba(245,158,11,0.07)] border border-[rgba(245,158,11,0.13)] px-[10px] py-[3px] font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[12px] leading-[18px] text-[#f59e0b] whitespace-nowrap shrink-0">
-        <Crown className="size-[12px]" strokeWidth={2} />
-        Panel Chair
-      </span>
-    )
-  }
+const ROLE_META: Record<
+  DefensePanelistPayload['role'],
+  { label: string; className: string; Icon: typeof Crown }
+> = {
+  CHAIR: { label: 'Panel Chair', className: 'text-[#f59e0b]', Icon: Crown },
+  PANEL_MEMBER: { label: 'Panel Member', className: 'text-[#707dff]', Icon: User },
+}
+
+function RoleLine({ role }: { role: DefensePanelistPayload['role'] }) {
+  const { label, className, Icon } = ROLE_META[role]
   return (
-    <span className="inline-flex items-center gap-[5px] rounded-[20px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.13)] px-[10px] py-[3px] font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[12px] leading-[18px] text-[#707dff] whitespace-nowrap shrink-0">
-      <User className="size-[12px]" strokeWidth={2} />
-      Panel Member
+    <span
+      className={`flex items-center gap-[4px] font-sans font-semibold text-[11.5px] leading-[17.25px] ${className}`}
+    >
+      <Icon className="size-[11px] shrink-0" strokeWidth={2.5} />
+      {label}
     </span>
   )
 }
@@ -83,32 +86,33 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
 
   return (
     <div
-      className={`bg-white ${border} ${radius} grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)] max-sm:grid-cols-1 max-sm:gap-2 items-center px-[17px] py-[6px] min-h-[61px] gap-2`}
+      className={`bg-white ${border} ${radius} grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] max-sm:grid-cols-1 max-sm:gap-2 items-center px-[17px] py-[10px] sm:py-[6px] min-h-[61px] gap-2`}
     >
-      {/* Col1: UserProfile avatar 35px gradient #1e3a8a→#2d52b8, name + email + Me */}
+      {/* Col1: avatar + name, with the panelist's role as the second line in
+          place of the email. The role identifies the person, so it belongs with
+          the name rather than in a column of its own. */}
       <div className="flex items-center gap-2.5 min-w-0 sm:h-[50px] w-full">
         <UserProfile
           initials={getInitials(panelist.name)}
           name={panelist.name}
-          email={panelist.email}
+          detailsNode={<RoleLine role={panelist.role} />}
           gradient={panelist.avatarGradient ?? PANELIST_AVATAR_GRADIENT}
           avatarClassName="size-[35px]"
         />
         {isMe ? <MeBadge /> : null}
       </div>
-      {/* Col2 center: panelist→panelist status (Pending vs Finished) */}
-      <div className="flex items-center justify-center sm:h-[50px] sm:px-2 min-w-0 w-full">
+
+      {/* Col2: panelist→panelist feedback status. Start-aligned below sm so a
+          wrapped line and a short one both begin at the same edge; the right
+          edge is kept from sm up, where it is the column you scan down. */}
+      <div className="flex items-center justify-start sm:justify-end sm:h-[50px] sm:pl-2 min-w-0 w-full">
         <p
-          className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-center ${
+          className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-left sm:text-right ${
             centerText.startsWith('✓') ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
           }`}
         >
           {centerText}
         </p>
-      </div>
-      {/* Col3 right: pill Chair amber vs Member indigo */}
-      <div className="flex items-center justify-end sm:h-[50px] shrink-0 w-full sm:w-auto">
-        <PanelPill role={panelist.role} />
       </div>
     </div>
   )

@@ -81,6 +81,59 @@ export function FacultyTable({
 
   return (
     <div className="w-full flex flex-col flex-1 min-h-0">
+      {/* Mobile: one card per member. Name, activity and workload all readable
+          without a sideways swipe; the desktop grid is untouched from sm up. */}
+      <div className="sm:hidden flex flex-col gap-[10px] p-3">
+        {faculty.length === 0 ? (
+          <EmptyState heading="No Faculty Found" description={emptyMessage} variant="table" />
+        ) : (
+          faculty.map((member) => (
+            <div
+              key={member.id}
+              className="flex items-start gap-[10px] rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px]"
+            >
+              <div className="min-w-0 flex-1 flex flex-col gap-[8px]">
+                <UserProfile
+                  initials={member.initials}
+                  name={member.name}
+                  email={member.email}
+                  gradient={member.avatarGradient}
+                  badge={member.userId === viewerUserId ? 'You' : undefined}
+                />
+
+                <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[8px]">
+                  <ActivityStatus status={member.activityStatus} />
+                  <Workload
+                    current={member.workload.current}
+                    max={member.workload.max}
+                  />
+                </div>
+              </div>
+
+              <ActionMenu
+                items={[
+                  {
+                    label: 'View Details',
+                    onClick: () => onViewDetails(member),
+                  },
+                  ...(manageMode
+                    ? [
+                        {
+                          label: 'Remove Faculty',
+                          onClick: () => onRemove(member),
+                          variant: 'danger' as const,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: the original grid table. */}
+      <div className="hidden sm:flex flex-col flex-1 min-h-0">
       {/* Header Row */}
       <div
         className={`grid ${gridCols} items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]`}
@@ -151,6 +204,7 @@ export function FacultyTable({
           </div>
         ))
       )}
+      </div>
     </div>
   )
 }

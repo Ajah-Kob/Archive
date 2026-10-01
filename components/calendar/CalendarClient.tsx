@@ -321,9 +321,23 @@ export function CalendarClient({
 
   // Mobile defaults to the agenda list; the month grid stays one tap away
   // in the view dropdown.
+  //
+  // The query is watched as well as read once, so crossing below the
+  // breakpoint on a resize or an orientation change moves off the time-grid
+  // views instead of leaving 7 day columns in ~343px. It only ever demotes:
+  // growing back does not promote, so a view someone picked deliberately is
+  // never undone underneath them.
   useEffect(() => {
-    if (window.matchMedia(MOBILE_BREAKPOINT).matches) setView(LIST_VIEW)
+    const query = window.matchMedia(MOBILE_BREAKPOINT)
+    if (query.matches) setView(LIST_VIEW)
     setReady(true)
+
+    const onBreakpointChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) return
+      setView((current) => (TIME_GRID_VIEWS.has(current) ? LIST_VIEW : current))
+    }
+    query.addEventListener('change', onBreakpointChange)
+    return () => query.removeEventListener('change', onBreakpointChange)
   }, [])
 
   // renderEventContent needs the active view, and the identity of this

@@ -16,6 +16,8 @@
  * boundary exists to avoid.
  */
 
+import { ScrollFadeRegion } from '@/components/ui/ScrollFadeRegion'
+
 const CARD_COUNT = 5
 
 // Matches the pulse colour used across the existing skeletons.
@@ -69,17 +71,19 @@ export function RepositorySkeleton() {
   return (
     <div className="flex flex-col flex-1 min-h-0 animate-pulse motion-reduce:animate-none">
       {/* HeaderBar strip — real: px-8 bg-[#eef2ff] border-b min-h-[56px] */}
-      <div className="flex flex-wrap h-fit items-center justify-between gap-x-[16px] gap-y-[10px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
-        <div className="flex flex-wrap items-center gap-1 min-w-0">
-          {/* SearchBar is w-full sm:flex-[0_0_320px] in the real header */}
-          <div className="w-full sm:flex-[0_0_320px] sm:max-w-[320px] h-[37.5px] rounded-lg bg-[#dfe3fb]" />
-          {/* published-date range pair — w-[300px] grid-cols-2 in the real header */}
-          <div className="w-[300px] max-w-full shrink-0 grid grid-cols-2 gap-[12px]">
+      <div className="flex flex-nowrap h-fit items-center justify-between gap-x-[16px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+        {/* Single line, matching the real bar: the search and date range scroll
+            together instead of wrapping. */}
+        <ScrollFadeRegion className="flex items-center gap-1 flex-1">
+          {/* SearchBar is w-[280px] sm:flex-[0_0_320px] in the real header */}
+          <div className="w-[280px] sm:flex-[0_0_320px] sm:max-w-[320px] h-[37.5px] shrink-0 rounded-lg bg-[#dfe3fb]" />
+          {/* published-date range pair — w-[280px] sm:w-[300px] grid-cols-2 in the real header */}
+          <div className="w-[280px] sm:w-[300px] shrink-0 grid grid-cols-2 gap-[12px]">
             <div className="h-[40px] rounded-md bg-white border border-[#e4e7f6]" />
             <div className="h-[40px] rounded-md bg-white border border-[#e4e7f6]" />
           </div>
-          <div className="h-[34px] w-[112px] rounded-lg bg-white border border-[#e4e7f6]" />
-        </div>
+          <div className="h-[34px] w-[112px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
+        </ScrollFadeRegion>
         {/* admin-only Upload Research slot — reserved so the bar does not reflow */}
         <div className="flex items-center gap-[8px] shrink-0">
           <div className="h-[37.5px] w-[145px] rounded-lg bg-[#c9cffb]" />

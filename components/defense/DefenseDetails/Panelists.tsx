@@ -102,12 +102,12 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
         {isMe ? <MeBadge /> : null}
       </div>
 
-      {/* Col2: panelist→panelist feedback status, right-aligned at every width.
-          Left-aligning it below sm made wrapped and unwrapped copy sit in
-          different columns in the same stack. */}
-      <div className="flex items-center justify-end sm:h-[50px] sm:pl-2 min-w-0 w-full">
+      {/* Col2: panelist→panelist feedback status. Start-aligned below sm so a
+          wrapped line and a short one both begin at the same edge; the right
+          edge is kept from sm up, where it is the column you scan down. */}
+      <div className="flex items-center justify-start sm:justify-end sm:h-[50px] sm:pl-2 min-w-0 w-full">
         <p
-          className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-right ${
+          className={`font-['Plus_Jakarta_Sans',sans-serif] font-medium text-[12px] leading-[18px] text-left sm:text-right ${
             centerText.startsWith('✓') ? 'text-[#16a34a]' : 'text-[#9ea8c6]'
           }`}
         >

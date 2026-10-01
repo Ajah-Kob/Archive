@@ -24,14 +24,15 @@ export function StudentsActionBar({
   onDeleteClick,
 }: StudentsActionBarProps) {
   return (
-    <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
-      <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+    <div className="w-full flex flex-nowrap items-center justify-between gap-x-[16px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+      {/* Single line: search + filter scroll sideways rather than wrapping. */}
+      <div className="flex items-center gap-2.5 min-w-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <SearchBar
           value={search}
           onChange={onSearchChange}
           placeholder="Search students…"
           ariaLabel="Search students"
-          className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
+          className="w-[280px] sm:flex-[0_0_320px] sm:max-w-[320px] shrink-0"
         />
         <Filter
           value={filter}
@@ -41,11 +42,13 @@ export function StudentsActionBar({
         />
       </div>
 
+      {/* Desktop only -- below sm the Delete control lives in the page container,
+          directly above the student cards. */}
       {selectedCount > 0 && (
         <button
           type="button"
           onClick={onDeleteClick}
-          className="flex gap-[6px] items-center h-[37.5px] px-[14px] rounded-lg bg-white border border-red-200 font-sans font-bold text-[13px] leading-none text-[#ef4444] hover:bg-red-50 transition-colors cursor-pointer"
+          className="hidden sm:flex gap-[6px] items-center h-[37.5px] px-[14px] rounded-lg bg-white border border-red-200 font-sans font-bold text-[13px] leading-none text-[#ef4444] hover:bg-red-50 transition-colors cursor-pointer"
         >
           <Trash2 className="size-[14px]" />
           Delete ({selectedCount})

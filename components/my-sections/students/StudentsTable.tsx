@@ -66,25 +66,11 @@ export function StudentsTable({
 
   return (
     <div className="w-full flex flex-col flex-1 min-h-full">
-      {/* Mobile: one card per student. Every column is readable without a
-          sideways swipe; the desktop grid is untouched from sm up. */}
-      <div className="sm:hidden flex flex-col gap-[10px] p-3">
-        <div className="flex items-center gap-[10px] px-[2px]">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            ref={(el) => {
-              if (el) el.indeterminate = !allSelected && someSelected
-            }}
-            onChange={onToggleAll}
-            aria-label="Select all visible students"
-            className="size-4 rounded border-[#dddff0] accent-[#707dff] cursor-pointer"
-          />
-          <span className="font-sans font-bold text-[11px] leading-[16.5px] text-[#9ea8c6] tracking-[0.88px] uppercase">
-            Select all
-          </span>
-        </div>
-
+      {/* Mobile: one card per student inside a white panel, matching the desktop
+          chrome so the page does not change surface at the breakpoint. Every
+          column is readable without a sideways swipe. */}
+      <div className="sm:hidden flex-1 min-h-0 overflow-y-auto">
+        <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] p-3 flex flex-col gap-[10px]">
         {students.length === 0 ? (
           <EmptyState heading="No Students Found" description={emptyMessage} variant="table" />
         ) : (
@@ -128,10 +114,11 @@ export function StudentsTable({
             </div>
           ))
         )}
+        </div>
       </div>
 
-      {/* Desktop: the original grid table. */}
-      <div className="hidden sm:flex flex-col flex-1 min-h-full">
+      {/* Desktop: the original grid table, still on its white card. */}
+      <div className="hidden sm:flex flex-col flex-1 min-h-full bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
         {/* Header Row */}
         <div className="grid grid-cols-[32px_2fr_1fr_1fr] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] rounded-t-[14px]">
           <div className="flex items-center">

@@ -6,6 +6,49 @@ const GRID_COLS = 'grid-cols-[1.4fr_0.8fr_1fr_1.6fr]'
 export function ProgressTableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0px_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden animate-pulse">
+      {/* Mobile cards — mirrors the card list ProgressOverview renders below sm,
+          so the layout does not reshuffle when the rows arrive. */}
+      <div className="sm:hidden flex-1 min-h-0 overflow-y-auto p-3">
+        <div className="flex flex-col gap-[10px]">
+          {Array.from({ length: rows }).map((_, i) => (
+            <div
+              key={i}
+              className="flex flex-col gap-[10px] rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px]"
+            >
+              {/* Team + member count */}
+              <div className="flex items-start justify-between gap-[10px]">
+                <div className={`h-[13px] w-28 rounded ${BAR}`} />
+                <div className={`h-[11px] w-16 shrink-0 rounded ${BAR}`} />
+              </div>
+
+              {/* Adviser */}
+              <div className="flex flex-col gap-[6px]">
+                <div className={`h-[10px] w-16 rounded ${BAR}`} />
+                <div className="flex gap-2.5 items-center min-w-0">
+                  <div className={`size-8 rounded-full shrink-0 ${BAR}`} />
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <div className={`h-[13px] w-24 rounded ${BAR}`} />
+                    <div className={`h-[11px] w-36 rounded ${BAR}`} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Journey — one dot per milestone */}
+              <div className="flex flex-col gap-[6px]">
+                <div className={`h-[10px] w-16 rounded ${BAR}`} />
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: JOURNEY_ROWS.length }).map((_, j) => (
+                    <div key={j} className={`size-3.5 rounded-full shrink-0 ${BAR}`} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop: the original four-column grid. */}
+      <div className="hidden sm:flex flex-col flex-1 min-h-0">
       {/* Header Row */}
       <div
         className={`grid ${GRID_COLS} items-center px-[20px] h-[40px] border-b border-[#f0f2fa] bg-[#fafbff] rounded-t-[14px]`}
@@ -47,6 +90,7 @@ export function ProgressTableSkeleton({ rows = 5 }: { rows?: number }) {
           </div>
         </div>
       ))}
+      </div>
     </div>
   )
 }

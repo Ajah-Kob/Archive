@@ -111,8 +111,6 @@ export function StudentList({ students }: { students: StudentData[] }) {
         filter={filter}
         onFilterChange={setFilter}
         filterOptions={filterOptions}
-        selectedCount={selectedIds.size}
-        onDeleteClick={() => setConfirmOpen(true)}
       />
 
       {confirmOpen && (
@@ -128,9 +126,10 @@ export function StudentList({ students }: { students: StudentData[] }) {
       )}
 
       <div className="flex-1 min-h-0 px-4 py-4 sm:px-8 flex flex-col gap-[12px]">
-        {/* Mobile bulk controls. Desktop keeps select-all in the table header and
-            Delete in the toolbar, so this row is mobile only. */}
-        <div className="sm:hidden flex items-center gap-[12px] h-[32px]">
+        {/* Bulk controls sit above the table at every width. Select-all used to
+          live in the table header and Delete in the toolbar; both are here now,
+          so there is one place to reach them regardless of viewport. */}
+      <div className="flex items-center gap-[12px] h-[32px]">
           <label className="flex items-center gap-[10px] cursor-pointer h-[32px]">
             <input
               type="checkbox"
@@ -179,18 +178,6 @@ export function StudentList({ students }: { students: StudentData[] }) {
                   if (next.has(id)) next.delete(id)
                   else next.add(id)
                   return next
-                })
-              }}
-              onToggleAll={() => {
-                setSelectedIds((prev) => {
-                  const visibleIds = filtered.map((s) => s.id)
-                  const allSelected = visibleIds.every((id) => prev.has(id))
-                  if (allSelected) {
-                    const next = new Set(prev)
-                    for (const id of visibleIds) next.delete(id)
-                    return next
-                  }
-                  return new Set([...prev, ...visibleIds])
                 })
               }}
             />

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ScrollFadeRegion } from '@/components/ui/ScrollFadeRegion'
 import { ChevronDown, ChevronUp, ClipboardCheck, FileText } from 'lucide-react'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
@@ -213,7 +214,7 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
     <div className="flex flex-col flex-1 min-h-0">
       <div className="w-full flex flex-nowrap items-center gap-2.5 px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
         {/* Single line: search and the three filters scroll sideways together. */}
-        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ScrollFadeRegion className="flex items-center gap-2.5 flex-1">
           <SearchBar
             value={search}
             onChange={setSearch}
@@ -240,7 +241,7 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
           onChange={(v) => setStatusFilter(v as StatusFilter)}
           ariaLabel="Filter by status"
         />
-        </div>
+        </ScrollFadeRegion>
       </div>
 
       <div className="flex-1 min-h-0 pt-[16px] px-4 pb-[30px] sm:px-8 flex flex-col">

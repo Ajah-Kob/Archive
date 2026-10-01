@@ -1,7 +1,7 @@
 'use client'
 
-import { Trash2 } from 'lucide-react'
 import { SearchBar } from '@/components/ui/SearchBar'
+import { ScrollFadeRegion } from '@/components/ui/ScrollFadeRegion'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
 
 interface StudentsActionBarProps {
@@ -10,8 +10,6 @@ interface StudentsActionBarProps {
   filter: string
   onFilterChange: (value: string) => void
   filterOptions: FilterOption[]
-  selectedCount: number
-  onDeleteClick: () => void
 }
 
 export function StudentsActionBar({
@@ -20,13 +18,11 @@ export function StudentsActionBar({
   filter,
   onFilterChange,
   filterOptions,
-  selectedCount,
-  onDeleteClick,
 }: StudentsActionBarProps) {
   return (
     <div className="w-full flex flex-nowrap items-center justify-between gap-x-[16px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
       {/* Single line: search + filter scroll sideways rather than wrapping. */}
-      <div className="flex items-center gap-2.5 min-w-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ScrollFadeRegion className="flex items-center gap-2.5 flex-1">
         <SearchBar
           value={search}
           onChange={onSearchChange}
@@ -40,20 +36,7 @@ export function StudentsActionBar({
           onChange={onFilterChange}
           ariaLabel="Filter by group"
         />
-      </div>
-
-      {/* Desktop only -- below sm the Delete control lives in the page container,
-          directly above the student cards. */}
-      {selectedCount > 0 && (
-        <button
-          type="button"
-          onClick={onDeleteClick}
-          className="hidden sm:flex gap-[6px] items-center h-[37.5px] px-[14px] rounded-lg bg-white border border-red-200 font-sans font-bold text-[13px] leading-none text-[#ef4444] hover:bg-red-50 transition-colors cursor-pointer"
-        >
-          <Trash2 className="size-[14px]" />
-          Delete ({selectedCount})
-        </button>
-      )}
+      </ScrollFadeRegion>
     </div>
   )
 }

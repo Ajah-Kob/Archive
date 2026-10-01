@@ -46,31 +46,26 @@ export function MySectionsPage({ initialSections }: MySectionsPageProps) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <HeaderBar>
-        {/* Single line, horizontally scrollable, scrollbar hidden.
-
-            Scoping note: the scrolling container has to live on THIS div, not
-            on HeaderBar's root. HeaderBar is `flex flex-wrap` and is shared by
-            13 routes; changing it there would silently rework every toolbar in
-            the app. Keeping the scroll local also keeps the clip contained --
-            Filter's listbox is `absolute` with no portal, so an overflow
-            ancestor on the shared root would cut the dropdown off. */}
-        <div className="flex items-center gap-2.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="w-[200px] sm:w-[280px] shrink-0 py-[8px]">
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Search section..."
-              ariaLabel="Search sections"
-              clearable
-            />
-          </div>
-          <Filter
-            value={phaseFilter}
-            options={PHASE_OPTIONS}
-            onChange={setPhaseFilter}
-            ariaLabel="Filter by capstone phase"
+        {/* Scrolling and the right-edge fade come from HeaderBar's own
+            ScrollFadeRegion, so this bar must not nest a second scroller of
+            its own -- the fade measures the wrong element if it does. The
+            Filter listbox used to be un-ported here, which is why this used to
+            be scoped locally; it is portalled now (f788b8a). */}
+        <div className="w-[200px] sm:w-[280px] shrink-0 py-[8px]">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search section..."
+            ariaLabel="Search sections"
+            clearable
           />
         </div>
+        <Filter
+          value={phaseFilter}
+          options={PHASE_OPTIONS}
+          onChange={setPhaseFilter}
+          ariaLabel="Filter by capstone phase"
+        />
       </HeaderBar>
 
       <div className="flex-1 min-h-0 pt-[16px] px-4 sm:px-8 flex flex-col">

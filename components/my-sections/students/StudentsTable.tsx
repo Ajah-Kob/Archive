@@ -48,7 +48,6 @@ interface StudentsTableProps {
   onSort?: (field: StudentSortKey) => void
   selectedIds: Set<number>
   onToggle: (id: number) => void
-  onToggleAll: () => void
 }
 
 export function StudentsTable({
@@ -59,10 +58,7 @@ export function StudentsTable({
   onSort,
   selectedIds,
   onToggle,
-  onToggleAll,
 }: StudentsTableProps) {
-  const allSelected = students.length > 0 && students.every((s) => selectedIds.has(s.id))
-  const someSelected = students.some((s) => selectedIds.has(s.id))
 
   return (
     <div className="w-full flex flex-col flex-1 min-h-full">
@@ -119,20 +115,10 @@ export function StudentsTable({
 
       {/* Desktop: the original grid table, still on its white card. */}
       <div className="hidden sm:flex flex-col flex-1 min-h-full bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
-        {/* Header Row */}
+        {/* Header Row — select-all now lives above the table in StudentList, so the
+            first column is kept only to line the row checkboxes up. */}
         <div className="grid grid-cols-[32px_2fr_1fr_1fr] items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] rounded-t-[14px]">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={allSelected}
-              ref={(el) => {
-                if (el) el.indeterminate = !allSelected && someSelected
-              }}
-              onChange={onToggleAll}
-              aria-label="Select all visible students"
-              className="size-4 rounded border-[#dddff0] accent-[#707dff] cursor-pointer"
-            />
-          </div>
+          <div />
           <SortHeader
             field="name"
             label="Student"

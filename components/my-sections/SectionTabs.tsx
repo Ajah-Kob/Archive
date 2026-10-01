@@ -48,7 +48,13 @@ export function SectionTabs({ sectionId, actions, children }: SectionTabsProps) 
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <HeaderBar actions={actions ? <>{actions}{backButton}</> : backButton}>
+      <HeaderBar
+        /* Single line: the back button stays pinned right and the tab strip
+           scrolls sideways instead of the bar wrapping onto two rows.
+           flex-nowrap! is needed because HeaderBar defaults to flex-wrap. */
+        className="sticky top-0 z-30 flex-nowrap!"
+        actions={actions ? <>{actions}{backButton}</> : backButton}
+      >
         {TABS.map((t) => {
           const isActive = activeKey === t.key
           return (

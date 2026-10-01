@@ -82,7 +82,9 @@ export function AuditFilters({
   return (
     <HeaderBar
       actions={
-        <div className="w-full sm:w-[320px] sm:shrink-0">
+        // Capped rather than w-full: the bar is a single line, so a full-width
+        // action would collapse the scrolling tab strip to nothing.
+        <div className="w-[280px] sm:w-[320px] shrink-0">
           <AppDateRangePicker
             start={start}
             end={end}

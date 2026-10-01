@@ -211,14 +211,16 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="w-full flex flex-wrap items-center gap-2.5 px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="Search teams, chapters…"
-          ariaLabel="Search teams and chapters"
-          className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
-        />
+      <div className="w-full flex flex-nowrap items-center gap-2.5 px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+        {/* Single line: search and the three filters scroll sideways together. */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search teams, chapters…"
+            ariaLabel="Search teams and chapters"
+            className="w-[280px] sm:flex-[0_0_320px] sm:max-w-[320px] shrink-0"
+          />
 
         <Filter
           value={teamFilter}
@@ -238,6 +240,7 @@ export function EvaluationTeamsView({ items }: EvaluationTeamsViewProps) {
           onChange={(v) => setStatusFilter(v as StatusFilter)}
           ariaLabel="Filter by status"
         />
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 pt-[16px] px-4 pb-[30px] sm:px-8 flex flex-col">

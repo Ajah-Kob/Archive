@@ -314,10 +314,10 @@ export function RepositoryClient({
 
           {/* Published-date range. Shares the children row (rather than the
               actions slot) so the admin Upload Research CTA keeps the
-              top-right. HeaderBar flex-wraps, so below ~1024px this drops to
-              a second line instead of overflowing. */}
+              top-right. Capped rather than w-full because the bar is a single
+              line -- a full-width action would collapse the tab strip. */}
           <div
-            className="w-full sm:w-[300px] sm:shrink-0"
+            className="w-[280px] sm:w-[300px] shrink-0"
             role="group"
             aria-label="Filter by published date range"
           >

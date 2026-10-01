@@ -154,7 +154,7 @@ export function CapstoneJourney({
     phaseLocks?.[header] === true
 
   return (
-    <aside className="self-stretch bg-white shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] w-[200px] shrink-0 flex flex-col gap-[12px] px-[13px] py-[26px] overflow-hidden">
+    <aside className="self-stretch bg-white shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] w-[200px] shrink-0 hidden lg:flex flex-col gap-[12px] px-[13px] py-[26px] overflow-hidden">
       <p className="font-heading font-bold text-[12.5px] leading-[18.75px] text-[#1e3a8a] tracking-[-0.125px] px-[4px]">
         Capstone Journey
       </p>

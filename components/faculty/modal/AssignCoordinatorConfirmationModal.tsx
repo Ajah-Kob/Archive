@@ -57,7 +57,7 @@ export function AssignCoordinatorConfirmationModal({
   if (!isOpen) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
       <div
         ref={dialogRef}
         role="dialog"
@@ -66,7 +66,7 @@ export function AssignCoordinatorConfirmationModal({
         aria-describedby={descriptionId}
         aria-busy={isLoading}
         tabIndex={-1}
-        className="bg-white rounded-2xl shadow-xl w-[380px] p-6 flex flex-col gap-5"
+        className="bg-white rounded-2xl shadow-xl w-[380px] max-w-full p-6 flex flex-col gap-5"
       >
         <div className="flex items-center justify-between">
           <h2

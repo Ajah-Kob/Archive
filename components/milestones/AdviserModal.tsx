@@ -43,8 +43,8 @@ export function AdviserModal({ onClose, onInvited }: AdviserModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
-      <div className="relative bg-white border border-[#eceef8] rounded-[16px] w-[480px] shadow-[0px_24px_64px_0px_rgba(16,20,58,0.16),0px_4px_16px_0px_rgba(0,0,0,0.06)] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px] p-4">
+      <div className="relative bg-white border border-[#eceef8] rounded-[16px] max-w-full w-[480px] shadow-[0px_24px_64px_0px_rgba(16,20,58,0.16),0px_4px_16px_0px_rgba(0,0,0,0.06)] flex flex-col">
         <div className="flex items-start justify-between gap-[16px] px-[24px] pt-[22px] pb-[19px] border-b border-[#eceef8]">
           <div>
             <p className="font-heading font-bold text-[17px] leading-[25.5px] text-[#12143a] tracking-[-0.17px]">

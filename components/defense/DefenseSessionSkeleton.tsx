@@ -1,5 +1,7 @@
 'use client'
 
+import { ScrollFadeRegion } from '@/components/ui/ScrollFadeRegion'
+
 function VerdictCalloutSkeleton() {
   return (
     <div className="flex flex-col gap-[12px] sm:flex-row sm:items-center sm:gap-[16px] rounded-[14px] border border-[#e8ebf8] bg-white px-[18px] py-[16px] sm:px-[22px] sm:py-[18px]">
@@ -128,9 +130,9 @@ function DefenseDetailsSkeleton() {
 
 function ContextBarSkeleton() {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-8 py-[10px] bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
-      {/* Left: Session / Resubmission tabs h-[40px] */}
-      <div className="flex items-center gap-1 min-w-0">
+    <div className="flex flex-nowrap items-center justify-between gap-x-[16px] px-4 sm:px-8 py-[10px] bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+      {/* Left: Session / Resubmission tabs h-[40px] — single line, scrolls. */}
+      <ScrollFadeRegion className="flex items-center gap-1 flex-1">
         <div className="relative flex items-center h-[40px] px-[14px] shrink-0">
           <div className="h-[13px] w-[56px] rounded bg-slate-200" />
           <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-slate-300" />
@@ -138,11 +140,12 @@ function ContextBarSkeleton() {
         <div className="flex items-center h-[40px] px-[14px] shrink-0">
           <div className="h-[13px] w-[98px] rounded bg-[#e8ebf8]" />
         </div>
-      </div>
+      </ScrollFadeRegion>
       {/* Right: Document History + Back after it */}
       <div className="flex items-center gap-[8px] shrink-0">
-        <div className="h-[30px] w-[148px] rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] shadow-sm" />
-        <div className="h-[30px] w-[72px] rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] shadow-sm" />
+        <div className="h-[30px] w-[30px] sm:w-[148px] shrink-0 rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] shadow-sm" />
+        {/* Back is a plain muted link now, not a pill. */}
+        <div className="h-[10px] w-[38px] shrink-0 rounded bg-[#e8ebf8]" />
       </div>
     </div>
   )

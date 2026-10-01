@@ -79,24 +79,31 @@ export function StatusCallout({
   return (
     <section
       aria-live="polite"
-      className={`flex items-center gap-[16px] rounded-[14px] border px-[22px] py-[18px] ${hero.boxClass}`}
+      className={`flex flex-col gap-[12px] sm:flex-row sm:items-center sm:gap-[16px] rounded-[14px] border px-[18px] py-[16px] sm:px-[22px] sm:py-[18px] ${hero.boxClass}`}
     >
-      <div
-        className={`flex size-[40px] items-center justify-center rounded-[12px] border shrink-0 ${hero.boxClass}`}
-      >
-        <Icon className={`size-[20px] ${hero.iconClass}`} strokeWidth={2} />
+      {/* Mirrors VerdictCallout's CalloutShell: icon and text stay side by side
+          on every width, and only the action drops to its own full-width row
+          below sm. */}
+      <div className="flex items-center gap-[12px] sm:gap-[16px] min-w-0 flex-1">
+        <div
+          className={`flex size-[40px] items-center justify-center rounded-[12px] border shrink-0 ${hero.boxClass}`}
+        >
+          <Icon className={`size-[20px] ${hero.iconClass}`} strokeWidth={2} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h2 className={`font-sora text-[15px] font-semibold ${hero.iconClass}`}>
+            {hero.headline(chapterLabel)}
+          </h2>
+          <p className="text-[13px] text-[#5a6382]">{hero.context(current)}</p>
+        </div>
       </div>
-      <div className="min-w-0 flex-1">
-        <h2 className={`font-sora text-[15px] font-semibold ${hero.iconClass}`}>
-          {hero.headline(chapterLabel)}
-        </h2>
-        <p className="text-[13px] text-[#5a6382]">{hero.context(current)}</p>
-      </div>
+
       {state === 'NEEDS_REVISION' && onReviewFeedback && (
         <button
           type="button"
           onClick={onReviewFeedback}
-          className="shrink-0 rounded-[9px] border border-[rgba(225,29,72,0.4)] bg-[#e11d48] px-[18px] py-[9px] font-sora text-[13px] font-medium text-white shadow-[0px_2px_4px_rgba(225,29,72,0.2)] transition-all hover:bg-[#c91a40]"
+          className="flex w-full sm:w-auto shrink-0 items-center justify-center rounded-[9px] border border-[rgba(225,29,72,0.4)] bg-[#e11d48] px-[18px] py-[9px] font-sora text-[13px] font-medium text-white shadow-[0px_2px_4px_rgba(225,29,72,0.2)] transition-all hover:bg-[#c91a40]"
         >
           Review feedback
         </button>

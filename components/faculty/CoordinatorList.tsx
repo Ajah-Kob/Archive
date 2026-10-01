@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { SearchBar } from '@/components/ui/SearchBar'
+import { ScrollFadeRegion } from '@/components/ui/ScrollFadeRegion'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ManageCoordinatorsButton } from '@/components/sections/main/ManageCoordinatorsButton'
 import {
@@ -96,7 +97,7 @@ export function CoordinatorList() {
 
   if (session && !viewerCanManage) {
     return (
-      <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
+      <div className="flex-1 min-h-0 pt-[16px] px-4 pb-[30px] sm:px-8 flex flex-col">
         <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
           <EmptyState
             heading="Restricted"
@@ -111,27 +112,28 @@ export function CoordinatorList() {
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="w-full flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+        <div className="w-full flex flex-nowrap items-center gap-x-[16px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+          {/* Single line: search and the manage control scroll together. */}
           {loading ? (
-            <>
-              <div className="h-[37.5px] w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
-              <div className="h-[37.5px] w-[180px] rounded-lg bg-[#dfe3fb] animate-pulse" />
-            </>
+            <ScrollFadeRegion className="flex items-center gap-2.5 flex-1">
+              <div className="h-[37.5px] w-[280px] sm:w-[320px] shrink-0 rounded-lg bg-[#dfe3fb] animate-pulse" />
+              <div className="h-[37.5px] w-[180px] shrink-0 rounded-lg bg-[#dfe3fb] animate-pulse" />
+            </ScrollFadeRegion>
           ) : (
-            <>
+            <ScrollFadeRegion className="flex items-center gap-2.5 flex-1">
               <SearchBar
                 value={search}
                 onChange={setSearch}
                 placeholder="Search coordinators…"
                 ariaLabel="Search coordinators"
-                className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+                className="w-[280px] sm:flex-[0_0_320px] sm:max-w-[320px] shrink-0"
               />
               <ManageCoordinatorsButton primary />
-            </>
+            </ScrollFadeRegion>
           )}
         </div>
 
-        <div className="flex-1 min-h-0 pt-[16px] px-8 pb-[30px] flex flex-col">
+        <div className="flex-1 min-h-0 pt-[16px] px-4 pb-[30px] sm:px-8 flex flex-col">
           <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0 overflow-hidden">
             {loading ? (
               <CoordinatorTableSkeleton />

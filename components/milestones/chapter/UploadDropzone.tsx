@@ -248,7 +248,10 @@ export function UploadDropzone({
           </div>
         ) : draft ? (
           <div className="flex flex-col gap-[10px]">
-            <div className="flex items-center gap-[11px] px-[14px] py-[12px] rounded-[10px] bg-[#f8f9ff] border border-[rgba(112,125,255,0.13)]">
+            {/* File row above the action buttons below sm. Three shrink-0
+                buttons in one non-wrapping row left the filename column about
+                60px wide, so it wrapped to one character per line. */}
+            <div className="flex flex-col items-stretch gap-[11px] px-[14px] py-[12px] rounded-[10px] bg-[#f8f9ff] border border-[rgba(112,125,255,0.13)] sm:flex-row sm:items-center">
               <div className="flex size-[36px] items-center justify-center rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] shrink-0">
                 {isUploading ? (
                   <Loader2 className="size-[16px] text-[#707dff] animate-spin motion-reduce:animate-none" />
@@ -277,7 +280,7 @@ export function UploadDropzone({
                     ? 'Wait for the upload to finish'
                     : undefined
                 }
-                className="flex items-center gap-[7px] px-[18px] py-[8px] rounded-[9px] border border-[rgba(112,125,255,0.6)] text-white font-sans font-bold text-[12px] drop-shadow-[0px_3px_4px_rgba(112,125,255,0.2)] transition-opacity hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  className="flex items-center justify-center gap-[7px] px-[18px] py-[8px] rounded-[9px] border border-[rgba(112,125,255,0.6)] text-white font-sans font-bold text-[12px] drop-shadow-[0px_3px_4px_rgba(112,125,255,0.2)] transition-opacity hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 style={{
                   backgroundImage: 'linear-gradient(159deg, #707dff 0%, #5565ff 100%)',
                 }}
@@ -291,18 +294,10 @@ export function UploadDropzone({
               </button>
               <button
                 type="button"
-                onClick={openPicker}
-                disabled={isUploading || submitting}
-                className="flex items-center justify-center px-[16px] py-[8px] rounded-[9px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Replace
-              </button>
-              <button
-                type="button"
                 onClick={handleRemove}
                 disabled={isUploading || submitting}
                 aria-label={`Remove ${draft.file.name}`}
-                className="flex items-center gap-[5px] p-[5px] font-sans font-semibold text-[12px] text-[#ef4444] hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                className="flex items-center justify-center gap-[5px] p-[5px] font-sans font-semibold text-[12px] text-[#ef4444] hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0 max-sm:w-full"
               >
                 <X className="size-[11px]" />
                 Remove

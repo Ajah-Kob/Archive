@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals'
 import {
   derivePanelistResubmissionState,
   deriveResubmissionActivity,
+  resolveApprovedVersion,
 } from '@/lib/defense/session-helpers'
 
 /**
@@ -115,6 +116,38 @@ describe('derivePanelistResubmissionState — the current panelist only', () => 
       approvedVersion: null,
       carriedForward: false,
     })
+  })
+})
+
+describe('resolveApprovedVersion — pin to the file actually reviewed', () => {
+  // The bug: scanning for the newest submission carrying an APPROVED review
+  // returned v3, because carry-forward copies APPROVED onto the new upload.
+  // The chair approved v2 on 09-22; v3 arrived 09-25 and inherited the verdict.
+  test('a carried-forward approval still pins the older version', () => {
+    const versions = twoVersions()
+    const state = derivePanelistResubmissionState(chair, versions)
+    const pinned = resolveApprovedVersion(versions, state.approvedVersion)
+    expect(pinned?.version).toBe(2)
+  })
+
+  test('a direct approval on the latest version pins that version', () => {
+    const versions = [twoVersions()[1]]
+    versions[0].reviews = [
+      { panelistId: chair, name: 'Program Chair', status: 'APPROVED', reviewedAt: '2026-09-26T08:00:00.000Z' },
+    ]
+    const state = derivePanelistResubmissionState(chair, versions)
+    const pinned = resolveApprovedVersion(versions, state.approvedVersion)
+    expect(pinned?.version).toBe(3)
+  })
+
+  test('a panelist who never approved gets null so the caller falls back to latest', () => {
+    const state = derivePanelistResubmissionState(coordinatorOne, twoVersions())
+    expect(state.approvedVersion).toBeNull()
+    expect(resolveApprovedVersion(twoVersions(), state.approvedVersion)).toBeNull()
+  })
+
+  test('an approvedVersion with no matching submission yields null, never a wrong file', () => {
+    expect(resolveApprovedVersion(twoVersions(), 99)).toBeNull()
   })
 })
 

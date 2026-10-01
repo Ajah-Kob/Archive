@@ -218,7 +218,7 @@ export function DefenseSchedulingPage({
           </button>
         }
       >
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <button
             type="button"
             role="switch"
@@ -247,7 +247,7 @@ export function DefenseSchedulingPage({
             onChange={setSearch}
             placeholder="Search schedules..."
             ariaLabel="Search defense schedules"
-            className="flex-1 min-w-[200px] max-w-[320px]"
+            className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[320px]"
           />
 
           <Filter

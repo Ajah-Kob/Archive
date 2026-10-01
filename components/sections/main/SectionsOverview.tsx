@@ -208,8 +208,8 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
             <div className="h-[32px] w-[140px] rounded-[8px] bg-[#dfe3fb] animate-pulse" />
           }
         >
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="h-[37.5px] w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <div className="h-[37.5px] w-full sm:w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
             <div className="h-[37.5px] w-[140px] rounded-lg bg-[#dfe3fb] animate-pulse" />
           </div>
         </HeaderBar>
@@ -244,13 +244,13 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
           </button>
         }
       >
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <SearchBar
             value={search}
             onChange={setSearch}
             placeholder="Search section, coordinator, or academic year…"
             ariaLabel="Search sections"
-            className="flex-[0_0_320px] max-w-[320px] min-w-[180px]"
+            className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
           />
           <Filter value={phaseFilter} options={PHASE_OPTIONS} onChange={(v) => setPhaseFilter(v as PhaseFilter)} ariaLabel="Filter by capstone phase" />
         </div>

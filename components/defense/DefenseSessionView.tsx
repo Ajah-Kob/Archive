@@ -115,7 +115,7 @@ function DefenseTypeBadge({ type }: { type: DefenseType }) {
   const isFinal = type === 'FINAL'
   return (
     <div
-      className={`flex items-center justify-center gap-[6px] min-w-[148px] px-[11px] py-[5px] rounded-[8px] border border-solid shrink-0 ${
+      className={`flex items-center justify-center gap-[6px] min-w-0 sm:min-w-[148px] sm:shrink-0 px-[11px] py-[5px] rounded-[8px] border border-solid ${
         isFinal
           ? 'bg-[rgba(254,111,111,0.07)] border-[rgba(254,111,111,0.18)]'
           : 'bg-[rgba(112,125,255,0.07)] border-[rgba(112,125,255,0.18)]'
@@ -304,8 +304,11 @@ export function DefenseSessionView({
 
   return (
     <div className="flex flex-col gap-[16px]">
-      {/* Title row — back button lives in DefenseSessionContextBar when hideBack */}
-      <div className="flex items-center gap-[12px]">
+      {/* Title row — back button lives in DefenseSessionContextBar when hideBack.
+          flex-wrap on both levels: the type badge is min-w-[148px] and
+          shrink-0, so without a wrap point the row could only shrink the group
+          name to nothing at 375px. */}
+      <div className="flex flex-wrap items-center gap-[12px]">
         {!hideBack && (
           <button
             type="button"
@@ -316,7 +319,7 @@ export function DefenseSessionView({
             <ArrowLeft className="size-[15px] text-[#8a93b4]" />
           </button>
         )}
-        <div className="flex items-center gap-[12px] min-w-0">
+        <div className="flex flex-wrap items-center gap-[12px] min-w-0">
           <DefenseTypeBadge type={session.type} />
           <div className="min-w-0">
             <h2 className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] break-words">

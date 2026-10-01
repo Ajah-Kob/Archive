@@ -100,6 +100,48 @@ export function CoordinatorTable({
 
   return (
     <div className="w-full">
+      {/* Mobile: one card per coordinator; desktop grid untouched from sm up. */}
+      <div className="sm:hidden flex flex-col gap-[10px] p-3">
+        {coordinators.map((coordinator) => (
+          <div
+            key={coordinator.id}
+            className="flex items-start gap-[10px] rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px]"
+          >
+            <div className="min-w-0 flex-1 flex flex-col gap-[8px]">
+              <UserProfile
+                initials={coordinator.initials}
+                name={coordinator.name}
+                email={coordinator.email}
+                gradient={coordinator.avatarGradient}
+                badge={coordinator.userId === viewerUserId ? 'You' : undefined}
+              />
+              <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[8px]">
+                <ActivityStatus status={coordinator.activityStatus} />
+                <span className="inline-flex items-center px-[10px] py-[4px] bg-[#f4f6ff] border border-[#e5e8ff] rounded-full font-sans font-semibold text-[11px] leading-[16.5px] text-[#707dff] whitespace-nowrap">
+                  {coordinator.sectionsManaged}{' '}
+                  {coordinator.sectionsManaged === 1 ? 'Section' : 'Sections'}
+                </span>
+              </div>
+            </div>
+            <ActionMenu
+              items={[
+                {
+                  label: 'View Details',
+                  onClick: () => onSelect(coordinator.id),
+                },
+                {
+                  label: 'Remove Coordinator',
+                  onClick: () => setRemoving(coordinator),
+                  variant: 'danger' as const,
+                },
+              ]}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: the original grid table. */}
+      <div className="hidden sm:block">
       {/* Header Row */}
       <div
         className="grid items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa]"
@@ -187,6 +229,7 @@ export function CoordinatorTable({
           </div>
         ))
       )}
+      </div>
 
       <RemoveCoordinatorModal
         isOpen={removing !== null}

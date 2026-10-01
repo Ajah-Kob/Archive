@@ -7,6 +7,7 @@ import { ResubmissionActivityFeed } from './ResubmissionActivityFeed'
 import {
   derivePanelistResubmissionState,
   deriveResubmissionActivity,
+  resolveApprovedVersion,
 } from '@/lib/defense/session-helpers'
 import type { DefenseSessionPayload } from '@/lib/actions/defense'
 
@@ -34,25 +35,6 @@ function resolveLatestResubmission(session: DefenseSessionPayload): SessionSubmi
   const list = session.resubmissions
   if (!list || list.length === 0) return null
   return list[list.length - 1]
-}
-
-/**
- * The version this panelist actually approved, or null when they never have.
- *
- * The card pins to this so an approved document stays visible even after the
- * group uploads a newer one. Newer versions remain in Document History.
- */
-function resolveApprovedVersion(
-  session: DefenseSessionPayload,
-  currentUserId: number | null,
-): SessionSubmission | null {
-  if (currentUserId == null) return null
-  const ordered = [...session.resubmissions].sort((a, b) => a.version - b.version)
-  for (let i = ordered.length - 1; i >= 0; i--) {
-    const mine = (ordered[i].reviews ?? []).find((r) => r.panelistId === currentUserId)
-    if (mine?.status === 'APPROVED') return ordered[i]
-  }
-  return null
 }
 
 /** The reviewing panelist's own reviewedAt for a version, for the callout date. */
@@ -251,7 +233,7 @@ export function ResubmissionTabPanel({ session }: ResubmissionTabPanelProps) {
 
   // Pin the card to the version this panelist approved, so a newer upload does
   // not replace the file they actually reviewed. Falls back to the latest.
-  const approvedSub = resolveApprovedVersion(session, currentUserId)
+  const approvedSub = resolveApprovedVersion(session.resubmissions, myState.approvedVersion)
   const shownSub = approvedSub ?? latest
   const myReviewedAt = resolveMyReviewedAt(approvedSub, currentUserId)
 

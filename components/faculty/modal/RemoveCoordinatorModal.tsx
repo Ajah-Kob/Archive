@@ -21,8 +21,8 @@ export function RemoveCoordinatorModal({
   if (!isOpen) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
-      <div className="bg-white rounded-2xl shadow-xl w-[380px] p-6 flex flex-col gap-5">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
+      <div className="bg-white rounded-2xl shadow-xl w-[380px] max-w-full p-6 flex flex-col gap-5">
         <div className="flex items-center justify-between">
           <span className="text-blue-900 text-sm font-bold font-['Sora'] leading-5">
             Remove Coordinator

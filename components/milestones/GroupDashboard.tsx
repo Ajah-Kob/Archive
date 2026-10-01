@@ -188,8 +188,7 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
           {group.members.map((member) => (
             <div
               key={member.id}
-              className="grid items-center gap-3 py-[10px]"
-              style={{ gridTemplateColumns: '1fr auto auto auto' }}
+              className="grid items-center gap-3 py-[10px] grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[1fr_auto_auto_auto]"
             >
               <span className="min-w-0">
                 <UserProfile
@@ -204,13 +203,13 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
               </span>
               {member.isLeader ? (
                 <Crown
-                  className="size-[14px] text-[#f59e0b] shrink-0"
+                  className="size-[14px] text-[#f59e0b] shrink-0 hidden sm:block"
                   aria-label="Group leader"
                 />
               ) : (
-                <span className="size-[14px] shrink-0" />
+                <span className="size-[14px] shrink-0 hidden sm:block" />
               )}
-              <ActivityStatus status={member.activityStatus} />
+              <ActivityStatus status={member.activityStatus} className="hidden sm:flex" />
               {isLeader && !member.isLeader ? (
                 <ActionMenu
                   items={[
@@ -234,8 +233,7 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
           {pendingInvites.map((invite) => (
             <div
               key={`pending-${invite.id}`}
-              className="grid items-center gap-3 py-[10px]"
-              style={{ gridTemplateColumns: '1fr auto auto' }}
+              className="grid items-center gap-3 py-[10px] grid-cols-[minmax(0,1fr)_auto_auto]"
             >
               <UserProfile
                 initials={getInitials(invite.name)}

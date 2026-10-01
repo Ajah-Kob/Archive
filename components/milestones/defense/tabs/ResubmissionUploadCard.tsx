@@ -248,7 +248,7 @@ export function ResubmissionUploadCard({
 
         {draft ? (
           <div className="flex flex-col gap-[10px]">
-            <div className="flex items-center gap-[11px] px-[14px] py-[12px] rounded-[10px] bg-[#f8f9ff] border border-[rgba(112,125,255,0.13)]">
+            <div className="flex flex-col items-stretch gap-[11px] sm:flex-row sm:items-center px-[14px] py-[12px] rounded-[10px] bg-[#f8f9ff] border border-[rgba(112,125,255,0.13)]">
               <div className="flex size-[36px] items-center justify-center rounded-[9px] bg-[rgba(112,125,255,0.07)] border border-[rgba(112,125,255,0.14)] shrink-0">
                 {isUploading ? (
                   <Loader2 className="size-[16px] text-[#707dff] animate-spin motion-reduce:animate-none" />

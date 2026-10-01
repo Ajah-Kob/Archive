@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react'
 import { startOfDay, endOfDay } from 'date-fns'
 import { useRouter } from 'next/navigation'
-import { Star, Eye, ExternalLink, X, Plus, Loader2 } from 'lucide-react'
+import { Star, Eye, ExternalLink, X, Plus, Loader2, Upload } from 'lucide-react'
+import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -291,10 +292,11 @@ export function RepositoryClient({
       <HeaderBar
         actions={
           isAdmin ? (
+            // Hidden below sm — the floating button carries the action there.
             <button
               type="button"
               onClick={() => setIsUploadOpen(true)}
-              className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+              className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
             >
               <Plus className="size-4" strokeWidth={2} />
               <span className="whitespace-nowrap">Upload Research</span>
@@ -569,9 +571,18 @@ export function RepositoryClient({
             router.refresh()
           }}
         />
-      ) : null}
-    </>
-  )
+        ) : null}
+
+        {/* Mobile stand-in for the Upload Research button in the bar. Same gate. */}
+        {isAdmin ? (
+          <FloatingActionButton
+            icon={<Upload className="size-6" strokeWidth={2} />}
+            label="Upload Research"
+            onClick={() => setIsUploadOpen(true)}
+          />
+        ) : null}
+      </>
+    )
 }
 
 export default RepositoryClient

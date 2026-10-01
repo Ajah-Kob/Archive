@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { type FilterOption } from '@/components/ui/Filter'
 import { EventDetailsModal } from '@/components/calendar/EventDetailsModal'
@@ -444,10 +445,11 @@ export function CalendarClient({
       <HeaderBar
         actions={
           canManage ? (
+            // Hidden below sm — the floating button carries the action there.
             <button
               type="button"
               onClick={() => setDraftSpan(todaySpan())}
-              className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+              className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
             >
               <Plus className="size-4" strokeWidth={2} />
               <span className="whitespace-nowrap">New Event</span>
@@ -567,6 +569,15 @@ export function CalendarClient({
 
       {canManage ? (
         <EditEventModal event={editingEvent} onClose={() => setEditingEvent(null)} />
+      ) : null}
+
+      {/* Mobile stand-in for the New Event button in the bar. Same gate. */}
+      {canManage ? (
+        <FloatingActionButton
+          icon={<CalendarPlus className="size-6" strokeWidth={2} />}
+          label="New Event"
+          onClick={() => setDraftSpan(todaySpan())}
+        />
       ) : null}
     </>
   )

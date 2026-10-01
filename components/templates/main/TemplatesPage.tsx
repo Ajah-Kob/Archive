@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Plus } from 'lucide-react'
+import { FileUp, Plus } from 'lucide-react'
+import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { HeaderBar } from '@/components/globals/HeaderBar'
@@ -128,10 +129,11 @@ export default function TemplatesPage({
         <HeaderBar
           actions={
             canUpload ? (
+              // Hidden below sm — the floating button carries the action there.
               <button
                 type="button"
                 onClick={() => setIsUploadModalOpen(true)}
-                className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+                className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
               >
                 <Plus className="size-4" strokeWidth={2} />
                 <span className="whitespace-nowrap">Upload Template</span>
@@ -223,6 +225,14 @@ export default function TemplatesPage({
           fetchTemplates(searchTerm)
         }}
       />
-    </>
-  )
+        {/* Mobile stand-in for the Upload Template button in the bar. Same gate. */}
+        {canUpload ? (
+          <FloatingActionButton
+            icon={<FileUp className="size-6" strokeWidth={2} />}
+            label="Upload Template"
+            onClick={() => setIsUploadModalOpen(true)}
+          />
+        ) : null}
+      </>
+    )
 }

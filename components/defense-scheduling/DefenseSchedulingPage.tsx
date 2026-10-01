@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import { CalendarPlus, Plus } from 'lucide-react'
+import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
@@ -208,10 +209,11 @@ export function DefenseSchedulingPage({
     <>
       <HeaderBar
         actions={
+          // Hidden below sm — the floating button carries the action there.
           <button
             type="button"
             onClick={openCreateWizard}
-            className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+            className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
           >
             <Plus className="size-4" strokeWidth={2} />
             <span className="whitespace-nowrap">New Defense Schedule</span>
@@ -301,12 +303,19 @@ export function DefenseSchedulingPage({
         onSubmit={handleWizardSubmit}
       />
 
-      <ConfirmDeleteModal
-        open={!!deletingSchedule}
-        schedule={deletingSchedule}
-        onClose={() => setDeletingSchedule(null)}
-        onConfirmed={() => router.refresh()}
-      />
-    </>
-  )
+        <ConfirmDeleteModal
+          open={!!deletingSchedule}
+          schedule={deletingSchedule}
+          onClose={() => setDeletingSchedule(null)}
+          onConfirmed={() => router.refresh()}
+        />
+
+        {/* Mobile stand-in for the New Defense Schedule button in the bar. */}
+        <FloatingActionButton
+          icon={<CalendarPlus className="size-6" strokeWidth={2} />}
+          label="New Defense Schedule"
+          onClick={openCreateWizard}
+        />
+      </>
+    )
 }

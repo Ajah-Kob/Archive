@@ -1,3 +1,5 @@
+import { JOURNEY_ROWS } from '@/types/milestones'
+
 const BAR = 'bg-[#e8ebf8]'
 const GRID_COLS = 'grid-cols-[1.4fr_0.8fr_1fr_1.6fr]'
 
@@ -37,7 +39,9 @@ export function ProgressTableSkeleton({ rows = 5 }: { rows?: number }) {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {Array.from({ length: 10 }).map((_, j) => (
+            {/* One dot per JOURNEY_ROWS entry (8) so the skeleton matches the
+                JourneyTracker the real row renders. */}
+            {Array.from({ length: JOURNEY_ROWS.length }).map((_, j) => (
               <div key={j} className={`size-3.5 rounded-full shrink-0 ${BAR}`} />
             ))}
           </div>

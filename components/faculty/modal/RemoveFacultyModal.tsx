@@ -23,8 +23,8 @@ export function RemoveFacultyModal({
   if (!isOpen) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
-      <div className="bg-white rounded-[16px] w-[380px] p-[24px] flex flex-col gap-[20px] shadow-[0_20px_60px_rgba(112,125,255,0.18),0_2px_8px_rgba(0,0,0,0.06)]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[rgba(16,19,58,0.3)] backdrop-blur-[4px]">
+      <div className="bg-white rounded-[16px] w-[380px] max-w-full p-[24px] flex flex-col gap-[20px] shadow-[0_20px_60px_rgba(112,125,255,0.18),0_2px_8px_rgba(0,0,0,0.06)]">
         <div className="flex items-center justify-between">
           <span className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a]">
             Remove Faculty

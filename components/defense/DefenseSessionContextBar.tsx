@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, History } from 'lucide-react'
+import { ChevronLeft, History } from 'lucide-react'
 
 interface DefenseSessionContextBarProps {
   /**
@@ -32,25 +32,31 @@ export function DefenseSessionContextBar({
   const target = backHref === '/defense' ? '/faculty/defense' : backHref
 
   return (
-    <div className="flex items-center justify-between py-[0px] px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[64px]">
+    <div className="flex items-center justify-between py-[0px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[64px]">
       <div className="flex-1" />
       <div className="flex items-center gap-[8px] shrink-0">
+        {/* Icon-only below sm -- the full label consumed most of the bar at
+            375px. The label returns from sm up, and aria-label carries the
+            accessible name at every width. */}
         {onDocumentHistory && (
           <button
             type="button"
             onClick={onDocumentHistory}
-            className="flex items-center gap-[7px] h-[30px] px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
+            aria-label="Document History"
+            className="flex items-center justify-center gap-[7px] h-[30px] w-[30px] sm:w-auto sm:px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
           >
             <History className="size-3.5" />
-            Document History
+            <span className="hidden sm:inline">Document History</span>
           </button>
         )}
+        {/* Plain muted back link, matching the coordinator back link in
+            SectionTabs rather than the indigo pill. */}
         <button
           type="button"
           onClick={() => router.push(target)}
-          className="flex items-center gap-[7px] h-[30px] px-[11px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[12.5px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0"
+          className="inline-flex items-center gap-0.5 font-sans font-semibold text-[13px] text-[#8a93b4] hover:text-[#5a6382] hover:bg-white/60 active:text-[#5a6382] active:bg-white/60 rounded-full px-2 py-1 transition-colors shrink-0"
         >
-          <ArrowLeft className="size-3.5" />
+          <ChevronLeft className="size-4" />
           Back
         </button>
       </div>

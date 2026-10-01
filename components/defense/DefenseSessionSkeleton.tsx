@@ -143,8 +143,9 @@ function ContextBarSkeleton() {
       </ScrollFadeRegion>
       {/* Right: Document History + Back after it */}
       <div className="flex items-center gap-[8px] shrink-0">
-        <div className="h-[30px] w-[148px] rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] shadow-sm" />
-        <div className="h-[30px] w-[72px] rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] shadow-sm" />
+        <div className="h-[30px] w-[30px] sm:w-[148px] shrink-0 rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] shadow-sm" />
+        {/* Back is a plain muted link now, not a pill. */}
+        <div className="h-[10px] w-[38px] shrink-0 rounded bg-[#e8ebf8]" />
       </div>
     </div>
   )

@@ -8,9 +8,8 @@ import { toast } from 'sonner'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import TemplateTable from '@/components/templates/main/TemplatesTable'
-import UploadTemplateModal from '@/components/templates/modal/UploadTemplateModal'
 import RemoveTemplateModal from '@/components/templates/modal/RemoveTemplateModal'
-import { getTemplates } from '@/lib/actions/template'
+import { getTemplates, uploadTemplate } from '@/lib/actions/template'
 
 export interface TemplateItem {
   id: number
@@ -35,8 +34,8 @@ export default function TemplatesPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState<string>('')
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false)
   const [removeTarget, setRemoveTarget] = useState<TemplateItem | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
   const [sortField, setSortField] = useState<'name' | 'date' | 'uploadedBy' | 'size'>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [myUploads, setMyUploads] = useState(false)
@@ -103,6 +102,33 @@ export default function TemplatesPage({
     fetchTemplates('')
   }
 
+  // A template is just the file, so the upload goes straight from the OS file
+  // picker to the server with no dialog in between. The input is reset after
+  // each pick so re-selecting the same file still fires a change event.
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const openFilePicker = () => fileInputRef.current?.click()
+
+  const handleFilePicked = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setIsUploading(true)
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const result = await uploadTemplate(formData)
+    setIsUploading(false)
+
+    if (!result.success) {
+      toast.error(result.message)
+      return
+    }
+    toast.success('Template uploaded successfully.')
+    handleUploadComplete()
+  }
+
   const handleViewFile = (file: TemplateItem) => {
     if (file.fileUrl && file.fileUrl !== '#') {
       window.open(file.fileUrl, '_blank')
@@ -132,11 +158,13 @@ export default function TemplatesPage({
               // Hidden below sm — the floating button carries the action there.
               <button
                 type="button"
-                onClick={() => setIsUploadModalOpen(true)}
-                className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+                onClick={openFilePicker}
+                className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0 disabled:opacity-60"
               >
                 <Plus className="size-4" strokeWidth={2} />
-                <span className="whitespace-nowrap">Upload Template</span>
+                <span className="whitespace-nowrap">
+                  {isUploading ? 'Uploading…' : 'Upload Template'}
+                </span>
               </button>
             ) : undefined
           }
@@ -208,14 +236,18 @@ export default function TemplatesPage({
         </div>
       </div>
 
-      {/* Upload Modal */}
-      {isUploadModalOpen && canUpload && (
-        <UploadTemplateModal
-          isOpen={isUploadModalOpen}
-          onClose={() => setIsUploadModalOpen(false)}
-          onUploadComplete={handleUploadComplete}
-        />
-      )}
+      {/* The OS file picker, driven by the bar button and the FAB. Kept in the
+          DOM and visually hidden so both can open the same one. Reset after
+          every pick so choosing the same file twice still fires onChange. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx"
+        onChange={handleFilePicked}
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
 
       {/* Confirm Remove Modal */}
       <RemoveTemplateModal
@@ -230,7 +262,8 @@ export default function TemplatesPage({
           <FloatingActionButton
             icon={<FileUp className="size-6" strokeWidth={2} />}
             label="Upload Template"
-            onClick={() => setIsUploadModalOpen(true)}
+            onClick={openFilePicker}
+            className={isUploading ? 'pointer-events-none opacity-60' : ''}
           />
         ) : null}
       </>

@@ -79,20 +79,23 @@ export function StatusCallout({
   return (
     <section
       aria-live="polite"
-      className={`flex flex-col items-start gap-[12px] rounded-[14px] border px-[16px] py-[14px] sm:flex-row sm:items-center sm:gap-[16px] sm:px-[22px] sm:py-[18px] ${hero.boxClass}`}
+      className={`rounded-[14px] border px-[16px] py-[14px] sm:flex sm:items-center sm:gap-[16px] sm:px-[22px] sm:py-[18px] ${hero.boxClass}`}
     >
-      <div
-        className={`flex size-[40px] items-center justify-center rounded-[12px] border shrink-0 ${hero.boxClass}`}
-      >
-        <Icon className={`size-[20px] ${hero.iconClass}`} strokeWidth={2} />
-      </div>
-      <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-[16px]">
-        <div className="min-w-0 flex-1">
-          <h2 className={`font-sora text-[15px] font-semibold ${hero.iconClass}`}>
-            {hero.headline(chapterLabel)}
-          </h2>
-          <p className="text-[13px] text-[#5a6382]">{hero.context(current)}</p>
+      {/* Mobile stacks icon / title / message / button on their own rows; from sm
+          up the flex row below restores the original desktop layout exactly. */}
+      <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:gap-[16px] sm:min-w-0 sm:flex-1">
+        <div
+          className={`flex size-[40px] items-center justify-center rounded-[12px] border shrink-0 ${hero.boxClass}`}
+        >
+          <Icon className={`size-[20px] ${hero.iconClass}`} strokeWidth={2} />
         </div>
+
+        <h2 className={`font-sora text-[15px] font-semibold min-w-0 sm:flex-none ${hero.iconClass}`}>
+          {hero.headline(chapterLabel)}
+        </h2>
+
+        <p className="text-[13px] text-[#5a6382] min-w-0 sm:flex-1">{hero.context(current)}</p>
+
         {state === 'NEEDS_REVISION' && onReviewFeedback && (
           <button
             type="button"

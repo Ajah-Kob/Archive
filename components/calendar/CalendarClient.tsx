@@ -225,12 +225,109 @@ function todaySpan(): CalendarDateSpan {
   return { startStr: day, endStr: day, allDay: true }
 }
 
+/**
+ * Loading placeholder for the calendar body.
+ *
+ * Matches the view that will actually render: the agenda list below `sm`
+ * (MOBILE_BREAKPOINT defaults to LIST_VIEW there) and the seven-column time grid
+ * from `sm` up. The old version was a single empty box at a fixed h-[420px],
+ * which was both shapeless and roughly a third of the height the week view
+ * settles at -- so the page jumped when the events arrived.
+ *
+ * Rendered inside the card both times it is used, so this draws the view body
+ * only: no card, no title, no view switcher.
+ */
 function CalendarSkeleton() {
+  const BLOCK = 'bg-[#e9ecf9]'
+  const HOURS = ['8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM']
+
   return (
-    <div
-      aria-hidden="true"
-      className="animate-pulse rounded-[10px] border border-[#e8ebf8] bg-[#f4f6ff] h-[420px]"
-    />
+    <div aria-hidden="true" className="animate-pulse flex flex-col">
+      {/* Mobile — agenda list, matching listMonth. */}
+      <div className="sm:hidden flex flex-col gap-[16px] pt-[4px]">
+        {[
+          { day: 'Mon 14', rows: 2 },
+          { day: 'Tue 15', rows: 1 },
+          { day: 'Wed 16', rows: 3 },
+        ].map((group) => (
+          <div key={group.day} className="flex flex-col gap-[8px]">
+            <div className={`h-[12px] w-[64px] rounded ${BLOCK}`} />
+            {Array.from({ length: group.rows }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-[10px] rounded-[10px] border border-[#eef0f8] px-[12px] py-[10px]"
+              >
+                <div className={`size-[28px] rounded-full shrink-0 ${BLOCK}`} />
+                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                  <div className={`h-[12px] w-[58%] rounded ${BLOCK}`} />
+                  <div className={`h-[10px] w-[38%] rounded ${BLOCK}`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop — time grid, matching timeGridWeek. */}
+      <div className="hidden sm:flex flex-col">
+        {/* Day headers, offset by the time gutter's width. */}
+        <div className="flex border-b border-[#eef0f8]">
+          <div className="w-[56px] shrink-0" />
+          {Array.from({ length: 7 }).map((_, d) => (
+            <div key={d} className="flex-1 flex flex-col items-center gap-[6px] py-[8px]">
+              <div className={`h-[9px] w-[26px] rounded ${BLOCK}`} />
+              <div className={`size-[22px] rounded-full ${BLOCK}`} />
+            </div>
+          ))}
+        </div>
+
+        {/* Time gutter + seven day columns. */}
+        <div className="flex">
+          <div className="w-[56px] shrink-0 flex flex-col">
+            {HOURS.map((hour) => (
+              <div
+                key={hour}
+                className="h-[56px] flex items-start justify-end pr-[8px]"
+              >
+                <span className={`h-[9px] w-[28px] rounded ${BLOCK}`} />
+              </div>
+            ))}
+          </div>
+
+          {Array.from({ length: 7 }).map((_, d) => (
+            <div key={d} className="flex-1 border-l border-[#f2f4fb] flex flex-col">
+              {HOURS.map((hour) => (
+                <div key={hour} className="h-[56px] border-b border-[#f7f8fc]" />
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Event blocks, absolutely placed so they read as timed entries. */}
+        <div className="hidden sm:block relative -mt-[336px] h-[336px] pointer-events-none">
+          {[
+            { col: 0, top: 8, h: 44 },
+            { col: 1, top: 76, h: 28 },
+            { col: 2, top: 30, h: 56 },
+            { col: 3, top: 120, h: 40 },
+            { col: 4, top: 60, h: 32 },
+            { col: 5, top: 152, h: 48 },
+            { col: 6, top: 20, h: 36 },
+          ].map((block) => (
+            <div
+              key={`${block.col}-${block.top}`}
+              className={`absolute rounded-[6px] ${BLOCK}`}
+              style={{
+                left: `calc(56px + (100% - 56px) / 7 * ${block.col} + 3px)`,
+                width: 'calc((100% - 56px) / 7 - 6px)',
+                top: `${block.top}px`,
+                height: `${block.h}px`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 

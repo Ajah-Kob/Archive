@@ -3,7 +3,19 @@
 import { useState, useMemo } from 'react'
 import { startOfDay, endOfDay } from 'date-fns'
 import { useRouter } from 'next/navigation'
-import { Star, Eye, ExternalLink, X, Plus, Loader2, Upload } from 'lucide-react'
+import {
+  Star,
+  Eye,
+  ExternalLink,
+  X,
+  Plus,
+  Loader2,
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from 'lucide-react'
 import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
@@ -105,6 +117,101 @@ function DetailsModal({ item, onClose }: { item: RepositoryArchiveRow | null; on
         </div>
       </div>
     </div>
+  )
+}
+
+const PER_PAGE = 10
+
+/** How many numbered buttons to show at once, centred on the current page. */
+const PAGE_WINDOW = 5
+
+/**
+ * `<<  <  1 2 3 4 5  >  >>`
+ *
+ * Scoped to the repository for now. The audit log has its own, different
+ * control (a "Page [n] / total" field with prev/next only) — if this numbered
+ * style is wanted everywhere, both should be folded into one shared component
+ * rather than left as two.
+ */
+function RepositoryPagination({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number
+  totalPages: number
+  onChange: (page: number) => void
+}) {
+  if (totalPages <= 1) return null
+
+  const half = Math.floor(PAGE_WINDOW / 2)
+  const end = Math.min(totalPages, page + half)
+  // Keep the window full width once either end is in view.
+  const start = Math.max(1, end - PAGE_WINDOW + 1)
+  const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i)
+
+  const btn =
+    'inline-flex items-center justify-center size-[32px] rounded-[9px] bg-white border border-[#e8ebf8] text-[#5a6382] hover:bg-[#fafbff] hover:border-[#dfe3fb] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0'
+  const numBtn = `${btn} text-[13px] font-semibold`
+  const activeBtn =
+    'inline-flex items-center justify-center size-[32px] rounded-[9px] bg-[#707dff] border border-[#707dff] text-white text-[13px] font-semibold shrink-0'
+
+  return (
+    <nav
+      aria-label="Repository pages"
+      className="flex items-center justify-center gap-[6px] pt-[4px] overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <button
+        type="button"
+        onClick={() => onChange(1)}
+        disabled={page <= 1}
+        aria-label="First page"
+        className={btn}
+      >
+        <ChevronsLeft className="size-[14px]" />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+        aria-label="Previous page"
+        className={btn}
+      >
+        <ChevronLeft className="size-[14px]" />
+      </button>
+
+      {pages.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onChange(p)}
+          aria-label={`Page ${p}`}
+          aria-current={p === page ? 'page' : undefined}
+          className={p === page ? activeBtn : numBtn}
+        >
+          {p}
+        </button>
+      ))}
+
+      <button
+        type="button"
+        onClick={() => onChange(page + 1)}
+        disabled={page >= totalPages}
+        aria-label="Next page"
+        className={btn}
+      >
+        <ChevronRight className="size-[14px]" />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(totalPages)}
+        disabled={page >= totalPages}
+        aria-label="Last page"
+        className={btn}
+      >
+        <ChevronsRight className="size-[14px]" />
+      </button>
+    </nav>
   )
 }
 
@@ -214,6 +321,22 @@ export function RepositoryClient({
 
     return list
   }, [archives, searchTerm, favoritesOnly, favoriteIdsState, dateFrom, dateTo])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
+
+  // The page is stored together with the filter signature it was set under.
+  // Changing a filter therefore resets to page 1 by derivation — no effect, so
+  // no double render — and going back to a previous filter restores the page
+  // you were on.
+  const filterKey = `${searchTerm}|${favoritesOnly}|${dateFrom?.getTime() ?? ''}|${dateTo?.getTime() ?? ''}`
+  const [pageState, setPageState] = useState({ page: 1, filterKey: '' })
+  const page = pageState.filterKey === filterKey ? pageState.page : 1
+  const setPage = (next: number) => setPageState({ page: next, filterKey })
+
+  // Narrowing the filters can strand the reader past the last page, so the
+  // page is clamped rather than trusted.
+  const safePage = Math.min(page, totalPages)
+  const paged = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE)
 
   // An inverted range matches nothing; the alert explains why the list is
   // empty instead of leaving a bare "No Results Found".
@@ -379,7 +502,10 @@ export function RepositoryClient({
       <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
         <div className="flex justify-between items-center text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6] px-1">
           <span>{filtered.length} RESULTS</span>
-          <span>Showing {filtered.length} of {archives.length}</span>
+          <span>
+            Showing {(safePage - 1) * PER_PAGE + 1}–
+            {Math.min(safePage * PER_PAGE, filtered.length)} of {archives.length}
+          </span>
         </div>
 
         {archives.length === 0 ? (
@@ -408,7 +534,7 @@ export function RepositoryClient({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {filtered.map((item) => {
+            {paged.map((item) => {
               const authorsLine = formatAuthorsForRepository(item.authorOrder)
               const dateLabel = formatRepositoryDate(item.datePublished)
               const tags = Array.isArray(item.tags) ? item.tags.filter((t) => t.trim().length > 0) : []
@@ -545,6 +671,12 @@ export function RepositoryClient({
             })}
           </div>
         )}
+
+        <RepositoryPagination
+          page={page}
+          totalPages={totalPages}
+          onChange={setPage}
+        />
       </div>
 
       <DetailsModal item={selected} onClose={() => setSelected(null)} />

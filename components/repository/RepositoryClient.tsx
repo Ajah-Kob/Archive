@@ -518,10 +518,7 @@ export function RepositoryClient({
       </HeaderBar>
 
       <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
-        {/* One row above the list: Sort, the results count, the page range, then
-            Favorites. The count and the range are meta rather than controls, so
-            they sit inline with a middot between them and lose the standalone
-            uppercased line they had when they were on their own row.
+        {/* One row above the list: Sort, the results count, then Favorites.
             ml-auto keeps Favorites hard right; flex-wrap lets the row reflow on
             narrow screens instead of overflowing, since this is one line at
             every width rather than a mobile-only control. */}
@@ -553,15 +550,8 @@ export function RepositoryClient({
             </div>
           </div>
 
-          <div className="flex items-center gap-[8px] min-w-0 text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6]">
+          <div className="flex items-center min-w-0 text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6]">
             <span className="whitespace-nowrap">{filtered.length} RESULTS</span>
-            <span aria-hidden="true" className="text-[#c4cadf]">
-              &middot;
-            </span>
-            <span className="whitespace-nowrap">
-              Showing {(safePage - 1) * PER_PAGE + 1}–
-              {Math.min(safePage * PER_PAGE, filtered.length)} of {archives.length}
-            </span>
           </div>
 
           <button

@@ -98,12 +98,15 @@ export function RepositorySkeleton() {
           <div className={`h-[11px] w-[104px] rounded ${BLOCK}`} />
         </div>
 
-        {/* Sort + Favorites row, directly above the list. Widths are estimates
-            from the real control metrics rather than measured — if the row
-            resizes on swap-in, adjust these two and nothing else. */}
-        <div className="flex items-center justify-start gap-[10px] shrink-0">
-          <div className={`h-[12px] w-[26px] rounded ${BLOCK}`} />
-          <div className="h-[37.5px] w-[93px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
+        {/* Sort + Favorites row, directly above the list. Mirrors the real
+            justify-between: sort pinned left, Favorites hard right. Widths are
+            estimates from the real control metrics rather than measured — if the
+            row resizes on swap-in, adjust these two and nothing else. */}
+        <div className="flex items-center justify-between gap-[10px] shrink-0">
+          <div className="flex items-center gap-[10px] min-w-0">
+            <div className={`h-[12px] w-[26px] rounded ${BLOCK}`} />
+            <div className="h-[37.5px] w-[93px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
+          </div>
           <div className="h-[37.5px] w-[126px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
         </div>
 

@@ -529,8 +529,10 @@ export function RepositoryClient({
         {/* Ordering and favourites sit directly above the list, matching the
             templates page. Both are shown at every width — the repository cards
             have no sortable column headers to fall back on, so this is the only
-            way to reorder or narrow to favourites on any screen. */}
-        <div className="flex items-center justify-start gap-[10px] shrink-0">
+            way to reorder or narrow to favourites on any screen.
+            justify-between pins the sort control to the left edge, where the
+            templates select is, and pushes Favorites to the far right. */}
+        <div className="flex items-center justify-between gap-[10px] shrink-0">
           <label
             htmlFor="repository-sort"
             className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]"

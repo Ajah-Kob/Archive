@@ -518,71 +518,80 @@ export function RepositoryClient({
       </HeaderBar>
 
       <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
-        <div className="flex justify-between items-center text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6] px-1">
-          <span>{filtered.length} RESULTS</span>
-          <span>
-            Showing {(safePage - 1) * PER_PAGE + 1}–
-            {Math.min(safePage * PER_PAGE, filtered.length)} of {archives.length}
-          </span>
-        </div>
-
-        {/* Ordering and favourites sit directly above the list, matching the
-            templates page. Both are shown at every width — the repository cards
-            have no sortable column headers to fall back on, so this is the only
-            way to reorder or narrow to favourites on any screen.
-            justify-between pins the sort control to the left edge, where the
-            templates select is, and pushes Favorites to the far right. */}
-        <div className="flex items-center justify-between gap-[10px] shrink-0">
-          {/* Label and select have to travel as one child. As siblings of the
-              Favorites button, justify-between treats all three as the ends and
-              the middle, which stranded the select in the centre of the row. */}
-          <div className="flex items-center gap-[10px] min-w-0">
-            <label
-              htmlFor="repository-sort"
-              className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]"
-            >
-              Sort
-            </label>
-            <div className="relative shrink-0">
-              <select
-                id="repository-sort"
-                value={sortValue}
-                onChange={(e) => setSortValue(e.target.value as SortValue)}
-                className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
+        {/* List controls and the results count travel as one block above the cards.
+            They are grouped so the tight gap between the two rows is this
+            container's gap-[6px], not the cards container's gap-4 — otherwise
+            the count ends up as far from the controls it belongs with as the
+            controls are from the first card. */}
+        <div className="flex flex-col gap-[6px] shrink-0">
+          {/* Ordering and favourites, matching the templates page. Both are shown
+              at every width — the repository cards have no sortable column
+              headers to fall back on, so this is the only way to reorder or
+              narrow to favourites on any screen.
+              justify-between pins the sort control to the left edge, where the
+              templates select is, and pushes Favorites to the far right. */}
+          <div className="flex items-center justify-between gap-[10px]">
+            {/* Label and select have to travel as one child. As siblings of the
+                Favorites button, justify-between treats all three as the ends and
+                the middle, which stranded the select in the centre of the row. */}
+            <div className="flex items-center gap-[10px] min-w-0">
+              <label
+                htmlFor="repository-sort"
+                className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]"
               >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                aria-hidden="true"
-                className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
-              />
+                Sort
+              </label>
+              <div className="relative shrink-0">
+                <select
+                  id="repository-sort"
+                  value={sortValue}
+                  onChange={(e) => setSortValue(e.target.value as SortValue)}
+                  className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
+                />
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setFavoritesOnly((v) => !v)}
+              disabled={!canFavorite}
+              aria-pressed={favoritesOnly}
+              title={canFavorite ? undefined : 'Sign in to save favorites'}
+              className={`inline-flex items-center gap-1.5 h-[37.5px] px-3 rounded-lg border text-[12.5px] font-sans font-semibold transition-colors shrink-0 disabled:opacity-45 disabled:cursor-not-allowed ${
+                favoritesOnly
+                  ? 'bg-[#fff8e6] border-[#f0d189] text-[#a5730a]'
+                  : 'bg-white border-[#dfe3fb] text-[#5a6382] hover:bg-[#f8f9ff]'
+              }`}
+            >
+              <Star
+                className={`size-[13px] ${favoritesOnly ? 'fill-current' : ''}`}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+              Favorites
+              <span className="tabular-nums opacity-70">({favoriteIdsState.size})</span>
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setFavoritesOnly((v) => !v)}
-            disabled={!canFavorite}
-            aria-pressed={favoritesOnly}
-            title={canFavorite ? undefined : 'Sign in to save favorites'}
-            className={`inline-flex items-center gap-1.5 h-[37.5px] px-3 rounded-lg border text-[12.5px] font-sans font-semibold transition-colors shrink-0 disabled:opacity-45 disabled:cursor-not-allowed ${
-              favoritesOnly
-                ? 'bg-[#fff8e6] border-[#f0d189] text-[#a5730a]'
-                : 'bg-white border-[#dfe3fb] text-[#5a6382] hover:bg-[#f8f9ff]'
-            }`}
-          >
-            <Star
-              className={`size-[13px] ${favoritesOnly ? 'fill-current' : ''}`}
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-            Favorites
-            <span className="tabular-nums opacity-70">({favoriteIdsState.size})</span>
-          </button>
+          {/* Results count, under the controls rather than above them — the row
+              above the list is for the things you can act on. */}
+          <div className="flex justify-between items-center text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6] px-1">
+            <span>{filtered.length} RESULTS</span>
+            <span>
+              Showing {(safePage - 1) * PER_PAGE + 1}–
+              {Math.min(safePage * PER_PAGE, filtered.length)} of {archives.length}
+            </span>
+          </div>
         </div>
 
         {archives.length === 0 ? (

@@ -208,16 +208,16 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
             <div className="h-[32px] w-[140px] rounded-[8px] bg-[#dfe3fb] animate-pulse" />
           }
         >
-          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-            <div className="h-[37.5px] w-full sm:w-[320px] rounded-lg bg-[#dfe3fb] animate-pulse" />
-            <div className="h-[37.5px] w-[140px] rounded-lg bg-[#dfe3fb] animate-pulse" />
+          <div className="flex flex-nowrap items-center gap-2.5 w-max">
+            <div className="h-[37.5px] w-[280px] sm:w-[320px] shrink-0 rounded-lg bg-[#dfe3fb] animate-pulse" />
+            <div className="h-[37.5px] w-[140px] shrink-0 rounded-lg bg-[#dfe3fb] animate-pulse" />
           </div>
         </HeaderBar>
         <div
           role="status"
           aria-live="polite"
           aria-label="Loading sections"
-          className="flex-1 flex flex-col min-h-0 pt-[16px] px-8 pb-[30px]"
+          className="flex-1 flex flex-col min-h-0 pt-[16px] px-4 sm:px-8 pb-[30px]"
         >
           <SectionTableSkeleton rows={5} />
         </div>
@@ -244,19 +244,22 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
           </button>
         }
       >
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-nowrap items-center gap-2.5 w-max">
           <SearchBar
             value={search}
             onChange={setSearch}
             placeholder="Search section, coordinator, or academic year…"
             ariaLabel="Search sections"
-            className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
+            // Capped rather than w-full: this bar scrolls horizontally, and a
+            // flexible search either collapses the filter beside it or fights the
+            // w-max wrapper. Matches the search on the other bars.
+            className="w-[280px] shrink-0 sm:w-[320px]"
           />
           <Filter value={phaseFilter} options={PHASE_OPTIONS} onChange={(v) => setPhaseFilter(v as PhaseFilter)} ariaLabel="Filter by capstone phase" />
         </div>
       </HeaderBar>
 
-      <div className="flex-1 flex flex-col min-h-0 pt-[16px] px-8 pb-[30px]">
+      <div className="flex-1 flex flex-col min-h-0 pt-[16px] px-4 sm:px-8 pb-[30px]">
         <SectionTable sections={filtered} renderActions={handleRenderActions} onAssign={handleAssign} />
       </div>
 

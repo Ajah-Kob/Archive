@@ -68,13 +68,16 @@ export function ArchivingReviewPage({ submissions }: ArchivingReviewPageProps) {
   return (
     <>
       <HeaderBar>
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-nowrap items-center gap-2.5 w-max">
           <SearchBar
             value={search}
             onChange={setSearch}
             placeholder="Search group, section, title, authors…"
             ariaLabel="Search archiving submissions"
-            className="w-full sm:flex-[0_0_320px] sm:max-w-[320px]"
+            // Capped rather than w-full: this bar scrolls horizontally, and a
+            // flexible search either collapses the filter beside it or fights the
+            // w-max wrapper. Matches the search on the other bars.
+            className="w-[280px] shrink-0 sm:w-[320px]"
           />
           <Filter
             value={statusFilter}
@@ -85,7 +88,7 @@ export function ArchivingReviewPage({ submissions }: ArchivingReviewPageProps) {
         </div>
       </HeaderBar>
 
-      <div className="flex-1 flex flex-col min-h-0 px-8 py-6">
+      <div className="flex-1 flex flex-col min-h-0 px-4 sm:px-8 py-6">
         <ChairReviewTable
           submissions={filtered}
           hasAnySubmissions={hasAny}

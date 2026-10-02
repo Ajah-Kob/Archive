@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { SectionCard } from '@/components/sections/main/SectionCard'
 import {
   SectionDataRow,
   type SectionData,
@@ -122,7 +123,21 @@ export function SectionTable({ sections, renderActions, onAssign }: SectionTable
 
   return (
     <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="overflow-x-auto flex-1 flex flex-col min-h-0">
+      {/* Mobile: one card per section, so all eight fields are readable without
+          a sideways swipe. Desktop grid below is untouched. */}
+      <div className="sm:hidden flex-1 flex flex-col min-h-0 overflow-y-auto p-3">
+        {sorted.map((item) => (
+          <SectionCard
+            key={item.id}
+            data={item}
+            actions={renderActions?.(item)}
+            onAssign={onAssign}
+          />
+        ))}
+      </div>
+
+      {/* Desktop: the original eight-column grid. */}
+      <div className="hidden sm:flex overflow-x-auto flex-1 flex flex-col min-h-0">
         <div role="table" aria-label="Sections" className="min-w-[960px] flex-1 flex flex-col min-h-0">
           {/* Header Row — Section, Academic Year, Phase, Coordinator, Date Created, Students, Groups, Actions */}
           <div role="row" className={`grid ${GRID_COLS} items-center px-[20px] h-[39px] bg-[#fafbff] border-b border-[#f0f2fa] rounded-t-[14px] shrink-0`}>

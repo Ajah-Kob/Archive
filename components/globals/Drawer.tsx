@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 import { useDrawer } from '@/store/useDrawer'
@@ -14,12 +14,15 @@ export default function Drawer() {
   const pathname = usePathname()
 
   // Close on navigation. The store isn't persisted, so a client-side route
-  // change leaves the panel open over the new page. Tracked via a ref so this
-  // fires on pathname changes only — never when the drawer is merely opened.
-  const prevPathname = useRef(pathname)
+  // change leaves the panel open over the new page.
+  //
+  // No ref guard: this effect only depends on `pathname` (setShow is a stable
+  // Zustand setter), so opening or closing the drawer never re-runs it. The
+  // ref was actively harmful -- on a cross-layout navigation the Drawer
+  // remounts, the ref initialises to the *new* pathname, the guard bails, and
+  // the store's `show: true` survives, so the drawer arrives open. Firing
+  // unconditionally covers both the remount and the in-layout case.
   useEffect(() => {
-    if (prevPathname.current === pathname) return
-    prevPathname.current = pathname
     setShow(false)
   }, [pathname, setShow])
 

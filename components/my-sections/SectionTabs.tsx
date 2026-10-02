@@ -49,9 +49,12 @@ export function SectionTabs({ sectionId, actions, children }: SectionTabsProps) 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <HeaderBar
-        /* HeaderBar is single-line with a scrollable tab strip by default, so
-           only the sticky positioning is needed here. */
-        className="sticky top-0 z-30"
+        /* z-10, not z-30: the drawer backdrop is z-20 and its panel z-30, so a
+           higher bar sits above the backdrop and never dims when the drawer
+           opens. z-10 keeps the bar above the page body while still letting
+           the backdrop cover it. This is the only HeaderBar that sets a
+           z-index, which is why only this bar showed the problem. */
+        className="sticky top-0 z-10"
         actions={actions ? <>{actions}{backButton}</> : backButton}
       >
         {TABS.map((t) => {

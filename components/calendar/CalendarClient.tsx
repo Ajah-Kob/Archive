@@ -73,8 +73,11 @@ const CALENDAR_PLUGINS = [
   interactionPlugin,
 ]
 
+// Order and labels are mirrored in app/calendar/loading.tsx, which cannot
+// import this: a non-component export from a 'use client' module arrives on
+// the server as a client reference, not as an array.
 const VIEW_OPTIONS: FilterOption[] = [
-  { value: MONTH_VIEW, label: '3 Months' },
+  { value: MONTH_VIEW, label: 'Months' },
   { value: WEEK_VIEW, label: 'Week' },
   { value: DAY_VIEW, label: 'Day' },
   { value: LIST_VIEW, label: 'List' },

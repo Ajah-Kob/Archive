@@ -1,0 +1,15 @@
+export default function Loading() {
+  return (
+    <main className="bg-primary min-h-svh">
+      <section className="animate-pulse">
+        <div className="container">
+          <div className="flex flex-col gap-5">
+            <h1 className="w-[100px] bg-gray-200">&nbsp;</h1>
+            <p className="w-[140px] bg-gray-200">&nbsp;</p>
+            <p className="w-[120px] bg-gray-200">&nbsp;</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}

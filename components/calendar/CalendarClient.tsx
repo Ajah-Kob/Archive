@@ -47,11 +47,17 @@ const MOBILE_BREAKPOINT = '(max-width: 639px)'
 const MULTIMONTH_VIEWS = {
   multiMonth: {
     duration: { months: 3 },
-    // v7 caps the stack at 3 columns and only drops to fewer once a month
-    // falls below this width, so narrow screens stack vertically rather than
-    // squeezing three of them into 343px.
-    multiMonthMaxColumns: 3,
-    singleMonthMinWidth: 280,
+    // One column, so the three months stack vertically. This is a deliberate
+    // override of the plugin's default of 3, which lays them side by side.
+    multiMonthMaxColumns: 1,
+    // Not set: singleMonthMinWidth only decides when a column is *dropped*,
+    // and with the cap already at 1 there is nothing left to drop.
+    //
+    // The per-month heading. The plugin's own default omits the year whenever
+    // every month falls in the same one, so Oct-Dec 2026 read "October",
+    // "November", "December" and the year came only from the toolbar title.
+    // The title is gone, so each heading carries its own year instead.
+    singleMonthTitleFormat: { year: 'numeric', month: 'long' } as const,
   },
 }
 
@@ -286,35 +292,42 @@ export function CalendarSkeleton() {
         ))}
       </div>
 
-      {/* Desktop — three stacked month tables, matching the multiMonth default.
-          The week/day views are reachable from the switcher, but the view the
-          calendar opens on is the one the skeleton has to match. */}
-      <div className="hidden sm:flex gap-[16px] pt-[4px]">
+      {/* Desktop — three month tables stacked vertically, matching the
+          multiMonth default at multiMonthMaxColumns: 1. The week/day views are
+          reachable from the switcher, but the view the calendar opens on is the
+          one the skeleton has to match. */}
+      <div className="hidden sm:flex flex-col gap-[14px] pt-[4px]">
         {Array.from({ length: 3 }).map((_, m) => (
-          <div key={m} className="flex-1 min-w-0 flex flex-col gap-[8px]">
-            {/* Month name */}
-            <div className={`h-[13px] w-[64px] rounded ${BLOCK}`} />
+          <div
+            key={m}
+            className="flex-1 min-h-0 flex flex-col gap-[6px] border-b border-[#f2f4fb] pb-[10px] last:border-b-0 last:pb-0"
+          >
+            {/* Month heading, with the year inline — the toolbar title is gone, so
+            each heading carries its own year. */}
+            <div className={`h-[13px] w-[112px] rounded ${BLOCK}`} />
             {/* Weekday initials */}
             <div className="flex gap-[4px]">
               {Array.from({ length: 7 }).map((__, d) => (
                 <div key={d} className={`h-[9px] flex-1 rounded ${BLOCK}`} />
               ))}
             </div>
-            {/* Six weeks of day cells, a few carrying an event block. */}
+            {/* Six weeks of day cells, a few carrying an event block. Rows are
+                flex-1 so the stack compresses to the card instead of
+                overflowing it, which is what the real view does too. */}
             {Array.from({ length: 6 }).map((__, w) => (
-              <div key={w} className="flex gap-[4px]">
+              <div key={w} className="flex-1 min-h-[18px] flex gap-[4px]">
                 {Array.from({ length: 7 }).map((___, d) => {
                   const seeded = (w * 7 + d + m) % 9
                   return (
                     <div
                       key={d}
-                      className="flex-1 h-[26px] rounded-[4px] border border-[#f2f4fb] flex flex-col items-center gap-[2px] p-[2px]"
+                      className="flex-1 min-h-0 rounded-[4px] border border-[#f2f4fb] flex flex-col items-center gap-[2px] p-[2px]"
                     >
                       <div
-                        className={`size-[9px] rounded-full ${seeded === 0 ? 'bg-[#707dff]' : BLOCK}`}
+                        className={`size-[9px] shrink-0 rounded-full ${seeded === 0 ? 'bg-[#707dff]' : BLOCK}`}
                       />
                       {seeded < 3 ? (
-                        <div className="h-[3px] w-full rounded bg-[#dfe3fb]" />
+                        <div className="h-[3px] w-full shrink-0 rounded bg-[#dfe3fb]" />
                       ) : null}
                     </div>
                   )
@@ -402,7 +415,7 @@ export function CalendarClient({
 }: CalendarClientProps) {
   const calendarRef = useRef<CalendarRef | null>(null)
   const [view, setView] = useState(MONTH_VIEW)
-  const [title, setTitle] = useState('')
+  // Period context lives on the month headings themselves, so no title state.
   const [isCurrentPeriod, setIsCurrentPeriod] = useState(true)
   // Modal targets — null = closed. Draft span doubles as the NewEventModal
   // open flag so read-only roles (which never set it) never render the modal.
@@ -492,11 +505,9 @@ export function CalendarClient({
   }
 
   function handleDatesSet(arg: {
-    view: { title: string }
     start: Date
     end: Date
   }) {
-    setTitle(arg.view.title)
     const now = new Date()
     setIsCurrentPeriod(arg.start <= now && now < arg.end)
   }
@@ -586,14 +597,6 @@ export function CalendarClient({
 
       <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
         <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)] p-4 sm:p-6 w-full">
-          <div className="flex items-center justify-center pb-1">
-            <span
-              aria-live="polite"
-              className="font-heading font-bold text-[15px] leading-[22px] text-[#10133a] whitespace-nowrap"
-            >
-              {title}
-            </span>
-          </div>
           {loadError ? (
             <p
               role="alert"

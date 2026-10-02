@@ -220,7 +220,7 @@ export function DefenseSchedulingPage({
           </button>
         }
       >
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-nowrap items-center gap-2.5 w-max">
           <button
             type="button"
             role="switch"
@@ -249,7 +249,10 @@ export function DefenseSchedulingPage({
             onChange={setSearch}
             placeholder="Search schedules..."
             ariaLabel="Search defense schedules"
-            className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[320px]"
+            // Capped rather than w-full / flex-1: this bar scrolls horizontally
+            // now, so a flexible search would either collapse the strip or
+            // fight the w-max wrapper. Matches the search on the other bars.
+            className="w-[280px] shrink-0 sm:w-[320px]"
           />
 
           <Filter
@@ -267,7 +270,7 @@ export function DefenseSchedulingPage({
         </div>
       </HeaderBar>
 
-      <div className="flex-1 flex flex-col min-h-0 px-8 pt-[16px] pb-[30px]">
+      <div className="flex-1 flex flex-col min-h-0 px-4 sm:px-8 pt-[16px] pb-[30px]">
         <DefenseTable
           schedules={visible}
           currentUserId={currentUserId}

@@ -12,6 +12,7 @@ import {
   EditEventModal,
 } from '@/components/calendar/NewEventModal'
 import dayGridPlugin from '@fullcalendar/react/daygrid'
+import multiMonthPlugin from '@fullcalendar/react/multimonth'
 import listPlugin from '@fullcalendar/react/list'
 import timeGridPlugin from '@fullcalendar/react/timegrid'
 import interactionPlugin from '@fullcalendar/react/interaction'
@@ -34,11 +35,25 @@ const FullCalendar = dynamic(
   { ssr: false, loading: () => <CalendarSkeleton /> },
 )
 
-const MONTH_VIEW = 'dayGridMonth'
+// Stacked months, not one calendar. v7's multimonth plugin registers a base
+// `multiMonth` view with no duration of its own, so three months is supplied
+// here via MULTIMONTH_VIEWS. The legacy `multiMonth3` name is gone in v7.
+const MONTH_VIEW = 'multiMonth'
 const LIST_VIEW = 'listMonth'
 const WEEK_VIEW = 'timeGridWeek'
 const DAY_VIEW = 'timeGridDay'
 const MOBILE_BREAKPOINT = '(max-width: 639px)'
+
+const MULTIMONTH_VIEWS = {
+  multiMonth: {
+    duration: { months: 3 },
+    // v7 caps the stack at 3 columns and only drops to fewer once a month
+    // falls below this width, so narrow screens stack vertically rather than
+    // squeezing three of them into 343px.
+    multiMonthMaxColumns: 3,
+    singleMonthMinWidth: 280,
+  },
+}
 
   // Defense pills are bare text on the grid, so the label is dark ink.
 const DEFENSE_TEXT_COLOR = '#10133a'
@@ -46,13 +61,14 @@ const DEFENSE_TEXT_COLOR = '#10133a'
 const CALENDAR_PLUGINS = [
   classicThemePlugin,
   dayGridPlugin,
+  multiMonthPlugin,
   listPlugin,
   timeGridPlugin,
   interactionPlugin,
 ]
 
 const VIEW_OPTIONS: FilterOption[] = [
-  { value: MONTH_VIEW, label: 'Month' },
+  { value: MONTH_VIEW, label: '3 Months' },
   { value: WEEK_VIEW, label: 'Week' },
   { value: DAY_VIEW, label: 'Day' },
   { value: LIST_VIEW, label: 'List' },
@@ -242,7 +258,6 @@ function todaySpan(): CalendarDateSpan {
  */
 export function CalendarSkeleton() {
   const BLOCK = 'bg-[#e9ecf9]'
-  const HOURS = ['8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM']
 
   return (
     <div aria-hidden="true" className="animate-pulse flex flex-col">
@@ -271,64 +286,43 @@ export function CalendarSkeleton() {
         ))}
       </div>
 
-      {/* Desktop — time grid, matching timeGridWeek. */}
-      <div className="hidden sm:flex flex-col">
-        {/* Day headers, offset by the time gutter's width. */}
-        <div className="flex border-b border-[#eef0f8]">
-          <div className="w-[56px] shrink-0" />
-          {Array.from({ length: 7 }).map((_, d) => (
-            <div key={d} className="flex-1 flex flex-col items-center gap-[6px] py-[8px]">
-              <div className={`h-[9px] w-[26px] rounded ${BLOCK}`} />
-              <div className={`size-[22px] rounded-full ${BLOCK}`} />
+      {/* Desktop — three stacked month tables, matching the multiMonth default.
+          The week/day views are reachable from the switcher, but the view the
+          calendar opens on is the one the skeleton has to match. */}
+      <div className="hidden sm:flex gap-[16px] pt-[4px]">
+        {Array.from({ length: 3 }).map((_, m) => (
+          <div key={m} className="flex-1 min-w-0 flex flex-col gap-[8px]">
+            {/* Month name */}
+            <div className={`h-[13px] w-[64px] rounded ${BLOCK}`} />
+            {/* Weekday initials */}
+            <div className="flex gap-[4px]">
+              {Array.from({ length: 7 }).map((__, d) => (
+                <div key={d} className={`h-[9px] flex-1 rounded ${BLOCK}`} />
+              ))}
             </div>
-          ))}
-        </div>
-
-        {/* Time gutter + seven day columns. */}
-        <div className="flex">
-          <div className="w-[56px] shrink-0 flex flex-col">
-            {HOURS.map((hour) => (
-              <div
-                key={hour}
-                className="h-[56px] flex items-start justify-end pr-[8px]"
-              >
-                <span className={`h-[9px] w-[28px] rounded ${BLOCK}`} />
+            {/* Six weeks of day cells, a few carrying an event block. */}
+            {Array.from({ length: 6 }).map((__, w) => (
+              <div key={w} className="flex gap-[4px]">
+                {Array.from({ length: 7 }).map((___, d) => {
+                  const seeded = (w * 7 + d + m) % 9
+                  return (
+                    <div
+                      key={d}
+                      className="flex-1 h-[26px] rounded-[4px] border border-[#f2f4fb] flex flex-col items-center gap-[2px] p-[2px]"
+                    >
+                      <div
+                        className={`size-[9px] rounded-full ${seeded === 0 ? 'bg-[#707dff]' : BLOCK}`}
+                      />
+                      {seeded < 3 ? (
+                        <div className="h-[3px] w-full rounded bg-[#dfe3fb]" />
+                      ) : null}
+                    </div>
+                  )
+                })}
               </div>
             ))}
           </div>
-
-          {Array.from({ length: 7 }).map((_, d) => (
-            <div key={d} className="flex-1 border-l border-[#f2f4fb] flex flex-col">
-              {HOURS.map((hour) => (
-                <div key={hour} className="h-[56px] border-b border-[#f7f8fc]" />
-              ))}
-            </div>
-          ))}
-        </div>
-
-        {/* Event blocks, absolutely placed so they read as timed entries. */}
-        <div className="hidden sm:block relative -mt-[336px] h-[336px] pointer-events-none">
-          {[
-            { col: 0, top: 8, h: 44 },
-            { col: 1, top: 76, h: 28 },
-            { col: 2, top: 30, h: 56 },
-            { col: 3, top: 120, h: 40 },
-            { col: 4, top: 60, h: 32 },
-            { col: 5, top: 152, h: 48 },
-            { col: 6, top: 20, h: 36 },
-          ].map((block) => (
-            <div
-              key={`${block.col}-${block.top}`}
-              className={`absolute rounded-[6px] ${BLOCK}`}
-              style={{
-                left: `calc(56px + (100% - 56px) / 7 * ${block.col} + 3px)`,
-                width: 'calc((100% - 56px) / 7 - 6px)',
-                top: `${block.top}px`,
-                height: `${block.h}px`,
-              }}
-            />
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   )
@@ -616,8 +610,9 @@ export function CalendarClient({
             {ready ? (
               <FullCalendar
                 ref={calendarRef}
-                    plugins={CALENDAR_PLUGINS}
-                    initialView={view}
+                plugins={CALENDAR_PLUGINS}
+                views={MULTIMONTH_VIEWS}
+                initialView={view}
                     headerToolbar={false}
                     datesSet={handleDatesSet}
                     firstDay={1}

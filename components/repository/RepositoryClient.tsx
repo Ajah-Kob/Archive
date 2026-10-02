@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ChevronDown,
 } from 'lucide-react'
 import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { HeaderBar } from '@/components/globals/HeaderBar'
@@ -122,6 +123,23 @@ function DetailsModal({ item, onClose }: { item: RepositoryArchiveRow | null; on
 
 const PER_PAGE = 10
 
+/**
+ * Orderings offered by the sort control, in the order it lists them. Same set as
+ * the templates list, so the two screens behave identically.
+ *
+ * `newest` is the default because it matches what the server already sends
+ * (datePublished desc), which means the list is unchanged until someone picks
+ * something else.
+ */
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'az', label: 'A-Z' },
+  { value: 'za', label: 'Z-A' },
+] as const
+
+type SortValue = (typeof SORT_OPTIONS)[number]['value']
+
 /** How many numbered buttons to show at once, centred on the current page. */
 const PAGE_WINDOW = 5
 
@@ -224,6 +242,7 @@ export function RepositoryClient({
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [sortValue, setSortValue] = useState<SortValue>('newest')
   const [dateFrom, setDateFrom] = useState<Date | null>(null)
   const [dateTo, setDateTo] = useState<Date | null>(null)
   const [selected, setSelected] = useState<RepositoryArchiveRow | null>(null)
@@ -319,8 +338,28 @@ export function RepositoryClient({
       return title.includes(term) || authorsFormatted.includes(term) || abstract.includes(term) || tagsJoined.includes(term)
     })
 
-    return list
-  }, [archives, searchTerm, favoritesOnly, favoriteIdsState, dateFrom, dateTo])
+    // Sorting happens after filtering so the order is stable for the current page
+    // and does not reshuffle as the search box narrows the list. Date bounds are
+    // widened to whole days above, so a same-day pair compares equal and A-Z
+    // falls through to the title as the tiebreak.
+    const sorted = [...list]
+    switch (sortValue) {
+      case 'newest':
+        sorted.sort((a, b) => new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        break
+      case 'oldest':
+        sorted.sort((a, b) => new Date(a.datePublished).getTime() - new Date(b.datePublished).getTime())
+        break
+      case 'az':
+        sorted.sort((a, b) => a.title.localeCompare(b.title) || new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        break
+      case 'za':
+        sorted.sort((a, b) => b.title.localeCompare(a.title) || new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        break
+    }
+
+    return sorted
+  }, [archives, searchTerm, favoritesOnly, favoriteIdsState, dateFrom, dateTo, sortValue])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
 
@@ -467,27 +506,6 @@ export function RepositoryClient({
             </button>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => setFavoritesOnly((v) => !v)}
-            disabled={!canFavorite}
-            aria-pressed={favoritesOnly}
-            title={canFavorite ? undefined : 'Sign in to save favorites'}
-            className={`inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border text-[12.5px] font-sans font-semibold transition-colors shrink-0 disabled:opacity-45 disabled:cursor-not-allowed ${
-              favoritesOnly
-                ? 'bg-[#fff8e6] border-[#f0d189] text-[#a5730a]'
-                : 'bg-white border-[#dfe3fb] text-[#5a6382] hover:bg-[#f8f9ff]'
-            }`}
-          >
-            <Star
-              className={`size-[13px] ${favoritesOnly ? 'fill-current' : ''}`}
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-            Favorites
-            <span className="tabular-nums opacity-70">({favoriteIdsState.size})</span>
-          </button>
-
           {isDateRangeInvalid ? (
             <span
               role="alert"
@@ -506,6 +524,58 @@ export function RepositoryClient({
             Showing {(safePage - 1) * PER_PAGE + 1}–
             {Math.min(safePage * PER_PAGE, filtered.length)} of {archives.length}
           </span>
+        </div>
+
+        {/* Ordering and favourites sit directly above the list, matching the
+            templates page. Both are shown at every width — the repository cards
+            have no sortable column headers to fall back on, so this is the only
+            way to reorder or narrow to favourites on any screen. */}
+        <div className="flex items-center justify-start gap-[10px] shrink-0">
+          <label
+            htmlFor="repository-sort"
+            className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]"
+          >
+            Sort
+          </label>
+          <div className="relative shrink-0">
+            <select
+              id="repository-sort"
+              value={sortValue}
+              onChange={(e) => setSortValue(e.target.value as SortValue)}
+              className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setFavoritesOnly((v) => !v)}
+            disabled={!canFavorite}
+            aria-pressed={favoritesOnly}
+            title={canFavorite ? undefined : 'Sign in to save favorites'}
+            className={`inline-flex items-center gap-1.5 h-[37.5px] px-3 rounded-lg border text-[12.5px] font-sans font-semibold transition-colors shrink-0 disabled:opacity-45 disabled:cursor-not-allowed ${
+              favoritesOnly
+                ? 'bg-[#fff8e6] border-[#f0d189] text-[#a5730a]'
+                : 'bg-white border-[#dfe3fb] text-[#5a6382] hover:bg-[#f8f9ff]'
+            }`}
+          >
+            <Star
+              className={`size-[13px] ${favoritesOnly ? 'fill-current' : ''}`}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+            Favorites
+            <span className="tabular-nums opacity-70">({favoriteIdsState.size})</span>
+          </button>
         </div>
 
         {archives.length === 0 ? (

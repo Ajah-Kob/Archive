@@ -4,9 +4,10 @@
  * Mirrors RepositoryClient's real layout one-to-one so the swap to loaded
  * content does not shift anything:
  *   - HeaderBar strip (px-8, bg-[#eef2ff], border-b) with search /
- *     published-date-range / favorites-chip placeholders and the admin-only
+ *     published-date-range placeholders and the admin-only
  *     Upload Research slot
  *   - results-count row
+ *   - sort + Favorites row above the list (both moved out of the bar)
  *   - the dotted content background with archive cards
  *
  * Each card reproduces the real card's anatomy: 5px left color bar, title,
@@ -82,7 +83,6 @@ export function RepositorySkeleton() {
             <div className="h-[40px] rounded-md bg-white border border-[#e4e7f6]" />
             <div className="h-[40px] rounded-md bg-white border border-[#e4e7f6]" />
           </div>
-          <div className="h-[34px] w-[112px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
         </ScrollFadeRegion>
         {/* admin-only Upload Research slot — reserved so the bar does not reflow */}
         <div className="flex items-center gap-[8px] shrink-0">
@@ -96,6 +96,15 @@ export function RepositorySkeleton() {
         <div className="flex justify-between items-center px-1">
           <div className={`h-[11px] w-[64px] rounded ${BLOCK}`} />
           <div className={`h-[11px] w-[104px] rounded ${BLOCK}`} />
+        </div>
+
+        {/* Sort + Favorites row, directly above the list. Widths are estimates
+            from the real control metrics rather than measured — if the row
+            resizes on swap-in, adjust these two and nothing else. */}
+        <div className="flex items-center justify-start gap-[10px] shrink-0">
+          <div className={`h-[12px] w-[26px] rounded ${BLOCK}`} />
+          <div className="h-[37.5px] w-[93px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
+          <div className="h-[37.5px] w-[126px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
         </div>
 
         <div className="flex flex-col gap-4">

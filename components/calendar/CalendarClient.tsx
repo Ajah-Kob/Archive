@@ -234,10 +234,13 @@ function todaySpan(): CalendarDateSpan {
  * which was both shapeless and roughly a third of the height the week view
  * settles at -- so the page jumped when the events arrived.
  *
- * Rendered inside the card both times it is used, so this draws the view body
- * only: no card, no title, no view switcher.
+ * Drawn on the same #f8f9fe ground as the loaded page, so the unpainted moment
+ * during first navigation is the app's own colour rather than white.
+ *
+ * Rendered inside the card every time it is used, so this draws the view body
+ * only: no card, no title, no view switcher. Exported for app/calendar/loading.
  */
-function CalendarSkeleton() {
+export function CalendarSkeleton() {
   const BLOCK = 'bg-[#e9ecf9]'
   const HOURS = ['8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM']
 

@@ -522,32 +522,25 @@ export function RepositoryClient({
             ml-auto keeps Favorites hard right; flex-wrap lets the row reflow on
             narrow screens instead of overflowing, since this is one line at
             every width rather than a mobile-only control. */}
-        <div className="flex flex-wrap items-center gap-x-[10px] gap-y-[8px] shrink-0">
-          <div className="flex items-center gap-[10px] min-w-0 shrink-0">
-            <label
-              htmlFor="repository-sort"
-              className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]"
+<div className="flex flex-wrap items-center gap-x-[10px] gap-y-[8px] shrink-0">
+          <div className="relative shrink-0">
+            <select
+              id="repository-sort"
+              aria-label="Sort results"
+              value={sortValue}
+              onChange={(e) => setSortValue(e.target.value as SortValue)}
+              className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
             >
-              Sort
-            </label>
-            <div className="relative shrink-0">
-              <select
-                id="repository-sort"
-                value={sortValue}
-                onChange={(e) => setSortValue(e.target.value as SortValue)}
-                className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                aria-hidden="true"
-                className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
-              />
-            </div>
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
+            />
           </div>
 
           <div className="flex items-center min-w-0 text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6]">

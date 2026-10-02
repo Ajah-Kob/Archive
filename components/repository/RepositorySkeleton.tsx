@@ -97,10 +97,7 @@ export function RepositorySkeleton() {
             measured — if the row resizes on swap-in, adjust these and nothing
             else. */}
         <div className="flex flex-wrap items-center gap-x-[10px] gap-y-[8px] shrink-0">
-          <div className="flex items-center gap-[10px] min-w-0 shrink-0">
-            <div className={`h-[12px] w-[26px] rounded ${BLOCK}`} />
-            <div className="h-[37.5px] w-[93px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
-          </div>
+          <div className="h-[37.5px] w-[93px] shrink-0 rounded-lg bg-white border border-[#e4e7f6]" />
 
           <div className={`h-[11px] w-[64px] rounded ${BLOCK}`} />
 

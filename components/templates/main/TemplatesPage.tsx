@@ -263,15 +263,10 @@ export default function TemplatesPage({
               already sorts through clickable NAME and DATE UPLOADED headers, and
               a second control there would just duplicate them. */}
           <div className="sm:hidden flex items-center justify-start gap-[10px] mb-[12px] shrink-0">
-            <label
-              htmlFor="template-sort"
-              className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]"
-            >
-              Sort
-            </label>
             <div className="relative">
               <select
                 id="template-sort"
+                aria-label="Sort templates"
                 value={sortValue}
                 onChange={(e) => handleSortSelect(e.target.value)}
                 className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"

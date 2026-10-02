@@ -26,42 +26,47 @@ export default function CalendarLoading() {
   return (
     <div aria-hidden="true" className="flex flex-col flex-1 min-h-0 animate-pulse">
       <HeaderBar>
-        <div className="flex items-center gap-2.5 shrink-0">
-          {/* Previous / next — a block standing in for the chevron. */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className={control}>
-              <span className={`size-4 rounded-[4px] ${BLOCK}`} />
-            </span>
-            <span className={control}>
-              <span className={`size-4 rounded-[4px] ${BLOCK}`} />
+        {/* One wrapper, matching CalendarClient: flex-nowrap so the strip
+            scrolls rather than wrapping onto a second row, and w-max so it
+            reports its true content width to ScrollFadeRegion. */}
+        <div className="flex flex-nowrap items-center gap-2.5 w-max">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Previous / next — a block standing in for the chevron. */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className={control}>
+                <span className={`size-4 rounded-[4px] ${BLOCK}`} />
+              </span>
+              <span className={control}>
+                <span className={`size-4 rounded-[4px] ${BLOCK}`} />
+              </span>
+            </div>
+            {/* Today — a block standing in for the label, not the text itself. */}
+            <span className="flex items-center justify-center h-[37.5px] px-[14px] bg-white border border-[#e8ebf8] rounded-lg shrink-0">
+              <span className={`h-[11px] w-[34px] rounded ${BLOCK}`} />
             </span>
           </div>
-          {/* Today — a block standing in for the label, not the text itself. */}
-          <span className="flex items-center justify-center h-[37.5px] px-[14px] bg-white border border-[#e8ebf8] rounded-lg shrink-0">
-            <span className={`h-[11px] w-[34px] rounded ${BLOCK}`} />
-          </span>
-        </div>
 
-        {/* View switcher — same four tabs and box as CalendarViewSwitcher. The
-            labels are text-transparent rather than absent: they are what sizes
-            each tab, so the row measures identically to the real one and the
-            toolbar does not resize when the calendar swaps in. Dropping them
-            would mean hardcoding per-label widths, which drift as soon as a
-            label or the font changes. Nothing is legible, so this reads as four
-            blocks. The whole fallback is aria-hidden, so the placeholders are
-            never announced as controls.
-            Keep in sync with VIEW_OPTIONS in CalendarClient — a non-component
-            export from a 'use client' module reaches the server as a client
-            reference, not as an array, so it cannot be shared directly. */}
-        <div className="flex items-center h-[37.5px] px-[5px] py-[6px] bg-white border border-[#e8ebf8] rounded-lg gap-[2px] shrink-0">
-          {['Months', 'Week', 'Day', 'List'].map((label) => (
-            <span
-              key={label}
-              className={`flex items-center h-[25.5px] px-[12px] rounded-[7px] text-[13px] font-semibold text-transparent ${BLOCK}`}
-            >
-              {label}
-            </span>
-          ))}
+          {/* View switcher — same four tabs and box as CalendarViewSwitcher. The
+              labels are text-transparent rather than absent: they are what sizes
+              each tab, so the row measures identically to the real one and the
+              toolbar does not resize when the calendar swaps in. Dropping them
+              would mean hardcoding per-label widths, which drift as soon as a
+              label or the font changes. Nothing is legible, so this reads as four
+              blocks. The whole fallback is aria-hidden, so the placeholders are
+              never announced as controls.
+              Keep in sync with VIEW_OPTIONS in CalendarClient — a non-component
+              export from a 'use client' module reaches the server as a client
+              reference, not as an array, so it cannot be shared directly. */}
+          <div className="flex items-center h-[37.5px] px-[5px] py-[6px] bg-white border border-[#e8ebf8] rounded-lg gap-[2px] shrink-0">
+            {['Months', 'Week', 'Day', 'List'].map((label) => (
+              <span
+                key={label}
+                className={`flex items-center h-[25.5px] px-[12px] rounded-[7px] text-[13px] font-semibold text-transparent ${BLOCK}`}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
         </div>
       </HeaderBar>
 

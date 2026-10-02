@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { FileUp, Plus } from 'lucide-react'
+import { FileUp, Plus, ChevronDown } from 'lucide-react'
 import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -11,6 +11,14 @@ import TemplateTable from '@/components/templates/main/TemplatesTable'
 import RemoveTemplateModal from '@/components/templates/modal/RemoveTemplateModal'
 import ConfirmTemplateUploadModal from '@/components/templates/modal/ConfirmTemplateUploadModal'
 import { getTemplates, uploadTemplate } from '@/lib/actions/template'
+
+/** The four orderings the mobile select offers, in the order it lists them. */
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest', field: 'date', dir: 'desc' },
+  { value: 'oldest', label: 'Oldest', field: 'date', dir: 'asc' },
+  { value: 'az', label: 'A-Z', field: 'name', dir: 'asc' },
+  { value: 'za', label: 'Z-A', field: 'name', dir: 'desc' },
+] as const
 
 export interface TemplateItem {
   id: number
@@ -45,6 +53,30 @@ export default function TemplatesPage({
   const handleSort = (field: typeof sortField) => {
     setSortDir((prev) => (sortField === field ? (prev === 'asc' ? 'desc' : 'asc') : 'desc'))
     setSortField(field)
+  }
+
+  // Mobile sort options. These drive the same sortField/sortDir pair the desktop
+  // column headers use, so there is one source of truth for the ordering rather
+  // than a second list sorted independently.
+  const sortValue =
+    sortField === 'date'
+      ? sortDir === 'desc'
+        ? 'newest'
+        : 'oldest'
+      : sortField === 'name' && sortDir === 'asc'
+        ? 'az'
+        : sortField === 'name'
+          ? 'za'
+          : // uploadedBy / size are only reachable from the desktop headers, so
+            // there is no mobile option for them. Report the default rather than
+            // a label that contradicts what the list is actually doing.
+            'newest'
+
+  function handleSortSelect(next: string) {
+    const option = SORT_OPTIONS.find((o) => o.value === next)
+    if (!option) return
+    setSortField(option.field)
+    setSortDir(option.dir)
   }
 
   const sortedTemplates = useMemo(() => {
@@ -227,6 +259,36 @@ export default function TemplatesPage({
         </HeaderBar>
 
         <div className="flex-1 min-h-0 pt-[16px] px-4 pb-[30px] sm:px-8 flex flex-col">
+          {/* Mobile-only ordering. Hidden from sm up because the desktop grid
+              already sorts through clickable NAME and DATE UPLOADED headers, and
+              a second control there would just duplicate them. */}
+          <div className="sm:hidden flex items-center justify-start gap-[10px] mb-[12px] shrink-0">
+            <label
+              htmlFor="template-sort"
+              className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]"
+            >
+              Sort
+            </label>
+            <div className="relative">
+              <select
+                id="template-sort"
+                value={sortValue}
+                onChange={(e) => handleSortSelect(e.target.value)}
+                className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                aria-hidden="true"
+                className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
+              />
+            </div>
+          </div>
+
           <TemplateTable
             templates={displayedTemplates}
             error={loading ? null : error}

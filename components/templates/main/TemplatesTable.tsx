@@ -6,6 +6,7 @@ import { UserProfile } from '@/components/ui/UserProfile'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ActionMenu, type ActionItem } from '@/components/ui/ActionMenu'
 import TableSkeleton from './TableSkeleton'
+import CardSkeleton from './CardSkeleton'
 
 export interface TemplateItem {
   id: number
@@ -113,7 +114,7 @@ export default function TemplateTable({
             without a sideways swipe. Desktop grid below is untouched. */}
         <div className="sm:hidden flex-1 min-h-0 overflow-y-auto p-3">
           {loading ? (
-            <TableSkeleton />
+            <CardSkeleton />
           ) : error ? (
             <EmptyState heading="Failed to Load Templates" description={error} variant="table" />
           ) : templates.length === 0 ? (
@@ -130,35 +131,25 @@ export default function TemplateTable({
             templates.map((item) => (
               <div
                 key={item.id}
-                className="flex flex-col gap-[10px] mb-[10px] last:mb-0 rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px]"
+                className="flex items-center gap-[12px] mb-[10px] last:mb-0 rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px]"
               >
-                <div className="flex items-center gap-[12px] min-w-0">
-                  <FileIcon filename={item.name} />
+                <FileIcon filename={item.name} />
+
+                {/* Two lines only: the file name, then size / uploader / date
+                    collapsed into one meta row. The uploader's avatar and email
+                    were dropped here — they pushed the card to three rows, and
+                    the desktop grid still carries both in full. */}
+                <div className="flex-1 min-w-0 flex flex-col gap-[4px]">
                   <span className="block truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145]">
                     {item.name}
                   </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[6px]">
-                  <span className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+                  <span className="block text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+                    {item.size} &middot; Uploaded by {item.uploadedBy} on{' '}
                     {item.dateUploaded}
                   </span>
-                  <span className="text-[#c4cadf] text-[12px]">·</span>
-                  <span className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#5a6382]">
-                    {item.size}
-                  </span>
                 </div>
 
-                <div className="flex items-center justify-between gap-[10px]">
-                  <div className="min-w-0">
-                    <UserProfile
-                      initials={getInitials(item.uploadedBy)}
-                      name={item.uploadedBy}
-                      email={item.uploadedByEmail}
-                    />
-                  </div>
-                  {getRowActions && <ActionMenu items={getRowActions(item)} />}
-                </div>
+                {getRowActions && <ActionMenu items={getRowActions(item)} />}
               </div>
             ))
           )}

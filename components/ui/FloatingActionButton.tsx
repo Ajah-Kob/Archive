@@ -16,9 +16,10 @@ interface FloatingActionButtonProps {
  * header bar. Below `sm` the bar button is hidden and this takes over, so the
  * two never appear together and the bar's scroll strip gets the reclaimed width.
  *
- * z-40 sits above the sticky bar (z-30) and below the modal overlays (z-60), so
- * an open dialog dims the button and stops it being tappable rather than leaving
- * it floating over the backdrop.
+ * z-40 sits above the sticky bar (z-30) and below the overlays that must dim it:
+ * the modal dialogs (z-50) and the nav drawer (z-[45]). Both paint over the
+ * button, so an open dialog or drawer dims it and stops it being tappable rather
+ * than leaving it floating over the backdrop.
  */
 export function FloatingActionButton({
   icon,

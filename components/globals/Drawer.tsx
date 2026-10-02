@@ -29,8 +29,12 @@ export default function Drawer() {
   return (
     <>
       {/* Backdrop */}
+      {/* z-[45], above the floating action buttons at z-40 but below the modal
+          overlays at z-50. The FABs are `fixed`, so a backdrop any lower left
+          them sitting undimmed and still tappable over the open drawer — the
+          backdrop also swallows their clicks once it is above them. */}
       <div
-        className={`fixed inset-0 z-20 bg-black/50 lg:hidden transition-opacity duration-300 ${
+        className={`fixed inset-0 z-[45] bg-black/50 lg:hidden transition-opacity duration-300 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={toggle}
@@ -38,7 +42,7 @@ export default function Drawer() {
 
       {/* Drawer panel — same surface as the desktop sidebar */}
       <div
-        className={`fixed top-0 left-0 h-dvh w-[240px] z-30 bg-white border-r border-[#eceef8] lg:hidden flex flex-col transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-dvh w-[240px] z-[45] bg-white border-r border-[#eceef8] lg:hidden flex flex-col transition-transform duration-300 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

@@ -9,6 +9,7 @@ import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import TemplateTable from '@/components/templates/main/TemplatesTable'
 import RemoveTemplateModal from '@/components/templates/modal/RemoveTemplateModal'
+import ConfirmTemplateUploadModal from '@/components/templates/modal/ConfirmTemplateUploadModal'
 import { getTemplates, uploadTemplate } from '@/lib/actions/template'
 
 export interface TemplateItem {
@@ -35,7 +36,6 @@ export default function TemplatesPage({
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [removeTarget, setRemoveTarget] = useState<TemplateItem | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
   const [sortField, setSortField] = useState<'name' | 'date' | 'uploadedBy' | 'size'>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [myUploads, setMyUploads] = useState(false)
@@ -102,30 +102,45 @@ export default function TemplatesPage({
     fetchTemplates('')
   }
 
-  // A template is just the file, so the upload goes straight from the OS file
-  // picker to the server with no dialog in between. The input is reset after
-  // each pick so re-selecting the same file still fires a change event.
+  // Upload runs in two steps: the OS file picker chooses the file, then a
+  // confirmation modal approves it. The input is reset after each pick so
+  // re-selecting the same file still fires a change event.
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
   const openFilePicker = () => fileInputRef.current?.click()
 
-  const handleFilePicked = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilePicked = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file) return
+    if (file) setPendingFile(file)
+  }
 
+  const cancelPendingFile = () => {
+    if (isUploading) return
+    setPendingFile(null)
+  }
+
+  const confirmUpload = async () => {
+    if (!pendingFile) return
     setIsUploading(true)
+
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', pendingFile)
 
     const result = await uploadTemplate(formData)
     setIsUploading(false)
 
     if (!result.success) {
+      // Keep the modal open on failure so the user can retry or cancel
+      // without going back to the file picker.
       toast.error(result.message)
       return
     }
+
     toast.success('Template uploaded successfully.')
+    setPendingFile(null)
     handleUploadComplete()
   }
 
@@ -156,15 +171,16 @@ export default function TemplatesPage({
           actions={
             canUpload ? (
               // Hidden below sm — the floating button carries the action there.
-              <button
-                type="button"
-                onClick={openFilePicker}
-                className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0 disabled:opacity-60"
-              >
-                <Plus className="size-4" strokeWidth={2} />
-                <span className="whitespace-nowrap">
-                  {isUploading ? 'Uploading…' : 'Upload Template'}
-                </span>
+      <button
+        type="button"
+        onClick={openFilePicker}
+        disabled={isUploading}
+        className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0 disabled:opacity-60 disabled:pointer-events-none"
+      >
+        <Plus className="size-4" strokeWidth={2} />
+        <span className="whitespace-nowrap">
+          {isUploading ? 'Uploading\u2026' : 'Upload Template'}
+        </span>
               </button>
             ) : undefined
           }
@@ -247,6 +263,14 @@ export default function TemplatesPage({
         className="hidden"
         aria-hidden="true"
         tabIndex={-1}
+      />
+
+      {/* Second step: confirm the file chosen above. */}
+      <ConfirmTemplateUploadModal
+        file={pendingFile}
+        busy={isUploading}
+        onConfirm={confirmUpload}
+        onClose={cancelPendingFile}
       />
 
       {/* Confirm Remove Modal */}

@@ -9,12 +9,15 @@ import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 export const DEFENSE_GRID_COLS =
   'grid-cols-[2fr_1.3fr_1.2fr_2fr_1.3fr_1.1fr_120px]'
 
-const TYPE_META: Record<DefenseType, { label: string; dotClass: string }> = {
+// Exported for DefenseCard, the mobile counterpart to this row. Kept here so the
+// two renderings of the same schedule can never disagree on a date, a time or a
+// verdict label.
+export const TYPE_META: Record<DefenseType, { label: string; dotClass: string }> = {
   PROPOSAL: { label: 'Proposal Defense', dotClass: 'bg-[#a855f7]' },
   FINAL: { label: 'Final Defense', dotClass: 'bg-[#FE6F6F]' },
 }
 
-const VERDICT_META: Record<
+export const VERDICT_META: Record<
   DefenseVerdict,
   { label: string; className: string }
 > = {
@@ -46,7 +49,7 @@ const VERDICT_META: Record<
 
 // Schedules store a date-only value at UTC midnight, so the display formats
 // it in UTC too — otherwise the day can shift in negative-offset timezones.
-function formatDefenseDate(iso: string): string {
+export function formatDefenseDate(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
   return date.toLocaleDateString('en-US', {
@@ -60,7 +63,7 @@ function formatDefenseDate(iso: string): string {
 
 // Normalizes the wizard's time strings ("09:00", "9:00 AM", "9 AM") into the
 // "9:00 AM" display format.
-function formatTime12hr(value: string): string {
+export function formatTime12hr(value: string): string {
   const trimmed = value.trim()
 
   const explicit = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)$/)
@@ -87,7 +90,7 @@ function formatTime12hr(value: string): string {
 }
 
 // Quiet icon buttons, matching the table row action styling used elsewhere.
-const actionButtonClass =
+export const actionButtonClass =
   'flex items-center justify-center size-[30px] rounded-md border border-[#e8ebf8] bg-white text-[#5a6382] hover:bg-[rgba(112,125,255,0.08)] transition-colors'
 
 interface DefenseDataRowProps {

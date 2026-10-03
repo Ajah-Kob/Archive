@@ -10,8 +10,8 @@ import type { SectionData } from './SectionDataRow'
  *
  * The table is an eight-column grid at `min-w-[960px]`, so on a phone it was a
  * horizontal scroll to read a single section. This stacks the same fields in
- * reading order: the section name with its capstone phase beside it, the
- * academic year, the coordinator, then the counts and the date.
+ * reading order: the section name with its academic year beside it and the
+ * capstone phase opposite, then the coordinator, the counts and the date.
  *
  * The counts and the creation date share one row because both are short and
  * neither is the thing you scan for — the section name and its coordinator are.
@@ -29,10 +29,17 @@ export function SectionCard({
 
   return (
     <div className="flex flex-col gap-[8px] mb-[10px] last:mb-0 rounded-[12px] border border-[#eceef8] bg-white px-[12px] py-[12px]">
-      {/* Section name, with the capstone phase opposite it. */}
+      {/* Section name with its academic year, then the capstone phase. The name
+          truncates on its own so a long section code can never push the year or
+          the phase off the card. */}
       <div className="flex items-center justify-between gap-[10px]">
-        <span className="truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145] tracking-[-0.14px]">
-          {data.section}
+        <span className="flex items-baseline gap-[6px] min-w-0">
+          <span className="truncate font-sans font-bold text-[13px] leading-[19.5px] text-[#1e2145] tracking-[-0.14px]">
+            {data.section}
+          </span>
+          <span className="shrink-0 whitespace-nowrap font-sans font-medium text-[12.5px] leading-[18.75px] text-[#5a6382]">
+            {data.academicYear}
+          </span>
         </span>
         <span
           className={`inline-flex items-center gap-1.5 font-sans font-bold text-[11px] leading-[16.5px] whitespace-nowrap shrink-0 ${
@@ -46,10 +53,6 @@ export function SectionCard({
           {data.capstonePhase === 'CAPSTONE_2' ? 'Capstone 2' : 'Capstone 1'}
         </span>
       </div>
-
-      <span className="block truncate font-sans font-medium text-[13px] leading-[19.5px] text-[#5a6382]">
-        {data.academicYear}
-      </span>
 
       {/* Coordinator, or the same assign affordance the row offers. */}
       <div className="min-w-0">

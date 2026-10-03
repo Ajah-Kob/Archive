@@ -7,6 +7,7 @@ import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
 import { ActionMenu } from '@/components/ui/ActionMenu'
+import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { SectionTable } from '@/components/sections/main/SectionTable'
 import { SectionTableSkeleton } from '@/components/sections/main/SectionTableSkeleton'
 import { SectionModal } from '@/components/my-sections/SectionModal'
@@ -232,7 +233,10 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 h-[32px] px-[14px] rounded-[8px] font-sans font-bold text-[13px] leading-[19.5px] text-white shrink-0 hover:opacity-90 active:scale-[0.98] transition-all"
+            // Hidden below sm — the floating button carries the action there, so
+            // the two never appear together and the bar's scroll strip keeps the
+            // reclaimed width.
+            className="hidden sm:inline-flex items-center justify-center gap-1.5 h-[32px] px-[14px] rounded-[8px] font-sans font-bold text-[13px] leading-[19.5px] text-white shrink-0 hover:opacity-90 active:scale-[0.98] transition-all"
             style={{
               backgroundImage:
                 'linear-gradient(163.7deg, rgb(112,125,255) 0%, rgb(85,101,255) 100%)',
@@ -262,6 +266,15 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
       <div className="flex-1 flex flex-col min-h-0 pt-[16px] px-4 sm:px-8 pb-[30px]">
         <SectionTable sections={filtered} renderActions={handleRenderActions} onAssign={handleAssign} />
       </div>
+
+      {/* Mobile stand-in for the Create Section button in the bar. Same action,
+          same gate — the bar button is hidden below sm so only one is ever
+          reachable. */}
+      <FloatingActionButton
+        icon={<Plus className="size-6" strokeWidth={2.5} />}
+        label="Create Section"
+        onClick={() => setCreateOpen(true)}
+      />
 
       {createOpen && (
         <SectionModal

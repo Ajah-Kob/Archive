@@ -51,9 +51,10 @@ function SlotZone({
     <User className="size-[13px] text-[#707dff] shrink-0" />
   )
 
-  // Dashed only while the slot is empty. Once someone is in it the zone is a
-  // container, not a target, and the dashed outline read as "still waiting for
-  // someone" on a slot that was already filled.
+  // Border states. Empty reads as a dropzone (dashed). Filled has no container
+  // border at all — the member cards inside are already bordered, so a second
+  // frame around them read as a box-within-a-box. The drag-over highlight still
+  // shows a border, because there it means "release here", not "contents".
   const isEmpty = members.length === 0
 
   return (
@@ -81,7 +82,7 @@ function SlotZone({
       ? 'border-[#707dff] bg-[rgba(112,125,255,0.06)]'
       : isEmpty
         ? 'border-dashed border-[#e0e3f5] bg-[#fbfcff]'
-        : 'border-[#e8ebf8] bg-white'
+        : 'border-transparent bg-transparent'
   }
   ${isChair ? 'h-[80px]' : 'h-[145px]'}
   ${isEmpty ? 'justify-center' : 'justify-start'}

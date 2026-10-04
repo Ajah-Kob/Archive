@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Crown, User, X } from 'lucide-react'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { getInitials } from '@/lib/helper'
@@ -23,6 +23,9 @@ interface SlotZoneProps {
    *  selected ring as a card in the pool. */
   selectedMemberId: number | null
   onSelectMember: (memberId: number) => void
+  /** Whether the layout is the narrow one, so the empty state can name the
+   *  gesture that device actually has. */
+  isTouchLayout: boolean
 }
 
 function SlotZone({
@@ -40,12 +43,18 @@ function SlotZone({
   onRemoveMember,
   selectedMemberId,
   onSelectMember,
+  isTouchLayout,
 }: SlotZoneProps) {
   const icon = isChair ? (
     <Crown className="size-[13px] text-[#f59e0b] shrink-0" />
   ) : (
     <User className="size-[13px] text-[#707dff] shrink-0" />
   )
+
+  // Dashed only while the slot is empty. Once someone is in it the zone is a
+  // container, not a target, and the dashed outline read as "still waiting for
+  // someone" on a slot that was already filled.
+  const isEmpty = members.length === 0
 
   return (
     <div className="flex flex-col gap-[5px]">
@@ -66,14 +75,16 @@ function SlotZone({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         onClick={onZoneClick}
-        className={`flex flex-col items-center gap-[10px] rounded-[14px] border-[2px] border-dashed px-[12px] py-[10px] transition-colors
+        className={`flex flex-col items-center gap-[10px] rounded-[14px] border-[2px] px-[12px] py-[10px] transition-colors
   ${
     highlight
       ? 'border-[#707dff] bg-[rgba(112,125,255,0.06)]'
-      : 'border-[#e0e3f5] bg-[#fbfcff]'
+      : isEmpty
+        ? 'border-dashed border-[#e0e3f5] bg-[#fbfcff]'
+        : 'border-[#e8ebf8] bg-white'
   }
   ${isChair ? 'h-[80px]' : 'h-[145px]'}
-  ${members.length > 0 ? 'justify-start' : 'justify-center'}
+  ${isEmpty ? 'justify-center' : 'justify-start'}
 `}
       >
         {members.length > 0 ? (
@@ -133,7 +144,9 @@ function SlotZone({
           <span
             className={`font-sans items-center flex font-medium text-[11.5px] text-[#a0a8c4]`}
           >
-            Drop a faculty member here
+            {isTouchLayout
+              ? 'Tap a faculty member, then tap here'
+              : 'Drag a faculty member here'}
           </span>
         )}
       </div>
@@ -159,6 +172,20 @@ export function StepPanelists({
   // a wedged browser drag operation): click a faculty card to select it,
   // then click a zone to assign. Mirrors the drop targets exactly.
   const [selectedId, setSelectedId] = useState<number | null>(null)
+
+  // The empty dropzone names the gesture the device actually has. Subscribed
+  // rather than read once on mount, so rotating a phone or narrowing a desktop
+  // window updates the wording. useSyncExternalStore keeps this off the server,
+  // where window does not exist — the third argument is the server snapshot.
+  const isTouchLayout = useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia('(max-width: 639px)')
+      query.addEventListener('change', onChange)
+      return () => query.removeEventListener('change', onChange)
+    },
+    () => window.matchMedia('(max-width: 639px)').matches,
+    () => false,
+  )
 
   const assignedIds = [slots.chair?.id, slots.member1?.id, slots.member2?.id]
   const available = faculty.filter((member) => !assignedIds.includes(member.id))
@@ -258,10 +285,11 @@ export function StepPanelists({
         {/* Visible on every viewport. The `title` tooltips this replaces only
             appeared on hover, so on touch the tap-to-assign gesture was
             undiscoverable. */}
-        <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4] -mt-[4px]">
-          Tap a name to select it, then tap a slot. You can also drag on a
-          desktop.
-        </p>
+<p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4] -mt-[4px]">
+            {isTouchLayout
+              ? 'Tap a name to select it, then tap a slot.'
+              : 'Tap a name to select it, then tap a slot. You can also drag.'}
+          </p>
         <div className="flex flex-col gap-[8px] h-[300px] overflow-y-auto pr-[4px]">
           {available.length === 0 ? (
             <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#a0a8c4]">
@@ -322,6 +350,7 @@ export function StepPanelists({
           onRemoveMember={() => onRemove('chair')}
           selectedMemberId={selectedId}
           onSelectMember={selectMember}
+          isTouchLayout={isTouchLayout}
         />
         <SlotZone
           label="Panel Members"
@@ -341,6 +370,7 @@ export function StepPanelists({
           }}
           selectedMemberId={selectedId}
           onSelectMember={selectMember}
+          isTouchLayout={isTouchLayout}
         />
       </div>
     </div>

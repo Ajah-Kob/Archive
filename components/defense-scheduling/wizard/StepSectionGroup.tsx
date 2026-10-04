@@ -247,7 +247,7 @@ export function StepSectionGroup({
   }
 
   return (
-    <div className="flex flex-col gap-[16px] w-[450px]">
+    <div className="flex flex-col gap-[16px] w-full max-w-[450px]">
       {/*Section Dropdown Menu */}
       <div className="flex flex-col gap-[6px]">
         <label className={LABEL_CLASS}>

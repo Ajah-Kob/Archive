@@ -69,7 +69,7 @@ export function StepReview({
   slots,
 }: StepReviewProps) {
   return (
-    <div className="flex flex-col gap-[12px] w-[450px]">
+    <div className="flex flex-col gap-[12px] w-full max-w-[450px]">
       <ReviewCard
         title="Section & Group"
         rows={[

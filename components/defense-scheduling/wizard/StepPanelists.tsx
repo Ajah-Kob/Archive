@@ -279,7 +279,7 @@ export function StepPanelists({
 
   return (
     <div className="w-full grid grid-cols-1 gap-[20px]">
-      <div className="flex flex-col w-full gap-[10px] h-full">
+      <div className="flex flex-col w-full gap-[10px]">
         <span className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
           Faculty
         </span>

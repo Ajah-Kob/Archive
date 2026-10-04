@@ -278,7 +278,7 @@ export function StepPanelists({
   )
 
   return (
-    <div className="w-full grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-[20px] max-sm:grid-cols-1">
+    <div className="w-full grid grid-cols-1 gap-[20px]">
       <div className="flex flex-col w-full gap-[10px] h-full">
         <span className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
           Faculty

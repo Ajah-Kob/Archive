@@ -333,7 +333,7 @@ return (
             ? 'Tap a name to select it, then tap a slot.'
             : 'Tap a name to select it, then tap a slot. You can also drag.'}
         </p>
-        <div className="flex flex-col gap-[8px] h-[300px] overflow-y-auto pr-[4px]">
+        <div className="flex flex-col gap-[8px] h-[300px] overflow-y-auto py-[3px] pl-[3px] pr-[4px]">
           {available.length === 0 ? (
             <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#a0a8c4]">
               All faculty are assigned. Remove someone from a slot first.

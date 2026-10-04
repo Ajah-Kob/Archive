@@ -101,18 +101,25 @@ function toDateKey(date: Date | null): string {
 
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="flex flex-col items-center gap-[5px]">
-      <div className="flex gap-[8px]">
+    <div className="flex flex-col items-center gap-[5px] min-w-0">
+      {/* 4 x w-[44px] plus gaps is 200px, which cannot share a row with the Back
+          and Next buttons (~174px) inside the wizard at any phone width -- the
+          footer overflowed and pushed Next off the screen. Narrow bars on mobile,
+          MUI-free Tailwind widths so the desktop value is untouched. */}
+      <div className="flex gap-[3px] sm:gap-[8px]">
         {STEPS.map((label, index) => (
           <div
             key={label}
-            className={`h-[5px] w-[44px] rounded-full transition-colors ${
+            className={`h-[5px] w-[12px] sm:w-[44px] rounded-full transition-colors ${
               index <= current ? 'bg-[#707dff]' : 'bg-[#e8ebf8]'
             }`}
           />
         ))}
       </div>
-      <span className="font-sans text-[10px] leading-[13px] font-semibold text-[#5a6382]">
+      {/* truncate is a floor: at 375px the label fits whole, but the longest step
+          name ("Schedule & Venue") is close enough to the ceiling that it would
+          otherwise be the thing that overflows. */}
+      <span className="max-w-full truncate font-sans text-[9px] sm:text-[10px] leading-[13px] font-semibold text-[#5a6382]">
         {STEPS[current]}
       </span>
     </div>
@@ -394,8 +401,8 @@ export function CreateDefenseWizard({
           ) : null}
         </div>
 
-        <div className="px-[22px] pt-[16px] pb-[16px] border-t border-[#f0f2fa]">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-[10px]">
+        <div className="px-[14px] sm:px-[22px] pt-[16px] pb-[16px] border-t border-[#f0f2fa]">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-[6px] sm:gap-[10px]">
             <div className="flex justify-start">
               <button
                 type="button"

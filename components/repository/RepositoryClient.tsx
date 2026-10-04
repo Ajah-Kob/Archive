@@ -3,7 +3,21 @@
 import { useState, useMemo } from 'react'
 import { startOfDay, endOfDay } from 'date-fns'
 import { useRouter } from 'next/navigation'
-import { Star, Eye, ExternalLink, X, Plus, Loader2 } from 'lucide-react'
+import {
+  Star,
+  Eye,
+  ExternalLink,
+  X,
+  Plus,
+  Loader2,
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronDown,
+} from 'lucide-react'
+import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -107,6 +121,118 @@ function DetailsModal({ item, onClose }: { item: RepositoryArchiveRow | null; on
   )
 }
 
+const PER_PAGE = 10
+
+/**
+ * Orderings offered by the sort control, in the order it lists them. Same set as
+ * the templates list, so the two screens behave identically.
+ *
+ * `newest` is the default because it matches what the server already sends
+ * (datePublished desc), which means the list is unchanged until someone picks
+ * something else.
+ */
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'az', label: 'A-Z' },
+  { value: 'za', label: 'Z-A' },
+] as const
+
+type SortValue = (typeof SORT_OPTIONS)[number]['value']
+
+/** How many numbered buttons to show at once, centred on the current page. */
+const PAGE_WINDOW = 5
+
+/**
+ * `<<  <  1 2 3 4 5  >  >>`
+ *
+ * Scoped to the repository for now. The audit log has its own, different
+ * control (a "Page [n] / total" field with prev/next only) — if this numbered
+ * style is wanted everywhere, both should be folded into one shared component
+ * rather than left as two.
+ */
+function RepositoryPagination({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number
+  totalPages: number
+  onChange: (page: number) => void
+}) {
+  if (totalPages <= 1) return null
+
+  const half = Math.floor(PAGE_WINDOW / 2)
+  const end = Math.min(totalPages, page + half)
+  // Keep the window full width once either end is in view.
+  const start = Math.max(1, end - PAGE_WINDOW + 1)
+  const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i)
+
+  const btn =
+    'inline-flex items-center justify-center size-[32px] rounded-[9px] bg-white border border-[#e8ebf8] text-[#5a6382] hover:bg-[#fafbff] hover:border-[#dfe3fb] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0'
+  const numBtn = `${btn} text-[13px] font-semibold`
+  const activeBtn =
+    'inline-flex items-center justify-center size-[32px] rounded-[9px] bg-[#707dff] border border-[#707dff] text-white text-[13px] font-semibold shrink-0'
+
+  return (
+    <nav
+      aria-label="Repository pages"
+      className="flex items-center justify-center gap-[6px] pt-[4px] overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <button
+        type="button"
+        onClick={() => onChange(1)}
+        disabled={page <= 1}
+        aria-label="First page"
+        className={btn}
+      >
+        <ChevronsLeft className="size-[14px]" />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+        aria-label="Previous page"
+        className={btn}
+      >
+        <ChevronLeft className="size-[14px]" />
+      </button>
+
+      {pages.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onChange(p)}
+          aria-label={`Page ${p}`}
+          aria-current={p === page ? 'page' : undefined}
+          className={p === page ? activeBtn : numBtn}
+        >
+          {p}
+        </button>
+      ))}
+
+      <button
+        type="button"
+        onClick={() => onChange(page + 1)}
+        disabled={page >= totalPages}
+        aria-label="Next page"
+        className={btn}
+      >
+        <ChevronRight className="size-[14px]" />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(totalPages)}
+        disabled={page >= totalPages}
+        aria-label="Last page"
+        className={btn}
+      >
+        <ChevronsRight className="size-[14px]" />
+      </button>
+    </nav>
+  )
+}
+
 export function RepositoryClient({
   archives,
   isAdmin = false,
@@ -116,6 +242,7 @@ export function RepositoryClient({
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [sortValue, setSortValue] = useState<SortValue>('newest')
   const [dateFrom, setDateFrom] = useState<Date | null>(null)
   const [dateTo, setDateTo] = useState<Date | null>(null)
   const [selected, setSelected] = useState<RepositoryArchiveRow | null>(null)
@@ -211,8 +338,44 @@ export function RepositoryClient({
       return title.includes(term) || authorsFormatted.includes(term) || abstract.includes(term) || tagsJoined.includes(term)
     })
 
-    return list
-  }, [archives, searchTerm, favoritesOnly, favoriteIdsState, dateFrom, dateTo])
+    // Sorting happens after filtering so the order is stable for the current page
+    // and does not reshuffle as the search box narrows the list. Date bounds are
+    // widened to whole days above, so a same-day pair compares equal and A-Z
+    // falls through to the title as the tiebreak.
+    const sorted = [...list]
+    switch (sortValue) {
+      case 'newest':
+        sorted.sort((a, b) => new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        break
+      case 'oldest':
+        sorted.sort((a, b) => new Date(a.datePublished).getTime() - new Date(b.datePublished).getTime())
+        break
+      case 'az':
+        sorted.sort((a, b) => a.title.localeCompare(b.title) || new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        break
+      case 'za':
+        sorted.sort((a, b) => b.title.localeCompare(a.title) || new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        break
+    }
+
+    return sorted
+  }, [archives, searchTerm, favoritesOnly, favoriteIdsState, dateFrom, dateTo, sortValue])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
+
+  // The page is stored together with the filter signature it was set under.
+  // Changing a filter therefore resets to page 1 by derivation — no effect, so
+  // no double render — and going back to a previous filter restores the page
+  // you were on.
+  const filterKey = `${searchTerm}|${favoritesOnly}|${dateFrom?.getTime() ?? ''}|${dateTo?.getTime() ?? ''}`
+  const [pageState, setPageState] = useState({ page: 1, filterKey: '' })
+  const page = pageState.filterKey === filterKey ? pageState.page : 1
+  const setPage = (next: number) => setPageState({ page: next, filterKey })
+
+  // Narrowing the filters can strand the reader past the last page, so the
+  // page is clamped rather than trusted.
+  const safePage = Math.min(page, totalPages)
+  const paged = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE)
 
   // An inverted range matches nothing; the alert explains why the list is
   // empty instead of leaving a bare "No Results Found".
@@ -291,10 +454,11 @@ export function RepositoryClient({
       <HeaderBar
         actions={
           isAdmin ? (
+            // Hidden below sm — the floating button carries the action there.
             <button
               type="button"
               onClick={() => setIsUploadOpen(true)}
-              className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+              className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
             >
               <Plus className="size-4" strokeWidth={2} />
               <span className="whitespace-nowrap">Upload Research</span>
@@ -342,13 +506,54 @@ export function RepositoryClient({
             </button>
           ) : null}
 
+          {isDateRangeInvalid ? (
+            <span
+              role="alert"
+              className="font-sans text-[11.5px] leading-none text-[#b4530a] shrink-0"
+            >
+              Start date is after end date
+            </span>
+          ) : null}
+        </div>
+      </HeaderBar>
+
+      <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
+        {/* One row above the list: Sort, the results count, then Favorites.
+            ml-auto keeps Favorites hard right; flex-wrap lets the row reflow on
+            narrow screens instead of overflowing, since this is one line at
+            every width rather than a mobile-only control. */}
+<div className="flex flex-wrap items-center gap-x-[10px] gap-y-[8px] shrink-0">
+          <div className="relative shrink-0">
+            <select
+              id="repository-sort"
+              aria-label="Sort results"
+              value={sortValue}
+              onChange={(e) => setSortValue(e.target.value as SortValue)}
+              className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
+            />
+          </div>
+
+          <div className="flex items-center min-w-0 text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6]">
+            <span className="whitespace-nowrap">{filtered.length} RESULTS</span>
+          </div>
+
           <button
             type="button"
             onClick={() => setFavoritesOnly((v) => !v)}
             disabled={!canFavorite}
             aria-pressed={favoritesOnly}
             title={canFavorite ? undefined : 'Sign in to save favorites'}
-            className={`inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border text-[12.5px] font-sans font-semibold transition-colors shrink-0 disabled:opacity-45 disabled:cursor-not-allowed ${
+            className={`ml-auto inline-flex items-center gap-1.5 h-[37.5px] px-3 rounded-lg border text-[12.5px] font-sans font-semibold transition-colors shrink-0 disabled:opacity-45 disabled:cursor-not-allowed ${
               favoritesOnly
                 ? 'bg-[#fff8e6] border-[#f0d189] text-[#a5730a]'
                 : 'bg-white border-[#dfe3fb] text-[#5a6382] hover:bg-[#f8f9ff]'
@@ -362,22 +567,6 @@ export function RepositoryClient({
             Favorites
             <span className="tabular-nums opacity-70">({favoriteIdsState.size})</span>
           </button>
-
-          {isDateRangeInvalid ? (
-            <span
-              role="alert"
-              className="font-sans text-[11.5px] leading-none text-[#b4530a] shrink-0"
-            >
-              Start date is after end date
-            </span>
-          ) : null}
-        </div>
-      </HeaderBar>
-
-      <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
-        <div className="flex justify-between items-center text-[11px] font-bold tracking-[0.88px] uppercase text-[#9ea8c6] px-1">
-          <span>{filtered.length} RESULTS</span>
-          <span>Showing {filtered.length} of {archives.length}</span>
         </div>
 
         {archives.length === 0 ? (
@@ -406,7 +595,7 @@ export function RepositoryClient({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {filtered.map((item) => {
+            {paged.map((item) => {
               const authorsLine = formatAuthorsForRepository(item.authorOrder)
               const dateLabel = formatRepositoryDate(item.datePublished)
               const tags = Array.isArray(item.tags) ? item.tags.filter((t) => t.trim().length > 0) : []
@@ -543,6 +732,12 @@ export function RepositoryClient({
             })}
           </div>
         )}
+
+        <RepositoryPagination
+          page={page}
+          totalPages={totalPages}
+          onChange={setPage}
+        />
       </div>
 
       <DetailsModal item={selected} onClose={() => setSelected(null)} />
@@ -569,9 +764,18 @@ export function RepositoryClient({
             router.refresh()
           }}
         />
-      ) : null}
-    </>
-  )
+        ) : null}
+
+        {/* Mobile stand-in for the Upload Research button in the bar. Same gate. */}
+        {isAdmin ? (
+          <FloatingActionButton
+            icon={<Upload className="size-6" strokeWidth={2} />}
+            label="Upload Research"
+            onClick={() => setIsUploadOpen(true)}
+          />
+        ) : null}
+      </>
+    )
 }
 
 export default RepositoryClient

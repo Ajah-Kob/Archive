@@ -300,7 +300,7 @@ export function CreateDefenseWizard({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-[3px] animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/30 backdrop-blur-[3px] animate-in fade-in duration-200">
       <div className="bg-white w-fit rounded-2xl shadow-xl border border-[#e8ebf8] flex flex-col max-h-[calc(100vh-3rem)]">
         <div className="flex items-center justify-between px-[22px] pt-[18px] pb-[16px] border-b border-[#f0f2fa]">
           <div className="flex items-center gap-[10px]">

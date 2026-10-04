@@ -1,6 +1,7 @@
 'use client'
 
 import { UserPlus } from 'lucide-react'
+import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { ManageCoodinatorDrawer } from '@/components/faculty/drawer/ManageCoodinatorDrawer'
 import { useCoordinatorDrawer } from '@/store/useCoordinatorDrawer'
 
@@ -19,13 +20,26 @@ export function ManageCoordinatorsButton({ primary = false }: { primary?: boolea
         onClick={open}
         className={
           primary
-            ? 'inline-flex items-center justify-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0'
+            ? // Hidden below sm -- the floating button carries the action there.
+              'hidden sm:inline-flex items-center justify-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0'
             : 'flex gap-[7px] items-center h-[37px] px-[15px] py-[9px] bg-[#f7f7ff] border border-[rgba(112,125,255,0.19)] rounded-[9px] font-sans font-bold text-[13px] text-[#707dff] hover:bg-[#eeefff] transition-colors shrink-0'
         }
       >
         <UserPlus className="size-4" />
         Add Coordinator
       </button>
+
+      {/* Mobile stand-in. Rendered here rather than at the call site so it
+          shares the drawer store, and so it inherits CoordinatorList's
+          viewerCanManage gate -- that component returns early without it. */}
+      {primary ? (
+        <FloatingActionButton
+          icon={<UserPlus className="size-6" strokeWidth={2} />}
+          label="Add Coordinator"
+          onClick={open}
+        />
+      ) : null}
+
       <ManageCoodinatorDrawer />
     </>
   )

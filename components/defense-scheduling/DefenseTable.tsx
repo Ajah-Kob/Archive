@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 import { DefenseDataRow, DEFENSE_GRID_COLS } from './DefenseDataRow'
+import { DefenseCard } from './DefenseCard'
 import { EmptyState } from './EmptyState'
 
 export type SortKey =
@@ -83,7 +84,37 @@ export function DefenseTable({
 }: DefenseTableProps) {
   return (
     <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="overflow-x-auto flex-1 min-h-0">
+      {/* Mobile: one card per schedule, so all seven fields are readable without
+          a sideways swipe. Desktop grid below is untouched. */}
+      <div className="sm:hidden flex-1 min-h-0 overflow-y-auto p-3">
+        {schedules.length === 0 ? (
+          <EmptyState
+            heading={
+              hasAnySchedules ? 'No Matching Schedules' : 'No Defense Schedules Yet'
+            }
+            description={
+              hasAnySchedules
+                ? 'No defense schedules match your search or filters. Try clearing them, or create a new schedule.'
+                : 'Create your first defense schedule for a capstone group — proposal or final defense — with venue, time, and panelists.'
+            }
+            variant="card"
+          />
+        ) : (
+          schedules.map((schedule) => (
+            <DefenseCard
+              key={schedule.id}
+              schedule={schedule}
+              currentUserId={currentUserId}
+              onView={onView}
+              onDelete={onDelete}
+              onReschedule={onReschedule}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Desktop: the original seven-column grid. */}
+      <div className="hidden sm:block overflow-x-auto flex-1 min-h-0">
         {/* Inner min width keeps the 7 columns readable on small screens. */}
         <div className="min-w-[880px] flex flex-col min-h-full">
           <div

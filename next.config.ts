@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Required to enable the 'use cache' directive and Cache Components (PPR)
   cacheComponents: true,
+  allowedDevOrigins: ['192.168.100.130'],
   experimental: {
     serverActions: {
       bodySizeLimit: '24mb',

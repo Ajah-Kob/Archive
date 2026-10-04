@@ -3,6 +3,7 @@
 import { Eye, Check } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
 import type { ArchivingReviewItem } from '@/lib/actions/archiving'
+import { ArchivingReviewCard } from '@/components/archiving/ArchivingReviewCard'
 
 const HEADER_LABELS = ['Group', 'Title', 'Date Submitted', 'Status', 'Action']
 
@@ -29,7 +30,9 @@ function formatAuthorsShort(authors: ArchivingReviewItem['authorOrder']): string
     .join('; ')
 }
 
-function formatDateSubmitted(iso: string): string {
+// Exported for ArchivingReviewCard, the mobile counterpart to this row, so the
+// two renderings of a submission cannot disagree on a date or a status label.
+export function formatDateSubmitted(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleDateString('en-US', {
@@ -39,7 +42,7 @@ function formatDateSubmitted(iso: string): string {
   })
 }
 
-function StatusBadge({ status }: { status: ArchivingReviewItem['status'] }) {
+export function StatusBadge({ status }: { status: ArchivingReviewItem['status'] }) {
   if (status === 'ARCHIVED') {
     return (
       <span className="inline-flex items-center h-[22px] px-[8px] rounded-[7px] font-sans font-semibold text-[10.5px] leading-[15.75px] whitespace-nowrap border bg-[rgba(22,163,74,0.07)] border-[rgba(22,163,74,0.2)] text-[#16a34a]">
@@ -72,7 +75,33 @@ interface ChairReviewTableProps {
 export function ChairReviewTable({ submissions, hasAnySubmissions = false, onView, onApprove }: ChairReviewTableProps) {
   return (
     <div className="bg-white border border-[#eceef8] rounded-[14px] shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)] flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="overflow-x-auto flex-1 min-h-0">
+      {/* Mobile: one card per submission, so all five fields are readable
+          without a sideways swipe. Desktop grid below is untouched. */}
+      <div className="sm:hidden flex-1 min-h-0 overflow-y-auto p-3">
+        {submissions.length === 0 ? (
+          <EmptyState
+            heading={hasAnySubmissions ? 'No Matching Submissions' : 'No Submissions for Review'}
+            description={
+              hasAnySubmissions
+                ? 'No submissions match your search or filter. Try adjusting your search or clear the filter.'
+                : 'When students submit their capstones for archiving, they will appear here for your review and approval.'
+            }
+            variant="card"
+          />
+        ) : (
+          submissions.map((item) => (
+            <ArchivingReviewCard
+              key={item.id}
+              item={item}
+              onView={onView}
+              onApprove={onApprove}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Desktop: the original five-column grid. */}
+      <div className="hidden sm:block overflow-x-auto flex-1 min-h-0">
         <div className="min-w-[960px] flex flex-col min-h-full">
           {/* Header */}
           <div

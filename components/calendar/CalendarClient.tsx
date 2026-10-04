@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { type FilterOption } from '@/components/ui/Filter'
 import { EventDetailsModal } from '@/components/calendar/EventDetailsModal'
@@ -11,6 +12,7 @@ import {
   EditEventModal,
 } from '@/components/calendar/NewEventModal'
 import dayGridPlugin from '@fullcalendar/react/daygrid'
+import multiMonthPlugin from '@fullcalendar/react/multimonth'
 import listPlugin from '@fullcalendar/react/list'
 import timeGridPlugin from '@fullcalendar/react/timegrid'
 import interactionPlugin from '@fullcalendar/react/interaction'
@@ -33,11 +35,31 @@ const FullCalendar = dynamic(
   { ssr: false, loading: () => <CalendarSkeleton /> },
 )
 
-const MONTH_VIEW = 'dayGridMonth'
+// Stacked months, not one calendar. v7's multimonth plugin registers a base
+// `multiMonth` view with no duration of its own, so three months is supplied
+// here via MULTIMONTH_VIEWS. The legacy `multiMonth3` name is gone in v7.
+const MONTH_VIEW = 'multiMonth'
 const LIST_VIEW = 'listMonth'
 const WEEK_VIEW = 'timeGridWeek'
 const DAY_VIEW = 'timeGridDay'
 const MOBILE_BREAKPOINT = '(max-width: 639px)'
+
+const MULTIMONTH_VIEWS = {
+  multiMonth: {
+    duration: { months: 3 },
+    // One column, so the three months stack vertically. This is a deliberate
+    // override of the plugin's default of 3, which lays them side by side.
+    multiMonthMaxColumns: 1,
+    // Not set: singleMonthMinWidth only decides when a column is *dropped*,
+    // and with the cap already at 1 there is nothing left to drop.
+    //
+    // The per-month heading. The plugin's own default omits the year whenever
+    // every month falls in the same one, so Oct-Dec 2026 read "October",
+    // "November", "December" and the year came only from the toolbar title.
+    // The title is gone, so each heading carries its own year instead.
+    singleMonthTitleFormat: { year: 'numeric', month: 'long' } as const,
+  },
+}
 
   // Defense pills are bare text on the grid, so the label is dark ink.
 const DEFENSE_TEXT_COLOR = '#10133a'
@@ -45,13 +67,17 @@ const DEFENSE_TEXT_COLOR = '#10133a'
 const CALENDAR_PLUGINS = [
   classicThemePlugin,
   dayGridPlugin,
+  multiMonthPlugin,
   listPlugin,
   timeGridPlugin,
   interactionPlugin,
 ]
 
+// Order and labels are mirrored in app/calendar/loading.tsx, which cannot
+// import this: a non-component export from a 'use client' module arrives on
+// the server as a client reference, not as an array.
 const VIEW_OPTIONS: FilterOption[] = [
-  { value: MONTH_VIEW, label: 'Month' },
+  { value: MONTH_VIEW, label: 'Months' },
   { value: WEEK_VIEW, label: 'Week' },
   { value: DAY_VIEW, label: 'Day' },
   { value: LIST_VIEW, label: 'List' },
@@ -224,12 +250,97 @@ function todaySpan(): CalendarDateSpan {
   return { startStr: day, endStr: day, allDay: true }
 }
 
-function CalendarSkeleton() {
+/**
+ * Loading placeholder for the calendar body.
+ *
+ * Matches the view that will actually render: the agenda list below `sm`
+ * (MOBILE_BREAKPOINT defaults to LIST_VIEW there) and the seven-column time grid
+ * from `sm` up. The old version was a single empty box at a fixed h-[420px],
+ * which was both shapeless and roughly a third of the height the week view
+ * settles at -- so the page jumped when the events arrived.
+ *
+ * Drawn on the same #f8f9fe ground as the loaded page, so the unpainted moment
+ * during first navigation is the app's own colour rather than white.
+ *
+ * Rendered inside the card every time it is used, so this draws the view body
+ * only: no card, no title, no view switcher. Exported for app/calendar/loading.
+ */
+export function CalendarSkeleton() {
+  const BLOCK = 'bg-[#e9ecf9]'
+
   return (
-    <div
-      aria-hidden="true"
-      className="animate-pulse rounded-[10px] border border-[#e8ebf8] bg-[#f4f6ff] h-[420px]"
-    />
+    <div aria-hidden="true" className="animate-pulse flex flex-col">
+      {/* Mobile — agenda list, matching listMonth. */}
+      <div className="sm:hidden flex flex-col gap-[16px] pt-[4px]">
+        {[
+          { day: 'Mon 14', rows: 2 },
+          { day: 'Tue 15', rows: 1 },
+          { day: 'Wed 16', rows: 3 },
+        ].map((group) => (
+          <div key={group.day} className="flex flex-col gap-[8px]">
+            <div className={`h-[12px] w-[64px] rounded ${BLOCK}`} />
+            {Array.from({ length: group.rows }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-[10px] rounded-[10px] border border-[#eef0f8] px-[12px] py-[10px]"
+              >
+                <div className={`size-[28px] rounded-full shrink-0 ${BLOCK}`} />
+                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                  <div className={`h-[12px] w-[58%] rounded ${BLOCK}`} />
+                  <div className={`h-[10px] w-[38%] rounded ${BLOCK}`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop — three month tables stacked vertically, matching the
+          multiMonth default at multiMonthMaxColumns: 1. The week/day views are
+          reachable from the switcher, but the view the calendar opens on is the
+          one the skeleton has to match. */}
+      <div className="hidden sm:flex flex-col gap-[14px] pt-[4px]">
+        {Array.from({ length: 3 }).map((_, m) => (
+          <div
+            key={m}
+            className="flex-1 min-h-0 flex flex-col gap-[6px] border-b border-[#f2f4fb] pb-[10px] last:border-b-0 last:pb-0"
+          >
+            {/* Month heading, with the year inline — the toolbar title is gone, so
+            each heading carries its own year. */}
+            <div className={`h-[13px] w-[112px] rounded ${BLOCK}`} />
+            {/* Weekday initials */}
+            <div className="flex gap-[4px]">
+              {Array.from({ length: 7 }).map((__, d) => (
+                <div key={d} className={`h-[9px] flex-1 rounded ${BLOCK}`} />
+              ))}
+            </div>
+            {/* Six weeks of day cells, a few carrying an event block. Rows are
+                flex-1 so the stack compresses to the card instead of
+                overflowing it, which is what the real view does too. */}
+            {Array.from({ length: 6 }).map((__, w) => (
+              <div key={w} className="flex-1 min-h-[18px] flex gap-[4px]">
+                {Array.from({ length: 7 }).map((___, d) => {
+                  const seeded = (w * 7 + d + m) % 9
+                  return (
+                    <div
+                      key={d}
+                      className="flex-1 min-h-0 rounded-[4px] border border-[#f2f4fb] flex flex-col items-center gap-[2px] p-[2px]"
+                    >
+                      <div
+                        className={`size-[9px] shrink-0 rounded-full ${seeded === 0 ? 'bg-[#707dff]' : BLOCK}`}
+                      />
+                      {seeded < 3 ? (
+                        <div className="h-[3px] w-full shrink-0 rounded bg-[#dfe3fb]" />
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -307,7 +418,7 @@ export function CalendarClient({
 }: CalendarClientProps) {
   const calendarRef = useRef<CalendarRef | null>(null)
   const [view, setView] = useState(MONTH_VIEW)
-  const [title, setTitle] = useState('')
+  // Period context lives on the month headings themselves, so no title state.
   const [isCurrentPeriod, setIsCurrentPeriod] = useState(true)
   // Modal targets — null = closed. Draft span doubles as the NewEventModal
   // open flag so read-only roles (which never set it) never render the modal.
@@ -397,11 +508,9 @@ export function CalendarClient({
   }
 
   function handleDatesSet(arg: {
-    view: { title: string }
     start: Date
     end: Date
   }) {
-    setTitle(arg.view.title)
     const now = new Date()
     setIsCurrentPeriod(arg.start <= now && now < arg.end)
   }
@@ -444,10 +553,11 @@ export function CalendarClient({
       <HeaderBar
         actions={
           canManage ? (
+            // Hidden below sm — the floating button carries the action there.
             <button
               type="button"
               onClick={() => setDraftSpan(todaySpan())}
-              className="flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
+              className="hidden sm:flex items-center gap-1.5 h-[37.5px] px-[14px] bg-[#707dff] text-white rounded-lg font-sans font-semibold text-[13px] shadow-[0px_2px_5px_rgba(112,125,255,0.25)] hover:bg-[#5565ff] active:scale-[0.98] transition-all shrink-0"
             >
               <Plus className="size-4" strokeWidth={2} />
               <span className="whitespace-nowrap">New Event</span>
@@ -455,7 +565,7 @@ export function CalendarClient({
           ) : undefined
         }
       >
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-nowrap items-center gap-2.5 w-max">
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-1.5 shrink-0">
               <button
@@ -490,14 +600,6 @@ export function CalendarClient({
 
       <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-8 bg-[#f8f9fe] bg-[radial-gradient(circle,#dbe0f3_1px,transparent_1px)] bg-[size:22px_22px] gap-4 overflow-y-auto">
         <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.04)] p-4 sm:p-6 w-full">
-          <div className="flex items-center justify-center pb-1">
-            <span
-              aria-live="polite"
-              className="font-heading font-bold text-[15px] leading-[22px] text-[#10133a] whitespace-nowrap"
-            >
-              {title}
-            </span>
-          </div>
           {loadError ? (
             <p
               role="alert"
@@ -514,8 +616,9 @@ export function CalendarClient({
             {ready ? (
               <FullCalendar
                 ref={calendarRef}
-                    plugins={CALENDAR_PLUGINS}
-                    initialView={view}
+                plugins={CALENDAR_PLUGINS}
+                views={MULTIMONTH_VIEWS}
+                initialView={view}
                     headerToolbar={false}
                     datesSet={handleDatesSet}
                     firstDay={1}
@@ -567,6 +670,15 @@ export function CalendarClient({
 
       {canManage ? (
         <EditEventModal event={editingEvent} onClose={() => setEditingEvent(null)} />
+      ) : null}
+
+      {/* Mobile stand-in for the New Event button in the bar. Same gate. */}
+      {canManage ? (
+        <FloatingActionButton
+          icon={<CalendarPlus className="size-6" strokeWidth={2} />}
+          label="New Event"
+          onClick={() => setDraftSpan(todaySpan())}
+        />
       ) : null}
     </>
   )

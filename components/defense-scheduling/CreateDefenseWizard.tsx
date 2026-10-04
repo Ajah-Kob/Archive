@@ -301,7 +301,14 @@ export function CreateDefenseWizard({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/30 backdrop-blur-[3px] animate-in fade-in duration-200">
-      <div className="bg-white w-fit rounded-2xl shadow-xl border border-[#e8ebf8] flex flex-col max-h-[calc(100vh-3rem)]">
+      {/* w-full max-w, not w-fit. w-fit resolves through intrinsic sizing against a
+          w-full body holding a max-w-[450px] step, and that chain can settle on
+          the step's max-content rather than the space actually available -- at
+          375px the overlay's p-6 leaves 327px, so a 450px modal centred itself
+          and got clipped on both sides, which read as no gutter. w-full resolves
+          against the overlay's content box deterministically, so the modal is
+          327px on a phone and 450px on desktop, with the gutter intact at both. */}
+      <div className="bg-white w-full max-w-[450px] rounded-2xl shadow-xl border border-[#e8ebf8] flex flex-col max-h-[calc(100vh-3rem)]">
         <div className="flex items-center justify-between px-[22px] pt-[18px] pb-[16px] border-b border-[#f0f2fa]">
           <div className="flex items-center gap-[10px]">
             <div className="size-[30px] rounded-[8px] bg-[rgba(112,125,255,0.05)] flex items-center justify-center">

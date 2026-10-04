@@ -277,64 +277,10 @@ export function StepPanelists({
     (m): m is FacultyMember => m != null,
   )
 
-  return (
+return (
     <div className="w-full grid grid-cols-1 gap-[20px]">
-      <div className="flex flex-col w-full gap-[10px]">
-        <span className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
-          Faculty
-        </span>
-        {/* Visible on every viewport. The `title` tooltips this replaces only
-            appeared on hover, so on touch the tap-to-assign gesture was
-            undiscoverable. */}
-<p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4] -mt-[4px]">
-            {isTouchLayout
-              ? 'Tap a name to select it, then tap a slot.'
-              : 'Tap a name to select it, then tap a slot. You can also drag.'}
-          </p>
-        <div className="flex flex-col gap-[8px] h-[300px] overflow-y-auto pr-[4px]">
-          {available.length === 0 ? (
-            <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#a0a8c4]">
-              All faculty are assigned. Remove someone from a slot first.
-            </p>
-          ) : (
-            available.map((member) => (
-              <div
-                key={member.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', String(member.id))
-                  e.dataTransfer.effectAllowed = 'move'
-                }}
-                onDragEnd={handleDragEnd}
-                onClick={() =>
-                  setSelectedId((prev) => (prev === member.id ? null : member.id))
-                }
-            title="Tap to select, then tap a slot — or drag"
-            role="button"
-            tabIndex={0}
-            aria-pressed={selectedId === member.id}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' && e.key !== ' ') return
-              e.preventDefault()
-              selectMember(member.id)
-            }}
-            className={`flex items-center h-fit gap-[8px] px-[12px] py-[8px] rounded-[10px] border bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] cursor-pointer select-none hover:border-[rgba(112,125,255,0.5)] hover:shadow-[0px_2px_8px_rgba(112,125,255,0.12)] transition-all ${
-                  selectedId === member.id
-                    ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.35)]'
-                    : 'border-[#e8ebf8]'
-                }`}
-              >
-                <UserProfile
-                  initials={getInitials(member.name)}
-                  name={member.name}
-                  email={member.email ?? ''}
-                />
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
+      {/* Slots first, pool second. The slots are what the step is for, so they
+          sit at the top where they are read before the list of candidates. */}
       <div className="flex flex-col w-full gap-[14px]">
         <SlotZone
           label="Panel Chair"
@@ -373,6 +319,62 @@ export function StepPanelists({
           onSelectMember={selectMember}
           isTouchLayout={isTouchLayout}
         />
+      </div>
+
+      <div className="flex flex-col w-full gap-[10px]">
+        <span className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
+          Faculty
+        </span>
+        {/* Visible on every viewport. The `title` tooltips this replaces only
+            appeared on hover, so on touch the tap-to-assign gesture was
+            undiscoverable. */}
+        <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4] -mt-[4px]">
+          {isTouchLayout
+            ? 'Tap a name to select it, then tap a slot.'
+            : 'Tap a name to select it, then tap a slot. You can also drag.'}
+        </p>
+        <div className="flex flex-col gap-[8px] h-[300px] overflow-y-auto pr-[4px]">
+          {available.length === 0 ? (
+            <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#a0a8c4]">
+              All faculty are assigned. Remove someone from a slot first.
+            </p>
+          ) : (
+            available.map((member) => (
+              <div
+                key={member.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', String(member.id))
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onDragEnd={handleDragEnd}
+                onClick={() =>
+                  setSelectedId((prev) => (prev === member.id ? null : member.id))
+                }
+                title="Tap to select, then tap a slot — or drag"
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedId === member.id}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return
+                  e.preventDefault()
+                  selectMember(member.id)
+                }}
+                className={`flex items-center h-fit gap-[8px] px-[12px] py-[8px] rounded-[10px] border bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] cursor-pointer select-none hover:border-[rgba(112,125,255,0.5)] hover:shadow-[0px_2px_8px_rgba(112,125,255,0.12)] transition-all ${
+                  selectedId === member.id
+                    ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.35)]'
+                    : 'border-[#e8ebf8]'
+                }`}
+              >
+                <UserProfile
+                  initials={getInitials(member.name)}
+                  name={member.name}
+                  email={member.email ?? ''}
+                />
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )

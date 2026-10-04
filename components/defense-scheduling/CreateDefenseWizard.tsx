@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
+import { assignFacultyToSlot as assignToSlot } from '@/lib/defense/panel-slots'
 import { StepSectionGroup } from './wizard/StepSectionGroup'
 import { StepSchedule } from './wizard/StepSchedule'
 import { StepPanelists } from './wizard/StepPanelists'
@@ -243,16 +244,14 @@ export function CreateDefenseWizard({
           : true
   const canSubmit = step1Valid && step2Valid && step3Valid
 
+  // Assigning into a slot that already has someone swaps the two rather than
+  // silently dropping the incumbent. Previously the seat was overwritten and the
+  // person in it vanished back to the pool with no warning -- which meant a
+  // Panel Chair could be demoted without the user ever being told.
+  //
+  // Logic and its tests live in lib/defense/panel-slots.ts.
   function assignFacultyToSlot(slot: PanelSlot, member: FacultyMember) {
-    setSlots((prev) => {
-      const next = { ...prev }
-      // A faculty member can only occupy one slot.
-      if (next.chair?.id === member.id) next.chair = null
-      if (next.member1?.id === member.id) next.member1 = null
-      if (next.member2?.id === member.id) next.member2 = null
-      next[slot] = member
-      return next
-    })
+    setSlots((prev) => assignToSlot(prev, slot, member))
   }
 
   async function handleCreate() {

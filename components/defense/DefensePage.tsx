@@ -61,7 +61,10 @@ export function DefensePage({ schedules, resubmissions }: DefensePageProps) {
         })}
       </HeaderBar>
 
-      <div className="flex-1 min-h-0 pt-[16px] px-8 flex flex-col">
+      {/* px-4 below sm, matching MySectionsPage. This was a flat px-8, so every
+          tab ran flush to both screen edges on a phone while the pages around it
+          stepped down. All three tabs share this container. */}
+      <div className="flex-1 min-h-0 pt-[16px] px-4 sm:px-8 flex flex-col">
         {active === 'upcoming' ? (
           <UpcomingSessionsContainer schedules={upcoming} />
         ) : active === 'resubmissions' ? (

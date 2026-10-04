@@ -30,17 +30,16 @@ export function AppDateCalendar({
       slots={markedDaySlots(markedDays)}
       slotProps={markedDaySlotProps(markedDays)}
       sx={{
-        // MUI sizes each day cell from --PickerDay-size (36px by default), so a
-        // seven-column month is ~280px before the calendar's own padding. The
-        // wizard body has ~287px at 375px, which the grid tipped over, and the
-        // step scrolled sideways. Overriding the variable the cells size
-        // themselves from tightens only the narrow layout and leaves desktop on
-        // MUI's own default.
+        // MUI sizes each day cell as a square from --PickerDay-size (36px by
+        // default), so the seven-column month comes out narrower than the wizard
+        // body once the calendar's own padding is added. The grid is left-aligned
+        // against that padding, which read as off-centre in the modal. Centring it
+        // is a one-line fix and costs no width -- mx-auto distributes the leftover
+        // rather than adding to it.
         //
-        // Note: MUI computes the weeks-container height from the same 36px
-        // constant in JS, not from this variable, so the shorter cells leave a
-        // little slack at the bottom. That is the cheaper trade against a
-        // horizontally scrolling calendar.
+        // Width, not alignment, was what made the step scroll sideways; that was
+        // fixed by shrinking the cells below sm.
+        mx: 'auto',
         '@media (max-width: 639px)': {
           '--PickerDay-size': '30px',
         },

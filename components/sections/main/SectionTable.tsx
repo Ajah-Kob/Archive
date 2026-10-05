@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SectionCard } from '@/components/sections/main/SectionCard'
@@ -68,20 +68,26 @@ interface SectionTableProps {
   sections: SectionData[]
   renderActions?: (section: SectionData) => ReactNode
   onAssign?: (section: SectionData) => void
+  sortField: SortKey
+  sortDir: 'asc' | 'desc'
+  onSort: (field: SortKey) => void
 }
 
-export function SectionTable({ sections, renderActions, onAssign }: SectionTableProps) {
-  const [sortField, setSortField] = useState<SortKey>('section')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+export type { SortKey }
 
-  const handleSort = (field: SortKey) => {
-    if (sortField !== field) {
-      setSortField(field)
-      setSortDir(field === 'section' ? 'asc' : 'desc')
-    } else {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-    }
-  }
+export function SectionTable({
+  sections,
+  renderActions,
+  onAssign,
+  sortField,
+  sortDir,
+  onSort,
+}: SectionTableProps) {
+  // Sorting is owned by SectionsOverview, which also renders the mobile-only
+  // ordering select. It used to live here, but the select has to sit above this
+  // card to match the templates and repository lists, and a control outside the
+  // component cannot set state inside it.
+  const handleSort = onSort ?? (() => {})
 
   const sorted = useMemo(() => {
     const rows = [...sections]

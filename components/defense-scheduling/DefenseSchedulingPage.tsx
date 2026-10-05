@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, Plus } from 'lucide-react'
+import { CalendarPlus, ChevronDown, Plus } from 'lucide-react'
 import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
@@ -35,6 +35,14 @@ interface DefenseSchedulingPageProps {
   /** Session user id — ownership drives row/drawer actions. */
   currentUserId: number
 }
+
+/** The orderings the mobile select offers, in the order it lists them. */
+const SCHEDULE_SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest', field: 'datetime', dir: 'desc' },
+  { value: 'oldest', label: 'Oldest', field: 'datetime', dir: 'asc' },
+  { value: 'az', label: 'A-Z', field: 'group', dir: 'asc' },
+  { value: 'za', label: 'Z-A', field: 'group', dir: 'desc' },
+] as const
 
 /**
  * Client orchestrator for /faculty/defense-scheduling. Owns every piece of
@@ -123,6 +131,31 @@ export function DefenseSchedulingPage({
       sortField === field ? (prev === 'asc' ? 'desc' : 'asc') : 'desc',
     )
     setSortField(field)
+  }
+
+  // Mobile-only ordering. The table sorts by clicking a column header, and the
+  // card list below sm has no headers, so this writes the same sortField/sortDir
+  // pair rather than sorting a second list independently. Mirrors the control on
+  // the templates list.
+  const sortValue =
+    sortField === 'datetime'
+      ? sortDir === 'asc'
+        ? 'oldest'
+        : 'newest'
+      : sortField === 'group' && sortDir === 'asc'
+        ? 'az'
+        : sortField === 'group'
+          ? 'za'
+          : // section / type / venue / verdict are only reachable from the desktop
+            // headers, so there is no mobile option for them. Report the default
+            // rather than a label contradicting the actual order.
+            'newest'
+
+  function handleSortSelect(next: string) {
+    const option = SCHEDULE_SORT_OPTIONS.find((o) => o.value === next)
+    if (!option) return
+    setSortField(option.field)
+    setSortDir(option.dir)
   }
 
   const visible = useMemo(() => {
@@ -271,6 +304,30 @@ export function DefenseSchedulingPage({
       </HeaderBar>
 
       <div className="flex-1 flex flex-col min-h-0 px-4 sm:px-8 pt-[16px] pb-[30px]">
+        {/* Mobile-only ordering. Hidden from sm up because the desktop grid
+            already sorts by clicking its column headers, and a second control
+            there would just duplicate them. */}
+        <div className="sm:hidden flex items-center justify-start gap-[10px] mb-[12px] shrink-0">
+          <div className="relative">
+            <select
+              aria-label="Sort schedules"
+              value={sortValue}
+              onChange={(e) => handleSortSelect(e.target.value)}
+              className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
+            >
+              {SCHEDULE_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
+            />
+          </div>
+        </div>
+
         <DefenseTable
           schedules={visible}
           currentUserId={currentUserId}

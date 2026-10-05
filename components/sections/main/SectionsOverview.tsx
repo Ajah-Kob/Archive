@@ -2,13 +2,13 @@
 
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { Filter, type FilterOption } from '@/components/ui/Filter'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
-import { SectionTable } from '@/components/sections/main/SectionTable'
+import { SectionTable, type SortKey } from '@/components/sections/main/SectionTable'
 import { SectionTableSkeleton } from '@/components/sections/main/SectionTableSkeleton'
 import { SectionModal } from '@/components/my-sections/SectionModal'
 import { ArchiveSectionModal } from '@/components/my-sections/ArchiveSectionModal'
@@ -21,6 +21,14 @@ import {
 } from '@/components/sections/main/SectionDataRow'
 
 type PhaseFilter = 'all' | 'CAPSTONE_1' | 'CAPSTONE_2'
+
+/** The orderings the mobile select offers, in the order it lists them. */
+const SECTION_SORT_OPTIONS = [
+  { value: 'az', label: 'A-Z', field: 'section', dir: 'asc' },
+  { value: 'za', label: 'Z-A', field: 'section', dir: 'desc' },
+  { value: 'newest', label: 'Newest', field: 'dateCreated', dir: 'desc' },
+  { value: 'oldest', label: 'Oldest', field: 'dateCreated', dir: 'asc' },
+] as const
 
 type CoordinatorActionState =
   | { mode: 'assign'; section: SectionData }
@@ -93,6 +101,39 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
   const [coordinatorAction, setCoordinatorAction] =
     useState<CoordinatorActionState | null>(null)
   const [archiving, setArchiving] = useState<SectionData | null>(null)
+  // Sorting lives here rather than in SectionTable so the mobile-only ordering
+  // select can sit above the card and write the same state the desktop column
+  // headers do.
+  const [sortField, setSortField] = useState<SortKey>('section')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(field: SortKey) {
+    if (sortField !== field) {
+      setSortField(field)
+      setSortDir(field === 'section' ? 'asc' : 'desc')
+    } else {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    }
+  }
+
+  const sortValue =
+    sortField === 'section'
+      ? sortDir === 'asc'
+        ? 'az'
+        : 'za'
+      : sortField === 'dateCreated' && sortDir === 'desc'
+        ? 'newest'
+        : // academicYear / capstonePhase / coordinator / students / groups are only
+          // reachable from the desktop headers, so there is no mobile option for
+          // them. Report the default rather than a label contradicting the order.
+          'az'
+
+  function handleSortSelect(next: string) {
+    const option = SECTION_SORT_OPTIONS.find((o) => o.value === next)
+    if (!option) return
+    setSortField(option.field)
+    setSortDir(option.dir)
+  }
 
   const fetchSections = useCallback(async () => {
     const res = await getSections()
@@ -220,6 +261,11 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
           aria-label="Loading sections"
           className="flex-1 flex flex-col min-h-0 pt-[16px] px-4 sm:px-8 pb-[30px]"
         >
+          {/* Stand-in for the mobile ordering select, so the list does not jump
+              when the data lands. */}
+          <div className="sm:hidden flex items-center mb-[12px] shrink-0">
+            <div className="h-[37.5px] w-[93px] rounded-lg bg-white border border-[#e4e7f6]" />
+          </div>
           <SectionTableSkeleton rows={5} />
         </div>
       </div>
@@ -264,7 +310,31 @@ export default function SectionsOverview({ renderActions, onAssign }: SectionsOv
       </HeaderBar>
 
       <div className="flex-1 flex flex-col min-h-0 pt-[16px] px-4 sm:px-8 pb-[30px]">
-        <SectionTable sections={filtered} renderActions={handleRenderActions} onAssign={handleAssign} />
+        {/* Mobile-only ordering. Hidden from sm up because the desktop grid
+            already sorts by clicking its column headers, and a second control
+            there would just duplicate them. */}
+        <div className="sm:hidden flex items-center justify-start gap-[10px] mb-[12px] shrink-0">
+          <div className="relative">
+            <select
+              aria-label="Sort sections"
+              value={sortValue}
+              onChange={(e) => handleSortSelect(e.target.value)}
+              className="appearance-none h-[37.5px] pl-[13px] pr-[36px] bg-white border border-[#e8ebf8] rounded-lg font-sans font-semibold text-[13px] text-[#5a6382] cursor-pointer focus:outline-none focus:border-[rgba(112,125,255,0.6)] hover:border-[rgba(112,125,255,0.6)] transition-colors"
+            >
+              {SECTION_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 size-4 text-[#8a93b4]"
+            />
+          </div>
+        </div>
+
+        <SectionTable sections={filtered} renderActions={handleRenderActions} onAssign={handleAssign} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
       </div>
 
       {/* Mobile stand-in for the Create Section button in the bar. Same action,

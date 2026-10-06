@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useSyncExternalStore } from 'react'
+import { useState } from 'react'
 import { Crown, User, X } from 'lucide-react'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { getInitials } from '@/lib/helper'
+import { useIsTouchViewport } from '@/lib/hooks/useMediaQuery'
 import type { FacultyMember, PanelSlot, PanelSlotState } from './types'
 
 interface SlotZoneProps {
@@ -176,17 +177,9 @@ export function StepPanelists({
 
   // The empty dropzone names the gesture the device actually has. Subscribed
   // rather than read once on mount, so rotating a phone or narrowing a desktop
-  // window updates the wording. useSyncExternalStore keeps this off the server,
-  // where window does not exist — the third argument is the server snapshot.
-  const isTouchLayout = useSyncExternalStore(
-    (onChange) => {
-      const query = window.matchMedia('(max-width: 639px)')
-      query.addEventListener('change', onChange)
-      return () => query.removeEventListener('change', onChange)
-    },
-    () => window.matchMedia('(max-width: 639px)').matches,
-    () => false,
-  )
+  // window updates the wording. The server snapshot keeps it off the server,
+  // where window does not exist.
+  const isTouchLayout = useIsTouchViewport()
 
   const assignedIds = [slots.chair?.id, slots.member1?.id, slots.member2?.id]
   const available = faculty.filter((member) => !assignedIds.includes(member.id))

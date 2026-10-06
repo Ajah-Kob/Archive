@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import {
   AnnotationLayer,
   useAnnotationPlugin,
@@ -77,6 +77,57 @@ export function AnnotationLayerWithDrag({
 }: AnnotationLayerWithDragProps) {
   const { plugin } = useAnnotationPlugin()
   const dragStartRef = useRef<{ x: number; y: number } | null>(null)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** True once the hold has elapsed and the annotation is actually picked up. */
+  const holdingRef = useRef(false)
+
+  /** How long a finger must stay put before a touch drag lifts the annotation. */
+  const HOLD_MS = 400
+
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+    holdingRef.current = false
+  }, [])
+
+  const beginDrag = useCallback(
+    (
+      e: React.PointerEvent<HTMLDivElement>,
+      annotationId: string,
+      pageSize: { width: number; height: number },
+    ) => {
+      if (!plugin) return
+      dragStartRef.current = { x: e.clientX, y: e.clientY }
+      plugin.startDrag(documentId, {
+        annotationIds: [annotationId],
+        pageSize,
+      })
+      e.currentTarget.setPointerCapture(e.pointerId)
+    },
+    [plugin, documentId],
+  )
+
+  const startHoldTimer = useCallback(
+    (
+      e: React.PointerEvent<HTMLDivElement>,
+      annotationId: string,
+      pageSize: { width: number; height: number },
+    ) => {
+      clearHoldTimer()
+      holdTimerRef.current = setTimeout(() => {
+        holdTimerRef.current = null
+        holdingRef.current = true
+        beginDrag(e, annotationId, pageSize)
+      }, HOLD_MS)
+    },
+    [beginDrag, clearHoldTimer],
+  )
+
+  // A pending hold must not fire after unmount, or it would start a drag for an
+  // annotation that is no longer mounted.
+  useEffect(() => clearHoldTimer, [clearHoldTimer])
 
   const customAnnotationRenderer = useCallback(
     ({
@@ -117,6 +168,9 @@ export function AnnotationLayerWithDrag({
           <div
             key={i}
             aria-hidden="true"
+            // Lets the workspace's page-pan handler tell an annotation's own
+            // drag surface from empty page.
+            data-annotation-drag=""
             style={{
               position: 'absolute',
               left: (seg.origin.x - annotation.rect.origin.x) * scale,
@@ -125,6 +179,10 @@ export function AnnotationLayerWithDrag({
               height: seg.size.height * scale,
               pointerEvents: isSelected ? 'none' : 'auto',
               cursor: isSelected ? 'default' : 'move',
+              // Without this the browser claims the gesture for page scrolling
+              // and fires pointercancel, so a touch drag never completes. The
+              // trade is that swiping over an annotation no longer scrolls.
+              touchAction: 'none',
               zIndex: 1,
             }}
             onPointerDown={(e) => {
@@ -134,14 +192,27 @@ export function AnnotationLayerWithDrag({
               // duplicating its text.
               onSelect?.(e)
               if (!plugin) return
-              dragStartRef.current = { x: e.clientX, y: e.clientY }
-              plugin.startDrag(documentId, {
-                annotationIds: [annotation.id],
-                pageSize: { width: pageWidth, height: pageHeight },
+              // On touch a drag means panning the page, so an annotation only
+              // lifts after a deliberate hold. Mouse keeps press-and-drag.
+              if (e.pointerType === 'touch') {
+                startHoldTimer(e, annotation.id, {
+                  width: pageWidth,
+                  height: pageHeight,
+                })
+                return
+              }
+              beginDrag(e, annotation.id, {
+                width: pageWidth,
+                height: pageHeight,
               })
-              e.currentTarget.setPointerCapture(e.pointerId)
             }}
             onPointerMove={(e) => {
+              if (holdTimerRef.current !== null) {
+                // Moved before the hold completed — the user meant to scroll.
+                clearHoldTimer()
+                return
+              }
+              if (!holdingRef.current) return
               const start = dragStartRef.current
               if (!start || !plugin) return
               // Screen delta → page delta (the plugin's drag API works in page
@@ -152,14 +223,21 @@ export function AnnotationLayerWithDrag({
               })
             }}
             onPointerUp={(e) => {
+              clearHoldTimer()
+              if (!holdingRef.current) {
+                holdingRef.current = false
+                return
+              }
               if (!dragStartRef.current || !plugin) return
               dragStartRef.current = null
+              holdingRef.current = false
               plugin.commitDrag(documentId)
               if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
                 e.currentTarget.releasePointerCapture(e.pointerId)
               }
             }}
             onPointerCancel={(e) => {
+              clearHoldTimer()
               if (!dragStartRef.current || !plugin) return
               dragStartRef.current = null
               plugin.cancelDrag(documentId)
@@ -178,7 +256,7 @@ export function AnnotationLayerWithDrag({
         </>
       )
     },
-    [documentId, plugin, readOnly, visibleAuthorName],
+    [documentId, plugin, readOnly, visibleAuthorName, beginDrag, clearHoldTimer, startHoldTimer],
   )
 
   return (

@@ -169,15 +169,20 @@ export function AnnotationToolbar({
         },
       )}
 
-      <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+      <div className="w-px h-[22px] bg-[#eceef8] max-sm:hidden" aria-hidden="true" />
 
+      {/* Hand is hidden below sm: on a phone there is no hover and no right
+          click, so swiping is navigation and a pan toggle is desktop thinking.
+          Pan is still available there, just as the default gesture rather than
+          a mode. Select is hidden for the same reason -- with no other mode to
+          toggle to, the cursor was dead UI. */}
       <button
         type="button"
         onClick={togglePanMode}
         aria-label="Hand tool (drag to move the page)"
         title="Hand — drag to move the page"
         aria-pressed={panMode}
-        className={`${BASE_BUTTON} ${
+        className={`${BASE_BUTTON} max-sm:hidden ${
           panMode ? ACTIVE_BUTTON : IDLE_BUTTON
         }`}
       >
@@ -191,7 +196,7 @@ export function AnnotationToolbar({
         aria-label="Select (cursor)"
         title="Select"
         aria-pressed={activeTool === null && !panMode}
-        className={`${BASE_BUTTON} ${
+        className={`${BASE_BUTTON} max-sm:hidden ${
           activeTool === null && !panMode ? ACTIVE_BUTTON : IDLE_BUTTON
         }`}
       >

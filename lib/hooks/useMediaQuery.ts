@@ -39,3 +39,18 @@ export const SM_DOWN_QUERY = '(max-width: 639px)'
 export function useIsTouchViewport(): boolean {
   return useMediaQuery(SM_DOWN_QUERY)
 }
+
+/**
+ * True when the device's primary pointer is coarse — phones and tablets.
+ *
+ * Preferred over a width check when the question is "can this be used with a
+ * mouse?". Width cannot answer it: a tablet in portrait is 768px, which is also
+ * a perfectly usable narrow laptop window, and a tablet in landscape is wider
+ * than some laptops. `pointer: coarse` asks the actual question.
+ *
+ * A tablet with a trackpad attached reports `fine` and is therefore not blocked,
+ * which is right — it has a real pointer and a hover target.
+ */
+export function useIsCoarsePointer(): boolean {
+  return useMediaQuery('(pointer: coarse)')
+}

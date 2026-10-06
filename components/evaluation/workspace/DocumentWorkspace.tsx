@@ -33,6 +33,7 @@ import {
   PagePointerProvider,
   GlobalPointerProvider,
   InteractionManagerPluginPackage,
+  useInteractionManagerCapability,
 } from '@embedpdf/plugin-interaction-manager/react'
 import {
   SelectionLayer,
@@ -573,6 +574,20 @@ function WorkspaceLayout({
   // Hand tool. Separate from activeTool because EmbedPDF's tool ids all create
   // annotations and pan is a viewer concern, not an annotation one.
   const { provides: pan, isPanning } = usePan(activeDocumentId)
+
+  // Nothing in EmbedPDF ever registers a default interaction mode: the Pan
+  // plugin only calls setDefaultMode for defaultMode 'always', so with 'mobile'
+  // the default stays empty. Both ways back to selection end in
+  // activateDefaultMode() -- pan.disablePan(), and the annotation plugin's own
+  // setActiveTool(null) -- so with no default they silently activate nothing and
+  // the previous mode survives. That is why pan could be switched on but never
+  // off: selecting still dragged the page.
+  // Declaring pointerMode as the default repairs both paths at once. The default
+  // lives on the plugin capability, not the document scope.
+  const { provides: interactionPlugin } = useInteractionManagerCapability()
+  useEffect(() => {
+    interactionPlugin?.setDefaultMode('pointerMode')
+  }, [interactionPlugin])
 
   // --- Auto-open Comments on inline annotation creation ---------------------
   // When the adviser creates a highlight/strikeout with the tool armed (a fresh

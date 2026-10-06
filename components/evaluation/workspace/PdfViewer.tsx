@@ -11,10 +11,13 @@ import {
 } from '@embedpdf/plugin-document-manager/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
+import { PanPluginPackage } from '@embedpdf/plugin-pan/react'
+import { ZoomPluginPackage, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
   InteractionManagerPluginPackage,
+  GlobalPointerProvider,
 } from '@embedpdf/plugin-interaction-manager/react'
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
@@ -72,6 +75,8 @@ export function PdfViewer({
       createPluginRegistration(ScrollPluginPackage),
       createPluginRegistration(RenderPluginPackage),
       createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(PanPluginPackage),
+  createPluginRegistration(ZoomPluginPackage, { minZoom: 0.5, maxZoom: 2 }),
       // toleranceFactor: 0 requires exact glyph hits — dragging past the end of
       // a line no longer snaps to the last glyph, so highlight/strikeout boxes
       // only cover the text actually selected (not the whole line).
@@ -168,7 +173,9 @@ export function PdfViewer({
                       documentId={activeDocumentId}
                       initialAnnotations={initialAnnotations}
                     />
+                    <GlobalPointerProvider documentId={activeDocumentId}>
                     <Viewport documentId={activeDocumentId}>
+                      <ZoomGestureWrapper documentId={activeDocumentId} enablePinch enableWheel>
                       <Scroller
                         documentId={activeDocumentId}
                         renderPage={({ width, height, pageIndex }) => (
@@ -184,7 +191,9 @@ export function PdfViewer({
                           </div>
                         )}
                       />
+                      </ZoomGestureWrapper>
                     </Viewport>
+                    </GlobalPointerProvider>
                   </>
                 )
               }

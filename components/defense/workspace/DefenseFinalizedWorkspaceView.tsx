@@ -9,8 +9,10 @@ import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { DocumentContent, DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage, useScroll } from '@embedpdf/plugin-scroll/react'
+import { PanPluginPackage } from '@embedpdf/plugin-pan/react'
+import { ZoomPluginPackage, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
-import { PagePointerProvider, InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/react'
+import { PagePointerProvider, GlobalPointerProvider, InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/react'
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 import { AnnotationLayer, AnnotationPluginPackage, useAnnotation } from '@embedpdf/plugin-annotation/react'
@@ -365,6 +367,8 @@ export function DefenseFinalizedWorkspaceView({
       createPluginRegistration(ScrollPluginPackage),
       createPluginRegistration(RenderPluginPackage),
       createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(PanPluginPackage),
+  createPluginRegistration(ZoomPluginPackage, { minZoom: 0.5, maxZoom: 2 }),
       createPluginRegistration(SelectionPluginPackage, { toleranceFactor: 0 }),
       createPluginRegistration(HistoryPluginPackage),
       createPluginRegistration(AnnotationPluginPackage, {
@@ -550,7 +554,9 @@ export function DefenseFinalizedWorkspaceView({
                       return (
                         <>
                           <AnnotationHydrator documentId={activeDocumentId} initialAnnotations={annotations as unknown as AnnotationTransferItem[]} />
+                          <GlobalPointerProvider documentId={activeDocumentId}>
                           <Viewport documentId={activeDocumentId}>
+                            <ZoomGestureWrapper documentId={activeDocumentId} enablePinch enableWheel>
                             <Scroller
                               documentId={activeDocumentId}
                               renderPage={({ width, height, pageIndex }) => (
@@ -563,7 +569,9 @@ export function DefenseFinalizedWorkspaceView({
                                 </div>
                               )}
                             />
+                            </ZoomGestureWrapper>
                           </Viewport>
+                          </GlobalPointerProvider>
                         </>
                       )
                     }}

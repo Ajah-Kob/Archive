@@ -31,6 +31,7 @@
     "@embedpdf/plugin-scroll": "^2.15.0",
     "@embedpdf/plugin-selection": "^2.15.0",
     "@embedpdf/plugin-viewport": "^2.15.0",
+    "@embedpdf/plugin-zoom": "^2.15.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@fullcalendar/react": "^7.1.0",

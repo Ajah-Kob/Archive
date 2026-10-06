@@ -28,6 +28,7 @@ import {
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import { usePan, PanPluginPackage } from '@embedpdf/plugin-pan/react'
+import { ZoomPluginPackage, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
@@ -371,6 +372,9 @@ function DocumentWorkspaceInner({
   // Pan (hand tool). Must follow viewport + interaction manager, which it
   // depends on. defaultMode 'mobile' makes it the default mode on touch.
   createPluginRegistration(PanPluginPackage, { defaultMode: 'mobile' }),
+  // Zoom owns the scale: ZoomControl's buttons, ZoomGestureWrapper's pinch and
+  // ctrl+wheel all go through it, so there is one writer of the value.
+  createPluginRegistration(ZoomPluginPackage, { minZoom: 0.5, maxZoom: 2 }),
       // toleranceFactor: 0 requires exact glyph hits — dragging past the end of
       // a line no longer snaps to the last glyph, so highlight/strikeout boxes
       // only cover the text actually selected (not the whole line).
@@ -950,7 +954,8 @@ function WorkspaceLayout({
                   return (
                     <GlobalPointerProvider documentId={activeDocumentId}>
                       <Viewport documentId={activeDocumentId}>
-                      <Scroller
+                      <ZoomGestureWrapper documentId={activeDocumentId} enablePinch enableWheel>
+                        <Scroller
                         documentId={activeDocumentId}
                         renderPage={({ width, height, pageIndex }) => (
                           <div
@@ -979,6 +984,7 @@ function WorkspaceLayout({
                           </div>
                         )}
                       />
+                      </ZoomGestureWrapper>
                     </Viewport>
                   </GlobalPointerProvider>
                   )

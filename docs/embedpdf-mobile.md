@@ -1,6 +1,6 @@
 # EmbedPDF: Mobile & Touch Documentation Reference
 
-Everything EmbedPDF documents about touch, and how it maps onto our PDF review
+Everything EmbedPDF documents about touch, and what it means for our PDF review
 workspaces. Compiled from the official docs site and verified against the npm
 registry.
 
@@ -13,6 +13,24 @@ registry.
 > There is no dedicated "mobile" page in EmbedPDF's docs. Mobile support is
 > distributed across the Pan, Zoom and Selection plugins plus the interaction
 > manager's pointer providers. That is why this file exists.
+
+## Current status: the review workspace is desktop-only
+
+The document review workspace refuses to load on touch-primary devices and shows
+a notice instead — see `components/workspace/MobileUnsupported.tsx` and the
+`useIsCoarsePointer()` guard in both workspace components.
+
+This was a decision to stop, not an unfinished job. It took several attempts to
+make pan, highlight and annotation placement agree with each other on a phone,
+and they did not converge. The blocker is structural rather than a missing flag:
+EmbedPDF's annotation layers set `touch-action: none`, so the app must own
+gesture arbitration between pan, text selection and annotation placement — work
+the plugins are supposed to own. See §8.
+
+**So read this file as a reference, not a to-do list.** The upstream capability
+is real and mostly excellent; we are simply not using it on touch. Sections 1–5
+describe what is available if that decision is ever revisited. Section 6 records
+what we tried and why it was removed. Section 7 is deferred, not recommended.
 
 ---
 
@@ -65,11 +83,12 @@ import { GlobalPointerProvider } from '@embedpdf/plugin-interaction-manager/reac
 This matters most on touch, where a finger routinely drifts outside the viewer
 mid-drag and the drag would otherwise die.
 
-**Our status: NOT USED.** This is the single highest-value gap in this file.
+**Our status: in use.** Added when touch was abandoned; it is what makes the
+desktop Hand tool track a drag that leaves the viewer.
 
 ---
 
-## 2. Pan plugin — touch panning is already solved for us
+## 2. Pan plugin — touch panning, solved upstream
 
 `@embedpdf/plugin-pan` is a hand tool built specifically for drag-to-scroll, and
 the docs describe it as "especially on touch devices".
@@ -128,8 +147,9 @@ pan?.onPanModeChange((isPanMode) => setToolState(isPanMode ? 'hand' : 'cursor'))
 // global variant: onPanModeChange(({ documentId, isPanMode }) => ...)
 ```
 
-**Our status: NOT INSTALLED, NOT REGISTERED.** We hand-rolled panning instead —
-see §6.
+**Our status: installed and registered** with `defaultMode: 'mobile'` in both
+workspaces, replacing the hand-rolled pan described in §6. It fixed touch panning
+and now backs the desktop Hand tool.
 
 ---
 
@@ -167,9 +187,11 @@ import { ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 Also in this plugin: `<MarqueeZoom />` (drag a box to zoom into an area), also
 requiring `PagePointerProvider`.
 
-**Our status: NOT INSTALLED, NOT REGISTERED.** `ZoomControl.tsx` is a custom
-stepper driving the render plugin's scale directly, so **we have no
-pinch-to-zoom at all**. Users must tap `+`/`-`.
+**Our status: not installed.** `ZoomControl.tsx` is a custom stepper driving the
+render plugin's scale directly, so **we have no pinch-to-zoom**. Desktop users
+use the `+`/`-` buttons. Pinch-to-zoom only matters on touch, so this is dormant
+while the workspace is blocked there — but it would also be the fix for a
+touch-enabled laptop or a tablet with a trackpad, which the guard does allow.
 
 ---
 
@@ -285,60 +307,108 @@ PDF document in the engine. This is what our draft auto-save listens for.
 
 ---
 
-## 6. What we hand-rolled, and what the docs say instead
+## 6. What was tried on touch, and why it was removed
 
-Honest audit of the mobile work in this repo versus upstream.
+Historical record. None of this code exists any more — it is here so nobody
+re-derives it from scratch if mobile is revisited.
 
-| We built | Upstream equivalent | Verdict |
-| --- | --- | --- |
-| `lib/pdf/viewer-pan.ts` — clamped pan maths | Pan plugin (`plugin-pan`) | **Replace.** Reimplementing a shipped plugin. |
-| Pan on `pointerdown/move/up` in the workspace | Pan plugin + `GlobalPointerProvider` | **Replace.** Missing global pointer capture, which is why drags die at the viewer edge. |
-| `LongPressGate` — swallow the gesture, then re-state it with a synthetic `pointerdown` | `minSelectionDragDistance` | **Partial replace.** See below. |
-| `ZoomControl.tsx` — custom stepper | `ZoomGestureWrapper` | **Add.** We have no pinch-to-zoom. |
-| `touch-callout: none` in `globals.css` | — | **Keep.** Not an EmbedPDF concern; browser-level. |
-| `data-annotation-drag` exempt touch starts | — | **Keep.** Still needed on top of anything upstream. |
+### Attempt 1 — hand-rolled panning
 
-### The long-press gate is not fully replaceable
+`lib/pdf/viewer-pan.ts` computed clamped pan offsets and the workspaces wrote
+`scrollLeft`/`scrollTop` directly. The plugin reads the same properties off the
+viewport, so targeting the right element was never the problem.
 
-`minSelectionDragDistance` prevents a *click* from starting a selection. That
-solves half the problem (tap must not annotate) in one line of config.
+It failed because the gesture was contested. The gate overlay declared
+`touch-action: pan-x pan-y`, so Chrome treated a flick as a *native* pan and
+fired `touchcancel`, killing the JS pan — while the overlay sat outside the
+scrollable element, so the native pan had nowhere to go. Nothing moved.
 
-It does **not** deliver hold-to-arm semantics: there is no upstream option for
-"only begin annotating after the finger has been still for 400ms, then let the
-user drag to select". That requirement is ours, so some gate remains. What the
-docs *do* let us delete is the synthetic-`pointerdown` machinery, which exists
-only because we disabled the plugin's own gesture handling. Enabling selection
-upstream and gating on movement instead would avoid synthesising input events.
+Deeper cause: `panMode` state sat beside `activeTool`, and both claimed the same
+gesture. Two owners, one gesture.
 
-**Do not remove the gate before §7's items are in place** — the current code is
-load-bearing for both scroll and annotate.
+### Attempt 2 — the Pan plugin
+
+`@embedpdf/plugin-pan` with `defaultMode: 'mobile'` plus `GlobalPointerProvider`.
+This is the correct upstream answer and it is what remains in the codebase,
+because it also backs the desktop Hand tool.
+
+It fixed pan. It did not fix highlight, and chasing that is what cost us.
+
+### Attempt 3 — long-press gate
+
+To stop a tap creating an annotation, a `LongPressGate` overlay swallowed the
+touch, and after a 400ms hold re-stated the gesture with a synthetic
+`pointerdown` on the element underneath.
+
+This worked but required synthesising input events, because the selection plugin
+only begins on a pointerdown it observed and the gate had eaten the real one.
+`minSelectionDragDistance` (§4) does the tap-safety half of this properly, in
+one line of config — there is still no upstream equivalent for hold-to-arm.
+
+### Why it was abandoned
+
+Not one unresolved bug. Three failures in a row across pan, tap-safety and
+highlight, each fixed by adding another layer of gesture arbitration on top of
+plugins that already arbitrate gestures. The structural cause is in §8:
+`touch-action: none` on the annotation layers means the app must decide what
+every touch means, forever, for every tool.
+
+Blocking the surface was cheaper than owning that permanently.
+
+### What was deleted
+
+| Removed | Reason |
+| --- | --- |
+| `lib/pdf/viewer-pan.ts` + test | Superseded by the Pan plugin |
+| `components/evaluation/workspace/LongPressGate.tsx` | Only existed to stop touch creating annotations |
+| `lib/pdf/long-press-gate.ts` + 9 tests | The gesture state machine behind it |
+| `handleLongPressArm` in both workspaces | The synthetic-event retargeting |
+| `touch-callout: none` rule in `globals.css` | Only needed to stop Chrome's image menu stealing the hold |
+
+Kept: `@embedpdf/plugin-pan` and `GlobalPointerProvider`, which back the desktop
+Hand tool.
 
 ---
 
-## 7. Recommended integration order
+## 7. If mobile is ever revisited (deferred, not recommended)
+
+Do not read this as a backlog. The workspace is deliberately blocked on touch,
+and nothing below is needed for the product as it stands.
+
+If that call is reversed, this is the order that avoids re-treading section 6:
 
 1. **`GlobalPointerProvider`** around `Viewport` + `Scroller` in both
    workspaces. No new dependency, largest payoff for drags that leave the
-   viewer. Lowest risk.
+   viewer. Lowest risk. **Already done.**
 2. **`@embedpdf/plugin-pan` + `defaultMode: 'mobile'`** with `usePan` driving
-   our existing Hand button. Delete `viewer-pan.ts` and the workspace pan
-   handlers. Keep the gate's scroll path until the plugin is verified on device.
+   the existing Hand button. **Already done, and still load-bearing on desktop.**
 3. **`minSelectionDragDistance`** on the existing `SelectionPluginPackage`
-   registration. One line; make the tap-vs-drag threshold explicit.
-4. **`@embedpdf/plugin-zoom` + `ZoomGestureWrapper`** for pinch-to-zoom. Replaces
-   or wraps `ZoomControl.tsx`; needs a decision on `FitWidth` as the mobile
-   default, since a page wider than a phone viewport is the current complaint.
+   registration. One line; makes the tap-vs-drag threshold explicit instead of
+   relying on the default.
+4. **`@embedpdf/plugin-zoom` + `ZoomGestureWrapper`** for pinch-to-zoom. Also
+   needs a decision on `FitWidth` as the mobile default, since a page wider than
+   a phone viewport is the original complaint.
 5. **`deactivateToolAfterCreate: true`** on the annotation plugin — fewer
    accidental second annotations.
-6. Only then revisit the `LongPressGate`: keep the long-press requirement, drop
-   the synthetic event if upstream selection can be gated on movement instead.
 
-Steps 1–3 are cheap and low-risk. Steps 2 and 4 need real-device testing.
+Steps 3 and 5 are desktop-safe and could be taken without unblocking mobile.
+Step 4 is the one that would most improve reading a document on a phone, if that
+ever matters separately from annotating one.
 
 ---
 
 ## 8. Gotchas worth remembering
 
+The first entry is the one that ended mobile support. The rest are ordinary
+footguns.
+
+- **`touch-action: none` on the annotation layers is the structural blocker.**
+  It means the browser refuses to scroll on touch, so *something* must own
+  scrolling — and once the app does, it also owns deciding what every touch
+  means: pan, text selection, or placing an annotation. That arbitration is the
+  plugins' job, and reimplementing it on top of them is what did not converge
+  (§6). Any future attempt should start by asking EmbedPDF how to delegate this,
+  not by adding an overlay.
 - **No dedicated mobile docs.** Mobile behaviour is spread across the plugins
   above; searching the docs for "mobile" alone will miss most of it.
 - **Provider nesting is mandatory.** `PagePointerProvider` per page for layers;
@@ -346,17 +416,27 @@ Steps 1–3 are cheap and low-risk. Steps 2 and 4 need real-device testing.
   silently receive nothing.
 - **`menuWrapperProps` must be spread.** Both selection and annotation menus use
   it for rotation-aware positioning; omitting it detaches the menu.
-- **`touch-action: none` on annotation layers means the browser will not scroll.**
-  Whatever owns touch scrolling has to do it explicitly. This is the root cause
-  of our scroll bugs — see `app/globals.css` and `LongPressGate`.
 - **`ScrollScope.viewport` and `scrollToPage` are private.** The public
   scroll scope only exposes `scrollToPage`, `scrollToNextPage`,
   `scrollToPreviousPage`, `forDocument(id)`, `onLayoutReady` and
-  `onPageChange`. There is no `scrollBy` — which is why `viewer-pan.ts` writes
-  `scrollLeft`/`scrollTop` directly via `useViewportRef`.
+  `onPageChange`. There is no `scrollBy`, which is why the deleted
+  `viewer-pan.ts` wrote `scrollLeft`/`scrollTop` directly via `useViewportRef`.
 - **Plugin registration order matters.** Dependencies before dependents:
   Viewport + InteractionManager before Pan; InteractionManager before Selection
   and Annotation.
+- **Peer deps are pinned exactly.** Every `@embedpdf/*` package resolves
+  `core@2.15.0`, so installing `@embedpdf/plugin-pan` at `2.15.1` fails with
+  `ERESOLVE`. Match the exact version.
 - **Docs cover the current stable line.** `@embedpdf/plugin-pan` and
   `@embedpdf/plugin-zoom` are both published at `2.15.0`, matching our
   `2.15.x` — so the pages above describe code we can actually install.
+
+---
+
+## Related
+
+- `components/workspace/MobileUnsupported.tsx` — the notice shown on touch
+- `lib/hooks/useMediaQuery.ts` — `useIsCoarsePointer()`, the `pointer: coarse`
+  guard. Prefer it over a width check for "can this be used with a mouse?": a
+  tablet in landscape is wider than a small laptop window, but a tablet with a
+  trackpad reports a fine pointer and should not be blocked.

@@ -76,7 +76,7 @@ export type DefenseWorkspaceMode = 'reviewer' | 'student'
 export type WorkspaceMode = DefenseWorkspaceMode
 
 export interface DefenseDocumentWorkspaceProps {
-  /** Viewer mode — student strips every editing affordance and write path. */
+  /** Viewer mode â€” student strips every editing affordance and write path. */
   mode?: DefenseWorkspaceMode
   /** Public Vercel Blob URL of the submission's document. */
   blobUrl: string
@@ -110,12 +110,12 @@ export interface DefenseDocumentWorkspaceProps {
    * Render a "Done" action that leaves annotation mode and returns to the
    * read-only view, instead of making Back the only exit.
    *
-   * Only passed by DefenseFinalizedWorkspaceView, which owns the read-only ⇄ edit
+   * Only passed by DefenseFinalizedWorkspaceView, which owns the read-only â‡„ edit
    * switch. Left undefined elsewhere (student mode, direct links) so no other
    * entry point grows an action it cannot honour.
    *
    * Exiting unmounts this component, so any annotations not yet submitted are
-   * discarded — the same as navigating away via Back today. Re-entering remounts
+   * discarded â€” the same as navigating away via Back today. Re-entering remounts
    * from the server-supplied `initialAnnotations`, never from local state.
    */
   onExitAnnotationMode?: () => void
@@ -123,7 +123,7 @@ export interface DefenseDocumentWorkspaceProps {
    * Called with the annotation set that was just saved.
    *
    * The parent swaps back to its read-only view on exit, and that view hydrates
-   * from the `initialAnnotations` prop it was rendered with — the server payload
+   * from the `initialAnnotations` prop it was rendered with â€” the server payload
    * from when the page first loaded. After a save that prop is stale, so a
    * deleted annotation would reappear on the document. Handing the saved set up
    * lets the parent show what was actually persisted.
@@ -179,13 +179,13 @@ function summarizeAnnotations(items: unknown[]): AnnotationSummary {
 }
 
 /**
- * Defense document review workspace — ONE specific document version per
+ * Defense document review workspace â€” ONE specific document version per
  * browser tab. Panelist-editable when `mode === 'reviewer'` (status PENDING &
  * isCurrent gating lives in the route; this component is purely viewer-mode).
  *
  * This is a defense-namespace copy of `components/evaluation/workspace/DocumentWorkspace.tsx`
  * preserving every feature (header, draft status, toolbar, zoom, undo/redo,
- * panels, annotation behaviors) except the verdict actions — replaced by a
+ * panels, annotation behaviors) except the verdict actions â€” replaced by a
  * single Submit annotations button that opens DefenseSaveConfirmModal.
  *
  * The ENTIRE layout lives inside a single `<EmbedPDF>` root so every child
@@ -213,7 +213,7 @@ export function DefenseDocumentWorkspace({
   const annotationAuthor = session?.user?.name ?? 'Panelist'
 
   // Private defense/chapter/archiving blobs must be fetched via the
-  // auth-gated route /api/blob/... — never put the raw blobUrl in the DOM.
+  // auth-gated route /api/blob/... â€” never put the raw blobUrl in the DOM.
   // The viewer fetches via signed route and creates an object URL; until then
   // no document is loaded (avoids exposing the raw private URL in inspect).
   const [privateObjectUrl, setPrivateObjectUrl] = useState<string | null>(null)
@@ -374,7 +374,7 @@ export function DefenseDocumentWorkspace({
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
         <Loader2 className="size-6 animate-spin text-[#707dff]" />
-        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading document…</p>
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">Loading documentâ€¦</p>
       </div>
     )
   }
@@ -395,7 +395,7 @@ export function DefenseDocumentWorkspace({
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
         <Loader2 className="size-6 animate-spin text-[#707dff]" />
         <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
-          Loading PDF engine…
+          Loading PDF engineâ€¦
         </p>
       </div>
     )
@@ -485,7 +485,7 @@ function DefenseWorkspaceLayout({
   const [visibleAuthor, setVisibleAuthor] = useState<string | null>(null)
   // ...but "null" must not mean "unfiltered" on first paint. The comments panel
   // resolves the same fallback and lifts it into this state, yet the panel is a
-  // drawer — it does not mount until opened, so before that the layer received
+  // drawer â€” it does not mount until opened, so before that the layer received
   // null and rendered EVERY reviewer's annotations, then snapped to one reviewer
   // the moment the panel opened. Deriving the fallback here (from the
   // annotations already in hand, so there is no flash) makes the document show
@@ -495,7 +495,7 @@ function DefenseWorkspaceLayout({
     [initialAnnotations],
   )
   const effectiveVisibleAuthor = useMemo(() => {
-    // Prefer the explicit choice, but only while it is still a real reviewer —
+    // Prefer the explicit choice, but only while it is still a real reviewer â€”
     // switching document or version can leave it pointing at someone absent.
     if (visibleAuthor && availableAuthors.includes(visibleAuthor)) {
       return visibleAuthor
@@ -636,7 +636,7 @@ function DefenseWorkspaceLayout({
   }
 
   // Browser-level guard: covers tab close, reload and any navigation the in-app
-  // Back button cannot intercept. Browsers show their own generic wording — the
+  // Back button cannot intercept. Browsers show their own generic wording â€” the
   // returnValue assignment is what triggers the prompt.
   useEffect(() => {
     if (!isDirty) return
@@ -658,8 +658,8 @@ function DefenseWorkspaceLayout({
   /**
    * Revert to the state the document had when this page loaded, then leave.
    *
-   * A genuine discard, not a dismissal. Anything already saved — whether from
-   * an earlier visit or an explicit Save earlier in this session — stays saved
+   * A genuine discard, not a dismissal. Anything already saved â€” whether from
+   * an earlier visit or an explicit Save earlier in this session â€” stays saved
    * unless it is written back, so this restores `initialOwnAnnotations`: this
    * panelist's own saved set, WITHOUT other panelists' committed rows, which
    * would otherwise be copied into their draft. Net-new work that was never
@@ -721,7 +721,7 @@ function DefenseWorkspaceLayout({
 
   /**
    * Save from the leave prompt: persist the current annotations directly, then
-   * leave. This must NOT open the Submit annotations confirmation modal — the
+   * leave. This must NOT open the Submit annotations confirmation modal â€” the
    * panelist already chose Save in the leave prompt.
    */
   async function saveAndLeave() {
@@ -791,8 +791,8 @@ function DefenseWorkspaceLayout({
     setHighlightCommentId(null)
   }
 
-  // ── Hand tool: drag the page ──────────────────────────────────────────────
-  // Same as the evaluation workspace — EmbedPDF scrolls natively, so panning
+  // â”€â”€ Hand tool: drag the page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Same as the evaluation workspace â€” EmbedPDF scrolls natively, so panning
   // adjusts the scroll viewport directly. Geometry lives in lib/pdf/viewer-pan.ts.
   const viewportRef = useViewportRef(activeDocumentId)
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; fromX: number; fromY: number } | null>(null)
@@ -861,7 +861,7 @@ function DefenseWorkspaceLayout({
           `flex-1` spacers and a fixed h-[64px]: the spacers consumed all the slack
           so nothing could compress, the fixed height forbade wrapping, and the
           control clusters overflowed any phone width. Same treatment as
-          DocumentWorkspace — tools wrap rather than scroll so none stay hidden. */}
+          DocumentWorkspace â€” tools wrap rather than scroll so none stay hidden. */}
       <header className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px] px-4 sm:px-6 py-[10px] sm:py-0 sm:h-[64px] bg-white border-b border-[#eceef8] shrink-0">
         <div className="flex items-center gap-[14px] min-w-0 flex-1 sm:flex-none sm:basis-auto">
         {/* With unsaved changes this becomes a button, not a link: navigating away
@@ -932,7 +932,7 @@ function DefenseWorkspaceLayout({
         )}
         </div>
 
-        {/* Tool group — wraps below sm. */}
+        {/* Tool group â€” wraps below sm. */}
         <div className="flex flex-wrap items-center gap-[8px] shrink-0">
 
         {editable && activeDocumentId && (
@@ -1007,7 +1007,7 @@ function DefenseWorkspaceLayout({
                 <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
                 {/* Single Save action for the initial document: it replaces both
                     the old "Submit annotations" and the "Done" button. Saving is
-                    the only way out of annotation mode — it persists, returns the
+                    the only way out of annotation mode â€” it persists, returns the
                     panelist to the read-only view, and stays on this document.
                     Gated on isDirty, not on whether annotations merely exist, so
                     it starts disabled on a freshly opened document. */}
@@ -1018,7 +1018,7 @@ function DefenseWorkspaceLayout({
                   title={
                     isDirty
                       ? 'Save your annotation changes and return to the read-only view'
-                      : 'No unsaved changes — add, edit, move or remove an annotation to enable Save'
+                      : 'No unsaved changes â€” add, edit, move or remove an annotation to enable Save'
                   }
                   className="flex items-center justify-center gap-[6px] h-[32px] px-[14px] rounded-[8px] bg-[#707dff] font-sans font-bold text-[11.5px] leading-[17px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[rgba(112,125,255,0.4)] outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#707dff]"
                 >
@@ -1049,6 +1049,7 @@ function DefenseWorkspaceLayout({
           onPointerMove={handlePanPointerMove}
           onPointerUp={endPan}
           onPointerCancel={endPan}
+          onContextMenu={(e) => e.preventDefault()}
         >
           {/* Touch only: a tap/flick must not create an annotation on its own.
               A hold stands the gate down and re-states the gesture, so
@@ -1074,7 +1075,7 @@ function DefenseWorkspaceLayout({
                     return (
                       <ViewerState
                         icon={Loader2}
-                        message="Loading document…"
+                        message="Loading documentâ€¦"
                         spin
                       />
                     )
@@ -1169,12 +1170,12 @@ function DefenseWorkspaceLayout({
           onSaved={(savedData) => {
             // Save is the single exit from annotation mode. Persist, drop the
             // dirty flag, hand control back to the read-only view, and leave the
-            // panelist on this same document — no redirect.
+            // panelist on this same document â€” no redirect.
             markClean()
             // Hand the persisted set up BEFORE exiting. The read-only view
             // hydrates from the initialAnnotations prop, which is the server
             // payload from when the page first loaded and is stale the moment we
-            // save — without this a deleted annotation is re-imported and
+            // save â€” without this a deleted annotation is re-imported and
             // reappears on the document.
             onSavedAnnotations?.(savedData)
             toast.success('Annotations saved.')

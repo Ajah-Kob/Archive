@@ -100,6 +100,19 @@
   pointer-events: auto;
 }
 
+/* Long-press on the page must belong to the annotation flow, not to Chrome.
+   `touch-callout` is the Android/iOS equivalent of user-drag: without it a
+   stationary touch raises the native image menu (open in new tab / preview /
+   Lens) on top of the PDF, and the hold never reaches the workspace. It is a
+   separate property from user-select, so suppressing one does not suppress
+   the other — all of them are needed. */
+.epdf-viewer-area,
+.epdf-viewer-area img,
+.epdf-viewer-area canvas,
+.epdf-viewer-area * {
+  -webkit-touch-callout: none;
+}
+
 /* Hover effect on annotations — a soft indigo outline appears when the
    pointer is over an annotation's hit area. */
 .epdf-viewer-area [data-no-interaction]:hover {

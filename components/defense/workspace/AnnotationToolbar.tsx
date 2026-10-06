@@ -99,10 +99,12 @@ export function AnnotationToolbar({
   function selectTool(tool: ToolId | null) {
     // Clicking the already-active tool toggles it off (back to the cursor).
     const next = activeTool === tool && tool !== null ? null : tool
+    // Leave pan mode FIRST. disablePan() returns the interaction mode to its
+    // default (text selection), so calling it after setActiveTool would undo the
+    // tool we just armed and the button would appear to do nothing.
+    onPanModeChange(false)
     onActiveToolChange(next)
     api?.setActiveTool(next)
-    // Picking any annotation tool means the user has left pan mode.
-    onPanModeChange(false)
   }
 
   function togglePanMode() {

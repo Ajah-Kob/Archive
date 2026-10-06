@@ -13,15 +13,12 @@ import {
   type GateState,
   type Point,
 } from '@/lib/pdf/long-press-gate'
-import { panScroll } from '@/lib/pdf/viewer-pan'
 
 interface LongPressGateProps {
   /** Whether a completed hold hands over to the annotation layer. */
   active: boolean
   /** Fired once the hold completes, with where the gesture started. */
   onArm: (point: Point, pointerId: number) => void
-  /** Element scrolled when the gesture turns out to be a pan. */
-  viewportRef: React.RefObject<HTMLElement | null>
   className?: string
 }
 
@@ -43,7 +40,7 @@ interface LongPressGateProps {
  * Renders nothing on desktop, where the hand tool and normal mouse behaviour
  * already cover this.
  */
-export function LongPressGate({ active, onArm, viewportRef, className }: LongPressGateProps) {
+export function LongPressGate({ active, onArm, className }: LongPressGateProps) {
   const isTouchViewport = useIsTouchViewport()
   const stateRef = useRef<GateState>(idle())
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -106,22 +103,6 @@ export function LongPressGate({ active, onArm, viewportRef, className }: LongPre
     }
   }
 
-  function panBy(delta: Point) {
-    const viewport = viewportRef.current
-    if (!viewport) return
-    const next = panScroll(
-      { x: viewport.scrollLeft, y: viewport.scrollTop },
-      delta,
-      {
-        scrollWidth: viewport.scrollWidth,
-        clientWidth: viewport.clientWidth,
-        scrollHeight: viewport.scrollHeight,
-        clientHeight: viewport.clientHeight,
-      },
-    )
-    viewport.scrollLeft = next.x
-    viewport.scrollTop = next.y
-  }
 
   function handleTouchStart(e: React.TouchEvent) {
     // Moving or deleting an existing annotation should not need a hold.
@@ -140,10 +121,12 @@ export function LongPressGate({ active, onArm, viewportRef, className }: LongPre
     }, LONG_PRESS_MS)
   }
 
-  function handleTouchMove(e: React.TouchEvent) {
-    const { state, pan } = advance(stateRef.current, pointFrom(e).point)
+function handleTouchMove(e: React.TouchEvent) {
+    // Scrolling is no longer ours to handle — EmbedPDF's Pan plugin owns it and
+    // is the default mode on touch. This gesture is only ever heading for an
+    // annotation, so there is nothing to pan here.
+    const { state } = advance(stateRef.current, pointFrom(e).point)
     stateRef.current = state
-    if (pan) panBy(pan)
     if (shouldPreventScroll(state)) e.preventDefault()
   }
 

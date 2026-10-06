@@ -28,7 +28,6 @@ import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import { useViewportRef } from '@embedpdf/plugin-viewport/react'
 import { panScroll } from '@/lib/pdf/viewer-pan'
-import { useIsTouchViewport } from '@/lib/hooks/useMediaQuery'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
@@ -774,15 +773,13 @@ function DefenseWorkspaceLayout({
   // adjusts the scroll viewport directly. Geometry lives in lib/pdf/viewer-pan.ts.
   const viewportRef = useViewportRef(activeDocumentId)
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; fromX: number; fromY: number } | null>(null)
-  // Below sm, swiping the page is navigation and the hand toggle is hidden, so
-  // pan is on by default there; above sm it is opt-in from the toolbar.
-  const isTouchViewport = useIsTouchViewport()
-
   function handlePanPointerDown(e: React.PointerEvent) {
+    // Only the explicit hand toggle drives this -- see the evaluation copy. On a
+    // phone the viewport scrolls natively, so running this below sm only fought
+    // the browser and preventDefault killed the scroll outright.
+    if (!panMode) return
     const viewport = viewportRef.current
     if (!viewport) return
-    if (!panMode && !isTouchViewport) return
-    // An annotation owns its own drag.
     if ((e.target as HTMLElement).closest('[data-annotation-drag]')) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     panRef.current = {

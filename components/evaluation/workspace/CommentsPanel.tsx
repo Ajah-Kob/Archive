@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Circle,
   Eraser,
@@ -22,6 +23,7 @@ import {
   Trash2,
   Type,
   Underline,
+  X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAnnotation } from '@embedpdf/plugin-annotation/react'
@@ -33,6 +35,7 @@ import {
 import type { PdfAnnotationObject } from '@embedpdf/models'
 import { WorkspacePanel } from '@/components/evaluation/workspace/WorkspacePanel'
 import { isReviewAnnotation } from '@/components/evaluation/workspace/review-annotations'
+import { useIsTouchViewport } from '@/lib/hooks/useMediaQuery'
 
 interface CommentsPanelProps {
   /** Active document id from the headless DocumentManagerPluginPackage. */
@@ -193,6 +196,9 @@ function CommentCard({
     if (!editing) return
     function handlePointerDown(e: PointerEvent) {
       if (containerRef.current?.contains(e.target as Node)) return
+      // The modal editor is portalled to <body>, so it sits outside the card —
+      // without this, tapping inside it would count as abandoning the edit.
+      if (modalRef.current?.contains(e.target as Node)) return
       if ((e.target as HTMLElement).closest('[data-preserve-editor]')) return
       setDraft(comment.contents)
       setEditing(false)
@@ -206,6 +212,16 @@ function CommentCard({
     onSave(comment, draft.trim())
     setEditing(false)
   }
+
+  function handleCancel() {
+    setDraft(comment.contents)
+    setEditing(false)
+    onCancelEdit(comment)
+  }
+
+  // Below sm the editor is a modal. Above sm it stays inline on the card.
+  const isTouchViewport = useIsTouchViewport()
+  const modalRef = useRef<HTMLDivElement | null>(null)
 
   // Single click jumps to the page; a second click within the window (double
   // click) edits the comment instead. The jump is deferred ~250ms so the
@@ -230,7 +246,53 @@ function CommentCard({
     }, 250)
   }
 
+  // Shared editor body. Inline on desktop; lifted into a modal below sm, where
+  // the on-screen keyboard over an inline textarea inside a full-width panel
+  // leaves almost nothing of the field visible.
+  const editorField = (
+    <textarea
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          handleSave()
+        }
+      }}
+      rows={3}
+      maxLength={500}
+      autoFocus
+      placeholder="Add a comment…"
+      aria-label="Comment on this annotation"
+      className="w-full h-[64px] px-[9px] py-[7px] bg-[#fafbff] border border-[#e8ebf8] rounded-[7px] font-sans font-medium text-[11.5px] leading-[17px] text-[#3d4566] placeholder:text-[#9ea8c6] outline-none focus:border-[rgba(112,125,255,0.5)] transition-colors resize-none"
+    />
+  )
+
+  const editorActions = (
+    <div className="flex items-center justify-end gap-[6px]">
+      <button
+        type="button"
+        onClick={handleCancel}
+        title="Cancel"
+        className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382] transition-all hover:bg-gray-50 hover:text-[#3d4566] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={!draft.trim()}
+        title="Save comment (Enter)"
+        className="flex items-center gap-[5px] h-[26px] px-[10px] rounded-[7px] bg-[#707dff] font-sans font-bold text-[11px] leading-[16px] text-white hover:bg-[#5565ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Save className="size-[12px]" strokeWidth={2} />
+        Save
+      </button>
+    </div>
+  )
+
   return (
+    <>
     <div
       ref={containerRef}
       onClick={handleContainerClick}
@@ -268,24 +330,9 @@ function CommentCard({
             {comment.author}
           </p>
         </div>
-        {editing && comment.canComment && !readOnly ? (
+        {editing && comment.canComment && !readOnly && !isTouchViewport ? (
           <div className="pt-[8px]" onClick={(e) => e.stopPropagation()}>
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSave()
-                }
-              }}
-              rows={3}
-              maxLength={500}
-              autoFocus
-              placeholder="Add a comment…"
-              aria-label="Comment on this annotation"
-              className="w-full h-[64px] px-[9px] py-[7px] bg-[#fafbff] border border-[#e8ebf8] rounded-[7px] font-sans font-medium text-[11.5px] leading-[17px] text-[#3d4566] placeholder:text-[#9ea8c6] outline-none focus:border-[rgba(112,125,255,0.5)] transition-colors resize-none"
-            />
+            {editorField}
           </div>
         ) : (
           <p className="pt-[8px] font-sans font-medium text-[12px] leading-[18px] text-[#5a6382]">
@@ -377,6 +424,48 @@ function CommentCard({
         )
       ) : null}
     </div>
+
+    {/* Below sm the editor is a modal rather than inline: the panel is
+        full-width and the on-screen keyboard would cover an inline field.
+        Portalled so it is not clipped by the panel's scroll container. */}
+    {editing && comment.canComment && !readOnly && isTouchViewport
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[70] flex items-end justify-center bg-[rgba(16,19,58,0.35)] backdrop-blur-[2px]"
+            onPointerDown={(e) => {
+              // Tapping the scrim abandons the edit, matching click-outside on
+              // the inline version.
+              if (e.target === e.currentTarget) handleCancel()
+            }}
+          >
+            <div
+              ref={modalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Edit comment"
+              className="w-full bg-white rounded-t-[16px] border-t border-[#eceef8] shadow-[0_-8px_30px_rgba(16,19,58,0.18)] pb-[max(env(safe-area-inset-bottom),12px)]"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#eceef8]">
+                <p className="font-heading font-bold text-[14px] leading-[20px] text-[#12143a]">
+                  {comment.contents ? 'Edit comment' : 'Add comment'}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  aria-label="Close"
+                  className="bg-[#fafbff] border border-[#eceef8] rounded-[14px] size-[28px] flex items-center justify-center hover:bg-gray-50 transition-colors"
+                >
+                  <X className="size-[13px] text-[#8a93b4]" />
+                </button>
+              </div>
+              <div className="px-4 py-3">{editorField}</div>
+              <div className="px-4 pb-3">{editorActions}</div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null}
+    </>
   )
 }
 

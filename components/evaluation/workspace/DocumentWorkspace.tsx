@@ -29,7 +29,6 @@ import {
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import { useViewportRef } from '@embedpdf/plugin-viewport/react'
 import { panScroll } from '@/lib/pdf/viewer-pan'
-import { useIsTouchViewport } from '@/lib/hooks/useMediaQuery'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
@@ -738,17 +737,16 @@ function WorkspaceLayout({
   // in lib/pdf/viewer-pan.ts; this is only the pointer plumbing.
   const viewportRef = useViewportRef(activeDocumentId)
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; fromX: number; fromY: number } | null>(null)
-  // Below sm, swiping the page is navigation and the hand toggle is hidden, so
-  // pan is on by default there. Above sm it is opt-in via the toolbar, because
-  // a desktop user may want drag for something else.
-  const isTouchViewport = useIsTouchViewport()
 
   function handlePanPointerDown(e: React.PointerEvent) {
+    // Only the explicit hand toggle drives this. On a phone, swiping is already
+    // the hand behaviour: EmbedPDF's viewport scrolls natively, so the browser
+    // pans the document and a JS drag on top of it only fights it. An earlier
+    // version ran this path below sm too and called preventDefault, which killed
+    // the native scroll outright — the page stopped moving on touch.
+    if (!panMode) return
     const viewport = viewportRef.current
     if (!viewport) return
-    // Explicit hand mode, or the default gesture below sm where swiping is
-    // navigation and there is no toggle to press.
-    if (!panMode && !isTouchViewport) return
     // An annotation owns its own drag. Panning instead would make it
     // impossible to move one on a phone.
     if ((e.target as HTMLElement).closest('[data-annotation-drag]')) return

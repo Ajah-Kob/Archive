@@ -541,12 +541,10 @@ function WorkspaceLayout({
   //
   // Freshly created highlight/strikeout annotations are tracked as "pending"
   // (no comment yet) and excluded from auto-save until a comment is submitted.
-  const pendingCommentIdsRef = useRef<Set<string>>(new Set())
   const { status: liveDraftStatus } = useAnnotationDraft({
     submissionId: submission.id,
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
-    excludeIdsRef: pendingCommentIdsRef,
     enabled: !isStudent,
   })
 
@@ -662,47 +660,16 @@ function WorkspaceLayout({
       }
       if (!inlineToolArmedRef.current) return
       inlineToolArmedRef.current = false
-      pendingCommentIdsRef.current.add(event.annotation.id)
+      // Nothing here gates the save — the annotation is already persisted. The
+      // panel opens with the editor focused so a comment can be written while
+      // the thought is fresh, but typing one is optional.
       setPanel('comments')
       setAutoEditId(event.annotation.id)
     })
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe()
     }
-  }, [annotationCapability, activeDocumentId])
-
-  // A comment was saved ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the annotation is no longer pending, so a later
-  // cancel must NOT delete it.
-  function handleSaveComment(comment: { id: string }) {
-    pendingCommentIdsRef.current.delete(comment.id)
-  }
-
-  // The editor closed without saving (cancel button / click-outside). If the
-  // annotation is still pending (freshly created, no comment), discard it.
-  function handleCancelEdit(comment: { id: string; pageIndex: number }) {
-    if (!pendingCommentIdsRef.current.has(comment.id)) return
-    pendingCommentIdsRef.current.delete(comment.id)
-    annotationCapabilityRef.current?.deleteAnnotation(
-      comment.pageIndex,
-      comment.id,
-    )
-  }
-
-  // Closing the panel without saving discards any pending annotations.
-  function discardPendingAnnotations() {
-    const cap = annotationCapabilityRef.current
-    if (!cap) return
-    const state = cap.getState()
-    for (const id of pendingCommentIdsRef.current) {
-      for (const [pageKey, uids] of Object.entries(state.pages)) {
-        if (uids.includes(id)) {
-          cap.deleteAnnotation(Number(pageKey), id)
-          break
-        }
-      }
-    }
-    pendingCommentIdsRef.current.clear()
-  }
+}, [annotationCapability, activeDocumentId])
 
   // Submit Review flow: capture THIS submission's annotations (the ones that
   // will be committed to the submission row) as the serialized payload + a
@@ -1034,13 +1001,10 @@ function WorkspaceLayout({
             autoEditId={autoEditId}
             highlightId={highlightCommentId}
             onClose={() => {
-              discardPendingAnnotations()
               setPanel(null)
               setAutoEditId(null)
               setHighlightCommentId(null)
             }}
-            onCancelEdit={handleCancelEdit}
-            onSaveComment={handleSaveComment}
           />
         )}
         {panel === 'versions' && isStudent && (

@@ -62,10 +62,6 @@ interface DefenseCommentsPanelProps {
   /** Annotation id whose comment card should be highlighted + scrolled into view. */
   highlightId?: string | null
   onClose: () => void
-  /** Fired when a comment editor closes without saving (cancel / click-outside). */
-  onCancelEdit: (comment: CommentItem) => void
-  /** Fired after a comment is saved. */
-  onSaveComment: (comment: CommentItem) => void
   /**
    * Which reviewer's annotations are shown. There is no "all reviewers"
    * option: null means "nothing chosen yet", and the panel resolves it to the
@@ -144,7 +140,6 @@ function DefenseCommentCard({
   onJump,
   onDelete,
   onSave,
-  onCancelEdit,
   onToggleVisibility,
 }: {
   comment: CommentItem
@@ -157,7 +152,6 @@ function DefenseCommentCard({
   onJump: (comment: CommentItem) => void
   onDelete: (comment: CommentItem) => void
   onSave: (comment: CommentItem, text: string) => void
-  onCancelEdit: (comment: CommentItem) => void
   onToggleVisibility: (comment: CommentItem, nextVisible: boolean) => void
 }) {
   const { label, icon: TypeIcon } = getTypeMeta(comment.type)
@@ -210,11 +204,10 @@ function DefenseCommentCard({
       if ((e.target as HTMLElement).closest('[data-preserve-editor]')) return
       setDraft(comment.contents)
       setEditing(false)
-      onCancelEdit(comment)
     }
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [editing, comment.contents, onCancelEdit])
+  }, [editing, comment.contents])
 
   function handleSave() {
     onSave(comment, draft.trim())
@@ -349,7 +342,6 @@ function DefenseCommentCard({
                   type="button"
                   onClick={() => {
                     setEditing(false)
-                    onCancelEdit(comment)
                   }}
                   title="Cancel"
                   className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382] transition-all hover:bg-gray-50 hover:text-[#3d4566] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
@@ -443,8 +435,6 @@ export function DefenseCommentsPanel({
   autoEditId = null,
   highlightId = null,
   onClose,
-  onCancelEdit,
-  onSaveComment,
   authorFilter = null,
   onAuthorFilterChange,
 }: DefenseCommentsPanelProps) {
@@ -524,7 +514,6 @@ export function DefenseCommentsPanel({
     provides?.updateAnnotation(comment.pageIndex, comment.id, {
       contents: text,
     })
-    onSaveComment(comment)
   }
 
   function handleToggleVisibility(comment: CommentItem, nextVisible: boolean) {
@@ -682,7 +671,6 @@ export function DefenseCommentsPanel({
               onJump={handleJump}
               onDelete={handleDelete}
               onSave={handleSave}
-              onCancelEdit={onCancelEdit}
               onToggleVisibility={handleToggleVisibility}
             />
           ))}

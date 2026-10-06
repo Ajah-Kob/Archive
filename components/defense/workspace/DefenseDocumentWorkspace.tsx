@@ -469,11 +469,9 @@ function DefenseWorkspaceLayout({
   const router = useRouter()
   const viewerRef = useRef<HTMLDivElement>(null)
 
-  const pendingCommentIdsRef = useRef<Set<string>>(new Set())
   const { isDirty, markClean } = useAnnotationDraft({
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
-    excludeIdsRef: pendingCommentIdsRef,
     enabled: editable,
   })
 
@@ -592,7 +590,8 @@ function DefenseWorkspaceLayout({
       }
       if (!inlineToolArmedRef.current) return
       inlineToolArmedRef.current = false
-      pendingCommentIdsRef.current.add(event.annotation.id)
+      // The annotation is already persisted; this only opens the comment editor
+      // while the thought is fresh. Typing a comment is optional.
       setPanel('comments')
       setAutoEditId(event.annotation.id)
     })
@@ -600,31 +599,6 @@ function DefenseWorkspaceLayout({
       if (typeof unsubscribe === 'function') unsubscribe()
     }
   }, [annotationCapability, activeDocumentId])
-
-  function handleSaveComment(comment: { id: string }) {
-    pendingCommentIdsRef.current.delete(comment.id)
-  }
-
-  function handleCancelEdit(comment: { id: string; pageIndex: number }) {
-    if (!pendingCommentIdsRef.current.has(comment.id)) return
-    pendingCommentIdsRef.current.delete(comment.id)
-    annotationCapabilityRef.current?.deleteAnnotation(comment.pageIndex, comment.id)
-  }
-
-  function discardPendingAnnotations() {
-    const cap = annotationCapabilityRef.current
-    if (!cap) return
-    const state = cap.getState()
-    for (const id of pendingCommentIdsRef.current) {
-      for (const [pageKey, uids] of Object.entries(state.pages)) {
-        if (uids.includes(id)) {
-          cap.deleteAnnotation(Number(pageKey), id)
-          break
-        }
-      }
-    }
-    pendingCommentIdsRef.current.clear()
-  }
 
   // Browser-level guard: covers tab close, reload and any navigation the in-app
   // Back button cannot intercept. Browsers show their own generic wording ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the
@@ -1081,13 +1055,10 @@ function DefenseWorkspaceLayout({
             authorFilter={visibleAuthor}
             onAuthorFilterChange={setVisibleAuthor}
             onClose={() => {
-              discardPendingAnnotations()
               setPanel(null)
               setAutoEditId(null)
               setHighlightCommentId(null)
             }}
-            onCancelEdit={handleCancelEdit}
-            onSaveComment={handleSaveComment}
           />
         )}
         {panel === 'versions' && isStudent && (

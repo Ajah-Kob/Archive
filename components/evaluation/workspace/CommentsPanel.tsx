@@ -50,10 +50,6 @@ interface CommentsPanelProps {
   /** Annotation id whose comment card should be highlighted + scrolled into view. */
   highlightId?: string | null
   onClose: () => void
-  /** Fired when a comment editor closes without saving (cancel / click-outside). */
-  onCancelEdit: (comment: CommentItem) => void
-  /** Fired after a comment is saved. */
-  onSaveComment: (comment: CommentItem) => void
 }
 
 /** A flattened, render-ready annotation entry for the comment list. */
@@ -120,7 +116,6 @@ function CommentCard({
   onJump,
   onDelete,
   onSave,
-  onCancelEdit,
 }: {
   comment: CommentItem
   /** Read-only (student workspace): no editor, no edit/delete actions. */
@@ -132,8 +127,6 @@ function CommentCard({
   onJump: (comment: CommentItem) => void
   onDelete: (comment: CommentItem) => void
   onSave: (comment: CommentItem, text: string) => void
-  /** Fired when the editor closes without saving (cancel / click-outside). */
-  onCancelEdit: (comment: CommentItem) => void
 }) {
   const { label, icon: TypeIcon } = getTypeMeta(comment.type)
   const [draft, setDraft] = useState(comment.contents)
@@ -202,11 +195,10 @@ function CommentCard({
       if ((e.target as HTMLElement).closest('[data-preserve-editor]')) return
       setDraft(comment.contents)
       setEditing(false)
-      onCancelEdit(comment)
     }
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [editing, comment.contents, onCancelEdit])
+  }, [editing, comment.contents])
 
   function handleSave() {
     onSave(comment, draft.trim())
@@ -214,9 +206,10 @@ function CommentCard({
   }
 
   function handleCancel() {
+    // Cancelling only discards the typed draft. The annotation itself is
+    // already saved and must survive — a comment is optional.
     setDraft(comment.contents)
     setEditing(false)
-    onCancelEdit(comment)
   }
 
   // Below sm the editor is a modal. Above sm it stays inline on the card.
@@ -357,7 +350,6 @@ function CommentCard({
                   type="button"
                   onClick={() => {
                     setEditing(false)
-                    onCancelEdit(comment)
                   }}
                   title="Cancel"
                   className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-[7px] font-sans font-semibold text-[11px] leading-[16px] text-[#5a6382] transition-all hover:bg-gray-50 hover:text-[#3d4566] focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
@@ -495,8 +487,6 @@ export function CommentsPanel({
   autoEditId = null,
   highlightId = null,
   onClose,
-  onCancelEdit,
-  onSaveComment,
 }: CommentsPanelProps) {
   const { state, provides } = useAnnotation(documentId)
   const scroll = useScroll(documentId)
@@ -571,7 +561,6 @@ export function CommentsPanel({
     provides?.updateAnnotation(comment.pageIndex, comment.id, {
       contents: text,
     })
-    onSaveComment(comment)
   }
 
   return (
@@ -612,7 +601,6 @@ export function CommentsPanel({
               onJump={handleJump}
               onDelete={handleDelete}
               onSave={handleSave}
-              onCancelEdit={onCancelEdit}
             />
           ))}
         </div>

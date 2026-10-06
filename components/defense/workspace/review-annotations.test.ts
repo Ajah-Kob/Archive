@@ -212,18 +212,6 @@ describe('fingerprintAnnotations — change detection', () => {
     ).toBe(false)
   })
 
-  test('honours excludeIds so dirty state matches what save persists', () => {
-    const saved = [ann('a')]
-    // A freshly created highlight with no comment yet is filtered from the
-    // persisted set, so it must not enable Save either.
-    const exclude = new Set(['pending'])
-    const current = [ann('a'), ann('pending')]
-    expect(
-      fingerprintAnnotations(current, exclude) !==
-        fingerprintAnnotations(saved, exclude),
-    ).toBe(false)
-  })
-
   test('an empty set fingerprints to the empty string', () => {
     expect(fingerprintAnnotations([])).toBe('')
   })

@@ -27,6 +27,8 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
+import { useViewportRef } from '@embedpdf/plugin-viewport/react'
+import { panScroll } from '@/lib/pdf/viewer-pan'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
@@ -558,6 +560,9 @@ function WorkspaceLayout({
 
   // --- Active annotation tool (shared by the toolbar + settings panel) -----
   const [activeTool, setActiveTool] = useState<ToolId | null>(null)
+  // Hand tool. Separate from activeTool because EmbedPDF's tool ids all create
+  // annotations and pan is a viewer concern, not an annotation one.
+  const [panMode, setPanMode] = useState(false)
 
   // --- Auto-open Comments on inline annotation creation ---------------------
   // When the adviser creates a highlight/strikeout with the tool armed (a fresh
@@ -719,10 +724,59 @@ function WorkspaceLayout({
   // annotation selection — unselecting removes ONLY that focus state; the
   // annotation's own visual (highlight/strike) is independent and stays.
   function handleViewerPointerDown(e: React.PointerEvent) {
+    if (panMode) return
     const target = e.target as HTMLElement
     if (target.closest('[data-no-interaction]')) return
     annotationCapabilityRef.current?.deselectAnnotation()
     setHighlightCommentId(null)
+  }
+
+  // ── Hand tool: drag the page ──────────────────────────────────────────────
+  // EmbedPDF's Scroller scrolls natively, so panning is a drag that adjusts the
+  // scroll viewport's scrollLeft/scrollTop. The geometry (and its clamping) is
+  // in lib/pdf/viewer-pan.ts; this is only the pointer plumbing.
+  const viewportRef = useViewportRef(activeDocumentId)
+  const panRef = useRef<{ pointerId: number; startX: number; startY: number; fromX: number; fromY: number } | null>(null)
+
+  function handlePanPointerDown(e: React.PointerEvent) {
+    if (!panMode) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    // Ignore secondary buttons so a right-click does not start a pan.
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    panRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      fromX: viewport.scrollLeft,
+      fromY: viewport.scrollTop,
+    }
+    // The viewer scrolls natively, so the browser would also pan the document
+    // on top of ours. touch-action on the wrapper (see className below) stops
+    // that for touch; this covers the rest.
+    e.preventDefault()
+  }
+
+  function handlePanPointerMove(e: React.PointerEvent) {
+    const pan = panRef.current
+    const viewport = viewportRef.current
+    if (!pan || !viewport || pan.pointerId !== e.pointerId) return
+    const next = panScroll(
+      { x: pan.fromX, y: pan.fromY },
+      { x: e.clientX - pan.startX, y: e.clientY - pan.startY },
+      {
+        scrollWidth: viewport.scrollWidth,
+        clientWidth: viewport.clientWidth,
+        scrollHeight: viewport.scrollHeight,
+        clientHeight: viewport.clientHeight,
+      },
+    )
+    viewport.scrollLeft = next.x
+    viewport.scrollTop = next.y
+  }
+
+  function endPan(e: React.PointerEvent) {
+    if (panRef.current?.pointerId === e.pointerId) panRef.current = null
   }
 
   return (
@@ -830,6 +884,8 @@ function WorkspaceLayout({
             documentId={activeDocumentId}
             activeTool={activeTool}
             onActiveToolChange={handleActiveToolChange}
+            panMode={panMode}
+            onPanModeChange={setPanMode}
           />
         )}
 
@@ -917,8 +973,14 @@ function WorkspaceLayout({
       <div className="flex-1 min-h-0 flex relative">
         <div
           ref={viewerRef}
-          className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area"
+          className={`flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area ${
+            panMode ? 'cursor-grab active:cursor-grabbing' : ''
+          }`}
           onPointerDownCapture={handleViewerPointerDown}
+          onPointerDown={handlePanPointerDown}
+          onPointerMove={handlePanPointerMove}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
         >
           <div className="absolute inset-0 overflow-hidden">
             {activeDocumentId ? (

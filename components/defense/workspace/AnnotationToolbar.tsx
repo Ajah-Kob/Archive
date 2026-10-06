@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import {
+  Hand,
   Highlighter,
   MousePointer2,
   Pen,
@@ -20,6 +21,9 @@ interface AnnotationToolbarProps {
   activeTool: ToolId | null
   /** Called when the active tool changes (user click or plugin reset). */
   onActiveToolChange: (tool: ToolId | null) => void
+  /** Hand tool: drags the page around instead of touching annotations. */
+  panMode: boolean
+  onPanModeChange: (panMode: boolean) => void
 }
 
 interface ToolDef {
@@ -73,6 +77,8 @@ export function AnnotationToolbar({
   documentId,
   activeTool,
   onActiveToolChange,
+  panMode,
+  onPanModeChange,
 }: AnnotationToolbarProps) {
   const { provides: api, state } = useAnnotation(documentId)
 
@@ -95,6 +101,17 @@ export function AnnotationToolbar({
     const next = activeTool === tool && tool !== null ? null : tool
     onActiveToolChange(next)
     api?.setActiveTool(next)
+    // Picking any annotation tool means the user has left pan mode.
+    onPanModeChange(false)
+  }
+
+  function togglePanMode() {
+    const next = !panMode
+    onPanModeChange(next)
+    if (!next && activeTool !== null) {
+      onActiveToolChange(null)
+      api?.setActiveTool(null)
+    }
   }
 
   function deleteSelected() {
@@ -112,8 +129,9 @@ export function AnnotationToolbar({
   }
 
   // selectedUid is null when MULTIPLE annotations are selected, so the delete
-  // button must key off the selectedUids array length instead.
-  const hasSelection = (state.selectedUids?.length ?? 0) > 0
+  // button must key off the selectedUids array length instead. Pan mode blocks
+  // selecting anything at all, so the button is dead while it is on.
+  const hasSelection = !panMode && (state.selectedUids?.length ?? 0) > 0
 
   return (
     <div
@@ -147,16 +165,30 @@ export function AnnotationToolbar({
 
       <button
         type="button"
+        onClick={togglePanMode}
+        aria-label="Hand tool (drag to move the page)"
+        title="Hand — drag to move the page"
+        aria-pressed={panMode}
+        className={`${BASE_BUTTON} ${
+          panMode ? ACTIVE_BUTTON : IDLE_BUTTON
+        }`}
+      >
+        <Hand className="size-[15px]" strokeWidth={1.75} />
+        {panMode && <ActiveIndicator />}
+      </button>
+
+      <button
+        type="button"
         onClick={() => selectTool(null)}
         aria-label="Select (cursor)"
         title="Select"
-        aria-pressed={activeTool === null}
+        aria-pressed={activeTool === null && !panMode}
         className={`${BASE_BUTTON} ${
-          activeTool === null ? ACTIVE_BUTTON : IDLE_BUTTON
+          activeTool === null && !panMode ? ACTIVE_BUTTON : IDLE_BUTTON
         }`}
       >
         <MousePointer2 className="size-[15px]" strokeWidth={1.75} />
-        {activeTool === null && <ActiveIndicator />}
+        {activeTool === null && !panMode && <ActiveIndicator />}
       </button>
 
       <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />

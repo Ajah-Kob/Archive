@@ -26,6 +26,8 @@ import {
 } from '@embedpdf/plugin-document-manager/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
+import { useViewportRef } from '@embedpdf/plugin-viewport/react'
+import { panScroll } from '@/lib/pdf/viewer-pan'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
@@ -514,6 +516,9 @@ function DefenseWorkspaceLayout({
       (submission as unknown as { version?: number }).version! > 1)
 
   const [activeTool, setActiveTool] = useState<ToolId | null>(null)
+  // Hand tool. Separate from activeTool because EmbedPDF's tool ids all create
+  // annotations and pan is a viewer concern, not an annotation one.
+  const [panMode, setPanMode] = useState(false)
 
   const [autoEditId, setAutoEditId] = useState<string | null>(null)
   const [highlightCommentId, setHighlightCommentId] = useState<string | null>(null)
@@ -756,10 +761,54 @@ function DefenseWorkspaceLayout({
   }
 
   function handleViewerPointerDown(e: React.PointerEvent) {
+    if (panMode) return
     const target = e.target as HTMLElement
     if (target.closest('[data-no-interaction]')) return
     annotationCapabilityRef.current?.deselectAnnotation()
     setHighlightCommentId(null)
+  }
+
+  // ── Hand tool: drag the page ──────────────────────────────────────────────
+  // Same as the evaluation workspace — EmbedPDF scrolls natively, so panning
+  // adjusts the scroll viewport directly. Geometry lives in lib/pdf/viewer-pan.ts.
+  const viewportRef = useViewportRef(activeDocumentId)
+  const panRef = useRef<{ pointerId: number; startX: number; startY: number; fromX: number; fromY: number } | null>(null)
+
+  function handlePanPointerDown(e: React.PointerEvent) {
+    if (!panMode) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    panRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      fromX: viewport.scrollLeft,
+      fromY: viewport.scrollTop,
+    }
+    e.preventDefault()
+  }
+
+  function handlePanPointerMove(e: React.PointerEvent) {
+    const pan = panRef.current
+    const viewport = viewportRef.current
+    if (!pan || !viewport || pan.pointerId !== e.pointerId) return
+    const next = panScroll(
+      { x: pan.fromX, y: pan.fromY },
+      { x: e.clientX - pan.startX, y: e.clientY - pan.startY },
+      {
+        scrollWidth: viewport.scrollWidth,
+        clientWidth: viewport.clientWidth,
+        scrollHeight: viewport.scrollHeight,
+        clientHeight: viewport.clientHeight,
+      },
+    )
+    viewport.scrollLeft = next.x
+    viewport.scrollTop = next.y
+  }
+
+  function endPan(e: React.PointerEvent) {
+    if (panRef.current?.pointerId === e.pointerId) panRef.current = null
   }
 
   const resolvedScheduleId = scheduleId ?? submission.scheduleId ?? null
@@ -865,6 +914,8 @@ function DefenseWorkspaceLayout({
             documentId={activeDocumentId}
             activeTool={activeTool}
             onActiveToolChange={handleActiveToolChange}
+            panMode={panMode}
+            onPanModeChange={setPanMode}
           />
         )}
 
@@ -964,8 +1015,14 @@ function DefenseWorkspaceLayout({
       <div className="flex-1 min-h-0 flex relative">
         <div
           ref={viewerRef}
-          className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area border border-[#d8daf0] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]"
+          className={`flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area border border-[#d8daf0] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] ${
+            panMode ? 'cursor-grab active:cursor-grabbing' : ''
+          }`}
           onPointerDownCapture={handleViewerPointerDown}
+          onPointerDown={handlePanPointerDown}
+          onPointerMove={handlePanPointerMove}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
         >
           <div className="absolute inset-0 overflow-hidden">
             {activeDocumentId ? (

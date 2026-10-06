@@ -58,7 +58,8 @@ import { AnnotationEmptyGuard } from '@/components/evaluation/workspace/Annotati
 import { AnnotationHover } from '@/components/evaluation/workspace/AnnotationHover'
 import { AnnotationDeleteKey } from '@/components/evaluation/workspace/AnnotationDeleteKey'
 import { DisableTextSelection } from '@/components/evaluation/workspace/DisableTextSelection'
-import { LongPressGate } from '@/components/evaluation/workspace/LongPressGate'
+import { useIsTouchViewport } from '@/lib/hooks/useMediaQuery'
+import { MobileUnsupported } from '@/components/workspace/MobileUnsupported'
 import { UndoRedo } from '@/components/evaluation/workspace/UndoRedo'
 import { ZoomControl } from '@/components/evaluation/workspace/ZoomControl'
 import { CommentsPanel } from '@/components/evaluation/workspace/CommentsPanel'
@@ -75,7 +76,7 @@ import type { SubmissionMeta } from '@/types/milestones'
 export type WorkspaceMode = 'reviewer' | 'student'
 
 export interface DocumentWorkspaceProps {
-  /** Viewer mode ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â student strips every editing affordance and write path. */
+  /** Viewer mode ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â student strips every editing affordance and write path. */
   mode?: WorkspaceMode
   /** Public Vercel Blob URL of the submission's document. */
   blobUrl: string
@@ -120,7 +121,7 @@ const SUBTYPE_TO_SUMMARY_KEY: Partial<
 }
 
 /**
- * Maps an annotation subtype to the toolbar tool that creates it ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â used to
+ * Maps an annotation subtype to the toolbar tool that creates it ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â used to
  * activate the matching tool when an existing annotation is selected. Native
  * TEXT (sticky note) has no toolbar tool, so it is intentionally absent.
  */
@@ -144,12 +145,12 @@ function summarizeAnnotations(items: unknown[]): AnnotationSummary {
 }
 
 /**
- * Adviser document review workspace ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ONE specific document version per
+ * Adviser document review workspace ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ONE specific document version per
  * browser tab. Opening a different version navigates to its own workspace
  * URL; there are no internal version tabs.
  *
- * Layout (top ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ bottom): header bar (back link + group/chapter/status +
- * annotation toolbar + Comments + verdict actions) ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ full-width PDF viewer.
+ * Layout (top ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ bottom): header bar (back link + group/chapter/status +
+ * annotation toolbar + Comments + verdict actions) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ full-width PDF viewer.
  * Comments opens as a right slide-over panel on demand.
  *
  * The ENTIRE layout lives inside a single `<EmbedPDF>` root so every child
@@ -157,7 +158,14 @@ function summarizeAnnotations(items: unknown[]): AnnotationSummary {
  * `useScroll`, ...). The annotation draft auto-save is wired to the
  * submission's document scope.
  */
-export function DocumentWorkspace({
+export function DocumentWorkspace(props: DocumentWorkspaceProps) {
+  // Desktop only. Checked here, before the engine and the PDF fetch below, so a
+  // phone costs nothing ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the document is never downloaded just to be hidden.
+  if (useIsTouchViewport()) return <MobileUnsupported />
+  return <DocumentWorkspaceInner {...props} />
+}
+
+function DocumentWorkspaceInner({
   mode = 'reviewer',
   blobUrl,
   submission,
@@ -171,7 +179,7 @@ export function DocumentWorkspace({
   const { data: session } = useSession()
 
   // Private Blob: derive signed route pathname (never expose raw blobUrl in EmbedPDF src).
-  // DB stores https://ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦vercel-storage.com/chapter/{groupId}/ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ but the viewer fetches
+  // DB stores https://ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦vercel-storage.com/chapter/{groupId}/ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ but the viewer fetches
   // via GET /api/blob/chapter/... with credentials, handling 401/403 with toast/redirect.
   const pathname = blobUrlToPathname(blobUrl)
   const signedPath = toSignedBlobPath(blobUrl)
@@ -197,7 +205,7 @@ export function DocumentWorkspace({
       // Only legacy public blobs (e.g. user/* avatars) take the direct path.
       const isPrivate = isPrivateBlobPath(pathname)
       if (!isPrivate) {
-        // Non-private (e.g. legacy public) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â allow direct load but still try signed route first when available.
+        // Non-private (e.g. legacy public) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â allow direct load but still try signed route first when available.
         if (signedPath && pathname) {
           // try signed; fall back to raw on failure
         } else {
@@ -236,7 +244,7 @@ export function DocumentWorkspace({
         }
         if (!res.ok) {
           // Legacy public blobs (pre-private migration) will 404 on the signed route
-          // because they are not private ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â fall back to direct URL once.
+          // because they are not private ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â fall back to direct URL once.
           if (res.status === 404 && blobUrl) {
             try {
               const directRes = await fetch(blobUrl, { credentials: 'include' })
@@ -339,15 +347,15 @@ export function DocumentWorkspace({
   // The adviser's display name is stamped on every annotation they create.
   const annotationAuthor = session?.user?.name ?? 'Adviser'
 
-  // Plugin registration order matters ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â each plugin's dependencies must be
-  // registered before it: document-manager ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ viewport ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ scroll ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ render ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢
-  // interaction-manager ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ selection ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ history ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ annotation.
+  // Plugin registration order matters ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â each plugin's dependencies must be
+  // registered before it: document-manager ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ viewport ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ scroll ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ render ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢
+  // interaction-manager ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ selection ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ history ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ annotation.
   //
   // In student (read-only) mode EVERY tool is registered with interaction
-  // overrides that disable drag/resize/rotate ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â otherwise a selected ink or
+  // overrides that disable drag/resize/rotate ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â otherwise a selected ink or
   // sticky-note annotation can still be moved through the plugin's own
   // drag surface even though our custom drag surfaces never mount.
-  // Render PDF only from the signed-route object URL ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never the raw blobUrl
+  // Render PDF only from the signed-route object URL ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â never the raw blobUrl
   // (private blobs must not be exposed in the DOM, even briefly).
   const effectivePdfUrl = pdfObjectUrl
   const plugins = useMemo(
@@ -364,7 +372,7 @@ export function DocumentWorkspace({
     // on touch devices, so a swipe scrolls the document out of the box; desktop
     // still starts in text selection.
     createPluginRegistration(PanPluginPackage, { defaultMode: 'mobile' }),
-      // toleranceFactor: 0 requires exact glyph hits ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â dragging past the end of
+      // toleranceFactor: 0 requires exact glyph hits ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â dragging past the end of
       // a line no longer snaps to the last glyph, so highlight/strikeout boxes
       // only cover the text actually selected (not the whole line).
       createPluginRegistration(SelectionPluginPackage, { toleranceFactor: 0 }),
@@ -431,7 +439,7 @@ export function DocumentWorkspace({
     [effectivePdfUrl, annotationAuthor, isStudent],
   )
 
-  // Signed-route loading / 401/403 error precedes engine display ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â document
+  // Signed-route loading / 401/403 error precedes engine display ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â document
   // requires auth and fails anonymously (curl 401), per private-blobs spec.
   if (pdfError) {
     return (
@@ -441,7 +449,7 @@ export function DocumentWorkspace({
           {pdfError}
         </p>
         <p className="font-sans text-[11px] text-[#9ea8c6] break-all">
-          Stored as private blob {pathname ? `at ${pathname}` : ''} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â fetched via {signedPath || '/api/blob/...'}.
+          Stored as private blob {pathname ? `at ${pathname}` : ''} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â fetched via {signedPath || '/api/blob/...'}.
         </p>
       </div>
     )
@@ -452,7 +460,7 @@ export function DocumentWorkspace({
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
         <Loader2 className="size-6 animate-spin text-[#707dff]" />
         <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
-          Loading documentÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦
+          Loading documentÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦
         </p>
       </div>
     )
@@ -474,7 +482,7 @@ export function DocumentWorkspace({
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fafbff]">
         <Loader2 className="size-6 animate-spin text-[#707dff]" />
         <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
-          Loading PDF engineÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦
+          Loading PDF engineÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦
         </p>
       </div>
     )
@@ -529,7 +537,7 @@ function WorkspaceLayout({
   // Wired to the submission's document scope. Annotations are persisted per
   // submission row; the server rejects saves for soft-deleted (previous)
   // versions, so only a live PENDING version can ever auto-save. Students
-  // never save ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the hook is not even mounted in student mode.
+  // never save ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the hook is not even mounted in student mode.
   //
   // Freshly created highlight/strikeout annotations are tracked as "pending"
   // (no comment yet) and excluded from auto-save until a comment is submitted.
@@ -546,7 +554,7 @@ function WorkspaceLayout({
     useAnnotation(CURRENT_DOCUMENT_ID)
 
   // Seed the bottom-bar status from the persisted row so an existing draft
-  // reads "Draft saved ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" on load; live status takes over once the user edits.
+  // reads "Draft saved ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ" on load; live status takes over once the user edits.
   const [seededDraftStatus] = useState<AnnotationDraftStatus>(() =>
     draftStatus === 'DRAFT' || draftStatus === 'COMMITTED' ? 'saved' : 'idle',
   )
@@ -570,7 +578,7 @@ function WorkspaceLayout({
   // because the plugin registers pan as the interaction mode and the mode
   // arbitration (pan vs. an annotation tool) only works if one thing owns it.
   // Registered with defaultMode: 'mobile', so `isPanning` starts true on touch
-  // and false on desktop Ã¢â‚¬â€ panning is the default gesture on a phone.
+  // and false on desktop ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â panning is the default gesture on a phone.
   const { provides: pan, isPanning } = usePan(activeDocumentId)
 
   // --- Auto-open Comments on inline annotation creation ---------------------
@@ -609,40 +617,12 @@ function WorkspaceLayout({
     }
   }
 
-  // The long-press gate swallowed the touch that began the gesture, and the
-  // annotation layer only starts on a pointerdown it actually saw. Re-state it
-  // at the hold point so the rest of the gesture ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â drag to select, release to
-  // place ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â behaves exactly as it does on desktop.
-  function handleLongPressArm(point: { x: number; y: number }, pointerId: number) {
-    // The gate still covers the page when the hold fires Ã¢â‚¬â€ React has not yet
-    // re-rendered it to pointer-events:none Ã¢â‚¬â€ so elementFromPoint would hand
-    // back the gate itself and the annotation layer would never see this. Skip
-    // the gate and take the first element actually underneath it.
-    const target = document
-      .elementsFromPoint(point.x, point.y)
-      .find((el) => !(el instanceof HTMLElement && el.dataset.longPressGate !== undefined))
-    if (!target) return
-    target.dispatchEvent(
-      new PointerEvent('pointerdown', {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        clientX: point.x,
-        clientY: point.y,
-        pointerId,
-        pointerType: 'touch',
-        isPrimary: true,
-        button: 0,
-        buttons: 1,
-      }),
-    )
-  }
 
   // Selecting an annotation activates its matching tool: the toolbar
   // highlights it and the settings strip reads the annotation's own
   // color/size (ToolSettingsPanel already prefers the selected object).
-  // Deselecting keeps the current tool ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â only a positive selection switches.
-  // READ-ONLY (student) must never arm a tool ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â otherwise a subsequent
+  // Deselecting keeps the current tool ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â only a positive selection switches.
+  // READ-ONLY (student) must never arm a tool ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â otherwise a subsequent
   // drag on empty page would create a new annotation.
   useEffect(() => {
     if (isStudent) return
@@ -691,7 +671,7 @@ function WorkspaceLayout({
     }
   }, [annotationCapability, activeDocumentId])
 
-  // A comment was saved ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the annotation is no longer pending, so a later
+  // A comment was saved ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the annotation is no longer pending, so a later
   // cancel must NOT delete it.
   function handleSaveComment(comment: { id: string }) {
     pendingCommentIdsRef.current.delete(comment.id)
@@ -734,7 +714,7 @@ function WorkspaceLayout({
     if (cap) {
       await cap.exportAnnotations(undefined, CURRENT_DOCUMENT_ID).wait(
         (items) => {
-          // Native document annotations (hyperlinks etc.) share the store ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+          // Native document annotations (hyperlinks etc.) share the store ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â
           // only review-tool annotations may be committed to the submission.
           const reviewItems = items.filter((item) =>
             isReviewAnnotation(item.annotation),
@@ -759,7 +739,7 @@ function WorkspaceLayout({
   // annotation container). Clicks on page background OR text deselect.
   //
   // The comment focus/highlight (Comments panel card highlight) is tied to the
-  // annotation selection ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â unselecting removes ONLY that focus state; the
+  // annotation selection ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â unselecting removes ONLY that focus state; the
   // annotation's own visual (highlight/strike) is independent and stays.
   function handleViewerPointerDown(e: React.PointerEvent) {
     if (isPanning) return
@@ -775,7 +755,7 @@ function WorkspaceLayout({
       {/* Heal duplicate annotation uids in the store (behavior-only) */}
       {activeDocumentId && <AnnotationDedupe documentId={activeDocumentId} />}
 
-      {/* Mutation behaviors ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â REVIEWER ONLY. Students never get a client-side
+      {/* Mutation behaviors ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â REVIEWER ONLY. Students never get a client-side
           path that creates, edits, or deletes an annotation. */}
       {!isStudent && activeDocumentId && (
         <>
@@ -798,7 +778,7 @@ function WorkspaceLayout({
           slack so nothing could compress, the fixed height forbade wrapping, and
           8-10 control clusters overflowed any phone width.
           Below sm each group wraps instead. Tools wrap rather than scroll
-          deliberately ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â a palette hidden behind a horizontal scroll with a fade
+          deliberately ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â a palette hidden behind a horizontal scroll with a fade
           is undiscoverable, and there is no room for one row either way at 375px. */}
       <header className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px] px-4 sm:px-6 py-[10px] sm:py-0 sm:h-[64px] bg-white border-b border-[#eceef8] shrink-0">
         <div className="flex items-center gap-[14px] min-w-0 flex-1 sm:flex-none sm:basis-auto">
@@ -827,7 +807,7 @@ function WorkspaceLayout({
           />
         </div>
 
-        {/* Draft save status (right of the stats) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â REVIEWER ONLY */}
+        {/* Draft save status (right of the stats) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â REVIEWER ONLY */}
         {!isStudent && (
           <div className="flex items-center gap-[7px] min-w-0 shrink-0">
             {draftSaveStatus === 'saving' ? (
@@ -840,7 +820,7 @@ function WorkspaceLayout({
                   className="font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]"
                   aria-live="polite"
                 >
-                  SavingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦
+                  SavingÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦
                 </span>
               </>
             ) : (
@@ -864,12 +844,12 @@ function WorkspaceLayout({
         )}
         </div>
 
-        {/* Tool group ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â wraps below sm rather than scrolling, so every control
+        {/* Tool group ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â wraps below sm rather than scrolling, so every control
             stays visible. Roughly 570px of controls at 343px of width, so one
             row does not fit at 375px either way. */}
         <div className="flex flex-wrap items-center gap-[8px] shrink-0">
 
-        {/* Annotation toolbar ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â REVIEWER ONLY (students get zero editing tools) */}
+        {/* Annotation toolbar ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â REVIEWER ONLY (students get zero editing tools) */}
         {!isStudent && activeDocumentId && (
           <AnnotationToolbar
             documentId={activeDocumentId}
@@ -884,10 +864,10 @@ function WorkspaceLayout({
           <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
         )}
 
-        {/* Zoom controls ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â 20% to 200%, per active document (viewing tool) */}
+        {/* Zoom controls ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â 20% to 200%, per active document (viewing tool) */}
         {activeDocumentId && <ZoomControl documentId={activeDocumentId} />}
 
-        {/* Undo / Redo ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â REVIEWER ONLY */}
+        {/* Undo / Redo ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â REVIEWER ONLY */}
         {!isStudent && <UndoRedo />}
 
         <div className="flex items-center gap-[8px] shrink-0">
@@ -905,7 +885,7 @@ function WorkspaceLayout({
             Comments
           </button>
 
-          {/* Versions ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â STUDENT ONLY (the adviser navigates versions via the
+          {/* Versions ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â STUDENT ONLY (the adviser navigates versions via the
               teams drawer; each student version opens in its own tab) */}
           {isStudent && versions && versions.length > 0 && (
             <>
@@ -931,7 +911,7 @@ function WorkspaceLayout({
             <>
               <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
 
-              {/* Submit Review ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â single reviewer entry point */}
+              {/* Submit Review ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â single reviewer entry point */}
               <button
                 type="button"
                 onClick={() => openSubmitReview()}
@@ -951,7 +931,7 @@ function WorkspaceLayout({
         </div>
       </header>
 
-      {/* Per-tool settings strip (color / size) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â REVIEWER ONLY, while a tool is active */}
+      {/* Per-tool settings strip (color / size) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â REVIEWER ONLY, while a tool is active */}
       {!isStudent && activeDocumentId && (
         <ToolSettingsPanel
           documentId={activeDocumentId}
@@ -959,7 +939,7 @@ function WorkspaceLayout({
         />
       )}
 
-      {/* Viewer + right-side panel (inline ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the PDF shrinks to make room).
+      {/* Viewer + right-side panel (inline ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the PDF shrinks to make room).
           `relative` anchors the panel, which is laid over the viewer below sm. */}
       <div className="flex-1 min-h-0 flex relative">
         <div
@@ -970,17 +950,7 @@ function WorkspaceLayout({
           onPointerDownCapture={handleViewerPointerDown}
           onContextMenu={(e) => e.preventDefault()}
         >
-          {/* Only needed for the tools that create something on a tap: free text
-              and ink both commit from a touch-down. Highlight and strikeout
-              select instead, and the selection plugin's minSelectionDragDistance
-              already stops a tap from starting a selection, so gating them would
-              only cost the user a swipe to pan. */}
-          <LongPressGate
-            active={!isStudent && (activeTool === 'freeText' || activeTool === 'ink')}
-            onArm={handleLongPressArm}
-            className="absolute inset-0 z-[5]"
-          />
-          <div className="absolute inset-0 overflow-hidden">
+                    <div className="absolute inset-0 overflow-hidden">
             {activeDocumentId ? (
               <DocumentContent documentId={activeDocumentId}>
                 {({ isLoaded, isLoading, isError }) => {
@@ -996,7 +966,7 @@ function WorkspaceLayout({
                     return (
                       <ViewerState
                         icon={Loader2}
-                        message="Loading documentÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                        message="Loading documentÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦"
                         spin
                       />
                     )
@@ -1043,7 +1013,7 @@ function WorkspaceLayout({
             )}
           </div>
 
-          {/* Hover border + click selection on annotations (JS hit-testing) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+          {/* Hover border + click selection on annotations (JS hit-testing) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â
               the delete menu is reviewer-only */}
           {activeDocumentId && (
             <AnnotationHover
@@ -1089,7 +1059,7 @@ function WorkspaceLayout({
           annotationSummary={verdict.summary}
           annotationData={verdict.data}
           onClose={() => setVerdict(null)}
-          // The evaluation is finalized on success ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â return to the Teams tab
+          // The evaluation is finalized on success ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â return to the Teams tab
           // (the default tab of /faculty/document-review). refresh() first: it
           // invalidates the client Router Cache so the list reflects the
           // verdict immediately instead of serving the pre-verdict snapshot.

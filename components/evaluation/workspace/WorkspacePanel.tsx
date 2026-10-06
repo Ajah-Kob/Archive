@@ -17,6 +17,14 @@ interface WorkspacePanelProps {
  * Shared shell for the workspace's right-side panels (Detail, Comments,
  * Versions). Renders as an INLINE column — the PDF viewer shrinks to make
  * room instead of the panel overlaying it as a fixed drawer.
+ *
+ * On narrow screens that inline behaviour cannot hold: at 420px the panel is
+ * wider than a 375px viewport, and being `shrink-0` it never gives way, so the
+ * PDF viewer was left with no width at all. Below `sm` the panel is therefore
+ * taken out of flow and laid over the viewer, full width. The panel is already
+ * toggled by a header button, so nothing is lost by it covering the document
+ * rather than sitting beside it — and the PDF keeps its full size, which
+ * stacking would not have.
  */
 export function WorkspacePanel({
   title,
@@ -26,7 +34,7 @@ export function WorkspacePanel({
   children,
 }: WorkspacePanelProps) {
   return (
-    <aside className="w-[420px] shrink-0 h-full bg-white border-l border-[#eceef8] flex flex-col">
+    <aside className="w-full max-w-[420px] sm:w-[420px] max-sm:absolute max-sm:inset-0 max-sm:z-20 shrink-0 h-full bg-white max-sm:border-t sm:border-l max-sm:border-t-0 border-[#eceef8] flex flex-col">
       <div className="flex items-start justify-between gap-[16px] px-5 py-4 border-b border-[#eceef8] shrink-0">
         <div className="min-w-0">
           <div className="flex items-center gap-[8px]">

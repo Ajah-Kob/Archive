@@ -782,7 +782,13 @@ function DefenseWorkspaceLayout({
 
       {activeDocumentId && <DisableTextSelection documentId={activeDocumentId} />}
 
-      <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
+      {/* Two logical groups under a wrapping header. It was one row with two
+          `flex-1` spacers and a fixed h-[64px]: the spacers consumed all the slack
+          so nothing could compress, the fixed height forbade wrapping, and the
+          control clusters overflowed any phone width. Same treatment as
+          DocumentWorkspace — tools wrap rather than scroll so none stay hidden. */}
+      <header className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px] px-4 sm:px-6 py-[10px] sm:py-0 sm:h-[64px] bg-white border-b border-[#eceef8] shrink-0">
+        <div className="flex items-center gap-[14px] min-w-0 flex-1 sm:flex-none sm:basis-auto">
         {/* With unsaved changes this becomes a button, not a link: navigating away
             must not skip the prompt. Identical styling so nothing shifts. */}
         {isDirty ? (
@@ -849,8 +855,10 @@ function DefenseWorkspaceLayout({
             </span>
           </div>
         )}
+        </div>
 
-        <div className="flex-1" />
+        {/* Tool group — wraps below sm. */}
+        <div className="flex flex-wrap items-center gap-[8px] shrink-0">
 
         {editable && activeDocumentId && (
           <AnnotationToolbar
@@ -865,8 +873,6 @@ function DefenseWorkspaceLayout({
         {activeDocumentId && <ZoomControl documentId={activeDocumentId} />}
 
         {editable && <UndoRedo />}
-
-        <div className="flex-1" />
 
         <div className="flex items-center gap-[8px] shrink-0">
           <button
@@ -946,13 +952,16 @@ function DefenseWorkspaceLayout({
             )
           )}
         </div>
+        </div>
       </header>
 
       {editable && activeDocumentId && (
         <ToolSettingsPanel documentId={activeDocumentId} activeTool={activeTool} />
       )}
 
-      <div className="flex-1 min-h-0 flex">
+      {/* Viewer + right-side panel. `relative` anchors the panel, which is laid
+          over the viewer below sm. */}
+      <div className="flex-1 min-h-0 flex relative">
         <div
           ref={viewerRef}
           className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area border border-[#d8daf0] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]"

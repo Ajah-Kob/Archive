@@ -747,8 +747,16 @@ function WorkspaceLayout({
         <DisableTextSelection documentId={activeDocumentId} />
       )}
 
-      {/* Header bar: back + context | draft status | tools | zoom | undo/redo | panels + verdict */}
-      <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
+      {/* Header bar: back + context | draft status | tools | zoom | undo/redo | panels + verdict
+          Two logical groups under a wrapping header. It was one row with two
+          `flex-1` spacers and a fixed h-[64px]: the spacers consumed all the
+          slack so nothing could compress, the fixed height forbade wrapping, and
+          8-10 control clusters overflowed any phone width.
+          Below sm each group wraps instead. Tools wrap rather than scroll
+          deliberately — a palette hidden behind a horizontal scroll with a fade
+          is undiscoverable, and there is no room for one row either way at 375px. */}
+      <header className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px] px-4 sm:px-6 py-[10px] sm:py-0 sm:h-[64px] bg-white border-b border-[#eceef8] shrink-0">
+        <div className="flex items-center gap-[14px] min-w-0 flex-1 sm:flex-none sm:basis-auto">
         <Link
           href={backHref ?? '/faculty/document-review'}
           className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
@@ -809,8 +817,12 @@ function WorkspaceLayout({
             )}
           </div>
         )}
+        </div>
 
-        <div className="flex-1" />
+        {/* Tool group — wraps below sm rather than scrolling, so every control
+            stays visible. Roughly 570px of controls at 343px of width, so one
+            row does not fit at 375px either way. */}
+        <div className="flex flex-wrap items-center gap-[8px] shrink-0">
 
         {/* Annotation toolbar — REVIEWER ONLY (students get zero editing tools) */}
         {!isStudent && activeDocumentId && (
@@ -830,8 +842,6 @@ function WorkspaceLayout({
 
         {/* Undo / Redo — REVIEWER ONLY */}
         {!isStudent && <UndoRedo />}
-
-        <div className="flex-1" />
 
         <div className="flex items-center gap-[8px] shrink-0">
           <button
@@ -891,6 +901,7 @@ function WorkspaceLayout({
             </>
           )}
         </div>
+        </div>
       </header>
 
       {/* Per-tool settings strip (color / size) — REVIEWER ONLY, while a tool is active */}
@@ -901,8 +912,9 @@ function WorkspaceLayout({
         />
       )}
 
-      {/* Viewer + right-side panel (inline — the PDF shrinks to make room) */}
-      <div className="flex-1 min-h-0 flex">
+      {/* Viewer + right-side panel (inline — the PDF shrinks to make room).
+          `relative` anchors the panel, which is laid over the viewer below sm. */}
+      <div className="flex-1 min-h-0 flex relative">
         <div
           ref={viewerRef}
           className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area"

@@ -1,45 +1,50 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useIsTouchViewport } from '@/lib/hooks/useMediaQuery'
 import {
+  advance,
   holdElapsed,
   idle,
   kickoffPoint,
   LONG_PRESS_MS,
-  move,
   press,
   shouldPreventScroll,
   type GateState,
   type Point,
 } from '@/lib/pdf/long-press-gate'
+import { panScroll } from '@/lib/pdf/viewer-pan'
 
 interface LongPressGateProps {
-  /** True while an annotation tool is armed. Renders nothing when false. */
+  /** Whether a completed hold hands over to the annotation layer. */
   active: boolean
-  /** Fired once the hold completes, with the point the gesture started at. */
-  onArm: (point: Point) => void
+  /** Fired once the hold completes, with where the gesture started. */
+  onArm: (point: Point, pointerId: number) => void
+  /** Element scrolled when the gesture turns out to be a pan. */
+  viewportRef: React.RefObject<HTMLElement | null>
   className?: string
 }
 
 /**
- * Touch-only gate that stops an annotation being created by a stray tap.
+ * Touch gate over the PDF page: owns every touch gesture and picks its outcome.
  *
- * The overlay sits over the page while an annotation tool is armed. It does
- * NOT block scrolling — `touch-action: pan-x pan-y` leaves panning to the
- * browser, so a flick still scrolls and still passes through this element. It
- * only swallows the touch event itself, which is what would have started a
- * selection or placed an annotation.
+ * It exists because neither outcome is available on its own. EmbedPDF's
+ * annotation layers set `touch-action: none`, so the browser refuses to scroll
+ * the page on touch; and without a gate a bare tap or flick creates an
+ * annotation. So the gate swallows the gesture and decides:
  *
- * After `LONG_PRESS_MS` unmoved the gate stands down and reports the origin
- * point, so the caller can re-state the gesture to the annotation layer. From
- * then on the gesture is the user's: drag to select, release to place.
+ *   tap            -> nothing
+ *   flick          -> pans the viewport (clamped, same maths as the hand tool)
+ *   hold 400ms     -> hands over to the annotation layer
  *
- * Touches that begin on an annotation are left alone — moving or deleting an
- * existing annotation must not require a hold.
+ * The hold re-states the gesture, because the plugin only begins on a
+ * pointerdown it saw and the one the gate swallowed never reached it.
  *
- * Renders nothing on the server and nothing when `active` is false.
+ * Renders nothing on desktop, where the hand tool and normal mouse behaviour
+ * already cover this.
  */
-export function LongPressGate({ active, onArm, className }: LongPressGateProps) {
+export function LongPressGate({ active, onArm, viewportRef, className }: LongPressGateProps) {
+  const isTouchViewport = useIsTouchViewport()
   const stateRef = useRef<GateState>(idle())
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [armed, setArmed] = useState(false)
@@ -51,38 +56,39 @@ export function LongPressGate({ active, onArm, className }: LongPressGateProps) 
     }
   }
 
-  // Once armed this element is inert, so the rest of the gesture is tracked on
-  // the window: the browser must not pan underneath the user's selection drag.
+  // The overlay is inert once armed, so the rest of the gesture is tracked on
+  // the window. Native scrolling has to be held off for the whole of it, or
+  // the browser pans underneath the selection drag.
   useEffect(() => {
     if (!armed) return
     function blockScroll(e: TouchEvent) {
       if (shouldPreventScroll(stateRef.current)) e.preventDefault()
     }
-    function end() {
-      // Touch ended either way — the gate resets for the next gesture.
+    function finish() {
       stateRef.current = idle()
       setArmed(false)
     }
     window.addEventListener('touchmove', blockScroll, { passive: false })
-    window.addEventListener('touchend', end)
-    window.addEventListener('touchcancel', end)
+    window.addEventListener('touchend', finish)
+    window.addEventListener('touchcancel', finish)
     return () => {
       window.removeEventListener('touchmove', blockScroll)
-      window.removeEventListener('touchend', end)
-      window.removeEventListener('touchcancel', end)
+      window.removeEventListener('touchend', finish)
+      window.removeEventListener('touchcancel', finish)
     }
   }, [armed])
 
-  // Switching tool or leaving review abandons an in-flight hold. The state is
-  // adjusted during render (React's "reset state when a prop changes" pattern);
-  // touching the timer ref there would not be render-safe.
+  // Switching tool or leaving review abandons an in-flight hold. Only state is
+  // touched here; the timer and gesture ref are reset in the effect below,
+  // since neither is safe to reach during render.
   const [lastActive, setLastActive] = useState(active)
   if (lastActive !== active) {
     setLastActive(active)
     if (!active) setArmed(false)
   }
 
-  // The hold timer is an external system, so cancelling it belongs in an effect.
+  // The hold timer and gesture ref are external to React, so they are reset
+  // here rather than during render.
   useEffect(() => {
     if (!active) {
       clearTimer()
@@ -92,29 +98,53 @@ export function LongPressGate({ active, onArm, className }: LongPressGateProps) 
 
   useEffect(() => clearTimer, [])
 
-  function pointFrom(e: React.TouchEvent): Point {
+  function pointFrom(e: React.TouchEvent): { point: Point; pointerId: number } {
     const t = e.changedTouches[0] ?? e.touches[0]
-    return { x: t?.clientX ?? 0, y: t?.clientY ?? 0 }
+    return {
+      point: { x: t?.clientX ?? 0, y: t?.clientY ?? 0 },
+      pointerId: t?.identifier ?? 1,
+    }
+  }
+
+  function panBy(delta: Point) {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const next = panScroll(
+      { x: viewport.scrollLeft, y: viewport.scrollTop },
+      delta,
+      {
+        scrollWidth: viewport.scrollWidth,
+        clientWidth: viewport.clientWidth,
+        scrollHeight: viewport.scrollHeight,
+        clientHeight: viewport.clientHeight,
+      },
+    )
+    viewport.scrollLeft = next.x
+    viewport.scrollTop = next.y
   }
 
   function handleTouchStart(e: React.TouchEvent) {
+    // Moving or deleting an existing annotation should not need a hold.
     if ((e.target as HTMLElement).closest('[data-annotation-drag]')) return
-    stateRef.current = press(stateRef.current, pointFrom(e))
+    const { point, pointerId } = pointFrom(e)
+    stateRef.current = press(stateRef.current, point, pointerId)
     clearTimer()
+    if (!active) return
     timerRef.current = setTimeout(() => {
       const next = holdElapsed(stateRef.current)
       stateRef.current = next
       const origin = kickoffPoint(next)
       if (!origin) return
       setArmed(true)
-      onArm(origin)
+      onArm(origin, next.pointerId ?? 1)
     }, LONG_PRESS_MS)
   }
 
   function handleTouchMove(e: React.TouchEvent) {
-    const next = move(stateRef.current, pointFrom(e))
-    stateRef.current = next
-    if (shouldPreventScroll(next)) e.preventDefault()
+    const { state, pan } = advance(stateRef.current, pointFrom(e).point)
+    stateRef.current = state
+    if (pan) panBy(pan)
+    if (shouldPreventScroll(state)) e.preventDefault()
   }
 
   function handleTouchEnd() {
@@ -123,11 +153,12 @@ export function LongPressGate({ active, onArm, className }: LongPressGateProps) 
     setArmed(false)
   }
 
-  if (!active) return null
+  if (!isTouchViewport) return null
 
   return (
     <div
       aria-hidden="true"
+      data-long-press-gate=""
       className={className}
       style={{ pointerEvents: armed ? 'none' : 'auto', touchAction: 'pan-x pan-y' }}
       onTouchStart={handleTouchStart}

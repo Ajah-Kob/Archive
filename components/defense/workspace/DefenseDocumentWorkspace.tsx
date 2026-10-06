@@ -548,8 +548,14 @@ function DefenseWorkspaceLayout({
   // The long-press gate swallowed the touch that began the gesture; the
   // annotation layer only starts on a pointerdown it saw. Re-state it at the
   // hold point so drag-to-select and tap-to-place match desktop.
-  function handleLongPressArm(point: { x: number; y: number }) {
-    const target = document.elementFromPoint(point.x, point.y)
+  function handleLongPressArm(point: { x: number; y: number }, pointerId: number) {
+    // The gate still covers the page when the hold fires — React has not yet
+    // re-rendered it to pointer-events:none — so elementFromPoint would hand
+    // back the gate itself and the annotation layer would never see this. Skip
+    // the gate and take the first element actually underneath it.
+    const target = document
+      .elementsFromPoint(point.x, point.y)
+      .find((el) => !(el instanceof HTMLElement && el.dataset.longPressGate !== undefined))
     if (!target) return
     target.dispatchEvent(
       new PointerEvent('pointerdown', {
@@ -558,7 +564,7 @@ function DefenseWorkspaceLayout({
         composed: true,
         clientX: point.x,
         clientY: point.y,
-        pointerId: 1,
+        pointerId,
         pointerType: 'touch',
         isPrimary: true,
         button: 0,
@@ -1057,6 +1063,7 @@ function DefenseWorkspaceLayout({
           <LongPressGate
             active={editable && activeTool !== null}
             onArm={handleLongPressArm}
+            viewportRef={viewportRef}
             className="absolute inset-0 z-[5]"
           />
           <div className="absolute inset-0 overflow-hidden">

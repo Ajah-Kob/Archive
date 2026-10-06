@@ -58,6 +58,7 @@ import { AnnotationEmptyGuard } from '@/components/evaluation/workspace/Annotati
 import { AnnotationHover } from '@/components/evaluation/workspace/AnnotationHover'
 import { AnnotationDeleteKey } from '@/components/evaluation/workspace/AnnotationDeleteKey'
 import { DisableTextSelection } from '@/components/evaluation/workspace/DisableTextSelection'
+import { LongPressGate } from '@/components/evaluation/workspace/LongPressGate'
 import { UndoRedo } from '@/components/evaluation/workspace/UndoRedo'
 import { ZoomControl } from '@/components/evaluation/workspace/ZoomControl'
 import { CommentsPanel } from '@/components/evaluation/workspace/CommentsPanel'
@@ -600,6 +601,29 @@ function WorkspaceLayout({
     }
   }
 
+  // The long-press gate swallowed the touch that began the gesture, and the
+  // annotation layer only starts on a pointerdown it actually saw. Re-state it
+  // at the hold point so the rest of the gesture — drag to select, release to
+  // place — behaves exactly as it does on desktop.
+  function handleLongPressArm(point: { x: number; y: number }) {
+    const target = document.elementFromPoint(point.x, point.y)
+    if (!target) return
+    target.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clientX: point.x,
+        clientY: point.y,
+        pointerId: 1,
+        pointerType: 'touch',
+        isPrimary: true,
+        button: 0,
+        buttons: 1,
+      }),
+    )
+  }
+
   // Selecting an annotation activates its matching tool: the toolbar
   // highlights it and the settings strip reads the annotation's own
   // color/size (ToolSettingsPanel already prefers the selected object).
@@ -986,6 +1010,14 @@ function WorkspaceLayout({
           onPointerUp={endPan}
           onPointerCancel={endPan}
         >
+          {/* Touch only: swallow a tap/flick so it cannot create an annotation
+              on its own. A hold stands the gate down and re-states the gesture
+              downstream, so drag-to-select and tap-to-place both still work. */}
+          <LongPressGate
+            active={!isStudent && activeTool !== null}
+            onArm={handleLongPressArm}
+            className="absolute inset-0 z-[5]"
+          />
           <div className="absolute inset-0 overflow-hidden">
             {activeDocumentId ? (
               <DocumentContent documentId={activeDocumentId}>

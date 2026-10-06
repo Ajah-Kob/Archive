@@ -55,6 +55,7 @@ import { AnnotationEmptyGuard } from '@/components/defense/workspace/AnnotationE
 import { AnnotationHover } from '@/components/defense/workspace/AnnotationHover'
 import { AnnotationDeleteKey } from '@/components/defense/workspace/AnnotationDeleteKey'
 import { DisableTextSelection } from '@/components/defense/workspace/DisableTextSelection'
+import { LongPressGate } from '@/components/evaluation/workspace/LongPressGate'
 import { UndoRedo } from '@/components/defense/workspace/UndoRedo'
 import { ZoomControl } from '@/components/defense/workspace/ZoomControl'
 import { DefenseCommentsPanel } from '@/components/defense/workspace/DefenseCommentsPanel'
@@ -544,6 +545,28 @@ function DefenseWorkspaceLayout({
     }
   }
 
+  // The long-press gate swallowed the touch that began the gesture; the
+  // annotation layer only starts on a pointerdown it saw. Re-state it at the
+  // hold point so drag-to-select and tap-to-place match desktop.
+  function handleLongPressArm(point: { x: number; y: number }) {
+    const target = document.elementFromPoint(point.x, point.y)
+    if (!target) return
+    target.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clientX: point.x,
+        clientY: point.y,
+        pointerId: 1,
+        pointerType: 'touch',
+        isPrimary: true,
+        button: 0,
+        buttons: 1,
+      }),
+    )
+  }
+
   useEffect(() => {
     if (isStudent) return
     const uid = annotationState.selectedUid
@@ -1027,6 +1050,14 @@ function DefenseWorkspaceLayout({
           onPointerUp={endPan}
           onPointerCancel={endPan}
         >
+          {/* Touch only: a tap/flick must not create an annotation on its own.
+              A hold stands the gate down and re-states the gesture, so
+              drag-to-select and tap-to-place still work. */}
+          <LongPressGate
+            active={editable && activeTool !== null}
+            onArm={handleLongPressArm}
+            className="absolute inset-0 z-[5]"
+          />
           <div className="absolute inset-0 overflow-hidden">
             {activeDocumentId ? (
               <DocumentContent documentId={activeDocumentId}>

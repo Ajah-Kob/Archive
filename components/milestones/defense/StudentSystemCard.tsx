@@ -128,33 +128,35 @@ export function StudentSystemCard({
           </p>
         ) : (
           links.map((link) => (
-            <div key={link.id} className="flex flex-col gap-3">
-              <div className="relative">
+            <div key={link.id} className="flex flex-col gap-4">
+              <div>
                 <SystemLinkCard link={link} />
                 {editable ? (
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                  <div className="mt-2 flex items-center justify-end gap-1.5">
                     <button
                       type="button"
                       onClick={() => setEditingId(link.id)}
                       aria-label={`Edit ${link.label}`}
-                      className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#eeefff] transition-colors"
+                      className="flex h-[28px] items-center gap-1 rounded-[8px] border border-[rgba(112,125,255,0.19)] bg-white px-2.5 font-sans text-[11.5px] font-bold text-[#707dff] hover:bg-[#eeefff] transition-colors"
                     >
-                      <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                         <path d="m15 5 4 4" />
                       </svg>
+                      Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => onRemove(link.id)}
                       aria-label={`Remove ${link.label}`}
-                      className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[#f0dfe2] text-[#d34d5c] hover:bg-[#fdf2f4] transition-colors"
+                      className="flex h-[28px] items-center gap-1 rounded-[8px] border border-[#f0dfe2] bg-white px-2.5 font-sans text-[11.5px] font-bold text-[#d34d5c] hover:bg-[#fdf2f4] transition-colors"
                     >
-                      <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M3 6h18" />
                         <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                         <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                       </svg>
+                      Remove
                     </button>
                   </div>
                 ) : null}

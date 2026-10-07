@@ -2,7 +2,6 @@ import { describe, expect, test } from '@jest/globals'
 import {
   isAllowedLinkUrl,
   linksAreEditable,
-  normalizeLabel,
 } from './system-links'
 
 describe('lib/systemLinks', () => {
@@ -33,9 +32,4 @@ describe('lib/systemLinks', () => {
     expect(linksAreEditable('PASSED')).toBe(false)
   })
 
-  test('uses the preset label unless Other is chosen', () => {
-    expect(normalizeLabel('GitHub', 'ignored')).toBe('GitHub')
-    expect(normalizeLabel('Other', '  My API  ')).toBe('My API')
-    expect(normalizeLabel('Other', '   ')).toBe('')
   })
-})

@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Copy, ExternalLink, Link2, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
 import { getInitials, timeAgo } from '@/lib/helper'
-import { LINK_PRESETS, OTHER_PRESET, linksAreEditable } from '@/lib/system-links'
+import { linksAreEditable } from '@/lib/system-links'
 import {
   addSystemLink,
   copyProposalLinks,
@@ -252,37 +252,25 @@ export function LinkFormFields({
   submitLabel?: string
   onCancel?: () => void
 }) {
-  // An existing link may carry a free-text label, which is not a preset value.
-  // Selecting it in the dropdown would silently rewrite the label on save, so
-  // pre-select "Other" whenever the stored label is not one of the presets.
-  const initialPreset =
-    defaultLabel && (LINK_PRESETS as readonly string[]).includes(defaultLabel)
-      ? defaultLabel
-      : OTHER_PRESET
-  const [preset, setPreset] = useState(initialPreset)
-  const isOther = preset === OTHER_PRESET
-
   return (
     <>
       <div className="flex flex-col gap-3 sm:flex-row">
-        <label className="flex flex-1 flex-col gap-1">
+        <label className="flex-1 flex-col gap-1">
           <span className="font-sans text-[11.5px] font-bold text-[#5a6382]">
-            Kind
+            Name
           </span>
-          <select
-            value={preset}
-            onChange={(e) => setPreset(e.target.value)}
+          <input
+            name="label"
+            type="text"
+            required
+            defaultValue={defaultLabel}
+            placeholder="GitHub repository"
+            maxLength={80}
             className="h-[34px] rounded-[9px] border border-[#dfe3fb] bg-white px-2.5 font-sans text-[13px] text-[#2c3159] outline-none focus:border-[#707dff]"
-          >
-            {LINK_PRESETS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+          />
         </label>
 
-        <label className="flex flex-[2] flex-col gap-1">
+        <label className="flex-[2] flex-col gap-1">
           <span className="font-sans text-[11.5px] font-bold text-[#5a6382]">
             Link
           </span>
@@ -298,41 +286,9 @@ export function LinkFormFields({
         </label>
       </div>
 
-      {isOther ? (
-        <label className="flex flex-col gap-1">
-          <span className="font-sans text-[11.5px] font-bold text-[#5a6382]">
-            Label
-          </span>
-          <input
-            name="customLabel"
-            defaultValue={defaultLabel && defaultLabel !== OTHER_PRESET ? defaultLabel : ''}
-            placeholder="e.g. Staging deployment"
-            maxLength={80}
-            className="h-[34px] rounded-[9px] border border-[#dfe3fb] bg-white px-2.5 font-sans text-[13px] text-[#2c3159] outline-none focus:border-[#707dff]"
-          />
-        </label>
-      ) : null}
-
-      {/* The preset is submitted as `label`; normalizeLabel() prefers the custom
-          text only when the preset is "Other". */}
-      {isOther ? (
-        <input type="hidden" name="label" value={OTHER_PRESET} />
-      ) : (
-        <input type="hidden" name="label" value={preset} />
-      )}
-
-      <label className="flex flex-col gap-1">
-        <span className="font-sans text-[11.5px] font-bold text-[#5a6382]">
-          Note <span className="font-normal text-[#8a93b4]">(optional)</span>
-        </span>
-        <input
-          name="note"
-          defaultValue={defaultNote ?? ''}
-          placeholder="What does this link show?"
-          maxLength={280}
-          className="h-[34px] rounded-[9px] border border-[#dfe3fb] bg-white px-2.5 font-sans text-[13px] text-[#2c3159] outline-none focus:border-[#707dff]"
-        />
-      </label>
+      {/* Kept out of the form but still submitted so editing a link that had a
+          note does not silently wipe it. */}
+      {defaultNote ? <input type="hidden" name="note" value={defaultNote} /> : null}
 
       {error ? (
         <p className="font-sans text-[12px] text-[#d34d5c]">{error}</p>

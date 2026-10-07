@@ -9,11 +9,9 @@ import {
 } from '@/lib/actions/guard'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import {
-  OTHER_PRESET,
   SYSTEM_LINK_MESSAGE,
   isAllowedLinkUrl,
   linksAreEditable,
-  normalizeLabel,
 } from '@/lib/system-links'
 
 // The acting user must see their own write immediately, so bust rather than let
@@ -191,10 +189,7 @@ export async function getSystemLinkCommentsForStudent(linkId: number) {
 
 /** Validates the shared add/edit fields. Returns null when valid. */
 function readLinkForm(formData: FormData) {
-  const label = normalizeLabel(
-    String(formData.get('label') ?? ''),
-    String(formData.get('customLabel') ?? ''),
-  )
+  const label = String(formData.get('label') ?? '').trim()
   const url = String(formData.get('url') ?? '').trim()
   const note = String(formData.get('note') ?? '').trim() || null
 

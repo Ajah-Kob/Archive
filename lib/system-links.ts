@@ -1,15 +1,3 @@
-export const LINK_PRESETS = [
-  'GitHub',
-  'Figma Prototype',
-  'Flutter Build',
-  'Live Demo',
-  'Database',
-  'API Docs',
-  'Other',
-] as const
-
-export const OTHER_PRESET = 'Other'
-
 export const SYSTEM_LINK_MESSAGE = {
   INVALID_URL: 'Enter a valid http or https link.',
   INVALID_LABEL: 'Give the link a short label.',
@@ -38,8 +26,4 @@ export function isAllowedLinkUrl(raw: string): boolean {
  */
 export function linksAreEditable(verdict: string): boolean {
   return verdict === 'PENDING'
-}
-
-export function normalizeLabel(preset: string, custom: string): string {
-  return (preset === OTHER_PRESET ? custom : preset).trim()
 }

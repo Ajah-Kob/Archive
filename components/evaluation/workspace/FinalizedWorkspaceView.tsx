@@ -6,6 +6,8 @@ import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { PdfViewer } from '@/components/evaluation/workspace/PdfViewer'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
 import { deserializeAnnotations } from '@/lib/annotations-serializer'
+import { useIsCoarsePointer } from '@/lib/hooks/useMediaQuery'
+import { MobileUnsupported } from '@/components/workspace/MobileUnsupported'
 import type { SubmissionMeta } from '@/types/milestones'
 
 export interface FinalizedWorkspaceViewProps {
@@ -39,7 +41,14 @@ function formatDate(iso: string) {
  * what students see on their side. No toolbar, no draft auto-save, no verdict
  * actions.
  */
-export function FinalizedWorkspaceView({
+export function FinalizedWorkspaceView(props: FinalizedWorkspaceViewProps) {
+  // Desktop only, as the review workspace. Before the PDF fetch so a touch
+  // device never downloads the document just to hide it.
+  if (useIsCoarsePointer()) return <MobileUnsupported />
+  return <FinalizedWorkspaceViewInner {...props} />
+}
+
+function FinalizedWorkspaceViewInner({
   submission,
   initialAnnotations,
   isSuperseded = false,

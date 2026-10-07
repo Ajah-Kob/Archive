@@ -20,6 +20,8 @@ import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
 import { StatusPill } from '@/components/defense/DefenseDocumentCard/StatusPill'
 import { deserializeAnnotations } from '@/lib/annotations-serializer'
+import { useIsCoarsePointer } from '@/lib/hooks/useMediaQuery'
+import { MobileUnsupported } from '@/components/workspace/MobileUnsupported'
 import { isPrivateBlobUrl, toSignedBlobPath } from '@/lib/blob'
 import type { SubmissionMeta } from '@/types/milestones'
 import { DefenseDocumentWorkspace } from '@/components/defense/workspace/DefenseDocumentWorkspace'
@@ -227,7 +229,14 @@ function AnnotationHydrator({
  * so the panelist can edit and Save again. Historical superseded versions
  * never show the button — they stay truly read-only.
  */
-export function DefenseFinalizedWorkspaceView({
+export function DefenseFinalizedWorkspaceView(props: DefenseFinalizedWorkspaceViewProps) {
+  // Desktop only, as the review workspace. Before the PDF fetch so a touch
+  // device never downloads the document just to hide it.
+  if (useIsCoarsePointer()) return <MobileUnsupported />
+  return <DefenseFinalizedWorkspaceViewInner {...props} />
+}
+
+function DefenseFinalizedWorkspaceViewInner({
   submission,
   initialAnnotations,
   initialOwnAnnotations = null,

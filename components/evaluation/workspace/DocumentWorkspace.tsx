@@ -27,10 +27,14 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
+import { usePan, PanPluginPackage } from '@embedpdf/plugin-pan/react'
+import { ZoomPluginPackage, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
+  GlobalPointerProvider,
   InteractionManagerPluginPackage,
+  useInteractionManagerCapability,
 } from '@embedpdf/plugin-interaction-manager/react'
 import {
   SelectionLayer,
@@ -56,6 +60,8 @@ import { AnnotationEmptyGuard } from '@/components/evaluation/workspace/Annotati
 import { AnnotationHover } from '@/components/evaluation/workspace/AnnotationHover'
 import { AnnotationDeleteKey } from '@/components/evaluation/workspace/AnnotationDeleteKey'
 import { DisableTextSelection } from '@/components/evaluation/workspace/DisableTextSelection'
+import { useIsCoarsePointer } from '@/lib/hooks/useMediaQuery'
+import { MobileUnsupported } from '@/components/workspace/MobileUnsupported'
 import { UndoRedo } from '@/components/evaluation/workspace/UndoRedo'
 import { ZoomControl } from '@/components/evaluation/workspace/ZoomControl'
 import { CommentsPanel } from '@/components/evaluation/workspace/CommentsPanel'
@@ -154,7 +160,14 @@ function summarizeAnnotations(items: unknown[]): AnnotationSummary {
  * `useScroll`, ...). The annotation draft auto-save is wired to the
  * submission's document scope.
  */
-export function DocumentWorkspace({
+export function DocumentWorkspace(props: DocumentWorkspaceProps) {
+  // Desktop only, before the engine hook and the PDF fetch, so a touch device
+  // never downloads the document just to hide it.
+  if (useIsCoarsePointer()) return <MobileUnsupported />
+  return <DocumentWorkspaceInner {...props} />
+}
+
+function DocumentWorkspaceInner({
   mode = 'reviewer',
   blobUrl,
   submission,
@@ -356,6 +369,12 @@ export function DocumentWorkspace({
       createPluginRegistration(ScrollPluginPackage),
       createPluginRegistration(RenderPluginPackage),
       createPluginRegistration(InteractionManagerPluginPackage),
+  // Pan (hand tool). Must follow viewport + interaction manager, which it
+  // depends on. defaultMode 'mobile' makes it the default mode on touch.
+  createPluginRegistration(PanPluginPackage, { defaultMode: 'mobile' }),
+  // Zoom owns the scale: ZoomControl's buttons, ZoomGestureWrapper's pinch and
+  // ctrl+wheel all go through it, so there is one writer of the value.
+  createPluginRegistration(ZoomPluginPackage, { minZoom: 0.5, maxZoom: 2 }),
       // toleranceFactor: 0 requires exact glyph hits — dragging past the end of
       // a line no longer snaps to the last glyph, so highlight/strikeout boxes
       // only cover the text actually selected (not the whole line).
@@ -525,12 +544,10 @@ function WorkspaceLayout({
   //
   // Freshly created highlight/strikeout annotations are tracked as "pending"
   // (no comment yet) and excluded from auto-save until a comment is submitted.
-  const pendingCommentIdsRef = useRef<Set<string>>(new Set())
   const { status: liveDraftStatus } = useAnnotationDraft({
     submissionId: submission.id,
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
-    excludeIdsRef: pendingCommentIdsRef,
     enabled: !isStudent,
   })
 
@@ -558,6 +575,23 @@ function WorkspaceLayout({
 
   // --- Active annotation tool (shared by the toolbar + settings panel) -----
   const [activeTool, setActiveTool] = useState<ToolId | null>(null)
+  // Hand tool. Separate from activeTool because EmbedPDF's tool ids all create
+  // annotations and pan is a viewer concern, not an annotation one.
+  const { provides: pan, isPanning } = usePan(activeDocumentId)
+
+  // Nothing in EmbedPDF ever registers a default interaction mode: the Pan
+  // plugin only calls setDefaultMode for defaultMode 'always', so with 'mobile'
+  // the default stays empty. Both ways back to selection end in
+  // activateDefaultMode() -- pan.disablePan(), and the annotation plugin's own
+  // setActiveTool(null) -- so with no default they silently activate nothing and
+  // the previous mode survives. That is why pan could be switched on but never
+  // off: selecting still dragged the page.
+  // Declaring pointerMode as the default repairs both paths at once. The default
+  // lives on the plugin capability, not the document scope.
+  const { provides: interactionPlugin } = useInteractionManagerCapability()
+  useEffect(() => {
+    interactionPlugin?.setDefaultMode('pointerMode')
+  }, [interactionPlugin])
 
   // --- Auto-open Comments on inline annotation creation ---------------------
   // When the adviser creates a highlight/strikeout with the tool armed (a fresh
@@ -639,7 +673,8 @@ function WorkspaceLayout({
       }
       if (!inlineToolArmedRef.current) return
       inlineToolArmedRef.current = false
-      pendingCommentIdsRef.current.add(event.annotation.id)
+      // Already persisted; the panel just opens the editor while the thought
+      // is fresh. Writing a comment is optional.
       setPanel('comments')
       setAutoEditId(event.annotation.id)
     })
@@ -648,38 +683,6 @@ function WorkspaceLayout({
     }
   }, [annotationCapability, activeDocumentId])
 
-  // A comment was saved — the annotation is no longer pending, so a later
-  // cancel must NOT delete it.
-  function handleSaveComment(comment: { id: string }) {
-    pendingCommentIdsRef.current.delete(comment.id)
-  }
-
-  // The editor closed without saving (cancel button / click-outside). If the
-  // annotation is still pending (freshly created, no comment), discard it.
-  function handleCancelEdit(comment: { id: string; pageIndex: number }) {
-    if (!pendingCommentIdsRef.current.has(comment.id)) return
-    pendingCommentIdsRef.current.delete(comment.id)
-    annotationCapabilityRef.current?.deleteAnnotation(
-      comment.pageIndex,
-      comment.id,
-    )
-  }
-
-  // Closing the panel without saving discards any pending annotations.
-  function discardPendingAnnotations() {
-    const cap = annotationCapabilityRef.current
-    if (!cap) return
-    const state = cap.getState()
-    for (const id of pendingCommentIdsRef.current) {
-      for (const [pageKey, uids] of Object.entries(state.pages)) {
-        if (uids.includes(id)) {
-          cap.deleteAnnotation(Number(pageKey), id)
-          break
-        }
-      }
-    }
-    pendingCommentIdsRef.current.clear()
-  }
 
   // Submit Review flow: capture THIS submission's annotations (the ones that
   // will be committed to the submission row) as the serialized payload + a
@@ -719,11 +722,13 @@ function WorkspaceLayout({
   // annotation selection — unselecting removes ONLY that focus state; the
   // annotation's own visual (highlight/strike) is independent and stays.
   function handleViewerPointerDown(e: React.PointerEvent) {
+    if (isPanning) return
     const target = e.target as HTMLElement
     if (target.closest('[data-no-interaction]')) return
     annotationCapabilityRef.current?.deselectAnnotation()
     setHighlightCommentId(null)
   }
+
 
   return (
     <div className="flex h-full w-full min-h-0 flex-col">
@@ -747,8 +752,16 @@ function WorkspaceLayout({
         <DisableTextSelection documentId={activeDocumentId} />
       )}
 
-      {/* Header bar: back + context | draft status | tools | zoom | undo/redo | panels + verdict */}
-      <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
+      {/* Header bar: back + context | draft status | tools | zoom | undo/redo | panels + verdict
+          Two logical groups under a wrapping header. It was one row with two
+          `flex-1` spacers and a fixed h-[64px]: the spacers consumed all the
+          slack so nothing could compress, the fixed height forbade wrapping, and
+          8-10 control clusters overflowed any phone width.
+          Below sm each group wraps instead. Tools wrap rather than scroll
+          deliberately — a palette hidden behind a horizontal scroll with a fade
+          is undiscoverable, and there is no room for one row either way at 375px. */}
+      <header className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px] px-4 sm:px-6 py-[10px] sm:py-0 sm:h-[64px] bg-white border-b border-[#eceef8] shrink-0">
+        <div className="flex items-center gap-[14px] min-w-0 flex-1 sm:flex-none sm:basis-auto">
         <Link
           href={backHref ?? '/faculty/document-review'}
           className="flex items-center gap-[6px] h-[32px] px-[10px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382] hover:bg-gray-50 hover:text-[#3d4566] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none shrink-0"
@@ -809,8 +822,12 @@ function WorkspaceLayout({
             )}
           </div>
         )}
+        </div>
 
-        <div className="flex-1" />
+        {/* Tool group — wraps below sm rather than scrolling, so every control
+            stays visible. Roughly 570px of controls at 343px of width, so one
+            row does not fit at 375px either way. */}
+        <div className="flex flex-wrap items-center gap-[8px] shrink-0">
 
         {/* Annotation toolbar — REVIEWER ONLY (students get zero editing tools) */}
         {!isStudent && activeDocumentId && (
@@ -818,6 +835,8 @@ function WorkspaceLayout({
             documentId={activeDocumentId}
             activeTool={activeTool}
             onActiveToolChange={handleActiveToolChange}
+            panMode={isPanning}
+            onPanModeChange={(next) => (next ? pan?.enablePan() : pan?.disablePan())}
           />
         )}
 
@@ -830,8 +849,6 @@ function WorkspaceLayout({
 
         {/* Undo / Redo — REVIEWER ONLY */}
         {!isStudent && <UndoRedo />}
-
-        <div className="flex-1" />
 
         <div className="flex items-center gap-[8px] shrink-0">
           <button
@@ -891,6 +908,7 @@ function WorkspaceLayout({
             </>
           )}
         </div>
+        </div>
       </header>
 
       {/* Per-tool settings strip (color / size) — REVIEWER ONLY, while a tool is active */}
@@ -901,12 +919,16 @@ function WorkspaceLayout({
         />
       )}
 
-      {/* Viewer + right-side panel (inline — the PDF shrinks to make room) */}
-      <div className="flex-1 min-h-0 flex">
+      {/* Viewer + right-side panel (inline — the PDF shrinks to make room).
+          `relative` anchors the panel, which is laid over the viewer below sm. */}
+      <div className="flex-1 min-h-0 flex relative">
         <div
           ref={viewerRef}
-          className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area"
+          className={`flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area ${
+            isPanning ? 'cursor-grab active:cursor-grabbing' : ''
+          }`}
           onPointerDownCapture={handleViewerPointerDown}
+          onContextMenu={(e) => e.preventDefault()}
         >
           <div className="absolute inset-0 overflow-hidden">
             {activeDocumentId ? (
@@ -930,8 +952,10 @@ function WorkspaceLayout({
                     )
                   }
                   return (
-                    <Viewport documentId={activeDocumentId}>
-                      <Scroller
+                    <GlobalPointerProvider documentId={activeDocumentId}>
+                      <Viewport documentId={activeDocumentId}>
+                      <ZoomGestureWrapper documentId={activeDocumentId} enablePinch enableWheel>
+                        <Scroller
                         documentId={activeDocumentId}
                         renderPage={({ width, height, pageIndex }) => (
                           <div
@@ -960,7 +984,9 @@ function WorkspaceLayout({
                           </div>
                         )}
                       />
+                      </ZoomGestureWrapper>
                     </Viewport>
+                  </GlobalPointerProvider>
                   )
                 }}
               </DocumentContent>
@@ -990,13 +1016,10 @@ function WorkspaceLayout({
             autoEditId={autoEditId}
             highlightId={highlightCommentId}
             onClose={() => {
-              discardPendingAnnotations()
               setPanel(null)
               setAutoEditId(null)
               setHighlightCommentId(null)
             }}
-            onCancelEdit={handleCancelEdit}
-            onSaveComment={handleSaveComment}
           />
         )}
         {panel === 'versions' && isStudent && (

@@ -3,6 +3,12 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+/**
+ * @deprecated Dead code. This tab bar was superseded by the tabs rendered inside
+ * `MilestoneHeader` (which owns Back + Document History + the tab strip), and no
+ * layout imports this component. Kept only because it is the historical shape;
+ * delete it rather than adding a third tab implementation.
+ */
 interface DefenseTabsProps {
   milestone: string
   defenseType?: 'PROPOSAL' | 'FINAL'
@@ -16,6 +22,10 @@ function isResubmissionActive(pathname: string, base: string): boolean {
   return pathname === `${base}/resubmission`
 }
 
+function isSystemActive(pathname: string, base: string): boolean {
+  return pathname === `${base}/system`
+}
+
 function tabClasses(isActive: boolean): string {
   const base = 'px-4 py-2 rounded-[9px] font-sans font-bold text-[13px] leading-[19.5px] transition-colors'
   const active = 'bg-[#707dff] text-white shadow-[0px_2px_8px_rgba(112,125,255,0.24)]'
@@ -24,16 +34,12 @@ function tabClasses(isActive: boolean): string {
   return `${base} ${isActive ? active : inactive}`
 }
 
-/**
- * Defense tab navigation shared via defenseType prop.
- * Highlights active segment using pathname. Works for both
- * proposal-defense and final-defense without duplication.
- */
 export function DefenseTabs({ milestone }: DefenseTabsProps) {
   const pathname = usePathname() || ''
   const base = `/student/milestone/${milestone}`
   const defenseActive = isDefenseActive(pathname, base)
   const resubmissionActive = isResubmissionActive(pathname, base)
+  const systemActive = isSystemActive(pathname, base)
 
   return (
     <div className="flex items-center gap-2 px-8 py-3 bg-white border-b border-[#e8ebf8] shrink-0">
@@ -43,6 +49,13 @@ export function DefenseTabs({ milestone }: DefenseTabsProps) {
         className={tabClasses(defenseActive)}
       >
         Defense
+      </Link>
+      <Link
+        href={`${base}/system`}
+        aria-current={systemActive ? 'page' : undefined}
+        className={tabClasses(systemActive)}
+      >
+        System
       </Link>
       <Link
         href={`${base}/resubmission`}

@@ -52,6 +52,8 @@ model User {
   archivingSubmissions         ArchivingSubmission[]
   calendarEvents               CalendarEvent[]
   notifications                Notification[]
+  systemLinksCreated           DefenseSystemLink[]            @relation("SystemLinkAuthor")
+  systemLinkComments           SystemLinkComment[]            @relation("SystemCommentAuthor")
 
   @@index([email, deletedAt])
 }
@@ -255,6 +257,7 @@ model Group {
   archivingSubmission ArchivingSubmission?
   invitations         Invitation[]
   defenseSchedules    DefenseSchedule[]
+  systemLinks         DefenseSystemLink[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   deletedAt           DateTime?
@@ -564,6 +567,7 @@ model DefenseSchedule {
   createdByUser      User                @relation("DefenseCreatedBy", fields: [createdBy], references: [id])
   panelists          DefensePanelist[]
   submissions        DefenseSubmission[]
+  systemLinks        DefenseSystemLink[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   deletedAt          DateTime?
@@ -705,7 +709,76 @@ model Notification {
   href      String?
   readAt    DateTime?
   createdAt DateTime  @default(now())
-
+  
   @@index([userId])
   @@index([userId, readAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Defense System Links
+//
+// Links a group submits for a specific defense (GitHub, Figma, a hosted build).
+// The set is keyed on the schedule rather than the defense type, which is what
+// keeps a proposal defense's discussion attached to the proposal defense even
+// after the same group submits new links for the final defense.
+//
+// `removedAt` is separate from `deletedAt` on purpose: students may edit the set
+// until the chair submits the verdict, so a link can be withdrawn while a
+// panelist has already commented on it. The row survives so the thread stays
+// attached, and the panelist side renders it greyed out.
+//
+// Locking is not stored. `linksAreEditable(verdict)` derives it from the
+// existing DefenseSchedule.verdict.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DefenseSystemLink {
+  id          Int             @id @default(autoincrement())
+  scheduleId  Int
+  schedule    DefenseSchedule @relation(fields: [scheduleId], references: [id])
+  groupId     Int
+  group       Group           @relation(fields: [groupId], references: [id])
+  /// A LINK_PRESETS value, or free text when the student chose "Other".
+  label       String
+  url         String
+  /// One line describing what this link shows.
+  note        String?
+  /// Set when this row was pre-filled from the proposal defense (decision 10).
+  /// The two sets stay independent; this only records the origin.
+  copiedFromId Int?
+  copiedFrom  DefenseSystemLink?  @relation("LinkCopies", fields: [copiedFromId], references: [id])
+  copies      DefenseSystemLink[] @relation("LinkCopies")
+  /// Withdrawn by the student while still unlocked, but panelist comments exist.
+  removedAt   DateTime?
+  createdById Int
+  createdBy   User             @relation("SystemLinkAuthor", fields: [createdById], references: [id])
+  comments    SystemLinkComment[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  @@index([scheduleId])
+  @@index([groupId])
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+model SystemLinkComment {
+  id       Int      @id @default(autoincrement())
+  linkId   Int
+  link     DefenseSystemLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  authorId Int
+  author   User     @relation("SystemCommentAuthor", fields: [authorId], references: [id])
+  body     String
+  /// null = a root comment. Set = a panelist reply to that root (depth 1).
+  parentId Int?
+  parent   SystemLinkComment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  SystemLinkComment[] @relation("CommentThread")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([linkId])
+  @@index([parentId])
+  @@index([authorId])
+  @@index([deletedAt])
 }

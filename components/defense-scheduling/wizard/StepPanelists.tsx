@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useSyncExternalStore } from 'react'
+import { useState } from 'react'
 import { Crown, User, X } from 'lucide-react'
 import { UserProfile } from '@/components/ui/UserProfile'
 import { getInitials } from '@/lib/helper'
+import { useIsTouchViewport } from '@/lib/hooks/useMediaQuery'
 import type { FacultyMember, PanelSlot, PanelSlotState } from './types'
 
 interface SlotZoneProps {
@@ -51,9 +52,10 @@ function SlotZone({
     <User className="size-[13px] text-[#707dff] shrink-0" />
   )
 
-  // Dashed only while the slot is empty. Once someone is in it the zone is a
-  // container, not a target, and the dashed outline read as "still waiting for
-  // someone" on a slot that was already filled.
+  // Border states. Empty reads as a dropzone (dashed). Filled has no container
+  // border at all — the member cards inside are already bordered, so a second
+  // frame around them read as a box-within-a-box. The drag-over highlight still
+  // shows a border, because there it means "release here", not "contents".
   const isEmpty = members.length === 0
 
   return (
@@ -81,7 +83,7 @@ function SlotZone({
       ? 'border-[#707dff] bg-[rgba(112,125,255,0.06)]'
       : isEmpty
         ? 'border-dashed border-[#e0e3f5] bg-[#fbfcff]'
-        : 'border-[#e8ebf8] bg-white'
+        : 'border-transparent bg-transparent'
   }
   ${isChair ? 'h-[80px]' : 'h-[145px]'}
   ${isEmpty ? 'justify-center' : 'justify-start'}
@@ -175,17 +177,9 @@ export function StepPanelists({
 
   // The empty dropzone names the gesture the device actually has. Subscribed
   // rather than read once on mount, so rotating a phone or narrowing a desktop
-  // window updates the wording. useSyncExternalStore keeps this off the server,
-  // where window does not exist — the third argument is the server snapshot.
-  const isTouchLayout = useSyncExternalStore(
-    (onChange) => {
-      const query = window.matchMedia('(max-width: 639px)')
-      query.addEventListener('change', onChange)
-      return () => query.removeEventListener('change', onChange)
-    },
-    () => window.matchMedia('(max-width: 639px)').matches,
-    () => false,
-  )
+  // window updates the wording. The server snapshot keeps it off the server,
+  // where window does not exist.
+  const isTouchLayout = useIsTouchViewport()
 
   const assignedIds = [slots.chair?.id, slots.member1?.id, slots.member2?.id]
   const available = faculty.filter((member) => !assignedIds.includes(member.id))
@@ -276,64 +270,10 @@ export function StepPanelists({
     (m): m is FacultyMember => m != null,
   )
 
-  return (
-    <div className="w-full max-w-[700px] grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-[20px] max-sm:grid-cols-1">
-      <div className="flex flex-col w-full gap-[10px] h-full">
-        <span className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
-          Faculty
-        </span>
-        {/* Visible on every viewport. The `title` tooltips this replaces only
-            appeared on hover, so on touch the tap-to-assign gesture was
-            undiscoverable. */}
-<p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4] -mt-[4px]">
-            {isTouchLayout
-              ? 'Tap a name to select it, then tap a slot.'
-              : 'Tap a name to select it, then tap a slot. You can also drag.'}
-          </p>
-        <div className="flex flex-col gap-[8px] h-[300px] overflow-y-auto pr-[4px]">
-          {available.length === 0 ? (
-            <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#a0a8c4]">
-              All faculty are assigned. Remove someone from a slot first.
-            </p>
-          ) : (
-            available.map((member) => (
-              <div
-                key={member.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', String(member.id))
-                  e.dataTransfer.effectAllowed = 'move'
-                }}
-                onDragEnd={handleDragEnd}
-                onClick={() =>
-                  setSelectedId((prev) => (prev === member.id ? null : member.id))
-                }
-            title="Tap to select, then tap a slot — or drag"
-            role="button"
-            tabIndex={0}
-            aria-pressed={selectedId === member.id}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' && e.key !== ' ') return
-              e.preventDefault()
-              selectMember(member.id)
-            }}
-            className={`flex items-center h-fit gap-[8px] px-[12px] py-[8px] rounded-[10px] border bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] cursor-pointer select-none hover:border-[rgba(112,125,255,0.5)] hover:shadow-[0px_2px_8px_rgba(112,125,255,0.12)] transition-all ${
-                  selectedId === member.id
-                    ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.35)]'
-                    : 'border-[#e8ebf8]'
-                }`}
-              >
-                <UserProfile
-                  initials={getInitials(member.name)}
-                  name={member.name}
-                  email={member.email ?? ''}
-                />
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
+return (
+    <div className="w-full grid grid-cols-1 gap-[20px]">
+      {/* Slots first, pool second. The slots are what the step is for, so they
+          sit at the top where they are read before the list of candidates. */}
       <div className="flex flex-col w-full gap-[14px]">
         <SlotZone
           label="Panel Chair"
@@ -372,6 +312,62 @@ export function StepPanelists({
           onSelectMember={selectMember}
           isTouchLayout={isTouchLayout}
         />
+      </div>
+
+      <div className="flex flex-col w-full gap-[10px]">
+        <span className="font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
+          Faculty
+        </span>
+        {/* Visible on every viewport. The `title` tooltips this replaces only
+            appeared on hover, so on touch the tap-to-assign gesture was
+            undiscoverable. */}
+        <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#8a93b4] -mt-[4px]">
+          {isTouchLayout
+            ? 'Tap a name to select it, then tap a slot.'
+            : 'Tap a name to select it, then tap a slot. You can also drag.'}
+        </p>
+        <div className="flex flex-col gap-[8px] h-[300px] overflow-y-auto py-[3px] pl-[3px] pr-[4px]">
+          {available.length === 0 ? (
+            <p className="font-sans font-medium text-[11.5px] leading-[17px] text-[#a0a8c4]">
+              All faculty are assigned. Remove someone from a slot first.
+            </p>
+          ) : (
+            available.map((member) => (
+              <div
+                key={member.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', String(member.id))
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onDragEnd={handleDragEnd}
+                onClick={() =>
+                  setSelectedId((prev) => (prev === member.id ? null : member.id))
+                }
+                title="Tap to select, then tap a slot — or drag"
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedId === member.id}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return
+                  e.preventDefault()
+                  selectMember(member.id)
+                }}
+                className={`flex items-center h-fit gap-[8px] px-[12px] py-[8px] rounded-[10px] border bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.04)] cursor-pointer select-none hover:border-[rgba(112,125,255,0.5)] hover:shadow-[0px_2px_8px_rgba(112,125,255,0.12)] transition-all ${
+                  selectedId === member.id
+                    ? 'border-[#707dff] ring-2 ring-[rgba(112,125,255,0.35)]'
+                    : 'border-[#e8ebf8]'
+                }`}
+              >
+                <UserProfile
+                  initials={getInitials(member.name)}
+                  name={member.name}
+                  email={member.email ?? ''}
+                />
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )

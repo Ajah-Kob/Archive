@@ -26,10 +26,14 @@ import {
 } from '@embedpdf/plugin-document-manager/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
+import { usePan, PanPluginPackage } from '@embedpdf/plugin-pan/react'
+import { ZoomPluginPackage, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
+  GlobalPointerProvider,
   InteractionManagerPluginPackage,
+  useInteractionManagerCapability,
 } from '@embedpdf/plugin-interaction-manager/react'
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
@@ -53,6 +57,8 @@ import { AnnotationEmptyGuard } from '@/components/defense/workspace/AnnotationE
 import { AnnotationHover } from '@/components/defense/workspace/AnnotationHover'
 import { AnnotationDeleteKey } from '@/components/defense/workspace/AnnotationDeleteKey'
 import { DisableTextSelection } from '@/components/defense/workspace/DisableTextSelection'
+import { useIsCoarsePointer } from '@/lib/hooks/useMediaQuery'
+import { MobileUnsupported } from '@/components/workspace/MobileUnsupported'
 import { UndoRedo } from '@/components/defense/workspace/UndoRedo'
 import { ZoomControl } from '@/components/defense/workspace/ZoomControl'
 import { DefenseCommentsPanel } from '@/components/defense/workspace/DefenseCommentsPanel'
@@ -188,7 +194,14 @@ function summarizeAnnotations(items: unknown[]): AnnotationSummary {
  * The ENTIRE layout lives inside a single `<EmbedPDF>` root so every child
  * (header toolbar, panels) can use the plugin hooks.
  */
-export function DefenseDocumentWorkspace({
+export function DefenseDocumentWorkspace(props: DefenseDocumentWorkspaceProps) {
+  // Desktop only, before the engine hook and the PDF fetch, so a touch device
+  // never downloads the document just to hide it.
+  if (useIsCoarsePointer()) return <MobileUnsupported />
+  return <DefenseDocumentWorkspaceInner {...props} />
+}
+
+function DefenseDocumentWorkspaceInner({
   mode = 'reviewer',
   blobUrl,
   submission,
@@ -305,6 +318,12 @@ export function DefenseDocumentWorkspace({
       createPluginRegistration(ScrollPluginPackage),
       createPluginRegistration(RenderPluginPackage),
       createPluginRegistration(InteractionManagerPluginPackage),
+  // Pan (hand tool). Must follow viewport + interaction manager, which it
+  // depends on. defaultMode 'mobile' makes it the default mode on touch.
+  createPluginRegistration(PanPluginPackage, { defaultMode: 'mobile' }),
+  // Zoom owns the scale: ZoomControl's buttons, ZoomGestureWrapper's pinch and
+  // ctrl+wheel all go through it, so there is one writer of the value.
+  createPluginRegistration(ZoomPluginPackage, { minZoom: 0.5, maxZoom: 2 }),
       createPluginRegistration(SelectionPluginPackage, { toleranceFactor: 0 }),
       createPluginRegistration(HistoryPluginPackage),
       createPluginRegistration(AnnotationPluginPackage, {
@@ -456,11 +475,9 @@ function DefenseWorkspaceLayout({
   const router = useRouter()
   const viewerRef = useRef<HTMLDivElement>(null)
 
-  const pendingCommentIdsRef = useRef<Set<string>>(new Set())
   const { isDirty, markClean } = useAnnotationDraft({
     documentId: CURRENT_DOCUMENT_ID,
     initialAnnotations: (initialAnnotations ?? []) as AnnotationTransferItem[],
-    excludeIdsRef: pendingCommentIdsRef,
     enabled: editable,
   })
 
@@ -514,6 +531,21 @@ function DefenseWorkspaceLayout({
       (submission as unknown as { version?: number }).version! > 1)
 
   const [activeTool, setActiveTool] = useState<ToolId | null>(null)
+  // Hand tool. Separate from activeTool because EmbedPDF's tool ids all create
+  // annotations and pan is a viewer concern, not an annotation one.
+  const { provides: pan, isPanning } = usePan(activeDocumentId)
+
+  // Nothing in EmbedPDF registers a default interaction mode: the Pan plugin only
+  // calls setDefaultMode for defaultMode 'always', so with 'mobile' the default
+  // stays empty. Both routes back to selection end in activateDefaultMode() --
+  // pan.disablePan(), and the annotation plugin's setActiveTool(null) -- so with
+  // no default they activate nothing and the old mode survives. That is why pan
+  // could be switched on but never off, leaving Select still dragging the page.
+  // The default lives on the plugin capability, not the document scope.
+  const { provides: interactionPlugin } = useInteractionManagerCapability()
+  useEffect(() => {
+    interactionPlugin?.setDefaultMode('pointerMode')
+  }, [interactionPlugin])
 
   const [autoEditId, setAutoEditId] = useState<string | null>(null)
   const [highlightCommentId, setHighlightCommentId] = useState<string | null>(null)
@@ -573,7 +605,8 @@ function DefenseWorkspaceLayout({
       }
       if (!inlineToolArmedRef.current) return
       inlineToolArmedRef.current = false
-      pendingCommentIdsRef.current.add(event.annotation.id)
+      // Already persisted; the panel just opens the editor while the thought
+      // is fresh. Writing a comment is optional.
       setPanel('comments')
       setAutoEditId(event.annotation.id)
     })
@@ -582,30 +615,6 @@ function DefenseWorkspaceLayout({
     }
   }, [annotationCapability, activeDocumentId])
 
-  function handleSaveComment(comment: { id: string }) {
-    pendingCommentIdsRef.current.delete(comment.id)
-  }
-
-  function handleCancelEdit(comment: { id: string; pageIndex: number }) {
-    if (!pendingCommentIdsRef.current.has(comment.id)) return
-    pendingCommentIdsRef.current.delete(comment.id)
-    annotationCapabilityRef.current?.deleteAnnotation(comment.pageIndex, comment.id)
-  }
-
-  function discardPendingAnnotations() {
-    const cap = annotationCapabilityRef.current
-    if (!cap) return
-    const state = cap.getState()
-    for (const id of pendingCommentIdsRef.current) {
-      for (const [pageKey, uids] of Object.entries(state.pages)) {
-        if (uids.includes(id)) {
-          cap.deleteAnnotation(Number(pageKey), id)
-          break
-        }
-      }
-    }
-    pendingCommentIdsRef.current.clear()
-  }
 
   // Browser-level guard: covers tab close, reload and any navigation the in-app
   // Back button cannot intercept. Browsers show their own generic wording — the
@@ -756,11 +765,13 @@ function DefenseWorkspaceLayout({
   }
 
   function handleViewerPointerDown(e: React.PointerEvent) {
+    if (isPanning) return
     const target = e.target as HTMLElement
     if (target.closest('[data-no-interaction]')) return
     annotationCapabilityRef.current?.deselectAnnotation()
     setHighlightCommentId(null)
   }
+
 
   const resolvedScheduleId = scheduleId ?? submission.scheduleId ?? null
   const resolvedBackHref =
@@ -782,7 +793,13 @@ function DefenseWorkspaceLayout({
 
       {activeDocumentId && <DisableTextSelection documentId={activeDocumentId} />}
 
-      <header className="flex items-center gap-[14px] px-6 h-[64px] bg-white border-b border-[#eceef8] shrink-0">
+      {/* Two logical groups under a wrapping header. It was one row with two
+          `flex-1` spacers and a fixed h-[64px]: the spacers consumed all the slack
+          so nothing could compress, the fixed height forbade wrapping, and the
+          control clusters overflowed any phone width. Same treatment as
+          DocumentWorkspace — tools wrap rather than scroll so none stay hidden. */}
+      <header className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px] px-4 sm:px-6 py-[10px] sm:py-0 sm:h-[64px] bg-white border-b border-[#eceef8] shrink-0">
+        <div className="flex items-center gap-[14px] min-w-0 flex-1 sm:flex-none sm:basis-auto">
         {/* With unsaved changes this becomes a button, not a link: navigating away
             must not skip the prompt. Identical styling so nothing shifts. */}
         {isDirty ? (
@@ -849,14 +866,18 @@ function DefenseWorkspaceLayout({
             </span>
           </div>
         )}
+        </div>
 
-        <div className="flex-1" />
+        {/* Tool group — wraps below sm. */}
+        <div className="flex flex-wrap items-center gap-[8px] shrink-0">
 
         {editable && activeDocumentId && (
           <AnnotationToolbar
             documentId={activeDocumentId}
             activeTool={activeTool}
             onActiveToolChange={handleActiveToolChange}
+            panMode={isPanning}
+            onPanModeChange={(next) => (next ? pan?.enablePan() : pan?.disablePan())}
           />
         )}
 
@@ -865,8 +886,6 @@ function DefenseWorkspaceLayout({
         {activeDocumentId && <ZoomControl documentId={activeDocumentId} />}
 
         {editable && <UndoRedo />}
-
-        <div className="flex-1" />
 
         <div className="flex items-center gap-[8px] shrink-0">
           <button
@@ -946,17 +965,23 @@ function DefenseWorkspaceLayout({
             )
           )}
         </div>
+        </div>
       </header>
 
       {editable && activeDocumentId && (
         <ToolSettingsPanel documentId={activeDocumentId} activeTool={activeTool} />
       )}
 
-      <div className="flex-1 min-h-0 flex">
+      {/* Viewer + right-side panel. `relative` anchors the panel, which is laid
+          over the viewer below sm. */}
+      <div className="flex-1 min-h-0 flex relative">
         <div
           ref={viewerRef}
-          className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area border border-[#d8daf0] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]"
+          className={`flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area border border-[#d8daf0] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] ${
+            isPanning ? 'cursor-grab active:cursor-grabbing' : ''
+          }`}
           onPointerDownCapture={handleViewerPointerDown}
+          onContextMenu={(e) => e.preventDefault()}
         >
           <div className="absolute inset-0 overflow-hidden">
             {activeDocumentId ? (
@@ -980,8 +1005,10 @@ function DefenseWorkspaceLayout({
                     )
                   }
                   return (
-                    <Viewport documentId={activeDocumentId}>
-                      <Scroller
+                    <GlobalPointerProvider documentId={activeDocumentId}>
+                      <Viewport documentId={activeDocumentId}>
+                      <ZoomGestureWrapper documentId={activeDocumentId} enablePinch enableWheel>
+                        <Scroller
                         documentId={activeDocumentId}
                         renderPage={({ width, height, pageIndex }) => (
                           <div
@@ -1011,7 +1038,9 @@ function DefenseWorkspaceLayout({
                           </div>
                         )}
                       />
+                      </ZoomGestureWrapper>
                     </Viewport>
+                  </GlobalPointerProvider>
                   )
                 }}
               </DocumentContent>
@@ -1045,13 +1074,10 @@ function DefenseWorkspaceLayout({
             authorFilter={visibleAuthor}
             onAuthorFilterChange={setVisibleAuthor}
             onClose={() => {
-              discardPendingAnnotations()
               setPanel(null)
               setAutoEditId(null)
               setHighlightCommentId(null)
             }}
-            onCancelEdit={handleCancelEdit}
-            onSaveComment={handleSaveComment}
           />
         )}
         {panel === 'versions' && isStudent && (

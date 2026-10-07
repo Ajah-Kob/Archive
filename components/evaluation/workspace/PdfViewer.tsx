@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Loader2, TriangleAlert } from 'lucide-react'
+import { blobUrlToPathname, isPrivateBlobPath, toSignedBlobPath } from '@/lib/blob'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
@@ -11,25 +12,35 @@ import {
 } from '@embedpdf/plugin-document-manager/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
+import { PanPluginPackage } from '@embedpdf/plugin-pan/react'
+import { ZoomPluginPackage, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
   InteractionManagerPluginPackage,
+  GlobalPointerProvider,
 } from '@embedpdf/plugin-interaction-manager/react'
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 import {
-  AnnotationLayer,
   AnnotationPluginPackage,
   useAnnotation,
 } from '@embedpdf/plugin-annotation/react'
+import { AnnotationLayerWithDrag } from '@/components/evaluation/workspace/AnnotationLayerWithDrag'
+import { AnnotationHover } from '@/components/evaluation/workspace/AnnotationHover'
 import type {
   AnnotationTransferItem,
   FreeTextClickBehavior,
 } from '@embedpdf/plugin-annotation'
 
 export interface PdfViewerProps {
-  /** Public Vercel Blob URL of the submitted document. */
+  /**
+   * Vercel Blob URL of the submitted document, exactly as stored.
+   *
+   * Not necessarily public: every content prefix (chapter, defense, archiving,
+   * archives, templates) is private, so this is resolved through the signed
+   * `/api/blob/...` route below rather than handed to the engine as-is.
+   */
   src: string
   /** Adviser's display name — stamped on every annotation created in this viewer. */
   annotationAuthor: string
@@ -43,6 +54,23 @@ export interface PdfViewerProps {
    * can prevent (canvas-level interaction).
    */
   readOnly?: boolean
+  /**
+   * Called with the EmbedPDF document id once the document is registered.
+   *
+   * The id is minted inside this component, so a parent that needs it — the
+   * finalized view's comments panel, which selects and scrolls to annotations —
+   * has no other way to reach it.
+   */
+  /**
+   * Rendered inside the EmbedPDF tree, beside the viewer, once the document is
+   * registered.
+   *
+   * It has to be inside, not a sibling: useScroll/useAnnotation resolve their
+   * capability from EmbedPDF's context, so a panel rendered outside cannot
+   * scroll to a page. That is why the finalized defense view hosts its own
+   * panel inside its tree while this component cannot.
+   */
+  renderPanel?: (documentId: string) => ReactNode
 }
 
 /**
@@ -60,18 +88,88 @@ export function PdfViewer({
   annotationAuthor,
   initialAnnotations,
   readOnly = false,
+  renderPanel,
 }: PdfViewerProps) {
   const { engine, isLoading, error } = usePdfiumEngine()
+  // AnnotationHover positions its tight per-fragment boxes against this
+  // container, the same way DocumentWorkspace does it.
+  const viewerRef = useRef<HTMLDivElement>(null)
+  // This surface has no Comments-panel focus to drive, so the hover overlay's
+  // selection callbacks have nothing to report. Stable identity so the overlay
+  // does not re-subscribe its hit-test on every render.
+  const noopAnnotationSelection = useMemo(() => () => {}, [])
+
+  // Resolve the stored Blob URL into something the engine can actually fetch.
+  // The engine fetches `src` itself and sends no credentials, so a private Blob
+  // URL comes back 401/403 and the document never loads. Fetching through the
+  // signed route first and handing over an object URL is what
+  // DocumentWorkspace already does -- see its blobUrlToPathname comment.
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null)
+  const [srcError, setSrcError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let objectUrl: string | null = null
+
+    async function resolve() {
+      if (!src) {
+        setSrcError('No document.')
+        return
+      }
+      const pathname = blobUrlToPathname(src)
+      const signedPath = toSignedBlobPath(src)
+      // Only legacy public blobs (e.g. user/*) can be fetched directly.
+      if (!isPrivateBlobPath(pathname) && !signedPath) {
+        setResolvedSrc(src)
+        return
+      }
+      if (!signedPath) {
+        setSrcError('Invalid document link.')
+        return
+      }
+      try {
+        const res = await fetch(signedPath, {
+          credentials: 'include',
+          headers: { Accept: 'application/pdf' },
+        })
+        if (cancelled) return
+        if (!res.ok) {
+          setSrcError(
+            res.status === 403
+              ? 'You do not have access to this document.'
+              : 'Please sign in to view this document.',
+          )
+          return
+        }
+        objectUrl = URL.createObjectURL(await res.blob())
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl)
+          return
+        }
+        setResolvedSrc(objectUrl)
+      } catch {
+        if (!cancelled) setSrcError('Could not load this document.')
+      }
+    }
+
+    void resolve()
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [src])
 
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url: src }],
+        initialDocuments: [{ url: resolvedSrc ?? '' }],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),
       createPluginRegistration(RenderPluginPackage),
       createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(PanPluginPackage),
+  createPluginRegistration(ZoomPluginPackage, { minZoom: 0.5, maxZoom: 2 }),
       // toleranceFactor: 0 requires exact glyph hits — dragging past the end of
       // a line no longer snaps to the last glyph, so highlight/strikeout boxes
       // only cover the text actually selected (not the whole line).
@@ -130,8 +228,32 @@ export function PdfViewer({
         ],
       }),
     ],
-    [src, annotationAuthor, readOnly],
+    [resolvedSrc, annotationAuthor, readOnly],
   )
+
+  if (srcError) {
+    return (
+      <div className="flex h-full w-full min-h-[480px] flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <TriangleAlert className="size-6 text-[#d97706]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+          {srcError}
+        </p>
+      </div>
+    )
+  }
+
+  // Nothing is registered until the Blob has been fetched, so the engine never
+  // sees a URL it cannot load.
+  if (!resolvedSrc) {
+    return (
+      <div className="flex h-full w-full min-h-[480px] flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <Loader2 className="size-6 animate-spin text-[#707dff]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+          Loading document…
+        </p>
+      </div>
+    )
+  }
 
   if (error) {
     return (
@@ -158,39 +280,92 @@ export function PdfViewer({
   return (
     <div className="h-full w-full min-h-[480px] overflow-hidden bg-[#fafbff]">
       <EmbedPDF engine={engine} plugins={plugins}>
-        {({ activeDocumentId }) =>
-          activeDocumentId && (
+        {({ activeDocumentId }) => {
+          return activeDocumentId ? (
             <DocumentContent documentId={activeDocumentId}>
-              {({ isLoaded }) =>
-                isLoaded && (
+              {({ isLoaded, isLoading, isError }) => {
+                // These three states used to be collapsed into `isLoaded &&`,
+                // which rendered nothing at all -- so a document that failed to
+                // load, or never finished, showed a blank panel with no way to
+                // tell a slow load from a dead one. DocumentWorkspace already
+                // spells all three out; this mirrors that.
+                if (isError) {
+                  return (
+                    <div className="flex h-full w-full min-h-[480px] flex-col items-center justify-center gap-3 bg-[#fafbff]">
+                      <TriangleAlert className="size-6 text-[#d97706]" />
+                      <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+                        Failed to load this document.
+                      </p>
+                    </div>
+                  )
+                }
+                if (isLoading || !isLoaded) {
+                  return (
+                    <div className="flex h-full w-full min-h-[480px] flex-col items-center justify-center gap-3 bg-[#fafbff]">
+                      <Loader2 className="size-6 animate-spin text-[#707dff]" />
+                      <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+                        Loading document…
+                      </p>
+                    </div>
+                  )
+                }
+                return (
                   <>
                     <AnnotationHydrator
                       documentId={activeDocumentId}
                       initialAnnotations={initialAnnotations}
                     />
-                    <Viewport documentId={activeDocumentId}>
+                    <GlobalPointerProvider documentId={activeDocumentId}>
+                    {/* Flex row so a rendered panel sits beside the viewer rather
+                        than below it. */}
+<div ref={viewerRef} className="flex h-full w-full min-h-0">
+                  <Viewport documentId={activeDocumentId}>
+                      <ZoomGestureWrapper documentId={activeDocumentId} enablePinch enableWheel>
                       <Scroller
                         documentId={activeDocumentId}
                         renderPage={({ width, height, pageIndex }) => (
-                          <div style={{ width, height }}>
+                          <div style={{ width, height }} data-page-index={pageIndex}>
                             <PagePointerProvider
                               documentId={activeDocumentId}
                               pageIndex={pageIndex}
                             >
                               <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
                               <SelectionLayer documentId={activeDocumentId} pageIndex={pageIndex} />
-                              <AnnotationLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+                              {/* WithDrag, not the bare AnnotationLayer: it hides the
+                                  plugin's built-in outline, which hugs the union
+                                  /Rect and so spans every line of a multi-line
+                                  highlight plus the gaps between them. AnnotationHover
+                                  below draws tight per-fragment boxes instead. */}
+                              <AnnotationLayerWithDrag
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                                readOnly
+                              />
                             </PagePointerProvider>
                           </div>
                         )}
                       />
+                      </ZoomGestureWrapper>
                     </Viewport>
+{renderPanel?.(activeDocumentId)}
+                  </div>
+                  {/* Tight hover + selection outlines. AnnotationHover's read-only
+                      path keeps the boxes and drops the delete menu, which is
+                      exactly what this surface needs. */}
+                  <AnnotationHover
+                    documentId={activeDocumentId}
+                    viewerRef={viewerRef}
+                    readOnly
+                    onSelectAnnotation={noopAnnotationSelection}
+                    onDeselectAnnotation={noopAnnotationSelection}
+                  />
+                  </GlobalPointerProvider>
                   </>
                 )
-              }
+              }}
             </DocumentContent>
-          )
-        }
+          ) : null
+        }}
       </EmbedPDF>
     </div>
   )

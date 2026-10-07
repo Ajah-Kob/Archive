@@ -131,6 +131,10 @@ export async function requireStudent(): Promise<Session | null> {
 
 // Guards a server action for users with a panelist record (DefensePanelist).
 // Verified via DB so removed panelists lose access without session refresh.
+//
+// NOTE: this is unscoped. It answers "is this user a panelist on *some*
+// defense", which is not enough for anything defense-specific. Use
+// requireSchedulePanelist for per-schedule access.
 export async function requirePanelist(): Promise<Session | null> {
   const session = await requireUser()
   if (!session) return null
@@ -139,6 +143,52 @@ export async function requirePanelist(): Promise<Session | null> {
     select: { id: true },
   })
   return row ? session : null
+}
+
+// Guards a server action for panelists of one specific defense schedule.
+//
+// Unlike requirePanelist, this scopes to the schedule: a panelist assigned to
+// defense 41 cannot read defense 42's links or comments. PanelistRole is
+// { CHAIR, PANEL_MEMBER }, so this single membership test covers the chair too
+// -- advisers are excluded because they hold no DefensePanelist row.
+//
+// Returns the schedule alongside the session so the caller does not have to
+// re-query for the groupId/verdict it needs to authorize a write.
+export async function requireSchedulePanelist(scheduleId: number) {
+  const session = await requireFaculty()
+  if (!session) return null
+
+  const schedule = await prisma.defenseSchedule.findFirst({
+    where: {
+      id: scheduleId,
+      deletedAt: null,
+      panelists: { some: { userId: +session.user.id, deletedAt: null } },
+    },
+    select: { id: true, groupId: true, verdict: true, type: true },
+  })
+  return schedule ? { session, schedule } : null
+}
+
+// Guards a server action for students of one specific defense schedule.
+//
+// The mirror of requireSchedulePanelist: asserts the signed-in student actually
+// belongs to the schedule's group. requireStudent only proves *some* student
+// record exists, so without this check any student could pass another group's
+// scheduleId and read or edit their links.
+export async function requireScheduleStudent(scheduleId: number) {
+  const session = await requireStudent()
+  if (!session) return null
+
+  const schedule = await prisma.defenseSchedule.findFirst({
+    where: {
+      id: scheduleId,
+      deletedAt: null,
+      // Group.students, not a relation on DefenseSchedule.
+      group: { students: { some: { userId: +session.user.id, deletedAt: null } } },
+    },
+    select: { id: true, groupId: true, verdict: true, type: true },
+  })
+  return schedule ? { session, schedule } : null
 }
 
 // Strips the password hash (and any other secrets) before a user row is sent

@@ -29,6 +29,10 @@ function isResubmissionTabActive(pathname: string, base: string): boolean {
   return pathname === `${base}/resubmission`
 }
 
+function isSystemTabActive(pathname: string, base: string): boolean {
+  return pathname === `${base}/system`
+}
+
 /**
  * Milestone header for the student milestone pages (renamed from GroupContext).
  * Renders Back + Defense/Resubmission tabs + Document History in a HeaderBar.
@@ -44,6 +48,7 @@ export function MilestoneHeader({ onDocumentHistory }: MilestoneHeaderProps) {
   const isDefenseMilestone = defenseBase !== null
   const defenseActive = defenseBase ? isDefenseTabActive(pathname, defenseBase) : false
   const resubmissionActive = defenseBase ? isResubmissionTabActive(pathname, defenseBase) : false
+  const systemActive = defenseBase ? isSystemTabActive(pathname, defenseBase) : false
 
   return (
     <HeaderBar
@@ -83,6 +88,20 @@ export function MilestoneHeader({ onDocumentHistory }: MilestoneHeaderProps) {
           >
             Defense
             {defenseActive && (
+              <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
+            )}
+          </Link>
+          <Link
+            href={`${defenseBase}/system`}
+            aria-current={systemActive ? 'page' : undefined}
+            className={`relative flex items-center h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
+              systemActive
+                ? 'font-bold text-[#707dff]'
+                : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
+            }`}
+          >
+            System
+            {systemActive && (
               <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
             )}
           </Link>

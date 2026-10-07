@@ -24,5 +24,6 @@ Schedule → Invite → Accept → Upcoming → Open Session
 
 **Related**:
 - concepts/defense-verdicts.md
+- concepts/defense-system-links.md
 - concepts/document-versioning.md
 - guides/resubmissions-tab.md

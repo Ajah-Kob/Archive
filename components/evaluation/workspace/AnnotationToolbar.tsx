@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import {
+  Hand,
   Highlighter,
   MousePointer2,
   Pen,
@@ -20,6 +21,9 @@ interface AnnotationToolbarProps {
   activeTool: ToolId | null
   /** Called when the active tool changes (user click or plugin reset). */
   onActiveToolChange: (tool: ToolId | null) => void
+  /** Hand tool: drags the page around instead of touching annotations. */
+  panMode: boolean
+  onPanModeChange: (panMode: boolean) => void
 }
 
 interface ToolDef {
@@ -64,15 +68,23 @@ function ActiveIndicator() {
 /**
  * Annotation tool buttons for the adviser review workspace header. The tools
  * are grouped by PDF annotation category (Inline, Drawing, Text) but rendered
- * as one flat row without category labels or separators — plus the selection
- * cursor and a delete button. The active tool is tracked locally and kept in
- * sync with the plugin via `onActiveToolChange` (e.g. the plugin auto-resetting
- * to selection after a commit).
+ * as one flat row without category labels or separators — plus the hand tool,
+ * the selection cursor and a delete button. The active tool is tracked locally
+ * and kept in sync with the plugin via `onActiveToolChange` (e.g. the plugin
+ * auto-resetting to selection after a commit).
+ *
+ * Hand is deliberately NOT one of the annotation `ToolId`s. EmbedPDF's tool ids
+ * all create annotations and `setActiveTool` is forwarded to the plugin, so
+ * passing 'hand' through would be an unknown tool to it. Pan mode is therefore a
+ * separate concern owned by the workspace, which is also what lets it drive the
+ * viewer's drag handlers.
  */
 export function AnnotationToolbar({
   documentId,
   activeTool,
   onActiveToolChange,
+  panMode,
+  onPanModeChange,
 }: AnnotationToolbarProps) {
   const { provides: api, state } = useAnnotation(documentId)
 
@@ -93,8 +105,23 @@ export function AnnotationToolbar({
   function selectTool(tool: ToolId | null) {
     // Clicking the already-active tool toggles it off (back to the cursor).
     const next = activeTool === tool && tool !== null ? null : tool
+    // Leave pan mode FIRST. disablePan() returns the interaction mode to its
+    // default (text selection), so calling it after setActiveTool would undo the
+    // tool we just armed and the button would appear to do nothing.
+    onPanModeChange(false)
     onActiveToolChange(next)
     api?.setActiveTool(next)
+  }
+
+  function togglePanMode() {
+    const next = !panMode
+    onPanModeChange(next)
+    // Leaving pan mode by hand also puts the annotation tool back to selection,
+    // so the two modes are never both active.
+    if (!next && activeTool !== null) {
+      onActiveToolChange(null)
+      api?.setActiveTool(null)
+    }
   }
 
   function deleteSelected() {
@@ -112,8 +139,9 @@ export function AnnotationToolbar({
   }
 
   // selectedUid is null when MULTIPLE annotations are selected, so the delete
-  // button must key off the selectedUids array length instead.
-  const hasSelection = (state.selectedUids?.length ?? 0) > 0
+  // button must key off the selectedUids array length instead. Pan mode blocks
+  // selecting anything at all, so the button is dead while it is on.
+  const hasSelection = !panMode && (state.selectedUids?.length ?? 0) > 0
 
   return (
     <div
@@ -143,20 +171,39 @@ export function AnnotationToolbar({
         },
       )}
 
-      <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />
+      <div className="w-px h-[22px] bg-[#eceef8] max-sm:hidden" aria-hidden="true" />
+
+      {/* Hand is hidden below sm: on a phone there is no hover and no right
+          click, so swiping is navigation and a pan toggle is desktop thinking.
+          Pan is still available there, just as the default gesture rather than
+          a mode. Select is hidden for the same reason -- with no other mode to
+          toggle to, the cursor was dead UI. */}
+      <button
+        type="button"
+        onClick={togglePanMode}
+        aria-label="Hand tool (drag to move the page)"
+        title="Hand — drag to move the page"
+        aria-pressed={panMode}
+        className={`${BASE_BUTTON} max-sm:hidden ${
+          panMode ? ACTIVE_BUTTON : IDLE_BUTTON
+        }`}
+      >
+        <Hand className="size-[15px]" strokeWidth={1.75} />
+        {panMode && <ActiveIndicator />}
+      </button>
 
       <button
         type="button"
         onClick={() => selectTool(null)}
         aria-label="Select (cursor)"
         title="Select"
-        aria-pressed={activeTool === null}
-        className={`${BASE_BUTTON} ${
-          activeTool === null ? ACTIVE_BUTTON : IDLE_BUTTON
+        aria-pressed={activeTool === null && !panMode}
+        className={`${BASE_BUTTON} max-sm:hidden ${
+          activeTool === null && !panMode ? ACTIVE_BUTTON : IDLE_BUTTON
         }`}
       >
         <MousePointer2 className="size-[15px]" strokeWidth={1.75} />
-        {activeTool === null && <ActiveIndicator />}
+        {activeTool === null && !panMode && <ActiveIndicator />}
       </button>
 
       <div className="w-px h-[22px] bg-[#eceef8]" aria-hidden="true" />

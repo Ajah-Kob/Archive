@@ -39,7 +39,7 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 - **Admin** — user management at `/admin/users`; soft-delete.
 - **Account** — profile/security shared by all roles at `/account/profile` and `/account/security`.
 
-- **Defense** — scheduling + sessions at `/faculty/defense-scheduling` and `/faculty/defense/[scheduleId]`; students see their group's defense in the milestone journey.
+- **Defense** — scheduling + sessions at `/faculty/defense-scheduling` and `/faculty/defense/[scheduleId]`; the session page has three tabs — `session`, `system`, `resubmission`. The `system` tab holds the prototype/system links the group submitted plus the panelist discussion on them; students submit and read those links from a System card inside the Defense tab on `/student/milestone/[milestone]`.
 - **Calendar** — shared read surface at `/calendar` (all roles except `GUEST`). Renders `DefenseSchedule` + chair/admin-created `CalendarEvent` rows; see `docs/calendar-page-layout.md`.
 
 **Workflow docs:** the complete capstone lifecycle — coordinator assignment → section management → group management → adviser assignment → Capstone 1 (topic, ch. 1–3, adviser review, proposal defense) → Capstone 2 (ch. 4–5, final defense) → progress monitoring — is documented in `docs/workflow/`. Start at `docs/workflow/00-overview.md`; each numbered file (`01-…`–`10-…`) details one business process.
@@ -69,6 +69,7 @@ Deployed to Vercel. Data on Neon PostgreSQL. Media on Vercel Blob.
 | Calendar       | `@fullcalendar/react`                  | 7.x                           |
 | PDF viewing    | `@embedpdf/react-pdf-viewer`           | 2.15.x                        |
 | PDF engine     | `@embedpdf/core` / `@embedpdf/engines` | 2.15.x                        |
+| PDF plugins    | `@embedpdf/plugin-pan`, `plugin-zoom`  | 2.15.0                        |
 | CSS            | `tailwindcss`                          | 4.x (PostCSS, no config file) |
 | TypeScript     | `typescript`                           | 6.x                           |
 
@@ -495,3 +496,5 @@ Two Vercel skill sets govern how we write React components. Full rules live in `
 9. **Password rounds:** 12 in all server actions, 10 in seed.
 10. **Server action responses** are plain objects — never throw. Pattern: `{ success, message, payload? }`.
 11. **EmbedPDF viewers are client-only.** Render `<PDFViewer>` (drop-in) or the headless `<EmbedPDF>` provider from `'use client'` components (Canvas/WASM). See `.agents/skills/embedpdf/SKILL.md`.
+12. **Document workspaces are desktop-only.** All four PDF surfaces guard with `useIsCoarsePointer()` / `(pointer: coarse)` and render `<MobileUnsupported>`. Pan and zoom come from the `@embedpdf/plugin-pan` and `@embedpdf/plugin-zoom` plugins, not hand-rolled state.
+13. **`requirePanelist()` is unscoped — do not use it for defense-specific access.** It answers "is this user a panelist on *some* defense". Use `requireSchedulePanelist(scheduleId)` / `requireScheduleStudent(scheduleId)` from `lib/actions/guard.ts`, which scope to one schedule and re-assert group or panelist membership.

@@ -145,22 +145,15 @@ function fingerprintOne(annotation: Record<string, unknown>): string {
 /**
  * Fingerprint a set of annotations for change detection.
  *
- * `excludeIds` must mirror whatever the save path filters out, so the dirty
- * check and the persisted set can never disagree — otherwise a freshly created
- * highlight with no comment yet would enable Save while saving would persist
- * nothing.
- *
  * Returns '' for an empty set, which is a meaningful value: 'was 1, now 0' is a
  * deletion and must compare unequal to the saved fingerprint.
  */
 export function fingerprintAnnotations(
   annotations: Iterable<Record<string, unknown>>,
-  excludeIds?: ReadonlySet<string>,
 ): string {
   const rows: string[] = []
   for (const annotation of annotations) {
     if (!annotation) continue
-    if (excludeIds?.has(String(annotation.id ?? ''))) continue
     if (!isReviewAnnotation(annotation as Pick<PdfAnnotationObject, 'type'>)) continue
     rows.push(fingerprintOne(annotation))
   }

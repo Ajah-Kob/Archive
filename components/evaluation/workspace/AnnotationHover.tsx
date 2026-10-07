@@ -28,6 +28,13 @@ interface AnnotationHoverProps {
   onDeselectAnnotation: () => void
 }
 
+// Menu box size, applied to the style so the clamping arithmetic matches what is
+// actually painted. Keep in sync with the menu's own classes below.
+const MENU_WIDTH = 96
+const MENU_HEIGHT = 32
+/** Space between the annotation and the menu. */
+const MENU_GAP = 6
+
 interface Box {
   left: number
   top: number
@@ -121,20 +128,42 @@ export function AnnotationHover({
       // tightly around its quads, never around the union /Rect.
       const boxes = getAnnotationSegments(obj).map(toScreen)
       const r = obj.rect
-      const menuBox = {
-        left:
-          pageRect.left -
-          viewerRect.left +
-          (r.origin.x + r.size.width / 2) * scale -
-          48,
-        top:
-          pageRect.top -
-          viewerRect.top +
-          (r.origin.y + r.size.height) * scale +
-          6,
-        width: 96,
-        height: 32,
+
+      // Menu geometry, in viewer-relative coordinates.
+      //
+      // The menu used to be positioned at the annotation's bottom-centre minus a
+      // fixed 48px with no edge handling, and its `width` was declared but never
+      // applied to the style — so the rendered box was content-sized while the
+      // maths assumed 96px. An annotation near the right or bottom edge put its
+      // Delete button off-screen. That is a desktop bug, not a touch one.
+      //
+      // Fixed here by pinning the width so the arithmetic is real, then clamping
+      // to the viewer and flipping above the annotation when there is no room
+      // below. Coordinates are viewer-relative (the menu is absolutely positioned
+      // inside the viewer), so the clamp is against viewerRect's size.
+      const anchorLeft =
+        pageRect.left - viewerRect.left + r.origin.x * scale
+      const anchorRight =
+        pageRect.left - viewerRect.left + (r.origin.x + r.size.width) * scale
+      const anchorTop = pageRect.top - viewerRect.top + r.origin.y * scale
+      const anchorBottom =
+        pageRect.top - viewerRect.top + (r.origin.y + r.size.height) * scale
+
+      const menuWidth = MENU_WIDTH
+      const menuHeight = MENU_HEIGHT
+
+      // Centre on the annotation, then keep it inside the viewer.
+      let left = (anchorLeft + anchorRight) / 2 - menuWidth / 2
+      left = Math.min(Math.max(left, 0), Math.max(0, viewerRect.width - menuWidth))
+
+      // Prefer below the annotation; flip above when that would overflow.
+      let top = anchorBottom + MENU_GAP
+      if (top + menuHeight > viewerRect.height) {
+        const above = anchorTop - MENU_GAP - menuHeight
+        top = above >= 0 ? above : Math.max(0, viewerRect.height - menuHeight)
       }
+
+      const menuBox = { left, top, width: menuWidth, height: menuHeight }
       return { id: uid, pageIndex, boxes, menuBox }
     }
 
@@ -318,8 +347,12 @@ export function AnnotationHover({
         ))}
       {menu && (
         <div
-          className="absolute z-20 flex items-center gap-[4px] h-[32px] px-[6px] rounded-[8px] bg-white border border-[#eceef8] shadow-[0_2px_10px_rgba(30,33,69,0.15)]"
-          style={{ left: menu.menuBox.left, top: menu.menuBox.top }}
+          className="absolute z-20 flex items-center justify-center gap-[4px] h-[32px] px-[6px] rounded-[8px] bg-white border border-[#eceef8] shadow-[0_2px_10px_rgba(30,33,69,0.15)]"
+          style={{
+            left: menu.menuBox.left,
+            top: menu.menuBox.top,
+            width: menu.menuBox.width,
+          }}
         >
           <button
             type="button"

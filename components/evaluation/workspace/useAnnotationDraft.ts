@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { RefObject } from 'react'
 import { useAnnotation } from '@embedpdf/plugin-annotation/react'
 import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { deserializeAnnotations, serializeAnnotations } from '@/lib/annotations-serializer'
@@ -47,12 +46,6 @@ export interface UseAnnotationDraftOptions {
   /** Serialized AnnotationTransferItem[] from getSubmissionAnnotations, or null. */
   initialAnnotations: AnnotationTransferItem[] | null
   /**
-   * Annotation ids to exclude from auto-save — e.g. freshly created
-   * highlight/strikeout annotations whose comment has not been submitted yet.
-   * Pending annotations are never persisted until the user saves a comment.
-   */
-  excludeIdsRef?: RefObject<Set<string>>
-  /**
    * When false (student read-only mode) only auto-save is disabled. Hydration
    * still runs — saved reviewer annotations must render for the student too.
    */
@@ -73,7 +66,6 @@ export function useAnnotationDraft({
   submissionId,
   documentId,
   initialAnnotations,
-  excludeIdsRef,
   enabled = true,
 }: UseAnnotationDraftOptions): { status: AnnotationDraftStatus } {
   const { provides } = useAnnotation(documentId)
@@ -186,23 +178,7 @@ export function useAnnotationDraft({
             setStatus('idle')
             return
           }
-          // Drop pending annotations (freshly created, no comment yet) so an
-          // empty highlight is never persisted. They are included only after a
-          // comment is saved (removed from the exclude set) or removed entirely
-          // when canceled (deleted from the store).
-          const excluded = excludeIdsRef?.current
-          const filtered =
-            excluded && excluded.size > 0
-              ? unique.filter((item) => {
-                  const id = (item.annotation as { id?: string } | null)?.id
-                  return !id || !excluded.has(id)
-                })
-              : unique
-          if (filtered.length === 0) {
-            setStatus('idle')
-            return
-          }
-          const data = serializeAnnotations(filtered)
+          const data = serializeAnnotations(unique)
           void saveAnnotationDraft(submissionId, data)
             .then((result) => setStatus(result.success ? 'saved' : 'idle'))
             .catch(() => setStatus('idle'))

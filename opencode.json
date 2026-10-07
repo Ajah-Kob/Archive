@@ -24,7 +24,8 @@
     "@mohak34/opencode-notifier@latest",
     "opencode-wakatime@latest",
     "opencode-throughput@latest",
-    "opencode-usage-monitor@latest"
+    "opencode-usage-monitor@latest",
+    "@dietrichgebert/ponytail"
   ],
   "lsp": true
 }

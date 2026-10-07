@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { RefObject } from 'react'
 import { useAnnotation } from '@embedpdf/plugin-annotation/react'
 import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { deserializeAnnotations } from '@/lib/annotations-serializer'
@@ -40,14 +39,6 @@ export interface UseAnnotationDraftOptions {
   /** Serialized AnnotationTransferItem[] from getSubmissionAnnotations, or null. */
   initialAnnotations: AnnotationTransferItem[] | null
   /**
-   * Annotation ids to exclude from change detection — e.g. freshly created
-   * highlight/strikeout annotations whose comment has not been submitted yet.
-   * Pending annotations are never persisted until the user saves a comment, so
-   * they must not count as changes either: a bare highlight must not enable a
-   * Save that would persist nothing.
-   */
-  excludeIdsRef?: RefObject<Set<string>>
-  /**
    * When false (student read-only mode) change tracking is disabled.
    * Hydration still runs — saved reviewer annotations must render for the
    * student too.
@@ -80,7 +71,6 @@ function savedStateFingerprint(items: AnnotationTransferItem[] | null | undefine
 export function useAnnotationDraft({
   documentId,
   initialAnnotations,
-  excludeIdsRef,
   enabled = true,
 }: UseAnnotationDraftOptions): {
   /**
@@ -134,11 +124,11 @@ export function useAnnotationDraft({
       for (const tracked of Object.values(state.byUid ?? {})) {
         if (tracked?.object) objects.push(tracked.object)
       }
-      return fingerprintAnnotations(objects, excludeIdsRef?.current)
+      return fingerprintAnnotations(objects)
     } catch {
       return null
     }
-  }, [excludeIdsRef])
+  }, [])
 
   const isDirty = currentPrint !== null && currentPrint !== baselinePrint
 

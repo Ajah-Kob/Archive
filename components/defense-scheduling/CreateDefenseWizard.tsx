@@ -1,10 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
+import { assignFacultyToSlot as assignToSlot } from '@/lib/defense/panel-slots'
 import { StepSectionGroup } from './wizard/StepSectionGroup'
 import { StepSchedule } from './wizard/StepSchedule'
 import { StepPanelists } from './wizard/StepPanelists'
@@ -101,18 +102,29 @@ function toDateKey(date: Date | null): string {
 
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="flex flex-col items-center gap-[5px]">
-      <div className="flex gap-[8px]">
+    <div className="flex flex-col items-center gap-[5px] min-w-0">
+      {/* 4 x w-[44px] plus gaps is 200px, which cannot share a row with the Back
+          and Next buttons (~174px) inside the wizard at any phone width -- the
+          footer overflowed and pushed Next off the screen. Narrow bars on mobile,
+          MUI-free Tailwind widths so the desktop value is untouched. */}
+      <div className="flex gap-[3px] sm:gap-[8px]">
         {STEPS.map((label, index) => (
           <div
             key={label}
-            className={`h-[5px] w-[44px] rounded-full transition-colors ${
+            className={`h-[5px] w-[12px] sm:w-[44px] rounded-full transition-colors ${
               index <= current ? 'bg-[#707dff]' : 'bg-[#e8ebf8]'
             }`}
           />
         ))}
       </div>
-      <span className="font-sans text-[10px] leading-[13px] font-semibold text-[#5a6382]">
+      {/* truncate is a floor: at 375px the label fits whole, but the longest step
+          name ("Schedule & Venue") is close enough to the ceiling that it would
+          otherwise be the thing that overflows.
+          max-w-[76px] below sm is the hard part. The column is `auto`, so it is
+          sized by its widest child, and a span with max-w-full still contributes
+          its full text width -- so without an explicit cap the label, not the
+          buttons, decided the footer overflowed at 320px. */}
+      <span className="max-w-[76px] sm:max-w-none truncate font-sans text-[9px] sm:text-[10px] leading-[13px] font-semibold text-[#5a6382]">
         {STEPS[current]}
       </span>
     </div>
@@ -236,16 +248,14 @@ export function CreateDefenseWizard({
           : true
   const canSubmit = step1Valid && step2Valid && step3Valid
 
+  // Assigning into a slot that already has someone swaps the two rather than
+  // silently dropping the incumbent. Previously the seat was overwritten and the
+  // person in it vanished back to the pool with no warning -- which meant a
+  // Panel Chair could be demoted without the user ever being told.
+  //
+  // Logic and its tests live in lib/defense/panel-slots.ts.
   function assignFacultyToSlot(slot: PanelSlot, member: FacultyMember) {
-    setSlots((prev) => {
-      const next = { ...prev }
-      // A faculty member can only occupy one slot.
-      if (next.chair?.id === member.id) next.chair = null
-      if (next.member1?.id === member.id) next.member1 = null
-      if (next.member2?.id === member.id) next.member2 = null
-      next[slot] = member
-      return next
-    })
+    setSlots((prev) => assignToSlot(prev, slot, member))
   }
 
   async function handleCreate() {
@@ -300,8 +310,25 @@ export function CreateDefenseWizard({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/30 backdrop-blur-[3px] animate-in fade-in duration-200">
-      <div className="bg-white w-fit rounded-2xl shadow-xl border border-[#e8ebf8] flex flex-col max-h-[calc(100vh-3rem)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/30 backdrop-blur-[3px] animate-in fade-in duration-200">
+      {/* w-full max-w, not w-fit. w-fit resolves through intrinsic sizing against
+          a w-full body holding a max-width step, and that chain can settle on the
+          step's max-content rather than the space actually available -- at 375px
+          the overlay's p-6 leaves 327px, so a wider modal centred itself and got
+          clipped on both sides, which read as no gutter. w-full resolves against
+          the overlay's content box deterministically.
+
+          The overlay gutter is p-3 below sm: at 320px p-6 left 272px, and the
+          footer needed 232px for its indicator and two buttons, so they overflowed
+          by a few pixels and Next was clipped. p-3 buys back 24px of that.
+
+          This max-width is the single source of truth for wizard width; the steps
+          are plain w-full and take whatever the body gives them. They carried
+          their own caps until this was raised to 600px, at which point a narrower
+          cap on a step would have left it floating in dead space. 600 gives the
+          Panelists step two 270px columns, which is what the faculty cards need to
+          stop truncating their email addresses. */}
+      <div className="bg-white w-full max-w-[600px] rounded-2xl shadow-xl border border-[#e8ebf8] flex flex-col max-h-[calc(100vh-3rem)]">
         <div className="flex items-center justify-between px-[22px] pt-[18px] pb-[16px] border-b border-[#f0f2fa]">
           <div className="flex items-center gap-[10px]">
             <div className="size-[30px] rounded-[8px] bg-[rgba(112,125,255,0.05)] flex items-center justify-center">
@@ -381,14 +408,14 @@ export function CreateDefenseWizard({
           ) : null}
         </div>
 
-        <div className="px-[22px] pt-[16px] pb-[16px] border-t border-[#f0f2fa]">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-[10px]">
+        <div className="px-[14px] sm:px-[22px] pt-[16px] pb-[16px] border-t border-[#f0f2fa]">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-[6px] sm:gap-[10px]">
             <div className="flex justify-start">
               <button
                 type="button"
                 onClick={() => setStep((prev) => Math.max(0, prev - 1))}
                 disabled={step === 0}
-                className="flex items-center gap-[6px] px-[16px] py-[9px] rounded-[10px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[13px] leading-[19.5px] text-[#5a6382] hover:bg-[#fafbff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-[6px] px-[12px] sm:px-[16px] py-[9px] rounded-[10px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[13px] leading-[19.5px] text-[#5a6382] hover:bg-[#fafbff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="size-[14px]" />
                 Back
@@ -403,7 +430,7 @@ export function CreateDefenseWizard({
                   type="button"
                   onClick={() => setStep((prev) => Math.min(3, prev + 1))}
                   disabled={!canProceed}
-                  className="flex items-center gap-[6px] px-[20px] py-[9px] rounded-[10px] font-sans font-bold text-[13px] leading-[19.5px] text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98] transition-all"
+                  className="flex items-center gap-[6px] px-[14px] sm:px-[20px] py-[9px] rounded-[10px] font-sans font-bold text-[13px] leading-[19.5px] text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98] transition-all"
                   style={{
                     backgroundImage:
                       'linear-gradient(163.7deg, rgb(112, 125, 255) 0%, rgb(85, 101, 255) 100%)',
@@ -418,7 +445,7 @@ export function CreateDefenseWizard({
                   type="button"
                   onClick={handleCreate}
                   disabled={!canSubmit || isSubmitting}
-                  className="px-[20px] py-[9px] rounded-[10px] font-sans font-bold text-[13px] leading-[19.5px] text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98] transition-all"
+                  className="px-[14px] sm:px-[20px] py-[9px] rounded-[10px] font-sans font-bold text-[13px] leading-[19.5px] text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98] transition-all"
                   style={{
                     backgroundImage:
                       'linear-gradient(163.7deg, rgb(112, 125, 255) 0%, rgb(85, 101, 255) 100%)',

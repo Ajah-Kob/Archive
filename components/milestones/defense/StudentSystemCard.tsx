@@ -412,9 +412,6 @@ function StudentLinkRow({
                   </p>
                 </div>
               ))}
-              <p className="font-sans text-[11.5px] text-[#8a93b4]">
-                Comments are one-way — reply to your panel directly.
-              </p>
             </div>
           ) : null}
         </div>

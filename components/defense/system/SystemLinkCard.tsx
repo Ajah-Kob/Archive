@@ -148,23 +148,25 @@ export function SystemLinkCard({
           ))
         )}
 
-        {showComposer ? (
-          <SystemCommentComposer
-            linkId={link.id}
-            placeholder="Leave a comment about this system…"
-            autoFocus
-            onDone={() => setShowComposer(false)}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowComposer(true)}
-            className="flex w-fit items-center gap-1.5 font-sans text-[12.5px] font-bold text-[#707dff] hover:text-[#5062f5] transition-colors"
-          >
-            <MessageSquare className="size-3.5" />
-            Add comment
-          </button>
-        )}
+        <div className="rounded-[12px] border-2 border-dashed border-[#dfe3fb] p-3.5 bg-[#f7f8ff]">
+          {showComposer ? (
+            <SystemCommentComposer
+              linkId={link.id}
+              placeholder="Leave a comment about this system…"
+              autoFocus
+              onDone={() => setShowComposer(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowComposer(true)}
+              className="flex w-full items-center justify-center gap-1.5 h-[34px] font-sans text-[13px] font-bold text-[#707dff] hover:text-[#5062f5] transition-colors"
+            >
+              <MessageSquare className="size-4" />
+              Add comment
+            </button>
+          )}
+        </div>
       </div>
     </article>
   )

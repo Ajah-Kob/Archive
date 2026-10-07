@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Send } from 'lucide-react'
@@ -21,7 +21,6 @@ export function SystemCommentComposer({
   compact?: boolean
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
 
   type ActionState = { success: boolean; message: string; payload: unknown }
 
@@ -29,7 +28,6 @@ export function SystemCommentComposer({
     const res = await addSystemComment(linkId, formData)
     if (res.success) {
       toast.success(res.message)
-      setOpen(false)
       onDone?.()
       router.refresh()
       return { success: true, message: res.message, payload: null }
@@ -39,18 +37,6 @@ export function SystemCommentComposer({
   }
 
   const [state, formAction, isPending] = useActionState(submit, null)
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="font-sans text-[12px] font-semibold text-[#707dff] hover:text-[#5062f5] transition-colors"
-      >
-        Add comment
-      </button>
-    )
-  }
 
   return (
     <form action={formAction} className="flex flex-col gap-2">
@@ -73,7 +59,7 @@ export function SystemCommentComposer({
         </button>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => onDone?.()}
           className="h-[30px] px-3 rounded-[9px] font-sans text-[12.5px] font-semibold text-[#8a93b4] hover:text-[#5a6382] transition-colors"
         >
           Cancel

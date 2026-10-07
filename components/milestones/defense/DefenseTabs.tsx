@@ -16,6 +16,10 @@ function isResubmissionActive(pathname: string, base: string): boolean {
   return pathname === `${base}/resubmission`
 }
 
+function isSystemActive(pathname: string, base: string): boolean {
+  return pathname === `${base}/system`
+}
+
 function tabClasses(isActive: boolean): string {
   const base = 'px-4 py-2 rounded-[9px] font-sans font-bold text-[13px] leading-[19.5px] transition-colors'
   const active = 'bg-[#707dff] text-white shadow-[0px_2px_8px_rgba(112,125,255,0.24)]'
@@ -34,6 +38,7 @@ export function DefenseTabs({ milestone }: DefenseTabsProps) {
   const base = `/student/milestone/${milestone}`
   const defenseActive = isDefenseActive(pathname, base)
   const resubmissionActive = isResubmissionActive(pathname, base)
+  const systemActive = isSystemActive(pathname, base)
 
   return (
     <div className="flex items-center gap-2 px-8 py-3 bg-white border-b border-[#e8ebf8] shrink-0">
@@ -43,6 +48,13 @@ export function DefenseTabs({ milestone }: DefenseTabsProps) {
         className={tabClasses(defenseActive)}
       >
         Defense
+      </Link>
+      <Link
+        href={`${base}/system`}
+        aria-current={systemActive ? 'page' : undefined}
+        className={tabClasses(systemActive)}
+      >
+        System
       </Link>
       <Link
         href={`${base}/resubmission`}

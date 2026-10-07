@@ -1,9 +1,14 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import {
+  useActionState,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Copy, ExternalLink, Link2, Lock, Plus, Trash2 } from 'lucide-react'
+import { Copy, ExternalLink, Link2, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
 import { getInitials, timeAgo } from '@/lib/helper'
 import { LINK_PRESETS, OTHER_PRESET, linksAreEditable } from '@/lib/system-links'
 import {
@@ -12,6 +17,7 @@ import {
   getSystemLinkCommentsForStudent,
   getSystemLinksForStudent,
   removeSystemLink,
+  updateSystemLink,
   type StudentSystemLink,
 } from '@/lib/actions/system-links'
 import type { PanelistSystemComment } from '@/components/defense/system/SystemLinkCard'
@@ -104,6 +110,7 @@ export function StudentSystemCard({
     const res = await removeSystemLink(linkId)
     if (res.success) {
       toast.success(res.message)
+      setEditingId(null)
       await load()
       router.refresh()
     } else {
@@ -111,7 +118,23 @@ export function StudentSystemCard({
     }
   }
 
+  async function onSaveEdit(_prev: ActionState | null, formData: FormData) {
+    const linkId = Number(formData.get('linkId'))
+    const res = await updateSystemLink(linkId, formData)
+    if (!res.success) {
+      toast.error(res.message)
+      return { success: false, message: res.message, payload: null }
+    }
+    toast.success(res.message)
+    setEditingId(null)
+    await load()
+    router.refresh()
+    return { success: true, message: res.message, payload: null }
+  }
+
   const [addState, addAction, isPending] = useActionState(onAdd, null)
+  const [editState, editAction, isEditPending] = useActionState(onSaveEdit, null)
+  const editing = links?.find((l) => l.id === editingId) ?? null
   const isEmpty = links !== null && links.length === 0
 
   return (
@@ -181,8 +204,26 @@ export function StudentSystemCard({
               editable={editable}
               busy={editingId === link.id}
               onEdit={() => setEditingId(link.id)}
+              onCancelEdit={() => setEditingId(null)}
               onRemove={() => onRemove(link.id)}
-            />
+            >
+              {editingId === link.id ? (
+                <form action={editAction} className="mt-3 border-t border-[#eef0f8] pt-3">
+                  <input type="hidden" name="linkId" value={link.id} />
+                  <LinkFormFields
+                    isPending={isEditPending}
+                    error={
+                      editState && !editState.success ? editState.message : null
+                    }
+                    defaultLabel={link.label}
+                    defaultUrl={link.url}
+                    defaultNote={link.note ?? ''}
+                    submitLabel="Save changes"
+                    onCancel={() => setEditingId(null)}
+                  />
+                </form>
+              ) : null}
+            </StudentLinkRow>
           ))
         )}
       </div>
@@ -200,7 +241,8 @@ export function LinkFormFields({
   defaultLabel,
   defaultUrl,
   defaultNote,
-  submitLabel = 'Add link',
+  submitLabel = 'Save link',
+  onCancel,
 }: {
   isPending?: boolean
   error?: string | null
@@ -208,8 +250,16 @@ export function LinkFormFields({
   defaultUrl?: string
   defaultNote?: string
   submitLabel?: string
+  onCancel?: () => void
 }) {
-  const [preset, setPreset] = useState(defaultLabel ?? LINK_PRESETS[0])
+  // An existing link may carry a free-text label, which is not a preset value.
+  // Selecting it in the dropdown would silently rewrite the label on save, so
+  // pre-select "Other" whenever the stored label is not one of the presets.
+  const initialPreset =
+    defaultLabel && (LINK_PRESETS as readonly string[]).includes(defaultLabel)
+      ? defaultLabel
+      : OTHER_PRESET
+  const [preset, setPreset] = useState(initialPreset)
   const isOther = preset === OTHER_PRESET
 
   return (
@@ -287,6 +337,25 @@ export function LinkFormFields({
       {error ? (
         <p className="font-sans text-[12px] text-[#d34d5c]">{error}</p>
       ) : null}
+
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={isPending}
+          className="flex items-center gap-1.5 h-[34px] px-4 rounded-[9px] bg-[#707dff] font-sans text-[13px] font-bold text-white transition-colors hover:bg-[#5062f5] disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isPending ? 'Saving…' : submitLabel}
+        </button>
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-[34px] px-3 rounded-[9px] font-sans text-[13px] font-semibold text-[#6b7399] hover:text-[#707dff] transition-colors"
+          >
+            Cancel
+          </button>
+        ) : null}
+      </div>
     </>
   )
 }
@@ -297,16 +366,22 @@ function StudentLinkRow({
   editable,
   busy,
   onEdit,
+  onCancelEdit,
   onRemove,
+  children,
 }: {
   link: StudentSystemLink
   comments: PanelistSystemComment[]
   editable: boolean
   busy: boolean
   onEdit: () => void
+  onCancelEdit: () => void
   onRemove: () => void
+  /** The inline edit form, rendered only while this row is the one being edited. */
+  children?: React.ReactNode
 }) {
   const [showComments, setShowComments] = useState(false)
+  const isEditing = busy
 
   return (
     <article className="rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-3.5">
@@ -327,28 +402,39 @@ function StudentLinkRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          <a
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 h-[30px] px-2.5 rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] font-sans text-[12px] font-bold text-[#707dff] hover:bg-[#eeefff] transition-colors"
-          >
-            Open
-            <ExternalLink className="size-3" />
-          </a>
-          {editable ? (
-            <button
-              type="button"
-              onClick={onRemove}
-              disabled={busy}
-              aria-label={`Remove ${link.label}`}
-              className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[#f0dfe2] text-[#d34d5c] hover:bg-[#fdf2f4] transition-colors disabled:opacity-50"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
+          {editable && !isEditing ? (
+            <>
+              <button
+                type="button"
+                onClick={onEdit}
+                aria-label={`Edit ${link.label}`}
+                className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#eeefff] transition-colors"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 h-[30px] px-2.5 rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] font-sans text-[12px] font-bold text-[#707dff] hover:bg-[#eeefff] transition-colors"
+              >
+                Open
+                <ExternalLink className="size-3" />
+              </a>
+              <button
+                type="button"
+                onClick={onRemove}
+                aria-label={`Remove ${link.label}`}
+                className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[#f0dfe2] text-[#d34d5c] hover:bg-[#fdf2f4] transition-colors"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </>
           ) : null}
         </div>
       </div>
+
+      {isEditing ? children : null}
 
       {comments.length > 0 ? (
         <div className="mt-2.5 border-t border-[#eef0f8] pt-2.5">

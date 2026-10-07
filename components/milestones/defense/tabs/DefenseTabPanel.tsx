@@ -21,7 +21,6 @@ import {
 import { DefenseTabSkeleton } from './DefenseTabSkeleton'
 import { MilestoneDefenseDetailsCard } from '../MilestoneDefenseDetailsCard'
 import { DefenseEmptyState } from '../DefenseEmptyState'
-import { StudentSystemCard } from '../StudentSystemCard'
 import type { DefenseSchedulePayload } from '@/lib/actions/defense'
 
 // ── Pure helpers (<50 lines each) ────────────────────────────────────────────
@@ -194,14 +193,6 @@ export function DefenseTabPanel({ data, defenseType }: DefenseTabPanelProps) {
             forceView
           />
         <MilestoneDefenseDetailsCard schedule={toSchedulePayload(data)} />
-        {/* System links. Renders only because `data` is non-null here, which
-            already means the defense is scheduled -- an unscheduled defense takes
-            the empty-state branch above, so there is no disabled card to design. */}
-        <StudentSystemCard
-          scheduleId={data.id}
-          verdict={String(data.verdict)}
-          defenseLabel={defenseType === 'FINAL' ? 'final defense' : 'proposal defense'}
-        />
       </div>
     </div>
   )

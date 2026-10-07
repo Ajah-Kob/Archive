@@ -14,11 +14,21 @@ registry.
 > distributed across the Pan, Zoom and Selection plugins plus the interaction
 > manager's pointer providers. That is why this file exists.
 
-## Current status: the review workspace is desktop-only
+## Current status: the whole document workspace is desktop-only
 
-The document review workspace refuses to load on touch-primary devices and shows
-a notice instead — see `components/workspace/MobileUnsupported.tsx` and the
-`useIsCoarsePointer()` guard in both workspace components.
+Every PDF surface refuses to load on touch-primary devices and shows a notice
+instead — see `components/workspace/MobileUnsupported.tsx` and the
+`useIsCoarsePointer()` guard. That is all four:
+
+| Component | Surface |
+| --- | --- |
+| `DocumentWorkspace` | review, adviser |
+| `DefenseDocumentWorkspace` | review, panel |
+| `FinalizedWorkspaceView` | read-only |
+| `DefenseFinalizedWorkspaceView` | read-only, panel |
+
+Each guard runs before the PDF fetch, so a phone never downloads a document only
+to hide it.
 
 This was a decision to stop, not an unfinished job. It took several attempts to
 make pan, highlight and annotation placement agree with each other on a phone,
@@ -26,6 +36,13 @@ and they did not converge. The blocker is structural rather than a missing flag:
 EmbedPDF's annotation layers set `touch-action: none`, so the app must own
 gesture arbitration between pan, text selection and annotation placement — work
 the plugins are supposed to own. See §8.
+
+**Pan and pinch-to-zoom do work now** — both come from plugins (§2, §3) and are
+verified on desktop. They were part of the original problem and got fixed along
+the way; annotation gestures are the part that never did. The finalized views
+were briefly left reachable because they only needed scrolling, then blocked for
+consistency. If mobile is ever reconsidered, those two read-only views are the
+easiest surface to reopen: they have no annotation gestures at all.
 
 **So read this file as a reference, not a to-do list.** The upstream capability
 is real and mostly excellent; we are simply not using it on touch. Sections 1–5
@@ -83,8 +100,9 @@ import { GlobalPointerProvider } from '@embedpdf/plugin-interaction-manager/reac
 This matters most on touch, where a finger routinely drifts outside the viewer
 mid-drag and the drag would otherwise die.
 
-**Our status: in use.** Added when touch was abandoned; it is what makes the
-desktop Hand tool track a drag that leaves the viewer.
+**Our status: in use** on all four PDF surfaces. Added when touch was abandoned,
+because it is what makes the desktop Hand tool track a drag that leaves the
+viewer.
 
 ---
 
@@ -129,7 +147,14 @@ const plugins = [
 | `'always'`  | Pan is always default.                                    |
 | `'never'`   | Never default; another mode (e.g. text selection) wins.   |
 
-`'mobile'` is exactly the behaviour the workspaces want by default.
+`'mobile'` is meant to be the behaviour we want by default — **but it is a no-op
+in 2.15.1.** Reading the plugin source, `onDocumentLoadingStarted` only calls
+`makePanDefault()` when `defaultMode === 'always'`; there is no pointer-coarse
+check anywhere in the package. So `'mobile'` behaves exactly like `'never'`: pan
+starts off and is only reached through `enablePan` / `togglePan`.
+
+Worth knowing because the docs present it as automatic, and a claim that pan is
+the default on touch came from here before the code was checked.
 
 ### API
 
@@ -147,9 +172,11 @@ pan?.onPanModeChange((isPanMode) => setToolState(isPanMode ? 'hand' : 'cursor'))
 // global variant: onPanModeChange(({ documentId, isPanMode }) => ...)
 ```
 
-**Our status: installed and registered** with `defaultMode: 'mobile'` in both
-workspaces, replacing the hand-rolled pan described in §6. It fixed touch panning
-and now backs the desktop Hand tool.
+**Our status: installed and registered** with `defaultMode: 'mobile'` on all four
+PDF surfaces, replacing a hand-rolled pan (`32478b9`, and see §6). It backs the
+desktop Hand tool; the config value itself does nothing.
+
+`GlobalPointerProvider` was added at the same time.
 
 ---
 
@@ -187,11 +214,19 @@ import { ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 Also in this plugin: `<MarqueeZoom />` (drag a box to zoom into an area), also
 requiring `PagePointerProvider`.
 
-**Our status: not installed.** `ZoomControl.tsx` is a custom stepper driving the
-render plugin's scale directly, so **we have no pinch-to-zoom**. Desktop users
-use the `+`/`-` buttons. Pinch-to-zoom only matters on touch, so this is dormant
-while the workspace is blocked there — but it would also be the fix for a
-touch-enabled laptop or a tablet with a trackpad, which the guard does allow.
+**Our status: installed and in use** on all four PDF surfaces, with
+`minZoom: 0.5, maxZoom: 2` so the previous 50–200% clamp moved out of the
+component and into the plugin, where the gestures inherit it.
+
+`ZoomControl.tsx` was rewritten onto `useZoom` rather than left holding its own
+scale. Adding the plugin beside the old implementation would have made the
+buttons and the gestures two writers of one value — the same split that left pan
+impossible to switch off (§6). Both copies are namespace duplicates, so both
+were rewritten.
+
+Pinch is therefore working but **unreachable on a phone or tablet**: all four
+surfaces are blocked there. It is reachable on a hybrid device — a touchscreen
+laptop, or a tablet with a trackpad, where `pointer: coarse` is false.
 
 ---
 
@@ -328,11 +363,24 @@ gesture. Two owners, one gesture.
 
 ### Attempt 2 — the Pan plugin
 
-`@embedpdf/plugin-pan` with `defaultMode: 'mobile'` plus `GlobalPointerProvider`.
-This is the correct upstream answer and it is what remains in the codebase,
-because it also backs the desktop Hand tool.
+`@embedpdf/plugin-pan` plus `GlobalPointerProvider`. This is the correct upstream
+answer and it is what remains in the codebase, because it also backs the desktop
+Hand tool.
 
 It fixed pan. It did not fix highlight, and chasing that is what cost us.
+
+**A second pan bug surfaced only after that fix.** Picking the Select tool did
+not select — it still panned, and pan could never be switched off. Nothing in
+EmbedPDF ever registers a default interaction mode: the Pan plugin only calls
+`setDefaultMode` for `'always'`, so with `'mobile'` the default stays empty. Both
+routes back to selection end in `activateDefaultMode()` — `pan.disablePan()`, and
+the annotation plugin's own `setActiveTool(null)` — so with no default they
+activate nothing and the previous mode survives. Declaring `pointerMode` as the
+default once on load repairs both routes at once.
+
+The lesson generalises past pan: **a plugin config flag is not the same as an
+initialised default.** Where a plugin defers to "the default", verify something
+actually set it.
 
 ### Attempt 3 — long-press gate
 
@@ -372,28 +420,40 @@ Hand tool.
 
 ## 7. If mobile is ever revisited (deferred, not recommended)
 
-Do not read this as a backlog. The workspace is deliberately blocked on touch,
-and nothing below is needed for the product as it stands.
+Do not read this as a backlog. All four PDF surfaces are deliberately blocked on
+touch, and nothing below is needed for the product as it stands.
 
-If that call is reversed, this is the order that avoids re-treading section 6:
+Pan and pinch are already done and verified, so they are not items here — they
+were part of the original problem and got fixed while chasing annotation
+gestures. The list below is what actually stands between us and mobile.
 
-1. **`GlobalPointerProvider`** around `Viewport` + `Scroller` in both
-   workspaces. No new dependency, largest payoff for drags that leave the
-   viewer. Lowest risk. **Already done.**
-2. **`@embedpdf/plugin-pan` + `defaultMode: 'mobile'`** with `usePan` driving
-   the existing Hand button. **Already done, and still load-bearing on desktop.**
-3. **`minSelectionDragDistance`** on the existing `SelectionPluginPackage`
+**If that call is reversed, this is the order that avoids re-treading section 6:**
+
+1. **`minSelectionDragDistance`** on the existing `SelectionPluginPackage`
    registration. One line; makes the tap-vs-drag threshold explicit instead of
    relying on the default.
-4. **`@embedpdf/plugin-zoom` + `ZoomGestureWrapper`** for pinch-to-zoom. Also
-   needs a decision on `FitWidth` as the mobile default, since a page wider than
-   a phone viewport is the original complaint.
-5. **`deactivateToolAfterCreate: true`** on the annotation plugin — fewer
+2. **`deactivateToolAfterCreate: true`** on the annotation plugin — fewer
    accidental second annotations.
+3. **Re-open the two finalized views first.** They have no annotation gestures,
+   so they are the lowest-risk read-only surface to allow. Un-blocking those alone
+   would give mobile users access to archived documents without touching the
+   annotation code path that never worked.
+4. **Only then the review workspaces**, which needs the annotation gesture
+   problem in §8 solved — that is the whole remaining blocker, and none of the
+   items above address it.
 
-Steps 3 and 5 are desktop-safe and could be taken without unblocking mobile.
-Step 4 is the one that would most improve reading a document on a phone, if that
-ever matters separately from annotating one.
+**Open decision, not on the list:** `defaultMode: 'FitWidth'` as the mobile
+default. A page wider than a phone viewport was the original complaint, and no
+zoom setting fixes it while the default is fit-page.
+
+Two config ideas were considered and deliberately not applied:
+
+- `minSelectionDragDistance` left at its default rather than restating `3` in
+  config. Writing a default into configuration implies a decision that was never
+  made.
+- `deactivateToolAfterCreate` left off. A review usually marks several passages
+  in a row, and auto-deselecting forces a re-arm every time — friction in the
+  flow the feature exists for. Delete is one click if one slips.
 
 ---
 

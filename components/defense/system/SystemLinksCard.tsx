@@ -112,7 +112,7 @@ export function SystemLinksCard({
         {showForm && editable ? (
           <form
             action={addAction}
-            className="flex flex-col gap-3 rounded-[12px] border border-[#eef0f8] bg-[#fafaff]"
+            className="flex flex-col gap-3"
           >
             <LinkFormFields
               isPending={isPending}
@@ -135,7 +135,7 @@ export function SystemLinksCard({
               {editingId === link.id ? (
                 <form
                   action={editAction}
-                  className="rounded-[12px] border border-[#eef0f8] bg-[#fafaff]"
+                  className=""
                 >
                   <input type="hidden" name="linkId" value={link.id} />
                   <LinkFormFields

@@ -132,8 +132,8 @@ export function SystemLinksCard({
               key={link.id}
               className="rounded-[10px] bg-[#fafbff] border border-[#eceef8] p-3.5"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="w-full min-w-0">
                   <h4 className="font-sora font-bold text-[13px] leading-[normal] text-[#1e3a8a] truncate">
                     {link.label}
                   </h4>
@@ -148,7 +148,7 @@ export function SystemLinksCard({
                   </p>
                 </div>
 
-                <div className="flex items-start gap-[10px] shrink-0">
+                <div className="flex items-center gap-[10px] shrink-0">
                   {editable ? (
                     <>
                       <button

@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Copy, ExternalLink, Link2, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ExternalLink, Link2, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
 import { getInitials, timeAgo } from '@/lib/helper'
 import { linksAreEditable } from '@/lib/system-links'
 import {
@@ -95,17 +95,6 @@ export function StudentSystemCard({
     return { success: true, message: res.message, payload: null }
   }
 
-  async function onCopy() {
-    const res = await copyProposalLinks(scheduleId)
-    if (res.success) {
-      toast.success(res.message)
-      await load()
-      router.refresh()
-    } else {
-      toast.error(res.message)
-    }
-  }
-
   async function onRemove(linkId: number) {
     const res = await removeSystemLink(linkId)
     if (res.success) {
@@ -134,7 +123,6 @@ export function StudentSystemCard({
 
   const [addState, addAction, isPending] = useActionState(onAdd, null)
   const [editState, editAction, isEditPending] = useActionState(onSaveEdit, null)
-  const editing = links?.find((l) => l.id === editingId) ?? null
   const isEmpty = links !== null && links.length === 0
 
   return (
@@ -151,26 +139,14 @@ export function StudentSystemCard({
         </div>
 
         {editable ? (
-          <div className="flex items-center gap-2">
-            {isEmpty ? (
-              <button
-                type="button"
-                onClick={onCopy}
-                className="flex items-center gap-1.5 h-[32px] px-3 rounded-[9px] border border-[rgba(112,125,255,0.19)] bg-[#f7f7ff] font-sans text-[12.5px] font-bold text-[#707dff] hover:bg-[#eeefff] transition-colors"
-              >
-                <Copy className="size-3.5" />
-                Copy from other defense
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setShowForm((v) => !v)}
-              className="flex items-center gap-1.5 h-[32px] px-3 rounded-[9px] bg-[#707dff] font-sans text-[12.5px] font-bold text-white hover:bg-[#5062f5] transition-colors"
-            >
-              <Plus className="size-3.5" />
-              Add link
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="flex items-center gap-1.5 h-[32px] px-3 rounded-[9px] bg-[#707dff] font-sans text-[12.5px] font-bold text-white hover:bg-[#5062f5] transition-colors shrink-0"
+          >
+            <Plus className="size-3.5" />
+            Add link
+          </button>
         ) : (
           <span className="flex items-center gap-1.5 rounded-full bg-[#eef0f6] px-2.5 py-1 font-sans text-[11px] font-bold text-[#5a6382]">
             <Lock className="size-3" />
@@ -208,7 +184,7 @@ export function StudentSystemCard({
               onRemove={() => onRemove(link.id)}
             >
               {editingId === link.id ? (
-                <form action={editAction} className="mt-3 border-t border-[#eef0f8] pt-3">
+                <form action={editAction}>
                   <input type="hidden" name="linkId" value={link.id} />
                   <LinkFormFields
                     isPending={isEditPending}
@@ -346,25 +322,27 @@ function StudentLinkRow({
 
   return (
     <article className="rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate font-sans text-[13.5px] font-bold text-[#2c3159]">
-            {link.label}
-          </h3>
-          {link.note ? (
-            <p className="mt-0.5 font-sans text-[12px] text-[#5a6382]">
-              {link.note}
+      {/* While editing, the form below already shows the name and the URL, so
+          repeating them above is noise. */}
+      {isEditing ? null : (
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate font-sans text-[13.5px] font-bold text-[#2c3159]">
+              {link.label}
+            </h3>
+            {link.note ? (
+              <p className="mt-0.5 font-sans text-[12px] text-[#5a6382]">
+                {link.note}
+              </p>
+            ) : null}
+            <p className="mt-0.5 font-sans text-[11px] text-[#8a93b4]">
+              added by {link.createdBy.name} · updated {timeAgo(link.updatedAt)}
             </p>
-          ) : null}
-          <p className="mt-0.5 font-sans text-[11px] text-[#8a93b4]">
-            added by {link.createdBy.name} · updated {timeAgo(link.updatedAt)}
-            {link.copiedFromId ? ' · copied' : ''}
-          </p>
-        </div>
+          </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          {editable && !isEditing ? (
-            <>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {editable ? (
+              <>
               <button
                 type="button"
                 onClick={onEdit}
@@ -390,10 +368,11 @@ function StudentLinkRow({
               >
                 <Trash2 className="size-3.5" />
               </button>
-            </>
-          ) : null}
+              </>
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
 
       {isEditing ? children : null}
 

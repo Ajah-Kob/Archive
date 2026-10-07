@@ -28,12 +28,19 @@ The panelist already has a Session tab and a Resubmission tab on
 | 2 | Per-defense sets, or one shared set edited in place? | **A fresh set per defense.** | Panelist comments are the valuable artefact. A comment from the proposal defense must stay attached to that defense rather than being overwritten when the group updates the URL later. |
 | 3 | When does the set lock? | **When the chair submits the verdict.** | The student keeps a window through the defense to fix a dead link. |
 | 4 | Tab name | **System** | Covers both the prototype (proposal) and the finished build (final). `Prototype` would be wrong at the final defense. |
-| 5 | Can students reply to panelist comments? | **No.** | One-way channel. Students see the feedback; the loop closes outside the product. |
+| 5 | Can students reply to panelist comments? | **No.** | One-way channel. Students see the feedback. |
 | 6 | Whose links? | **Group-level.** One shared set per group per defense, any member may add. | Per-member sets would be unmanageable on a 5-person group. |
+| 7 | Should a comment be markable resolved? | **No.** | Not requested, and it adds a state to the model for no consumer. Comments are just comments. |
+| 8 | Can the chair delete a panelist's comment? | **No.** | Panelists own their own threads. |
 
-**Consequence of decision 5:** the panelist owns the entire loop — raise a
-point, the student fixes it, the panelist marks it resolved. This makes
-`resolvedAt` load-bearing rather than optional.
+**Consequence of decision 5:** the channel is one-way. Panelists discuss the
+system among themselves; students read the result. There is no in-product signal
+that a point has been addressed.
+
+**Consequence of decisions 5 and 7 together:** nothing in this feature tracks
+completion. The panelist tab is a discussion record of what was raised, not a
+task list. That is deliberate — a later "were these addressed?" feature would
+need its own design, and guessing at it now would be speculative.
 
 **Consequence of decision 3:** links stay editable while panelists are reading.
 Two mitigations are designed in: links are soft-deleted so removing one cannot
@@ -99,13 +106,10 @@ model SystemLinkComment {
   authorId Int
   author   User      @relation(fields: [authorId], references: [id])
   body     String
-  /// null = root comment. Set = a reply to that root.
+  /// null = root comment. Set = a panelist reply to that root.
   parentId Int?
   parent   SystemLinkComment?  @relation("Thread", fields: [parentId], references: [id], onDelete: Cascade)
   replies  SystemLinkComment[] @relation("Thread")
-  /// Panelist marks a revision point as handled. Panelist-only (decision 5).
-  resolvedAt   DateTime?
-  resolvedById Int?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
@@ -167,7 +171,7 @@ The links belong in the Defense tab students already have
 │  ┌────────────────────────────────────────────┐  │
 │  │ A. Reyes · Panelist                        │  │
 │  │ Needs filtering on the dashboard.          │  │
-│  │ ✓ Resolved                                 │  │
+│  │ ↳ 2 replies                               │  │
 │  └────────────────────────────────────────────┘  │
 │  Figma · Prototype                          ↗    │
 │  Flutter · Test build                       ↗    │
@@ -181,7 +185,7 @@ The links belong in the Defense tab students already have
 | Scheduled, with links | List, add, edit, remove, reorder. |
 | Verdict submitted | Inputs gone, "Locked" note shown, comments still readable. |
 
-Students **read** panelist comments and cannot reply or resolve (decision 5).
+Students **read** panelist comments and cannot reply (decision 5).
 
 **Add-link form:** preset dropdown (`LINK_PRESETS`) plus a `note` line.
 Preset rather than free text so labels are consistent and the panelist side can
@@ -195,26 +199,25 @@ API Docs, Other. `Other` reveals a free-text label field.
 New third tab on `/faculty/defense/[scheduleId]/system`, beside Session and
 Resubmission.
 
-Per link: the link opens in a new tab, and its thread sits below it. Panelists
-can add a root comment, reply to a thread, and resolve.
+Per link: the link opens in a new tab, and its discussion sits below it.
+Panelists can post a comment and reply within a thread.
 
-Panelist-only affordances, since students cannot (decision 5):
-- resolve / un-resolve
-- reply
+Panelist-only affordance, since students cannot (decision 5): **reply**.
 
 **Empty state:** *"No links submitted yet."* A legitimate answer, not an error
 — the group may simply not have submitted. It must not look broken.
 
-**Removed links** render greyed out, labelled removed, with the thread intact.
+**Removed links** render greyed out, labelled removed, with their discussion
+intact.
 
 ## 8. Permissions
 
-| Actor | Read links | Add/edit links | Comment | Reply | Resolve |
-| --- | --- | --- | --- | --- | --- |
-| Student (group member) | own group | own group, until verdict | — | — | — |
-| Panelist (assigned) | yes | no | yes | yes | yes |
-| Chair | yes | no | yes | yes | yes |
-| Other faculty | no | no | no | no | no |
+| Actor | Read links | Add/edit links | Comment | Reply |
+| --- | --- | --- | --- | --- |
+| Student (group member) | own group | own group, until verdict | — | — |
+| Panelist (assigned) | yes | no | yes | yes |
+| Chair | yes | no | yes | yes |
+| Other faculty | no | no | no | no |
 
 Every server action re-checks these. The route is not the guard — consistent
 with the rest of the codebase, where `proxy.ts` handles role roots and actions
@@ -222,7 +225,9 @@ re-verify.
 
 ## 9. Out of scope
 
-- Students replying or resolving (decision 5)
+- Students replying (decision 5)
+- Marking a comment resolved, or any completion tracking (decision 7)
+- The chair deleting or editing a panelist's comment (decision 8)
 - Rich text — comments are plain text, matching the existing annotation comment
 - Attachments or screenshots on a comment
 - Email or in-app notification when a comment is posted
@@ -232,13 +237,10 @@ re-verify.
 
 ## 10. Open questions
 
-None blocking. Two to settle during implementation, neither of which changes the
-model above:
-
-1. **Does the chair need to be able to remove a panelist's comment?** Default no
-   — panelist owns their own thread.
-2. **Should a resolved thread hide, collapse, or stay open?** Default stays open
-   with a resolved marker, so the student can see what was addressed.
+None blocking. One to settle during implementation, which does not change the
+model: **should a thread with replies collapse to a summary line when closed?**
+Default is to keep it expanded — with no resolve state, the discussion is the
+only record and hiding it would work against the student-side read.
 
 ## 11. Where this lands
 
@@ -247,7 +249,7 @@ model above:
 | Schema | `prisma/schema.prisma` — two models + relations on `DefenseSchedule`, `Group`, `User` |
 | Migration | new migration, additive only |
 | Constants | `lib/system-links.ts` — `LINK_PRESETS`, scheme validation, `linksAreEditable` |
-| Actions | `lib/actions/system-links.ts` — add/update/remove link, add/reply/resolve comment |
+| Actions | `lib/actions/system-links.ts` — add/update/remove link, add comment, reply to thread |
 | Panelist UI | `components/defense/system/` — tab panel, link card, thread, composer |
 | Student UI | `components/milestones/defense/` — System card added to the existing defense tab panel |
 | Tab | `components/defense/DefenseSessionTabs.tsx` — add `system` to `TABS` and `DefenseSessionTabKey` |

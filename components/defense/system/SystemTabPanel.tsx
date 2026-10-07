@@ -17,9 +17,12 @@ const EMPTY_STATE =
 export function SystemTabPanel({
   links,
   commentsByLink,
+  currentUserId,
 }: {
   links: PanelistSystemLink[]
   commentsByLink: Record<number, PanelistSystemComment[]>
+  /** Whose comments get a delete button. */
+  currentUserId: number
 }) {
   // Withdrawn links sink to the bottom but are never hidden: a panelist should
   // see that feedback was left on something the group took down.
@@ -49,6 +52,7 @@ export function SystemTabPanel({
             key={link.id}
             link={link}
             comments={commentsByLink[link.id] ?? []}
+            currentUserId={currentUserId}
           />
         ))}
       </div>

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { DefenseSessionTabPanel } from '@/components/defense/DefenseSessionTabs'
 import { SystemTabPanel } from '@/components/defense/system/SystemTabPanel'
 import type { PanelistSystemComment } from '@/components/defense/system/SystemLinkCard'
+import { getSession } from '@/lib/actions/guard'
 import {
   getSystemLinkComments,
   getSystemLinksForPanelist,
@@ -24,6 +25,11 @@ export default async function DefenseSystemTabPage({
   if (!linksRes.success) notFound()
   const links = linksRes.payload?.links ?? []
 
+  // Drives which comments show a delete button. Read here rather than in the
+  // action so the card can render the button without a second round trip.
+  const session = await getSession()
+  const currentUserId = session?.user?.id ? +session.user.id : 0
+
   // One thread query per link, in parallel. The thread query is tiny, and this
   // keeps the link payload free of nested comments nobody has opened yet.
   const threads = await Promise.all(
@@ -40,7 +46,11 @@ export default async function DefenseSystemTabPage({
 
   return (
     <DefenseSessionTabPanel value="system">
-      <SystemTabPanel links={links} commentsByLink={commentsByLink} />
+      <SystemTabPanel
+        links={links}
+        commentsByLink={commentsByLink}
+        currentUserId={currentUserId}
+      />
     </DefenseSessionTabPanel>
   )
 }

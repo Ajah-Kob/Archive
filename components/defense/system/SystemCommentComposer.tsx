@@ -4,43 +4,29 @@ import { useActionState, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Send } from 'lucide-react'
-import {
-  addSystemComment,
-  replyToSystemComment,
-} from '@/lib/actions/system-links'
+import { addSystemComment } from '@/lib/actions/system-links'
 
-// Panelist-only affordance: students read comments but never write one, and
-// replies attach to a root comment only (depth 1).
-//
-// One composer serves both a root comment and a reply: with `parentId` it
-// replies, without it it posts a new root comment on `linkId`. They were a
-// single component calling replyToSystemComment unconditionally, so the root
-// path looked up a comment with id undefined and always failed with
-// "Comment not found."
+// Panelist-only affordance: students read comments but never write one.
 export function SystemCommentComposer({
   linkId,
-  parentId,
   placeholder,
   autoFocus = false,
   onDone,
   compact = false,
 }: {
   linkId: number
-  parentId?: number
   placeholder: string
   autoFocus?: boolean
   onDone?: () => void
   compact?: boolean
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(Boolean(parentId))
+  const [open, setOpen] = useState(false)
 
   type ActionState = { success: boolean; message: string; payload: unknown }
 
   async function submit(_prev: ActionState | null, formData: FormData) {
-    const res = parentId
-      ? await replyToSystemComment(parentId, formData)
-      : await addSystemComment(linkId, formData)
+    const res = await addSystemComment(linkId, formData)
     if (res.success) {
       toast.success(res.message)
       setOpen(false)
@@ -61,7 +47,7 @@ export function SystemCommentComposer({
         onClick={() => setOpen(true)}
         className="font-sans text-[12px] font-semibold text-[#707dff] hover:text-[#5062f5] transition-colors"
       >
-        Reply
+        Add comment
       </button>
     )
   }

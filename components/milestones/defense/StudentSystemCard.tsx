@@ -410,21 +410,6 @@ function StudentLinkRow({
                   <p className="mt-1.5 whitespace-pre-wrap font-sans text-[12.5px] leading-relaxed text-[#3d4468]">
                     {c.body}
                   </p>
-                  {c.replies.length > 0 ? (
-                    <div className="mt-2 flex flex-col gap-1.5 border-l-2 border-[#dfe3fb] pl-3">
-                      {c.replies.map((r) => (
-                        <p
-                          key={r.id}
-                          className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-[#5a6382]"
-                        >
-                          <span className="font-bold text-[#2c3159]">
-                            {r.author.name}:
-                          </span>{' '}
-                          {r.body}
-                        </p>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
               ))}
               <p className="font-sans text-[11.5px] text-[#8a93b4]">

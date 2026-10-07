@@ -125,7 +125,7 @@ export async function getSystemLinksForStudent(scheduleId: number) {
   return { success: true as const, message: '', payload: { links } }
 }
 
-/** Roots with their nested replies. Panelist-only: students get counts, not bodies. */
+/** Panelist-only: students get counts, not bodies. */
 export async function getSystemLinkComments(linkId: number) {
   const link = await prisma.defenseSystemLink.findFirst({
     where: { id: linkId, deletedAt: null },
@@ -146,23 +146,14 @@ async function cachedLinkComments(linkId: number, scheduleId: number) {
   cacheLife('max')
 
   return prisma.systemLinkComment.findMany({
-    where: { linkId, deletedAt: null, parentId: null },
+    where: { linkId, deletedAt: null },
     orderBy: { createdAt: 'asc' },
     select: {
       id: true,
       body: true,
       createdAt: true,
+      authorId: true,
       author: { select: { name: true } },
-      replies: {
-        where: { deletedAt: null },
-        orderBy: { createdAt: 'asc' },
-        select: {
-          id: true,
-          body: true,
-          createdAt: true,
-          author: { select: { name: true } },
-        },
-      },
     },
   })
 }
@@ -360,30 +351,33 @@ export async function addSystemComment(linkId: number, formData: FormData) {
   return ok('Comment posted.')
 }
 
-/** Replies attach to a root comment only; a reply to a reply does not nest deeper. */
-export async function replyToSystemComment(parentId: number, formData: FormData) {
-  const body = String(formData.get('body') ?? '').trim()
-  if (!body) return fail('Write something first.')
-  if (body.length > MAX_COMMENT_LENGTH) return fail('Comment is too long.')
-
-  const parent = await prisma.systemLinkComment.findFirst({
-    where: { id: parentId, deletedAt: null, parentId: null },
-    select: { id: true, link: { select: { id: true, scheduleId: true } } },
-  })
-  if (!parent) return fail('Comment not found.')
-
-  const access = await requireSchedulePanelist(parent.link.scheduleId)
-  if (!access) return unauthorized
-
-  await prisma.systemLinkComment.create({
-    data: {
-      linkId: parent.link.id,
-      parentId: parent.id,
-      body,
-      authorId: +access.session.user.id,
+/**
+ * Soft-deletes a comment. A panelist can only delete their own -- the chair
+ * cannot remove another panelist's comment (decision 8).
+ *
+ * Soft, not hard: the comment is a record of what was raised, and a hard delete
+ * would leave a gap in the discussion with no explanation.
+ */
+export async function deleteSystemComment(commentId: number) {
+  const comment = await prisma.systemLinkComment.findFirst({
+    where: { id: commentId, deletedAt: null },
+    select: {
+      id: true,
+      authorId: true,
+      link: { select: { id: true, scheduleId: true } },
     },
   })
+  if (!comment) return fail('Comment not found.')
 
-  revalidateTag(`system-links-${parent.link.scheduleId}`, FRESH)
-  return ok('Reply posted.')
+  const access = await requireSchedulePanelist(comment.link.scheduleId)
+  if (!access) return unauthorized
+  if (comment.authorId !== +access.session.user.id) return unauthorized
+
+  await prisma.systemLinkComment.update({
+    where: { id: commentId },
+    data: { deletedAt: new Date() },
+  })
+
+  revalidateTag(`system-links-${comment.link.scheduleId}`, FRESH)
+  return ok('Comment deleted.')
 }

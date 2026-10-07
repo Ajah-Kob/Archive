@@ -1,9 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { ExternalLink, MessageSquare } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { ExternalLink, MessageSquare, Trash2 } from 'lucide-react'
 import { getInitials, timeAgo } from '@/lib/helper'
-import type { PanelistSystemLink } from '@/lib/actions/system-links'
+import {
+  deleteSystemComment,
+  type PanelistSystemLink,
+} from '@/lib/actions/system-links'
 import { SystemCommentComposer } from './SystemCommentComposer'
 
 // Dates arrive as Date objects inside the server action and as strings once they
@@ -13,12 +18,7 @@ export interface PanelistSystemComment {
   body: string
   createdAt: Date | string
   author: { name: string }
-  replies: Array<{
-    id: number
-    body: string
-    createdAt: Date | string
-    author: { name: string }
-  }>
+  authorId: number
 }
 
 /**
@@ -31,14 +31,28 @@ export interface PanelistSystemComment {
 export function SystemLinkCard({
   link,
   comments,
+  currentUserId,
 }: {
   link: PanelistSystemLink
   comments: PanelistSystemComment[]
+  /** Drives which comments show a delete button -- only the author's own. */
+  currentUserId: number
 }) {
+  const router = useRouter()
   // Withdrawn by the group after a panelist commented. Kept visible because the
   // thread is evidence; the link itself is not clickable.
   const removed = Boolean(link.removedAt)
   const [showComposer, setShowComposer] = useState(false)
+
+  async function onDelete(commentId: number) {
+    const res = await deleteSystemComment(commentId)
+    if (res.success) {
+      toast.success(res.message)
+      router.refresh()
+    } else {
+      toast.error(res.message)
+    }
+  }
 
   return (
     <article
@@ -116,34 +130,20 @@ export function SystemLinkCard({
                 {c.body}
               </p>
 
-              {c.replies.length > 0 ? (
-                <div className="mt-2 flex flex-col gap-2 border-l-2 border-[#dfe3fb] pl-3">
-                  {c.replies.map((r) => (
-                    <div key={r.id}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-sans text-[12px] font-bold text-[#2c3159]">
-                          {r.author.name}
-                        </span>
-                        <span className="font-sans text-[11px] text-[#8a93b4]">
-                          {timeAgo(r.createdAt)}
-                        </span>
-                      </div>
-                      <p className="mt-1 whitespace-pre-wrap font-sans text-[12.5px] leading-relaxed text-[#3d4468]">
-                        {r.body}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+              {/* Delete is offered only on the author's own comment. The action
+                  re-checks this server-side, so the button is a convenience rather
+                  than the guard. */}
+              {c.authorId === currentUserId ? (
+                <button
+                  type="button"
+                  onClick={() => onDelete(c.id)}
+                  aria-label="Delete comment"
+                  className="mt-2 flex items-center gap-1.5 font-sans text-[12px] font-semibold text-[#d34d5c] hover:text-[#b03a48] transition-colors"
+                >
+                  <Trash2 className="size-3.5" />
+                  Delete
+                </button>
               ) : null}
-
-              <div className="mt-2">
-                <SystemCommentComposer
-                  linkId={link.id}
-                  parentId={c.id}
-                  placeholder="Reply to this comment…"
-                  compact
-                />
-              </div>
             </div>
           ))
         )}

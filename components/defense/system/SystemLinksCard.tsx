@@ -130,63 +130,12 @@ export function SystemLinksCard({
           links.map((link) => (
             <div
               key={link.id}
-              className="rounded-[10px] bg-[#fafbff] border border-[#eceef8] p-3.5"
+              className="items-center rounded-[10px] bg-[#fafbff] border border-[#eceef8] p-3.5"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div className="w-full min-w-0">
-                  <h4 className="font-sora font-bold text-[13px] leading-[normal] text-[#1e3a8a] truncate">
-                    {link.label}
-                  </h4>
-                  {link.note ? (
-                    <p className="pt-[4px] font-sans font-medium text-[12px] leading-[18px] text-[#6b7399]">
-                      {link.note}
-                    </p>
-                  ) : null}
-                  <p className="pt-[4px] font-sans font-medium text-[11.5px] leading-[18px] text-[#9ea8c6]">
-                    added by {link.createdBy.name} · updated{' '}
-                    {timeAgo(link.updatedAt)}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-[10px] shrink-0">
-                  {editable ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => onRemove(link.id)}
-                        aria-label={`Remove ${link.label}`}
-                        className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] font-sans font-bold text-[12px] leading-[18px] text-[#d34d5c] hover:opacity-80 transition-opacity shrink-0"
-                      >
-                        <Trash2 className="size-3" />
-                        Remove
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(link.id)}
-                        aria-label={`Edit ${link.label}`}
-                        className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
-                      >
-                        <Pencil className="size-3" />
-                        Edit
-                      </button>
-                    </>
-                  ) : null}
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
-                  >
-                    <ExternalLink className="size-3" />
-                    Open
-                  </a>
-                </div>
-              </div>
-
               {editingId === link.id ? (
                 <form
                   action={editAction}
-                  className="mt-3 rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-4"
+                  className="rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-4"
                 >
                   <input type="hidden" name="linkId" value={link.id} />
                   <LinkFormFields
@@ -201,7 +150,58 @@ export function SystemLinksCard({
                     onCancel={() => setEditingId(null)}
                   />
                 </form>
-              ) : null}
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="w-full min-w-0">
+                    <h4 className="font-sora font-bold text-[13px] leading-[normal] text-[#1e3a8a] truncate">
+                      {link.label}
+                    </h4>
+                    {link.note ? (
+                      <p className="pt-[4px] font-sans font-medium text-[12px] leading-[18px] text-[#6b7399]">
+                        {link.note}
+                      </p>
+                    ) : null}
+                    <p className="pt-[4px] font-sans font-medium text-[11.5px] leading-[18px] text-[#9ea8c6]">
+                      added by {link.createdBy.name} · updated{' '}
+                      {timeAgo(link.updatedAt)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-center h-full gap-[10px] shrink-0">
+                    {editable ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onRemove(link.id)}
+                          aria-label={`Remove ${link.label}`}
+                          className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] font-sans font-bold text-[12px] leading-[18px] text-[#d34d5c] hover:opacity-80 transition-opacity shrink-0"
+                        >
+                          <Trash2 className="size-3" />
+                          Remove
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(link.id)}
+                          aria-label={`Edit ${link.label}`}
+                          className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
+                        >
+                          <Pencil className="size-3" />
+                          Edit
+                        </button>
+                      </>
+                    ) : null}
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
+                    >
+                      <ExternalLink className="size-3" />
+                      Open
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}

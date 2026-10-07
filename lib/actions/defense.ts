@@ -1394,6 +1394,44 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
       console.error('[submitPanelistVerdict | revalidate students | Error]:', revalidateError)
     }
 
+    // Notify every group member that the result is in. Until now this path sent
+    // nothing, so a student only ever learned their verdict by refreshing the
+    // page and noticing the callout changed. Copied from the shape
+    // rescheduleForRedefense already uses.
+    //
+    // Deliberately OUTSIDE the transaction and wrapped: a verdict that is
+    // recorded but not announced is far better than a recorded-then-rolled-back
+    // verdict, and the notification panel is advisory anyway.
+    try {
+      const notified = await prisma.defenseSchedule.findFirst({
+        where: { id: scheduleId },
+        select: {
+          type: true,
+          group: {
+            select: {
+              groupName: true,
+              students: { where: { deletedAt: null }, select: { userId: true } },
+            },
+          },
+        },
+      })
+      const members = notified?.group.students ?? []
+      if (members.length > 0) {
+        const groupName = notified.group.groupName ?? `Group ${scheduleId}`
+        const milestoneSlug = notified.type === 'FINAL' ? 'final-defense' : 'proposal-defense'
+        await prisma.notification.createMany({
+          data: members.map((m) => ({
+            userId: m.userId,
+            title: 'Defense verdict',
+            body: `${groupName} received ${String(verdict).replace(/_/g, ' ').toLowerCase()}.`,
+            href: `/student/milestone/${milestoneSlug}`,
+          })),
+        })
+      }
+    } catch (notifyError) {
+      console.error('[submitPanelistVerdict | notify Error]:', notifyError)
+    }
+
     return { success: true, message: 'Verdict submitted successfully.', payload: updated }
   } catch (error) {
     return { success: false, message: 'Failed to submit verdict.', payload: null }

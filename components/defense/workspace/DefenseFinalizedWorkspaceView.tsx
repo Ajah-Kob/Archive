@@ -26,6 +26,7 @@ import { isPrivateBlobUrl, toSignedBlobPath } from '@/lib/blob'
 import type { SubmissionMeta } from '@/types/milestones'
 import { DefenseDocumentWorkspace } from '@/components/defense/workspace/DefenseDocumentWorkspace'
 import { WorkspacePanel } from '@/components/defense/workspace/WorkspacePanel'
+import { ReadOnlyCommentsPanel } from '@/components/workspace/ReadOnlyCommentsPanel'
 import { ZoomControl } from '@/components/defense/workspace/ZoomControl'
 import { AnnotationDedupe } from '@/components/defense/workspace/AnnotationDedupe'
 
@@ -80,107 +81,6 @@ function AnnotateButton({ onClick }: { onClick: () => void }) {
       <Pencil className="size-[13px]" strokeWidth={2} />
       Annotate
     </button>
-  )
-}
-
-function ReadOnlyCommentCard({
-  item,
-  onClick,
-}: {
-  item: unknown
-  onClick?: () => void
-}) {
-  const ann = (item as unknown as { annotation?: Record<string, unknown> }).annotation as
-    | { type?: number; author?: string; contents?: string; pageIndex?: number; id?: string }
-    | undefined
-  const author = (ann?.author as string)?.trim() || 'Unknown'
-  const contents = (ann?.contents as string)?.trim() || ''
-  const pageIndex = typeof ann?.pageIndex === 'number' ? ann.pageIndex + 1 : null
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-left border border-[#eceef8] rounded-[9px] px-[14px] pt-[12px] pb-[12px] hover:bg-[#fafbff] hover:border-[#e5e8ff] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none"
-    >
-      <div className="flex items-center gap-[8px] min-w-0">
-        <span className="flex items-center justify-center size-[26px] rounded-[8px] bg-[#f4f6ff] border border-[#e5e8ff] shrink-0">
-          <MessageSquareText className="size-[13px] text-[#707dff]" strokeWidth={2} />
-        </span>
-        <p className="shrink-0 font-sans font-bold text-[12.5px] leading-[18.75px] text-[#3d4566]">Comment</p>
-        {pageIndex != null && (
-          <span className="shrink-0 bg-[#f4f6ff] border border-[#e5e8ff] rounded-full px-[7px] py-[2px] font-sans font-bold text-[10px] text-[#707dff]">
-            Page {pageIndex}
-          </span>
-        )}
-        <div className="flex-1" />
-        <p className="truncate font-sans font-medium text-[11px] leading-[16.5px] text-[#9ea8c6]">{author}</p>
-      </div>
-      <p className="pt-[8px] font-sans font-medium text-[12px] leading-[18px] text-[#5a6382] text-left">
-        {contents || 'No text — annotation on page.'}
-      </p>
-    </button>
-  )
-}
-
-function ReadOnlyCommentsPanel({
-  documentId,
-  annotations,
-  onClose,
-}: {
-  documentId: string
-  annotations: unknown[]
-  onClose: () => void
-}) {
-  const { provides: annotationProvides } = useAnnotation(documentId)
-  const scroll = useScroll(documentId)
-
-  function handleCommentClick(item: unknown) {
-    const ann = (item as unknown as { annotation?: { pageIndex?: number; id?: string } }).annotation
-    const pageIndex = typeof ann?.pageIndex === 'number' ? ann.pageIndex : 0
-    const id = typeof ann?.id === 'string' ? ann.id : ''
-    if (annotationProvides) {
-      try {
-        annotationProvides.selectAnnotation(pageIndex, id)
-      } catch {}
-    }
-    const scrollProvides = (scroll as unknown as { provides?: { scrollToPage?: (opts: { pageNumber: number; behavior?: string; alignY?: number }) => void } })?.provides
-    if (scrollProvides?.scrollToPage) {
-      try {
-        scrollProvides.scrollToPage({ pageNumber: pageIndex + 1, behavior: 'smooth', alignY: 25 })
-      } catch {}
-    } else {
-      const pageEl = document.querySelector(`[data-page-index="${pageIndex}"]`)
-      if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }
-
-  return (
-    <WorkspacePanel
-      title="Comments"
-      subtitle="Click a comment to jump to its annotation."
-      count={annotations.length}
-      onClose={onClose}
-    >
-      {annotations.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center px-[8px] py-[24px]">
-          <div className="size-[40px] rounded-full bg-[#f4f5fc] flex items-center justify-center">
-            <MessageSquareText className="size-[18px] text-[#c4cadf]" strokeWidth={1.75} />
-          </div>
-          <p className="pt-[8px] font-sans font-semibold text-[12.5px] text-[#8a93b4]">No comments yet</p>
-          <p className="pt-[3px] font-sans font-medium text-[11px] text-[#c4cadf] leading-[16.5px]">Annotations you saved will appear here.</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-[10px]">
-          {annotations.map((item, idx) => (
-            <ReadOnlyCommentCard
-              key={(item as unknown as { annotation?: { id?: string } }).annotation?.id ?? String(idx)}
-              item={item}
-              onClick={() => handleCommentClick(item)}
-            />
-          ))}
-        </div>
-      )}
-    </WorkspacePanel>
   )
 }
 

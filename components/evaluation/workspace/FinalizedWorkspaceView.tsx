@@ -1,13 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, CalendarDays, Lock } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, CalendarDays, Lock, MessageSquareText } from 'lucide-react'
 import type { AnnotationTransferItem } from '@embedpdf/plugin-annotation'
 import { PdfViewer } from '@/components/evaluation/workspace/PdfViewer'
 import { SubmissionStatusBadge } from '@/components/milestones/chapter/SubmissionStatusBadge'
 import { deserializeAnnotations } from '@/lib/annotations-serializer'
 import { useIsCoarsePointer } from '@/lib/hooks/useMediaQuery'
 import { MobileUnsupported } from '@/components/workspace/MobileUnsupported'
+import { ReadOnlyCommentsPanel } from '@/components/workspace/ReadOnlyCommentsPanel'
 import type { SubmissionMeta } from '@/types/milestones'
 
 export interface FinalizedWorkspaceViewProps {
@@ -57,6 +59,9 @@ function FinalizedWorkspaceViewInner({
   // Decode persisted items (base64 stamp data → ArrayBuffer) before the
   // viewer imports them — same hydration path as useAnnotationDraft.
   const annotations = deserializeAnnotations(initialAnnotations ?? [])
+  const [showComments, setShowComments] = useState(false)
+  // Minted inside PdfViewer; the comments panel needs it to select and scroll.
+  const [documentId, setDocumentId] = useState<string | null>(null)
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-[#fafbff]">
       {/* Header bar: back + context | finalized notice */}
@@ -87,10 +92,6 @@ function FinalizedWorkspaceViewInner({
 
         {/* Finalized notice */}
         <div className="flex items-center gap-[8px] shrink-0">
-          <span className="flex items-center gap-[6px] h-[32px] px-[12px] rounded-[8px] bg-[#f4f5fc] border border-[#e0e3f0] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382]">
-            <Lock className="size-[12px] text-[#9ea8c6]" strokeWidth={2.25} />
-            {isSuperseded ? 'Previous version — read-only' : 'Evaluation finalized'}
-          </span>
           {submission.reviewedAt && (
             <span className="flex items-center gap-[6px] font-sans font-medium text-[12px] leading-[18px] text-[#8a93b4]">
               <CalendarDays
@@ -102,6 +103,30 @@ function FinalizedWorkspaceViewInner({
               {submission.reviewedBy ? ` by ${submission.reviewedBy}` : ''}
             </span>
           )}
+          <span className="flex items-center gap-[6px] h-[32px] px-[12px] rounded-[8px] bg-[#f4f5fc] border border-[#e0e3f0] font-sans font-semibold text-[11.5px] leading-[17px] text-[#5a6382]">
+            <Lock className="size-[12px] text-[#9ea8c6]" strokeWidth={2.25} />
+            {isSuperseded ? 'Previous version — read-only' : 'Evaluation finalized'}
+          </span>
+          {/* Same affordance the finalized defense view has: a read-only list
+              that jumps to an annotation. Read-only here is navigation only. */}
+          <button
+            type="button"
+            onClick={() => setShowComments((v) => !v)}
+            aria-pressed={showComments}
+            className={`flex items-center gap-[6px] h-[32px] px-[12px] rounded-[8px] font-sans font-semibold text-[11.5px] leading-[17px] transition-colors focus-visible:ring-2 focus-visible:ring-[#707dff] outline-none ${
+              showComments
+                ? 'bg-[#f4f6ff] border border-[#e5e8ff] text-[#707dff]'
+                : 'bg-white border border-[#e8ebf8] text-[#5a6382] hover:bg-gray-50'
+            }`}
+          >
+            <MessageSquareText className="size-[13px]" strokeWidth={1.75} />
+            Comments
+            {annotations.length > 0 && (
+              <span className="font-sans font-bold text-[10.5px] text-[#707dff]">
+                {annotations.length}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
@@ -113,14 +138,26 @@ function FinalizedWorkspaceViewInner({
         </div>
       )}
 
-      {/* Read-only document viewer — annotations visible but not interactive */}
-      <div className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area read-only">
-        <PdfViewer
-          src={submission.blobUrl}
-          annotationAuthor={submission.reviewedBy ?? 'Adviser'}
-          initialAnnotations={annotations as unknown as AnnotationTransferItem[]}
-          readOnly
-        />
+      {/* Read-only document viewer + comments panel, mirroring the defense
+          finalized view: the panel sits beside the viewer and overlays it on
+          narrow viewports. */}
+      <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area read-only">
+          <PdfViewer
+            src={submission.blobUrl}
+            annotationAuthor={submission.reviewedBy ?? 'Adviser'}
+            initialAnnotations={annotations as unknown as AnnotationTransferItem[]}
+            onActiveDocumentId={setDocumentId}
+            readOnly
+          />
+        </div>
+        {showComments && documentId && (
+          <ReadOnlyCommentsPanel
+            documentId={documentId}
+            annotations={annotations}
+            onClose={() => setShowComments(false)}
+          />
+        )}
       </div>
     </div>
   )

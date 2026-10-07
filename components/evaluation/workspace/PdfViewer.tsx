@@ -53,6 +53,14 @@ export interface PdfViewerProps {
    * can prevent (canvas-level interaction).
    */
   readOnly?: boolean
+  /**
+   * Called with the EmbedPDF document id once the document is registered.
+   *
+   * The id is minted inside this component, so a parent that needs it — the
+   * finalized view's comments panel, which selects and scrolls to annotations —
+   * has no other way to reach it.
+   */
+  onActiveDocumentId?: (documentId: string) => void
 }
 
 /**
@@ -70,6 +78,7 @@ export function PdfViewer({
   annotationAuthor,
   initialAnnotations,
   readOnly = false,
+  onActiveDocumentId,
 }: PdfViewerProps) {
   const { engine, isLoading, error } = usePdfiumEngine()
 
@@ -254,8 +263,9 @@ export function PdfViewer({
   return (
     <div className="h-full w-full min-h-[480px] overflow-hidden bg-[#fafbff]">
       <EmbedPDF engine={engine} plugins={plugins}>
-        {({ activeDocumentId }) =>
-          activeDocumentId ? (
+        {({ activeDocumentId }) => {
+          if (activeDocumentId) onActiveDocumentId?.(activeDocumentId)
+          return activeDocumentId ? (
             <DocumentContent documentId={activeDocumentId}>
               {({ isLoaded, isLoading, isError }) => {
                 // These three states used to be collapsed into `isLoaded &&`,
@@ -315,7 +325,7 @@ export function PdfViewer({
               }}
             </DocumentContent>
           ) : null
-        }
+        }}
       </EmbedPDF>
     </div>
   )

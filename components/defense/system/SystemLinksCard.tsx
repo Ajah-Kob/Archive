@@ -117,6 +117,7 @@ export function SystemLinksCard({
             <LinkFormFields
               isPending={isPending}
               error={addState && !addState.success ? addState.message : null}
+              onCancel={() => setShowForm(false)}
             />
           </form>
         ) : null}
@@ -152,21 +153,21 @@ export function SystemLinksCard({
                     <>
                       <button
                         type="button"
+                        onClick={() => onRemove(link.id)}
+                        aria-label={`Remove ${link.label}`}
+                        className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] font-sans font-bold text-[12px] leading-[18px] text-[#d34d5c] hover:opacity-80 transition-opacity shrink-0"
+                      >
+                        <Trash2 className="size-3" />
+                        Remove
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setEditingId(link.id)}
                         aria-label={`Edit ${link.label}`}
                         className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
                       >
                         <Pencil className="size-3" />
                         Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onRemove(link.id)}
-                        aria-label={`Remove ${link.label}`}
-                        className="flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#d34d5c] hover:bg-gray-50 transition-colors shrink-0"
-                      >
-                        <Trash2 className="size-3" />
-                        Remove
                       </button>
                     </>
                   ) : null}

@@ -135,14 +135,20 @@ export function AnnotationLayerWithDrag({
       onSelect,
     }: CustomAnnotationRendererProps<PdfAnnotationObject>) => {
       const type = annotation.type
-      const draggable = !readOnly && DRAGGABLE_TYPES.has(type)
+      // Per-fragment surfaces in BOTH modes. The plugin's own surface hit-tests
+      // the union /Rect, which for multi-line text markup swallows every
+      // unannotated gap between lines — so clicking blank text beside a
+      // highlight would select it. Read-only still needs the tight surface, it
+      // just must not drag: it selects on pointerdown and nothing more.
+      const usesFragmentSurface = DRAGGABLE_TYPES.has(type)
+      const draggable = usesFragmentSurface && !readOnly
 
-      // One drag surface PER annotated fragment (getAnnotationSegments):
+      // One surface PER annotated fragment (getAnnotationSegments):
       // text markup only captures the pointer over its actual quads, so
       // unannotated text between/after fragments keeps normal hover + text
       // selection for creating new annotations. FreeText (single segment =
       // full rect) behaves exactly like the old full-box surface.
-      const dragSurfaces = draggable ? (
+      const dragSurfaces = usesFragmentSurface ? (
         getAnnotationSegments(annotation).map((seg, i) => (
           <div
             key={i}
@@ -158,13 +164,14 @@ export function AnnotationLayerWithDrag({
               width: seg.size.width * scale,
               height: seg.size.height * scale,
               pointerEvents: isSelected ? 'none' : 'auto',
-              cursor: isSelected ? 'default' : 'move',
+              cursor: !draggable || isSelected ? 'default' : 'move',
               // Without this the browser claims the gesture for page scrolling
               // and fires pointercancel, so a drag on a touch screen never
               // completes. The trade is that swiping over an annotation no longer
               // scrolls the page, which is the usual behaviour for draggable
-              // items on touch.
-              touchAction: 'none',
+              // items on touch. Read-only surfaces never drag, so they keep the
+              // browser's scrolling and only narrow what a click selects.
+              touchAction: draggable ? 'none' : 'auto',
               zIndex: 1,
             }}
             onPointerDown={(e) => {
@@ -173,7 +180,7 @@ export function AnnotationLayerWithDrag({
               // annotation — dragging an existing annotation moves it instead of
               // duplicating its text.
               onSelect?.(e)
-              if (!plugin) return
+              if (!plugin || readOnly) return
               // On touch, a drag means "move the page", so an annotation only
               // picks up after a deliberate hold. A mouse is already precise, so
               // it keeps moving on press-and-drag.

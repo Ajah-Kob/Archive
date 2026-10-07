@@ -23,10 +23,11 @@ import {
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 import {
-  AnnotationLayer,
   AnnotationPluginPackage,
   useAnnotation,
 } from '@embedpdf/plugin-annotation/react'
+import { AnnotationLayerWithDrag } from '@/components/evaluation/workspace/AnnotationLayerWithDrag'
+import { AnnotationHover } from '@/components/evaluation/workspace/AnnotationHover'
 import type {
   AnnotationTransferItem,
   FreeTextClickBehavior,
@@ -90,6 +91,13 @@ export function PdfViewer({
   renderPanel,
 }: PdfViewerProps) {
   const { engine, isLoading, error } = usePdfiumEngine()
+  // AnnotationHover positions its tight per-fragment boxes against this
+  // container, the same way DocumentWorkspace does it.
+  const viewerRef = useRef<HTMLDivElement>(null)
+  // This surface has no Comments-panel focus to drive, so the hover overlay's
+  // selection callbacks have nothing to report. Stable identity so the overlay
+  // does not re-subscribe its hit-test on every render.
+  const noopAnnotationSelection = useMemo(() => () => {}, [])
 
   // Resolve the stored Blob URL into something the engine can actually fetch.
   // The engine fetches `src` itself and sends no credentials, so a private Blob
@@ -310,8 +318,8 @@ export function PdfViewer({
                     <GlobalPointerProvider documentId={activeDocumentId}>
                     {/* Flex row so a rendered panel sits beside the viewer rather
                         than below it. */}
-                    <div className="flex h-full w-full min-h-0">
-                    <Viewport documentId={activeDocumentId}>
+<div ref={viewerRef} className="flex h-full w-full min-h-0">
+                  <Viewport documentId={activeDocumentId}>
                       <ZoomGestureWrapper documentId={activeDocumentId} enablePinch enableWheel>
                       <Scroller
                         documentId={activeDocumentId}
@@ -323,16 +331,35 @@ export function PdfViewer({
                             >
                               <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
                               <SelectionLayer documentId={activeDocumentId} pageIndex={pageIndex} />
-                              <AnnotationLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+                              {/* WithDrag, not the bare AnnotationLayer: it hides the
+                                  plugin's built-in outline, which hugs the union
+                                  /Rect and so spans every line of a multi-line
+                                  highlight plus the gaps between them. AnnotationHover
+                                  below draws tight per-fragment boxes instead. */}
+                              <AnnotationLayerWithDrag
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                                readOnly
+                              />
                             </PagePointerProvider>
                           </div>
                         )}
                       />
                       </ZoomGestureWrapper>
                     </Viewport>
-                    {renderPanel?.(activeDocumentId)}
-                    </div>
-                    </GlobalPointerProvider>
+{renderPanel?.(activeDocumentId)}
+                  </div>
+                  {/* Tight hover + selection outlines. AnnotationHover's read-only
+                      path keeps the boxes and drops the delete menu, which is
+                      exactly what this surface needs. */}
+                  <AnnotationHover
+                    documentId={activeDocumentId}
+                    viewerRef={viewerRef}
+                    readOnly
+                    onSelectAnnotation={noopAnnotationSelection}
+                    onDeselectAnnotation={noopAnnotationSelection}
+                  />
+                  </GlobalPointerProvider>
                   </>
                 )
               }}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Send } from 'lucide-react'
@@ -17,20 +17,20 @@ export function SystemCommentComposer({
   linkId: number
   placeholder: string
   autoFocus?: boolean
-  onDone?: () => void
+  onDone?: (comment?: unknown) => void
   compact?: boolean
 }) {
   const router = useRouter()
 
   type ActionState = { success: boolean; message: string; payload: unknown }
 
-  async function submit(_prev: ActionState | null, formData: FormData) {
+  async function submit(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
     const res = await addSystemComment(linkId, formData)
     if (res.success) {
       toast.success(res.message)
-      onDone?.()
+      onDone?.(res.payload)
       router.refresh()
-      return { success: true, message: res.message, payload: null }
+      return { success: true, message: res.message, payload: res.payload }
     }
     toast.error(res.message)
     return { success: false, message: res.message, payload: null }

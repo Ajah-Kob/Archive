@@ -1,84 +1,41 @@
 'use client'
 
-import {
-  useActionState,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useActionState, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ExternalLink, Link2, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
-import { getInitials, timeAgo } from '@/lib/helper'
+import { Lock, Plus } from 'lucide-react'
 import { linksAreEditable } from '@/lib/system-links'
 import {
   addSystemLink,
-  copyProposalLinks,
-  getSystemLinkCommentsForStudent,
-  getSystemLinksForStudent,
   removeSystemLink,
   updateSystemLink,
   type StudentSystemLink,
 } from '@/lib/actions/system-links'
-import type { PanelistSystemComment } from '@/components/defense/system/SystemLinkCard'
+import type { PanelistSystemComment } from '@/components/defense/system/SystemCommentsCard'
+import { SystemLinkCard } from '@/components/defense/system/SystemLinkCard'
+import { SystemCommentsCard } from '@/components/defense/system/SystemCommentsCard'
 
-/**
- * The student's System card, shown inside the Defense tab they already have.
- *
- * Fetched client-side rather than threaded down as a prop: this panel already
- * reloads through DefenseTabsRefreshContext, and a self-fetching card keeps the
- * prop surface small and the card reusable across both defense types.
- *
- * The card does not render at all when there is no schedule -- that is the
- * parent panel's job, not a disabled card here.
- */
 export function StudentSystemCard({
   scheduleId,
   verdict,
   defenseLabel,
+  initialLinks,
+  initialCommentsByLink,
 }: {
   scheduleId: number
   verdict: string
   defenseLabel: string
+  initialLinks: StudentSystemLink[]
+  initialCommentsByLink: Record<number, PanelistSystemComment[]>
 }) {
   const router = useRouter()
   const editable = linksAreEditable(verdict)
 
-  const [links, setLinks] = useState<StudentSystemLink[] | null>(null)
-  const [comments, setComments] = useState<
-    Record<number, PanelistSystemComment[]>
-  >({})
+  const [links, setLinks] = useState<StudentSystemLink[]>(initialLinks)
+  const [comments, setComments] =
+    useState<Record<number, PanelistSystemComment[]>>(initialCommentsByLink)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
-
-  async function load() {
-    const res = await getSystemLinksForStudent(scheduleId)
-    const rows = res.success ? (res.payload?.links ?? []) : []
-    setLinks(rows)
-    // Students read the panelist discussion, so fetch bodies for every link.
-    const threads = await Promise.all(
-      rows.map((l) => getSystemLinkCommentsForStudent(l.id)),
-    )
-    const map: Record<number, PanelistSystemComment[]> = {}
-    rows.forEach((l, i) => {
-      const t = threads[i]
-      map[l.id] =
-        t.success ? ((t.payload?.comments ?? []) as unknown as PanelistSystemComment[]) : []
-    })
-    setComments(map)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      await load()
-      if (cancelled) return
-    })()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheduleId])
 
   type ActionState = { success: boolean; message: string; payload: unknown }
 
@@ -90,7 +47,6 @@ export function StudentSystemCard({
     }
     toast.success(res.message)
     setShowForm(false)
-    await load()
     router.refresh()
     return { success: true, message: res.message, payload: null }
   }
@@ -100,7 +56,6 @@ export function StudentSystemCard({
     if (res.success) {
       toast.success(res.message)
       setEditingId(null)
-      await load()
       router.refresh()
     } else {
       toast.error(res.message)
@@ -116,14 +71,13 @@ export function StudentSystemCard({
     }
     toast.success(res.message)
     setEditingId(null)
-    await load()
     router.refresh()
     return { success: true, message: res.message, payload: null }
   }
 
   const [addState, addAction, isPending] = useActionState(onAdd, null)
   const [editState, editAction, isEditPending] = useActionState(onSaveEdit, null)
-  const isEmpty = links !== null && links.length === 0
+  const isEmpty = links.length === 0
 
   return (
     <section className="rounded-[14px] border border-[#eceef8] bg-white p-5 shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)]">
@@ -160,31 +114,57 @@ export function StudentSystemCard({
           action={addAction}
           className="mt-4 flex flex-col gap-3 rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-4"
         >
-          <LinkFormFields isPending={isPending} error={addState && !addState.success ? addState.message : null} />
+          <LinkFormFields
+            isPending={isPending}
+            error={addState && !addState.success ? addState.message : null}
+          />
         </form>
       ) : null}
 
-      <div className="mt-4 flex flex-col gap-3">
-        {links === null ? (
-          <p className="font-sans text-[12.5px] text-[#8a93b4]">Loading links…</p>
-        ) : isEmpty ? (
+      <div className="mt-4 flex flex-col gap-5">
+        {isEmpty ? (
           <p className="font-sans text-[12.5px] text-[#8a93b4]">
             No links yet. Add the ones your panel will open.
           </p>
         ) : (
           links.map((link) => (
-            <StudentLinkRow
-              key={link.id}
-              link={link}
-              comments={comments[link.id] ?? []}
-              editable={editable}
-              busy={editingId === link.id}
-              onEdit={() => setEditingId(link.id)}
-              onCancelEdit={() => setEditingId(null)}
-              onRemove={() => onRemove(link.id)}
-            >
+            <div key={link.id} className="flex flex-col gap-3">
+              <div className="relative">
+                <SystemLinkCard link={link} />
+                {editable ? (
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(link.id)}
+                      aria-label={`Edit ${link.label}`}
+                      className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#eeefff] transition-colors"
+                    >
+                      <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRemove(link.id)}
+                      aria-label={`Remove ${link.label}`}
+                      className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[#f0dfe2] text-[#d34d5c] hover:bg-[#fdf2f4] transition-colors"
+                    >
+                      <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
               {editingId === link.id ? (
-                <form action={editAction}>
+                <form
+                  action={editAction}
+                  className="rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-4"
+                >
                   <input type="hidden" name="linkId" value={link.id} />
                   <LinkFormFields
                     isPending={isEditPending}
@@ -199,7 +179,13 @@ export function StudentSystemCard({
                   />
                 </form>
               ) : null}
-            </StudentLinkRow>
+
+              <SystemCommentsCard
+                linkId={link.id}
+                initialComments={comments[link.id] ?? []}
+                isPanelist={false}
+              />
+            </div>
           ))
         )}
       </div>
@@ -230,8 +216,6 @@ export function LinkFormFields({
 }) {
   return (
     <>
-      {/* One row on desktop, stacked below sm. items-end keeps the button
-          baseline-aligned with the inputs instead of hanging below them. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="flex-1 min-w-0 flex flex-col gap-1">
           <span className="font-sans text-[11.5px] font-bold text-[#5a6382]">
@@ -263,7 +247,6 @@ export function LinkFormFields({
           />
         </label>
 
-        {/* Buttons live in the same row so the row reads as one control. */}
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="submit"
@@ -284,138 +267,13 @@ export function LinkFormFields({
         </div>
       </div>
 
-      {/* Kept out of the form but still submitted so editing a link that had a
-          note does not silently wipe it. */}
-      {/* Kept out of the form but still submitted so editing a link that had a
-          note does not silently wipe it. */}
-      {defaultNote ? <input type="hidden" name="note" value={defaultNote} /> : null}
+      {defaultNote ? (
+        <input type="hidden" name="note" value={defaultNote} />
+      ) : null}
 
       {error ? (
         <p className="font-sans text-[12px] text-[#d34d5c]">{error}</p>
       ) : null}
     </>
-  )
-}
-
-function StudentLinkRow({
-  link,
-  comments,
-  editable,
-  busy,
-  onEdit,
-  onCancelEdit,
-  onRemove,
-  children,
-}: {
-  link: StudentSystemLink
-  comments: PanelistSystemComment[]
-  editable: boolean
-  busy: boolean
-  onEdit: () => void
-  onCancelEdit: () => void
-  onRemove: () => void
-  /** The inline edit form, rendered only while this row is the one being edited. */
-  children?: React.ReactNode
-}) {
-  const [showComments, setShowComments] = useState(false)
-  const isEditing = busy
-
-  return (
-    <article className="rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-3.5">
-      {/* While editing, the form below already shows the name and the URL, so
-          repeating them above is noise. */}
-      {isEditing ? null : (
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="truncate font-sans text-[13.5px] font-bold text-[#2c3159]">
-              {link.label}
-            </h3>
-            {link.note ? (
-              <p className="mt-0.5 font-sans text-[12px] text-[#5a6382]">
-                {link.note}
-              </p>
-            ) : null}
-            <p className="mt-0.5 font-sans text-[11px] text-[#8a93b4]">
-              added by {link.createdBy.name} · updated {timeAgo(link.updatedAt)}
-            </p>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1.5">
-            {editable ? (
-              <>
-              <button
-                type="button"
-                onClick={onEdit}
-                aria-label={`Edit ${link.label}`}
-                className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] text-[#707dff] hover:bg-[#eeefff] transition-colors"
-              >
-                <Pencil className="size-3.5" />
-              </button>
-              <a
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 h-[30px] px-2.5 rounded-[9px] bg-white border border-[rgba(112,125,255,0.19)] font-sans text-[12px] font-bold text-[#707dff] hover:bg-[#eeefff] transition-colors"
-              >
-                Open
-                <ExternalLink className="size-3" />
-              </a>
-              <button
-                type="button"
-                onClick={onRemove}
-                aria-label={`Remove ${link.label}`}
-                className="flex size-[30px] items-center justify-center rounded-[9px] bg-white border border-[#f0dfe2] text-[#d34d5c] hover:bg-[#fdf2f4] transition-colors"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-              </>
-            ) : null}
-          </div>
-        </div>
-      )}
-
-      {isEditing ? children : null}
-
-      {comments.length > 0 ? (
-        <div className="mt-2.5 border-t border-[#eef0f8] pt-2.5">
-          <button
-            type="button"
-            onClick={() => setShowComments((v) => !v)}
-            className="flex items-center gap-1.5 font-sans text-[12px] font-bold text-[#707dff] hover:text-[#5062f5] transition-colors"
-          >
-            <Link2 className="size-3" />
-            {showComments
-              ? 'Hide panelist comments'
-              : `${comments.length} panelist comment${comments.length === 1 ? '' : 's'}`}
-          </button>
-
-          {showComments ? (
-            <div className="mt-2 flex flex-col gap-2">
-              {comments.map((c) => (
-                <div
-                  key={c.id}
-                  className="rounded-[10px] bg-white border border-[#eef0f8] p-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="flex size-5 items-center justify-center rounded-full bg-[#707dff] font-sans text-[9.5px] font-bold text-white">
-                      {getInitials(c.author.name)}
-                    </span>
-                    <span className="font-sans text-[12px] font-bold text-[#2c3159]">
-                      {c.author.name}
-                    </span>
-                    <span className="font-sans text-[11px] text-[#8a93b4]">
-                      {timeAgo(c.createdAt)}
-                    </span>
-                  </div>
-                  <p className="mt-1.5 whitespace-pre-wrap font-sans text-[12.5px] leading-relaxed text-[#3d4468]">
-                    {c.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </article>
   )
 }

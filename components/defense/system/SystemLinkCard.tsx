@@ -1,58 +1,28 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
-import { ExternalLink, MessageSquare, Trash2 } from 'lucide-react'
-import { getInitials, timeAgo } from '@/lib/helper'
-import {
-  deleteSystemComment,
-  type PanelistSystemLink,
-} from '@/lib/actions/system-links'
-import { SystemCommentComposer } from './SystemCommentComposer'
+import { ExternalLink } from 'lucide-react'
+import { timeAgo } from '@/lib/helper'
 
-// Dates arrive as Date objects inside the server action and as strings once they
-// cross to the client, so both are accepted. timeAgo handles either.
-export interface PanelistSystemComment {
+interface SystemLinkCardProps {
   id: number
-  body: string
-  createdAt: Date | string
-  author: { name: string }
-  authorId: number
+  label: string
+  url: string
+  note: string | null
+  removedAt?: Date | string | null
+  updatedAt: Date | string
+  createdBy: { name: string }
 }
 
 /**
- * One link plus the discussion on it.
- *
- * Threads render expanded, not collapsed behind a count. With no resolve state
- * the discussion is the only record of what was raised, and the student reads
- * the same record from the other side — collapsing would work against that.
+ * Renders the system link itself (Name, Link, Open button, Remove status).
+ * Panelist comments are now rendered in a separate card below this one.
  */
 export function SystemLinkCard({
   link,
-  comments,
-  currentUserId,
 }: {
-  link: PanelistSystemLink
-  comments: PanelistSystemComment[]
-  /** Drives which comments show a delete button -- only the author's own. */
-  currentUserId: number
+  link: SystemLinkCardProps
 }) {
-  const router = useRouter()
-  // Withdrawn by the group after a panelist commented. Kept visible because the
-  // thread is evidence; the link itself is not clickable.
   const removed = Boolean(link.removedAt)
-  const [showComposer, setShowComposer] = useState(false)
-
-  async function onDelete(commentId: number) {
-    const res = await deleteSystemComment(commentId)
-    if (res.success) {
-      toast.success(res.message)
-      router.refresh()
-    } else {
-      toast.error(res.message)
-    }
-  }
 
   return (
     <article
@@ -102,71 +72,6 @@ export function SystemLinkCard({
             <ExternalLink className="size-3.5" />
           </a>
         )}
-      </div>
-
-      <div className="mt-3 flex flex-col gap-2 border-t border-[#eef0f8] pt-3">
-        {comments.length === 0 ? (
-          <p className="font-sans text-[12.5px] text-[#8a93b4]">
-            No comments yet.
-          </p>
-        ) : (
-          comments.map((c) => (
-            <div
-              key={c.id}
-              className="rounded-[10px] bg-[#f7f8ff] border border-[#eef0f8] p-3"
-            >
-              <div className="flex items-center gap-2">
-                <span className="flex size-5 items-center justify-center rounded-full bg-[#707dff] font-sans text-[9.5px] font-bold text-white">
-                  {getInitials(c.author.name)}
-                </span>
-                <span className="font-sans text-[12px] font-bold text-[#2c3159]">
-                  {c.author.name}
-                </span>
-                <span className="font-sans text-[11px] text-[#8a93b4]">
-                  {timeAgo(c.createdAt)}
-                </span>
-              </div>
-              <p className="mt-1.5 whitespace-pre-wrap font-sans text-[12.5px] leading-relaxed text-[#3d4468]">
-                {c.body}
-              </p>
-
-              {/* Delete is offered only on the author's own comment. The action
-                  re-checks this server-side, so the button is a convenience rather
-                  than the guard. */}
-              {c.authorId === currentUserId ? (
-                <button
-                  type="button"
-                  onClick={() => onDelete(c.id)}
-                  aria-label="Delete comment"
-                  className="mt-2 flex items-center gap-1.5 font-sans text-[12px] font-semibold text-[#d34d5c] hover:text-[#b03a48] transition-colors"
-                >
-                  <Trash2 className="size-3.5" />
-                  Delete
-                </button>
-              ) : null}
-            </div>
-          ))
-        )}
-
-        <div className="rounded-[12px] border-2 border-dashed border-[#dfe3fb] p-3.5 bg-[#f7f8ff]">
-          {showComposer ? (
-            <SystemCommentComposer
-              linkId={link.id}
-              placeholder="Leave a comment about this system…"
-              autoFocus
-              onDone={() => setShowComposer(false)}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowComposer(true)}
-              className="flex w-full items-center justify-center gap-1.5 h-[34px] font-sans text-[13px] font-bold text-[#707dff] hover:text-[#5062f5] transition-colors"
-            >
-              <MessageSquare className="size-4" />
-              Add comment
-            </button>
-          )}
-        </div>
       </div>
     </article>
   )

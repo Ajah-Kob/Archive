@@ -1,18 +1,17 @@
 'use client'
 
-import { useState } from 'react'
 import { Link2 } from 'lucide-react'
-import type { PanelistSystemComment } from './SystemLinkCard'
+import type { PanelistSystemComment } from './SystemCommentsCard'
 import type { PanelistSystemLink } from '@/lib/actions/system-links'
 import { SystemLinkCard } from './SystemLinkCard'
+import { SystemCommentsCard } from './SystemCommentsCard'
 
 const EMPTY_STATE =
   'No links submitted yet. The group has not added any links for this defense.'
 
 /**
- * Panelist System tab. Read-only on the links themselves -- panelists discuss
- * what was built, the group maintains the list -- so there is no add/edit/remove
- * affordance here by design.
+ * Panelist System tab. Renders separate cards for each link and its corresponding
+ * panelist comments card.
  */
 export function SystemTabPanel({
   links,
@@ -41,21 +40,18 @@ export function SystemTabPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="font-sans text-[12.5px] text-[#5a6382]">
-        Links the group submitted for this defense. Open a link in a new tab,
-        then leave comments on what to revise or add.
-      </p>
-      <div className="flex flex-col gap-3">
-        {ordered.map((link) => (
-          <SystemLinkCard
-            key={link.id}
-            link={link}
-            comments={commentsByLink[link.id] ?? []}
+    <div className="flex flex-col gap-5">
+      {ordered.map((link) => (
+        <div key={link.id} className="flex flex-col gap-3">
+          <SystemLinkCard link={link} />
+          <SystemCommentsCard
+            linkId={link.id}
+            initialComments={commentsByLink[link.id] ?? []}
             currentUserId={currentUserId}
+            isPanelist={true}
           />
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   )
 }

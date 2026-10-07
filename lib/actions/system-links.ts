@@ -27,7 +27,7 @@ function fail(message: string) {
   return { success: false as const, message, payload: null }
 }
 
-function ok(message: string, payload: null = null) {
+function ok(message: string, payload: unknown = null) {
   return { success: true as const, message, payload }
 }
 
@@ -343,12 +343,19 @@ export async function addSystemComment(linkId: number, formData: FormData) {
   const access = await requireSchedulePanelist(link.scheduleId)
   if (!access) return unauthorized
 
-  await prisma.systemLinkComment.create({
+  const created = await prisma.systemLinkComment.create({
     data: { linkId, body, authorId: +access.session.user.id },
+    select: {
+      id: true,
+      body: true,
+      createdAt: true,
+      authorId: true,
+      author: { select: { name: true } },
+    },
   })
 
   revalidateTag(`system-links-${link.scheduleId}`, FRESH)
-  return ok('Comment posted.')
+  return ok('Comment posted.', created)
 }
 
 /**

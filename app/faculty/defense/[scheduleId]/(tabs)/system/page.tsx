@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { DefenseSessionTabPanel } from '@/components/defense/DefenseSessionTabs'
 import { SystemTabPanel } from '@/components/defense/system/SystemTabPanel'
-import type { PanelistSystemComment } from '@/components/defense/system/SystemLinkCard'
+import type { PanelistSystemComment } from '@/components/defense/system/SystemCommentsCard'
 import { getSession } from '@/lib/actions/guard'
 import {
   getSystemLinkComments,

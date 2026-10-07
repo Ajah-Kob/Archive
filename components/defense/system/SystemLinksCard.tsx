@@ -160,7 +160,7 @@ export function SystemLinksCard({
                   />
                 </form>
               ) : (
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="w-full min-w-0">
                     <h4 className="font-sora font-bold text-[13px] leading-[normal] text-[#1e3a8a] truncate">
                       {link.label}
@@ -176,7 +176,7 @@ export function SystemLinksCard({
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-center h-full gap-[10px] shrink-0">
+                  <div className="flex flex-wrap items-center gap-[10px] shrink-0">
                     {editable ? (
                       <>
                         <button
@@ -325,7 +325,7 @@ export function LinkFormFields({
           />
         </label>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap shrink-0 items-center gap-2">
           <button
             type="submit"
             disabled={isPending}

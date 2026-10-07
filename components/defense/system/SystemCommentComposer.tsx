@@ -54,7 +54,7 @@ export function SystemCommentComposer({
         onChange={(e) => setBody(e.target.value)}
         className="w-full resize-y rounded-[10px] border border-[#dfe3fb] bg-white px-3 py-2 font-sans text-[13px] text-[#2c3159] outline-none focus:border-[#707dff] focus:ring-2 focus:ring-[#707dff]/15"
       />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="submit"
           disabled={isPending || !body.trim()}

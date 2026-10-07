@@ -77,7 +77,7 @@ export function SystemCommentsCard({
             key={c.id}
             className="rounded-[10px] bg-[#f7f8ff] border border-[#eef0f8] p-3"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="flex size-5 items-center justify-center rounded-full bg-[#707dff] font-sans text-[9.5px] font-bold text-white shrink-0">
                 {getInitials(c.author.name)}
               </span>

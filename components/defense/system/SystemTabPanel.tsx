@@ -3,15 +3,15 @@
 import { Link2 } from 'lucide-react'
 import type { PanelistSystemComment } from './SystemCommentsCard'
 import type { PanelistSystemLink } from '@/lib/actions/system-links'
-import { SystemLinkCard } from './SystemLinkCard'
+import { SystemLinksCard } from './SystemLinksCard'
 import { SystemCommentsCard } from './SystemCommentsCard'
 
 const EMPTY_STATE =
   'No links submitted yet. The group has not added any links for this defense.'
 
 /**
- * Panelist System tab. Renders separate cards for each link and its corresponding
- * panelist comments card.
+ * Panelist System tab. Renders the System Links card and, for each link,
+ * a separate Panelist Comments card below it.
  */
 export function SystemTabPanel({
   links,
@@ -41,16 +41,22 @@ export function SystemTabPanel({
 
   return (
     <div className="flex flex-col gap-5">
+      <SystemLinksCard
+        scheduleId={0}
+        verdict=""
+        defenseLabel=""
+        initialLinks={ordered as never}
+        editable={false}
+      />
+
       {ordered.map((link) => (
-        <div key={link.id} className="flex flex-col gap-3">
-          <SystemLinkCard link={link} />
-          <SystemCommentsCard
-            linkId={link.id}
-            initialComments={commentsByLink[link.id] ?? []}
-            currentUserId={currentUserId}
-            isPanelist={true}
-          />
-        </div>
+        <SystemCommentsCard
+          key={link.id}
+          linkId={link.id}
+          initialComments={commentsByLink[link.id] ?? []}
+          currentUserId={currentUserId}
+          isPanelist={true}
+        />
       ))}
     </div>
   )

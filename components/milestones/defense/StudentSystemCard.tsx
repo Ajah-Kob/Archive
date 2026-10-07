@@ -80,118 +80,118 @@ export function StudentSystemCard({
   const isEmpty = links.length === 0
 
   return (
-    <section className="rounded-[14px] border border-[#eceef8] bg-white p-5 shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)]">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-sans text-[15px] font-bold text-[#2c3159]">
-            System
-          </h2>
-          <p className="mt-0.5 font-sans text-[12px] text-[#8a93b4]">
-            Links the panel will open for your {defenseLabel} — GitHub, Figma, a
-            hosted build. Shared by the whole group.
-          </p>
-        </div>
+    <div className="flex flex-col gap-5">
+      <section className="rounded-[14px] border border-[#eceef8] bg-white p-5 shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)]">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-sans text-[15px] font-bold text-[#2c3159]">
+              System
+            </h2>
+            <p className="mt-0.5 font-sans text-[12px] text-[#8a93b4]">
+              Links the panel will open for your {defenseLabel} — GitHub, Figma, a
+              hosted build. Shared by the whole group.
+            </p>
+          </div>
 
-        {editable ? (
-          <button
-            type="button"
-            onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-1.5 h-[32px] px-3 rounded-[9px] bg-[#707dff] font-sans text-[12.5px] font-bold text-white hover:bg-[#5062f5] transition-colors shrink-0"
+          {editable ? (
+            <button
+              type="button"
+              onClick={() => setShowForm((v) => !v)}
+              className="flex items-center gap-1.5 h-[32px] px-3 rounded-[9px] bg-[#707dff] font-sans text-[12.5px] font-bold text-white hover:bg-[#5062f5] transition-colors shrink-0"
+            >
+              <Plus className="size-3.5" />
+              Add link
+            </button>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-full bg-[#eef0f6] px-2.5 py-1 font-sans text-[11px] font-bold text-[#5a6382]">
+              <Lock className="size-3" />
+              Locked — verdict submitted
+            </span>
+          )}
+        </header>
+
+        {showForm && editable ? (
+          <form
+            action={addAction}
+            className="mt-4 flex flex-col gap-3 rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-4"
           >
-            <Plus className="size-3.5" />
-            Add link
-          </button>
-        ) : (
-          <span className="flex items-center gap-1.5 rounded-full bg-[#eef0f6] px-2.5 py-1 font-sans text-[11px] font-bold text-[#5a6382]">
-            <Lock className="size-3" />
-            Locked — verdict submitted
-          </span>
-        )}
-      </header>
+            <LinkFormFields
+              isPending={isPending}
+              error={addState && !addState.success ? addState.message : null}
+            />
+          </form>
+        ) : null}
+      </section>
 
-      {showForm && editable ? (
-        <form
-          action={addAction}
-          className="mt-4 flex flex-col gap-3 rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-4"
-        >
-          <LinkFormFields
-            isPending={isPending}
-            error={addState && !addState.success ? addState.message : null}
-          />
-        </form>
-      ) : null}
-
-      <div className="mt-4 flex flex-col gap-5">
-        {isEmpty ? (
-          <p className="font-sans text-[12.5px] text-[#8a93b4]">
-            No links yet. Add the ones your panel will open.
-          </p>
-        ) : (
-          links.map((link) => (
-            <div key={link.id} className="flex flex-col gap-4">
-              <div>
-                <SystemLinkCard link={link} />
-                {editable ? (
-                  <div className="mt-2 flex items-center justify-end gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(link.id)}
-                      aria-label={`Edit ${link.label}`}
-                      className="flex h-[28px] items-center gap-1 rounded-[8px] border border-[rgba(112,125,255,0.19)] bg-white px-2.5 font-sans text-[11.5px] font-bold text-[#707dff] hover:bg-[#eeefff] transition-colors"
-                    >
-                      <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                        <path d="m15 5 4 4" />
-                      </svg>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onRemove(link.id)}
-                      aria-label={`Remove ${link.label}`}
-                      className="flex h-[28px] items-center gap-1 rounded-[8px] border border-[#f0dfe2] bg-white px-2.5 font-sans text-[11.5px] font-bold text-[#d34d5c] hover:bg-[#fdf2f4] transition-colors"
-                    >
-                      <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                      </svg>
-                      Remove
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-
-              {editingId === link.id ? (
-                <form
-                  action={editAction}
-                  className="rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-4"
-                >
-                  <input type="hidden" name="linkId" value={link.id} />
-                  <LinkFormFields
-                    isPending={isEditPending}
-                    error={
-                      editState && !editState.success ? editState.message : null
-                    }
-                    defaultLabel={link.label}
-                    defaultUrl={link.url}
-                    defaultNote={link.note ?? ''}
-                    submitLabel="Save changes"
-                    onCancel={() => setEditingId(null)}
-                  />
-                </form>
+      {isEmpty ? (
+        <p className="font-sans text-[12.5px] text-[#8a93b4]">
+          No links yet. Add the ones your panel will open.
+        </p>
+      ) : (
+        links.map((link) => (
+          <div key={link.id} className="flex flex-col gap-4">
+            <div>
+              <SystemLinkCard link={link} />
+              {editable ? (
+                <div className="mt-2 flex items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(link.id)}
+                    aria-label={`Edit ${link.label}`}
+                    className="flex h-[28px] items-center gap-1 rounded-[8px] border border-[rgba(112,125,255,0.19)] bg-white px-2.5 font-sans text-[11.5px] font-bold text-[#707dff] hover:bg-[#eeefff] transition-colors"
+                  >
+                    <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                      <path d="m15 5 4 4" />
+                    </svg>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(link.id)}
+                    aria-label={`Remove ${link.label}`}
+                    className="flex h-[28px] items-center gap-1 rounded-[8px] border border-[#f0dfe2] bg-white px-2.5 font-sans text-[11.5px] font-bold text-[#d34d5c] hover:bg-[#fdf2f4] transition-colors"
+                  >
+                    <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
+                    Remove
+                  </button>
+                </div>
               ) : null}
-
-              <SystemCommentsCard
-                linkId={link.id}
-                initialComments={comments[link.id] ?? []}
-                isPanelist={false}
-              />
             </div>
-          ))
-        )}
-      </div>
-    </section>
+
+            {editingId === link.id ? (
+              <form
+                action={editAction}
+                className="rounded-[12px] border border-[#eef0f8] bg-[#fafaff] p-4"
+              >
+                <input type="hidden" name="linkId" value={link.id} />
+                <LinkFormFields
+                  isPending={isEditPending}
+                  error={
+                    editState && !editState.success ? editState.message : null
+                  }
+                  defaultLabel={link.label}
+                  defaultUrl={link.url}
+                  defaultNote={link.note ?? ''}
+                  submitLabel="Save changes"
+                  onCancel={() => setEditingId(null)}
+                />
+              </form>
+            ) : null}
+
+            <SystemCommentsCard
+              linkId={link.id}
+              initialComments={comments[link.id] ?? []}
+              isPanelist={false}
+            />
+          </div>
+        ))
+      )}
+    </div>
   )
 }
 

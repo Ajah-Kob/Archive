@@ -169,6 +169,26 @@ async function cachedLinkComments(linkId: number, scheduleId: number) {
   })
 }
 
+/**
+ * Student-side comment read. Separate from getSystemLinkComments because the
+ * guard differs: a student must belong to the link's group, not be a panelist.
+ * Students read the discussion but can never write to it (decision 5).
+ */
+export async function getSystemLinkCommentsForStudent(linkId: number) {
+  const link = await prisma.defenseSystemLink.findFirst({
+    where: { id: linkId, deletedAt: null },
+    select: { id: true, scheduleId: true, groupId: true },
+  })
+  if (!link) return fail('Link not found.')
+
+  const access = await requireScheduleStudent(link.scheduleId)
+  if (!access) return { ...unauthorized, payload: null }
+  if (link.groupId !== access.schedule.groupId) return fail('Link not found.')
+
+  const comments = await cachedLinkComments(linkId, link.scheduleId)
+  return { success: true as const, message: '', payload: { comments } }
+}
+
 /** Validates the shared add/edit fields. Returns null when valid. */
 function readLinkForm(formData: FormData) {
   const label = normalizeLabel(

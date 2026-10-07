@@ -254,8 +254,10 @@ export function LinkFormFields({
 }) {
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <label className="flex-1 flex-col gap-1">
+      {/* One row on desktop, stacked below sm. items-end keeps the button
+          baseline-aligned with the inputs instead of hanging below them. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label className="flex-1 min-w-0 flex flex-col gap-1">
           <span className="font-sans text-[11.5px] font-bold text-[#5a6382]">
             Name
           </span>
@@ -266,11 +268,11 @@ export function LinkFormFields({
             defaultValue={defaultLabel}
             placeholder="GitHub repository"
             maxLength={80}
-            className="h-[34px] rounded-[9px] border border-[#dfe3fb] bg-white px-2.5 font-sans text-[13px] text-[#2c3159] outline-none focus:border-[#707dff]"
+            className="h-[34px] w-full rounded-[9px] border border-[#dfe3fb] bg-white px-2.5 font-sans text-[13px] text-[#2c3159] outline-none focus:border-[#707dff]"
           />
         </label>
 
-        <label className="flex-[2] flex-col gap-1">
+        <label className="flex-[2] min-w-0 flex flex-col gap-1">
           <span className="font-sans text-[11.5px] font-bold text-[#5a6382]">
             Link
           </span>
@@ -281,11 +283,33 @@ export function LinkFormFields({
             defaultValue={defaultUrl}
             placeholder="https://github.com/your-group/project"
             maxLength={2048}
-            className="h-[34px] rounded-[9px] border border-[#dfe3fb] bg-white px-2.5 font-sans text-[13px] text-[#2c3159] outline-none focus:border-[#707dff]"
+            className="h-[34px] w-full rounded-[9px] border border-[#dfe3fb] bg-white px-2.5 font-sans text-[13px] text-[#2c3159] outline-none focus:border-[#707dff]"
           />
         </label>
+
+        {/* Buttons live in the same row so the row reads as one control. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="submit"
+            disabled={isPending}
+            className="flex h-[34px] items-center gap-1.5 rounded-[9px] bg-[#707dff] px-4 font-sans text-[13px] font-bold text-white transition-colors hover:bg-[#5062f5] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isPending ? 'Saving…' : submitLabel}
+          </button>
+          {onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="h-[34px] rounded-[9px] px-3 font-sans text-[13px] font-semibold text-[#6b7399] transition-colors hover:text-[#707dff]"
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
       </div>
 
+      {/* Kept out of the form but still submitted so editing a link that had a
+          note does not silently wipe it. */}
       {/* Kept out of the form but still submitted so editing a link that had a
           note does not silently wipe it. */}
       {defaultNote ? <input type="hidden" name="note" value={defaultNote} /> : null}
@@ -293,25 +317,6 @@ export function LinkFormFields({
       {error ? (
         <p className="font-sans text-[12px] text-[#d34d5c]">{error}</p>
       ) : null}
-
-      <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="flex items-center gap-1.5 h-[34px] px-4 rounded-[9px] bg-[#707dff] font-sans text-[13px] font-bold text-white transition-colors hover:bg-[#5062f5] disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isPending ? 'Saving…' : submitLabel}
-        </button>
-        {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="h-[34px] px-3 rounded-[9px] font-sans text-[13px] font-semibold text-[#6b7399] hover:text-[#707dff] transition-colors"
-          >
-            Cancel
-          </button>
-        ) : null}
-      </div>
     </>
   )
 }

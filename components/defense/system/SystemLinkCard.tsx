@@ -138,6 +138,7 @@ export function SystemLinkCard({
 
               <div className="mt-2">
                 <SystemCommentComposer
+                  linkId={link.id}
                   parentId={c.id}
                   placeholder="Reply to this comment…"
                   compact
@@ -149,6 +150,7 @@ export function SystemLinkCard({
 
         {showComposer ? (
           <SystemCommentComposer
+            linkId={link.id}
             placeholder="Leave a comment about this system…"
             autoFocus
             onDone={() => setShowComposer(false)}

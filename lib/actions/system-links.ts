@@ -33,6 +33,32 @@ function ok(message: string, payload: null = null) {
   return { success: true as const, message, payload }
 }
 
+/** Shapes the UI consumes, derived from the selects above so they cannot drift. */
+export type PanelistSystemLink = {
+  id: number
+  label: string
+  url: string
+  note: string | null
+  removedAt: Date | string | null
+  updatedAt: Date | string
+  createdBy: { name: string }
+  _count: { comments: number }
+}
+
+export type StudentSystemLink = Omit<
+  PanelistSystemLink,
+  'removedAt'
+> & {
+  copiedFromId: number | null
+}
+
+export type SystemLinkCommentNode = {
+  id: number
+  body: string
+  createdAt: Date | string
+  author: { name: string }
+}
+
 /**
  * Panelist view of one defense: every link, including withdrawn ones, so a
  * panelist can see that a comment thread existed on something the group took

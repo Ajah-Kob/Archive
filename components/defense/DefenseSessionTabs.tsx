@@ -21,15 +21,21 @@ import { deriveResubmissionStatus } from '@/lib/defense/session-helpers'
 
 /**
  * Defense session tab keys — `session` shows the initial defense document
- * (verdict 6-state + initial-only LatestDocument + details), `resubmission`
- * shows the latest !isInitial resubmission + approval checklist.
+ * (verdict 6-state + initial-only LatestDocument + details), `system` shows the
+ * links the group submitted for their prototype/finished system plus the
+ * panelist discussion on them, `resubmission` shows the latest !isInitial
+ * resubmission + approval checklist.
  * Sora for headings, Plus Jakarta Sans for body — same visual language as
  * SectionTabs / ContextBar (bg #eef2ff, border #dfe3fb, responsive).
+ *
+ * System sits between the other two on purpose: a panelist reads what was built
+ * before they read what was revised.
  */
-export type DefenseSessionTabKey = 'session' | 'resubmission'
+export type DefenseSessionTabKey = 'session' | 'system' | 'resubmission'
 
 const TABS: ReadonlyArray<{ key: DefenseSessionTabKey; label: string }> = [
   { key: 'session', label: 'Session' },
+  { key: 'system', label: 'System' },
   { key: 'resubmission', label: 'Resubmission' },
 ]
 
@@ -56,7 +62,9 @@ function useDefenseSessionTabs(): DefenseSessionTabsContextValue {
 // ── Pure helpers (<50 lines) ─────────────────────────────────────────────────
 
 function isValidTab(value: string | null): DefenseSessionTabKey | null {
-  if (value === 'session' || value === 'resubmission') return value
+  if (value === 'session' || value === 'system' || value === 'resubmission') {
+    return value
+  }
   return null
 }
 
@@ -257,10 +265,11 @@ export function DefenseSessionTabsRoot({
 
 
 
-  // Active tab derived from pathname segment: /session or /resubmission
+  // Active tab derived from pathname segment: /session, /system or /resubmission
   // Fallback to ?tab= query for bookmark compat, then defaultTab.
   const activeTab: DefenseSessionTabKey = (() => {
     if (pathname?.endsWith('/resubmission')) return 'resubmission'
+    if (pathname?.endsWith('/system')) return 'system'
     if (pathname?.endsWith('/session')) return 'session'
     // legacy query fallback
     const q = searchParams.get('tab')

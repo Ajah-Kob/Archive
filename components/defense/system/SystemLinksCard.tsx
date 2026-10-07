@@ -155,7 +155,7 @@ export function SystemLinksCard({
                         type="button"
                         onClick={() => setEditingId(link.id)}
                         aria-label={`Edit ${link.label}`}
-                        className="flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
+              className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
                       >
                         <Pencil className="size-3" />
                         Edit

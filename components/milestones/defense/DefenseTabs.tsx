@@ -3,6 +3,12 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+/**
+ * @deprecated Dead code. This tab bar was superseded by the tabs rendered inside
+ * `MilestoneHeader` (which owns Back + Document History + the tab strip), and no
+ * layout imports this component. Kept only because it is the historical shape;
+ * delete it rather than adding a third tab implementation.
+ */
 interface DefenseTabsProps {
   milestone: string
   defenseType?: 'PROPOSAL' | 'FINAL'
@@ -28,11 +34,6 @@ function tabClasses(isActive: boolean): string {
   return `${base} ${isActive ? active : inactive}`
 }
 
-/**
- * Defense tab navigation shared via defenseType prop.
- * Highlights active segment using pathname. Works for both
- * proposal-defense and final-defense without duplication.
- */
 export function DefenseTabs({ milestone }: DefenseTabsProps) {
   const pathname = usePathname() || ''
   const base = `/student/milestone/${milestone}`

@@ -67,7 +67,12 @@ export function SystemCommentsCard({
       </div>
 
       <div className="p-4 flex flex-col gap-2.5">
-        {comments.map((c) => (
+        {comments.length === 0 ? (
+          <p className="font-sans text-[12.5px] text-[#8a93b4]">
+            No comments yet.
+          </p>
+        ) : (
+          comments.map((c) => (
           <div
             key={c.id}
             className="rounded-[10px] bg-[#f7f8ff] border border-[#eef0f8] p-3"
@@ -99,7 +104,8 @@ export function SystemCommentsCard({
               {c.body}
             </p>
           </div>
-        ))}
+          ))
+        )}
 
         {isPanelist ? (
           <div className="rounded-[8px] border-2 border-dashed border-[#dfe3fb] py-1.5 px-3.5 bg-[#f7f8ff]">

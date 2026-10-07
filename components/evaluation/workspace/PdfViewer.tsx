@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, TriangleAlert } from 'lucide-react'
+import { blobUrlToPathname, isPrivateBlobPath, toSignedBlobPath } from '@/lib/blob'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
@@ -32,7 +33,13 @@ import type {
 } from '@embedpdf/plugin-annotation'
 
 export interface PdfViewerProps {
-  /** Public Vercel Blob URL of the submitted document. */
+  /**
+   * Vercel Blob URL of the submitted document, exactly as stored.
+   *
+   * Not necessarily public: every content prefix (chapter, defense, archiving,
+   * archives, templates) is private, so this is resolved through the signed
+   * `/api/blob/...` route below rather than handed to the engine as-is.
+   */
   src: string
   /** Adviser's display name — stamped on every annotation created in this viewer. */
   annotationAuthor: string
@@ -66,10 +73,70 @@ export function PdfViewer({
 }: PdfViewerProps) {
   const { engine, isLoading, error } = usePdfiumEngine()
 
+  // Resolve the stored Blob URL into something the engine can actually fetch.
+  // The engine fetches `src` itself and sends no credentials, so a private Blob
+  // URL comes back 401/403 and the document never loads. Fetching through the
+  // signed route first and handing over an object URL is what
+  // DocumentWorkspace already does -- see its blobUrlToPathname comment.
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null)
+  const [srcError, setSrcError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let objectUrl: string | null = null
+
+    async function resolve() {
+      if (!src) {
+        setSrcError('No document.')
+        return
+      }
+      const pathname = blobUrlToPathname(src)
+      const signedPath = toSignedBlobPath(src)
+      // Only legacy public blobs (e.g. user/*) can be fetched directly.
+      if (!isPrivateBlobPath(pathname) && !signedPath) {
+        setResolvedSrc(src)
+        return
+      }
+      if (!signedPath) {
+        setSrcError('Invalid document link.')
+        return
+      }
+      try {
+        const res = await fetch(signedPath, {
+          credentials: 'include',
+          headers: { Accept: 'application/pdf' },
+        })
+        if (cancelled) return
+        if (!res.ok) {
+          setSrcError(
+            res.status === 403
+              ? 'You do not have access to this document.'
+              : 'Please sign in to view this document.',
+          )
+          return
+        }
+        objectUrl = URL.createObjectURL(await res.blob())
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl)
+          return
+        }
+        setResolvedSrc(objectUrl)
+      } catch {
+        if (!cancelled) setSrcError('Could not load this document.')
+      }
+    }
+
+    void resolve()
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [src])
+
   const plugins = useMemo(
     () => [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url: src }],
+        initialDocuments: [{ url: resolvedSrc ?? '' }],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage),
@@ -135,8 +202,32 @@ export function PdfViewer({
         ],
       }),
     ],
-    [src, annotationAuthor, readOnly],
+    [resolvedSrc, annotationAuthor, readOnly],
   )
+
+  if (srcError) {
+    return (
+      <div className="flex h-full w-full min-h-[480px] flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <TriangleAlert className="size-6 text-[#d97706]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+          {srcError}
+        </p>
+      </div>
+    )
+  }
+
+  // Nothing is registered until the Blob has been fetched, so the engine never
+  // sees a URL it cannot load.
+  if (!resolvedSrc) {
+    return (
+      <div className="flex h-full w-full min-h-[480px] flex-col items-center justify-center gap-3 bg-[#fafbff]">
+        <Loader2 className="size-6 animate-spin text-[#707dff]" />
+        <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+          Loading document…
+        </p>
+      </div>
+    )
+  }
 
   if (error) {
     return (

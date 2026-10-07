@@ -22,6 +22,9 @@ The panelist already has a Session tab and a Resubmission tab on
 
 ## 2. Decisions
 
+Recorded during design review. Decisions 1–8 came from the initial consultation;
+9–13 came from the review pass and are confirmed by the client.
+
 | # | Question | Decision | Rationale |
 | --- | --- | --- | --- |
 | 1 | When can students submit links? | **Once the defense is scheduled.** Before that the feature does not exist for them. | The schedule is what makes the defense real — panelists and a date exist. |
@@ -32,6 +35,11 @@ The panelist already has a Session tab and a Resubmission tab on
 | 6 | Whose links? | **Group-level.** One shared set per group per defense, any member may add. | Per-member sets would be unmanageable on a 5-person group. |
 | 7 | Should a comment be markable resolved? | **No.** | Not requested, and it adds a state to the model for no consumer. Comments are just comments. |
 | 8 | Can the chair delete a panelist's comment? | **No.** | Panelists own their own threads. |
+| 9 | What happens to links on reschedule? | **Cleared — back to initial state.** | The group is being asked to defend again from scratch. |
+| 10 | Retyping links at the final defense? | **Yes — pre-fill from the proposal defense.** | Same URLs, months later. Fresh set, not a fresh chore. |
+| 11 | Ordering? | **Creation order. No manual reorder.** | One less interaction, one less column, one less action. |
+| 12 | Adviser access to the System tab? | **No — panelists only.** | An adviser is not a panelist. `CHAIR` *is* a `PanelistRole`, so the chair keeps access for free. |
+| 13 | Notification? | **On verdict only.** Never on a comment. | See §6. |
 
 **Consequence of decision 5:** the channel is one-way. Panelists discuss the
 system among themselves; students read the result. There is no in-product signal
@@ -41,6 +49,20 @@ that a point has been addressed.
 completion. The panelist tab is a discussion record of what was raised, not a
 task list. That is deliberate — a later "were these addressed?" feature would
 need its own design, and guessing at it now would be speculative.
+
+**Decision 9 needs no code.** `rescheduleForRedefense` soft-deletes the old
+schedule and creates a new row, so the set is empty by construction. The old
+rows survive for audit. Verified in `lib/actions/defense.ts`.
+
+**Decision 10 is a convenience, not a shared set.** Copying pre-fills the *new*
+schedule's rows; the proposal rows are untouched. Two independent sets, as
+decision 2 requires.
+
+**Decision 13 closes an existing gap.** `rescheduleForRedefense` notifies group
+members via `prisma.notification.createMany`, but `submitPanelistVerdict` sends
+nothing. This feature adds the verdict notification — one call, copying the
+existing pattern. Students are notified exactly once, when the result is final,
+not on every comment.
 
 **Consequence of decision 3:** links stay editable while panelists are reading.
 Two mitigations are designed in: links are soft-deleted so removing one cannot
@@ -83,12 +105,13 @@ model DefenseSystemLink {
   url         String
   /// One line describing what this link shows.
   note        String?
-  sortOrder   Int       @default(0)
   /// Set when a student removes a link a panelist has already commented on.
   /// The row survives so the thread stays attached.
   removedAt   DateTime?
   createdById Int
   createdBy   User       @relation(fields: [createdById], references: [id])
+  /// Copied from the proposal defense when the student pre-fills (decision 10).
+  copiedFromId Int?
   comments    SystemLinkComment[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -182,8 +205,17 @@ The links belong in the Defense tab students already have
 | --- | --- |
 | Not scheduled | Card does not render. |
 | Scheduled, no links | Card renders with the empty state and `+ Add link`. |
-| Scheduled, with links | List, add, edit, remove, reorder. |
+| Scheduled, with links | List in creation order, add, edit, remove. No reorder (decision 11). |
 | Verdict submitted | Inputs gone, "Locked" note shown, comments still readable. |
+
+**Pre-fill from the proposal defense** (decision 10): when the final defense set
+is empty and the proposal set is not, offer one button — *"Copy links from your
+proposal defense."* One click, then the student confirms each. This is a copy,
+not a link between the two sets.
+
+**Notification: none here** (decision 13). The one alert a student gets is the
+verdict notification, which already needs to be added to
+`submitPanelistVerdict` (§7).
 
 Students **read** panelist comments and cannot reply (decision 5).
 
@@ -215,25 +247,61 @@ intact.
 | Actor | Read links | Add/edit links | Comment | Reply |
 | --- | --- | --- | --- | --- |
 | Student (group member) | own group | own group, until verdict | — | — |
-| Panelist (assigned) | yes | no | yes | yes |
-| Chair | yes | no | yes | yes |
+| Panelist (`PANEL_MEMBER`) | yes | no | yes | yes |
+| Chair (`CHAIR`) | yes | no | yes | yes |
+| Adviser (not a panelist) | no | no | no | no |
 | Other faculty | no | no | no | no |
+
+The guard tests panelist membership by `DefensePanelist` row, which covers the
+chair without a special case — `PanelistRole` is `{ CHAIR, PANEL_MEMBER }`.
+Advisers are excluded by that same test (decision 12).
 
 Every server action re-checks these. The route is not the guard — consistent
 with the rest of the codebase, where `proxy.ts` handles role roots and actions
 re-verify.
+
+## 8.1 Notification
+
+One notification, at verdict submission (decision 13):
+
+| Trigger | Recipients | Content |
+| --- | --- | --- |
+| Chair submits verdict | every group member | Result + a link to the Defense tab |
+
+**No notification on a comment.** A student is not told they have new feedback;
+they see it when they open the Defense tab. This is deliberate — comment alerts
+would multiply into noise, and the verdict is the only result that demands a
+decision.
+
+Implementation note: `submitPanelistVerdict` (`lib/actions/defense.ts`) currently
+sends no notification, while `rescheduleForRedefense` already notifies group
+members with `prisma.notification.createMany`. Copy that pattern. Keep it in a
+`try`/`catch` so a failed notification cannot roll back a submitted verdict.
 
 ## 9. Out of scope
 
 - Students replying (decision 5)
 - Marking a comment resolved, or any completion tracking (decision 7)
 - The chair deleting or editing a panelist's comment (decision 8)
+- Manual link reordering (decision 11 — creation order)
+- Adviser access to the System tab (decision 12)
+- Notification on a comment (decision 13 — verdict only)
 - Rich text — comments are plain text, matching the existing annotation comment
 - Attachments or screenshots on a comment
-- Email or in-app notification when a comment is posted
 - Link previews / thumbnails (would require server-side fetching of auth-walled
   pages, which will fail)
 - Any change to the defense verdict flow
+
+## 9.1 Archive behaviour
+
+When a defense is archived to the capstone repository, links and comments are
+kept as a historical record and the set becomes read-only (decision confirmed).
+The links are not rewritten and not re-fetched — external targets rot, so the
+archive preserves *what was submitted and discussed*, not a guarantee the URL
+still resolves.
+
+On reschedule the old schedule is soft-deleted with its links intact, reachable
+only through audit. Students never see the cleared set (decision 9).
 
 ## 10. Open questions
 
@@ -241,6 +309,9 @@ None blocking. One to settle during implementation, which does not change the
 model: **should a thread with replies collapse to a summary line when closed?**
 Default is to keep it expanded — with no resolve state, the discussion is the
 only record and hiding it would work against the student-side read.
+
+Decisions 1–13 are all settled. Anything not listed as a decision here was
+answered during the review and needs no further sign-off.
 
 ## 11. Where this lands
 

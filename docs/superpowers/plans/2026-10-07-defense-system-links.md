@@ -4,7 +4,30 @@
 **Date:** 2026-10-07
 **Status:** Plan only — no code written. Each task needs approval before starting.
 
-Seven tasks, sequential. Tasks 1–3 are verifiable without UI; 5 and 6 depend on 4.
+Eight tasks, sequential. Tasks 1–3 are verifiable without UI; 5 and 6 depend on 4.
+Revised after design review — decisions 9–13 landed, and one was dropped.
+
+| # | Task | Needs DB | Needs UI |
+| --- | --- | --- | --- |
+| 1 | Pure helpers + tests | no | no |
+| 2 | Schema + migration | yes | no |
+| 3 | Schedule-scoped guard | yes | no |
+| 4 | Server actions | yes | no |
+| 4b | Verdict notification | yes | no |
+| 5 | Panelist System tab | yes | yes |
+| 6 | Student System card | yes | yes |
+| 7 | Verify + docs | — | — |
+
+Decisions resolved during review and what they changed:
+
+- **9 (reschedule clears)** — no code. `rescheduleForRedefense` already
+  soft-deletes and recreates the schedule, so the new set is empty.
+- **11 (no reorder)** — `sortOrder` dropped from the model, reorder action and
+  drag interaction dropped from the plan.
+- **12 (panelists only)** — verified `PanelistRole` is `{ CHAIR, PANEL_MEMBER }`,
+  so one membership test covers the chair and excludes advisers. No special case.
+- **13 (verdict notification)** — found a real gap: `submitPanelistVerdict` sends
+  nothing. Became Task 4b, copying the existing `rescheduleForRedefense` pattern.
 
 ---
 
@@ -80,15 +103,22 @@ Additive only. Two models exactly as specified — no extra columns, no lock fla
 (the verdict already derives it).
 
 - `DefenseSystemLink` — `scheduleId`, `groupId`, `label`, `url`, `note`,
-  `sortOrder`, `removedAt`, `createdById`, `deletedAt`, timestamps
+  `copiedFromId`, `removedAt`, `createdById`, `deletedAt`, timestamps
 - `SystemLinkComment` — `linkId`, `authorId`, `body`, `parentId`,
   `deletedAt`, timestamps
+
+**No `sortOrder` column** (decision 11). Order by `createdAt`. Dropping it
+removes the reorder action and the drag interaction from later tasks too.
 
 Add back-relations on `DefenseSchedule`, `Group`, and `User`. Follow existing
 soft-delete convention: `deletedAt DateTime?` plus a `@@index([deletedAt])`.
 
 `onDelete: Cascade` from link to comments is correct — a hard-deleted schedule
 takes its comments with it.
+
+No reset logic for reschedule (decision 9): `rescheduleForRedefense` soft-deletes
+the old schedule and creates a new row, so the new set is empty by construction.
+Verified — nothing to build.
 
 **Verify:**
 ```
@@ -110,28 +140,27 @@ One new function. Does not touch the existing guards — other features rely on
 their current behaviour and changing it would ripple.
 
 ```ts
-export async function requireScheduleAccess(scheduleId: number) {
+export async function requireSchedulePanelist(scheduleId: number) {
   const session = await requireFaculty()
   if (!session) return null
 
+  // Panelist membership covers both roles: PanelistRole is { CHAIR, PANEL_MEMBER }.
+  // Advisers are excluded because they have no DefensePanelist row (decision 12).
   const schedule = await prisma.defenseSchedule.findFirst({
     where: {
       id: scheduleId,
       deletedAt: null,
-      OR: [
-        { panelists: { some: { userId: +session.user.id, deletedAt: null } } },
-        { createdByUser: { role: { in: ['ADMIN', 'SUPERADMIN'] } } },
-      ],
+      panelists: { some: { userId: +session.user.id, deletedAt: null } },
     },
-    select: { id: true, groupId: true, verdict: true },
+    select: { id: true, groupId: true, verdict: true, type: true },
   })
   return schedule ? { session, schedule } : null
 }
 ```
 
-Verify the `Faculty` model actually has a `role` before writing that predicate —
-if chairing is tracked elsewhere (a `Chair` record, a coordinator flag), match
-that instead. **Check the schema rather than guessing.**
+Verified against the schema: `PanelistRole` is `{ CHAIR, PANEL_MEMBER }`, so a
+single membership test grants the chair access and excludes advisers. No separate
+chair predicate, and no admin bypass — decision 12 is panelists only.
 
 The student side gets the equivalent check inside its own action: the student
 must belong to `schedule.groupId`. `requireStudent()` is also unscoped, so the
@@ -157,13 +186,17 @@ Two surfaces, one file, so the permission logic sits next to each other.
 - `updateSystemLink(linkId, formData)`
 - `removeSystemLink(linkId)` — sets `removedAt` + `deletedAt`, **never** a hard
   delete, and refuses if comments exist and `verdict !== 'PENDING'`
-- `reorderSystemLinks(scheduleId, orderedIds)` — only if sort order proves
-  worth it; drop it otherwise, it is the first thing to cut
+- `copyProposalLinks(scheduleId)` — pre-fills the final defense set from the
+  proposal defense set (decision 10). Reads the sibling schedule of the same
+  `groupId` with the other `DefenseType`, clones rows, sets `copiedFromId`.
+  Refuses when the current set is non-empty or the source is missing.
 
 **Panelist writes** — each re-asserts schedule access via Task 3's guard
 - `addSystemComment(linkId, formData)`
 - `replyToSystemComment(parentId, formData)` — `parentId` only accepts a root
   comment id; a reply to a reply nests two deep at most
+
+No reorder action (decision 11) — ordering is `createdAt`.
 
 Every URL goes through `isAllowedLinkUrl` **server-side**. Client validation is
 cosmetic.
@@ -177,6 +210,42 @@ panelist tab, `journey-${groupId}` for the student view.
 
 **Verify:** tsc clean. Manual: student adds a link, it appears; panelist comments,
 student sees it; a student cannot read another group's links.
+
+## Task 4b — Verdict notification
+
+**Edit:** `lib/actions/defense.ts` (`submitPanelistVerdict`)
+**Depends on:** Task 4
+
+One gap this feature closes (decision 13). `submitPanelistVerdict` currently
+sends no notification, so a student never learns their result. `rescheduleForRedefense`
+already does this correctly — copy its shape:
+
+```ts
+try {
+  const members = await prisma.student.findMany({
+    where: { groupId: schedule.groupId, deletedAt: null },
+    select: { userId: true },
+  })
+  const milestoneSlug = schedule.type === 'FINAL' ? 'final-defense' : 'proposal-defense'
+  if (members.length > 0) {
+    await prisma.notification.createMany({
+      data: members.map((m) => ({
+        userId: m.userId,
+        title: 'Defense verdict',
+        body: `${groupName} received ${verdict}.`,
+        href: `/student/milestone/${milestoneSlug}`,
+      })),
+    })
+  }
+} catch (notifyError) {
+  console.error('[submitPanelistVerdict | notify Error]:', notifyError)
+}
+```
+
+The `try`/`catch` is load-bearing: a failed notification must not roll back a
+submitted verdict. `NotificationPanel` already renders these rows, so no UI work.
+
+No notification on a comment — decision 13.
 
 ---
 
@@ -223,14 +292,19 @@ a reload, unknown tab still 404s.
 
 **Edit:** `components/milestones/defense/tabs/DefenseTabPanel.tsx`
 **New:** `components/milestones/defense/StudentSystemCard.tsx`
-**Depends on:** Tasks 4, 5
+**Depends on:** Tasks 4, 4b, 5
 
 Renders **only when the defense is scheduled** — no schedule, no card, not a
 disabled one. Below `MilestoneDefenseDetailsCard`, as a separate section.
 
 States per spec §6: scheduled-empty shows `+ Add link`; scheduled-with-links
-lists them; verdict submitted hides all inputs and shows a locked note while
-comments stay readable. Students read comments and cannot reply.
+lists them in creation order; verdict submitted hides all inputs and shows a
+locked note while comments stay readable. Students read comments and cannot
+reply.
+
+At the final defense, when the set is empty and the proposal set is not, show
+one button — *"Copy links from your proposal defense"* (decision 10). One click
+calls `copyProposalLinks`, then the student confirms each row.
 
 Add-link form: preset `<select>` plus a note line; `Other` reveals a free-text
 label. Group members share the set, so the card names the group rather than
@@ -267,11 +341,13 @@ Then update:
 
 ## Cut list
 
-If this runs long, these go first and nothing else changes:
+Already cut by decision 11: manual reordering and the `sortOrder` column.
 
-1. `reorderSystemLinks` and all `sortOrder` handling
-2. The note field — a label and URL may be enough
-3. Panelist replies — keep roots only, drops the `parentId` relation entirely
+If this runs long, these go next and nothing else changes:
+
+1. The note field — a label and URL may be enough
+2. Panelist replies — keep roots only, drops the `parentId` relation entirely
+3. `copyProposalLinks` — the student retypes; annoying, not broken
 
 ## Not doing
 

@@ -164,10 +164,35 @@ export function PdfViewer({
     <div className="h-full w-full min-h-[480px] overflow-hidden bg-[#fafbff]">
       <EmbedPDF engine={engine} plugins={plugins}>
         {({ activeDocumentId }) =>
-          activeDocumentId && (
+          activeDocumentId ? (
             <DocumentContent documentId={activeDocumentId}>
-              {({ isLoaded }) =>
-                isLoaded && (
+              {({ isLoaded, isLoading, isError }) => {
+                // These three states used to be collapsed into `isLoaded &&`,
+                // which rendered nothing at all -- so a document that failed to
+                // load, or never finished, showed a blank panel with no way to
+                // tell a slow load from a dead one. DocumentWorkspace already
+                // spells all three out; this mirrors that.
+                if (isError) {
+                  return (
+                    <div className="flex h-full w-full min-h-[480px] flex-col items-center justify-center gap-3 bg-[#fafbff]">
+                      <TriangleAlert className="size-6 text-[#d97706]" />
+                      <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+                        Failed to load this document.
+                      </p>
+                    </div>
+                  )
+                }
+                if (isLoading || !isLoaded) {
+                  return (
+                    <div className="flex h-full w-full min-h-[480px] flex-col items-center justify-center gap-3 bg-[#fafbff]">
+                      <Loader2 className="size-6 animate-spin text-[#707dff]" />
+                      <p className="font-sans font-medium text-[12.5px] leading-[18.75px] text-[#8a93b4]">
+                        Loading document…
+                      </p>
+                    </div>
+                  )
+                }
+                return (
                   <>
                     <AnnotationHydrator
                       documentId={activeDocumentId}
@@ -196,9 +221,9 @@ export function PdfViewer({
                     </GlobalPointerProvider>
                   </>
                 )
-              }
+              }}
             </DocumentContent>
-          )
+          ) : null
         }
       </EmbedPDF>
     </div>

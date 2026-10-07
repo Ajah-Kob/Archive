@@ -60,8 +60,6 @@ function FinalizedWorkspaceViewInner({
   // viewer imports them — same hydration path as useAnnotationDraft.
   const annotations = deserializeAnnotations(initialAnnotations ?? [])
   const [showComments, setShowComments] = useState(false)
-  // Minted inside PdfViewer; the comments panel needs it to select and scroll.
-  const [documentId, setDocumentId] = useState<string | null>(null)
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-[#fafbff]">
       {/* Header bar: back + context | finalized notice */}
@@ -138,26 +136,26 @@ function FinalizedWorkspaceViewInner({
         </div>
       )}
 
-      {/* Read-only document viewer + comments panel, mirroring the defense
-          finalized view: the panel sits beside the viewer and overlays it on
-          narrow viewports. */}
-      <div className="flex-1 min-h-0 flex">
-        <div className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area read-only">
-          <PdfViewer
-            src={submission.blobUrl}
-            annotationAuthor={submission.reviewedBy ?? 'Adviser'}
-            initialAnnotations={annotations as unknown as AnnotationTransferItem[]}
-            onActiveDocumentId={setDocumentId}
-            readOnly
-          />
-        </div>
-        {showComments && documentId && (
-          <ReadOnlyCommentsPanel
-            documentId={documentId}
-            annotations={annotations}
-            onClose={() => setShowComments(false)}
-          />
-        )}
+      {/* The panel is rendered by PdfViewer from inside its EmbedPDF tree, not
+          here as a sibling. useScroll resolves EmbedPDF's context, so a panel
+          mounted outside it cannot scroll to a page -- which is why the first
+          version of this showed the list but never navigated. */}
+      <div className="flex-1 min-h-0 relative bg-[#e8eaf4] epdf-viewer-area read-only">
+        <PdfViewer
+          src={submission.blobUrl}
+          annotationAuthor={submission.reviewedBy ?? 'Adviser'}
+          initialAnnotations={annotations as unknown as AnnotationTransferItem[]}
+          renderPanel={(id) =>
+            showComments ? (
+              <ReadOnlyCommentsPanel
+                documentId={id}
+                annotations={annotations}
+                onClose={() => setShowComments(false)}
+              />
+            ) : null
+          }
+          readOnly
+        />
       </div>
     </div>
   )

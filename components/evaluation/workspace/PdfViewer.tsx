@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Loader2, TriangleAlert } from 'lucide-react'
 import { blobUrlToPathname, isPrivateBlobPath, toSignedBlobPath } from '@/lib/blob'
 import { createPluginRegistration } from '@embedpdf/core'
@@ -60,7 +60,16 @@ export interface PdfViewerProps {
    * finalized view's comments panel, which selects and scrolls to annotations —
    * has no other way to reach it.
    */
-  onActiveDocumentId?: (documentId: string) => void
+  /**
+   * Rendered inside the EmbedPDF tree, beside the viewer, once the document is
+   * registered.
+   *
+   * It has to be inside, not a sibling: useScroll/useAnnotation resolve their
+   * capability from EmbedPDF's context, so a panel rendered outside cannot
+   * scroll to a page. That is why the finalized defense view hosts its own
+   * panel inside its tree while this component cannot.
+   */
+  renderPanel?: (documentId: string) => ReactNode
 }
 
 /**
@@ -78,7 +87,7 @@ export function PdfViewer({
   annotationAuthor,
   initialAnnotations,
   readOnly = false,
-  onActiveDocumentId,
+  renderPanel,
 }: PdfViewerProps) {
   const { engine, isLoading, error } = usePdfiumEngine()
 
@@ -264,7 +273,6 @@ export function PdfViewer({
     <div className="h-full w-full min-h-[480px] overflow-hidden bg-[#fafbff]">
       <EmbedPDF engine={engine} plugins={plugins}>
         {({ activeDocumentId }) => {
-          if (activeDocumentId) onActiveDocumentId?.(activeDocumentId)
           return activeDocumentId ? (
             <DocumentContent documentId={activeDocumentId}>
               {({ isLoaded, isLoading, isError }) => {
@@ -300,12 +308,15 @@ export function PdfViewer({
                       initialAnnotations={initialAnnotations}
                     />
                     <GlobalPointerProvider documentId={activeDocumentId}>
+                    {/* Flex row so a rendered panel sits beside the viewer rather
+                        than below it. */}
+                    <div className="flex h-full w-full min-h-0">
                     <Viewport documentId={activeDocumentId}>
                       <ZoomGestureWrapper documentId={activeDocumentId} enablePinch enableWheel>
                       <Scroller
                         documentId={activeDocumentId}
                         renderPage={({ width, height, pageIndex }) => (
-                          <div style={{ width, height }}>
+                          <div style={{ width, height }} data-page-index={pageIndex}>
                             <PagePointerProvider
                               documentId={activeDocumentId}
                               pageIndex={pageIndex}
@@ -319,6 +330,8 @@ export function PdfViewer({
                       />
                       </ZoomGestureWrapper>
                     </Viewport>
+                    {renderPanel?.(activeDocumentId)}
+                    </div>
                     </GlobalPointerProvider>
                   </>
                 )

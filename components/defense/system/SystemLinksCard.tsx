@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ExternalLink, Link2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Link2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { timeAgo } from '@/lib/helper'
 import {
   addSystemLink,
@@ -37,6 +37,8 @@ export function SystemLinksCard({
   const [links, setLinks] = useState<StudentSystemLink[]>(initialLinks)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [removingId, setRemovingId] = useState<number | null>(null)
+  const [isRemoving, setIsRemoving] = useState(false)
 
   // Sync local state when the server re-fetches (router.refresh).
   useEffect(() => {
@@ -61,11 +63,18 @@ export function SystemLinksCard({
     return { success: true, message: res.message, payload: null }
   }
 
-  async function onRemove(linkId: number) {
-    const res = await removeSystemLink(linkId)
+  async function confirmRemove() {
+    if (removingId === null) return
+    setIsRemoving(true)
+    const targetId = removingId
+    setRemovingId(null)
+
+    const res = await removeSystemLink(targetId)
+    setIsRemoving(false)
     if (res.success) {
       toast.success(res.message)
       setEditingId(null)
+      setLinks((prev) => prev.filter((l) => l.id !== targetId))
       router.refresh()
     } else {
       toast.error(res.message)
@@ -172,7 +181,7 @@ export function SystemLinksCard({
                       <>
                         <button
                           type="button"
-                          onClick={() => onRemove(link.id)}
+                          onClick={() => setRemovingId(link.id)}
                           aria-label={`Remove ${link.label}`}
                           className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] font-sans font-bold text-[12px] leading-[18px] text-[#d34d5c] hover:opacity-80 transition-opacity shrink-0"
                         >
@@ -220,6 +229,44 @@ export function SystemLinksCard({
           </div>
         ) : null}
       </div>
+
+      {/* Confirmation Modal */}
+      {removingId !== null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-[16px] bg-white p-6 shadow-2xl border border-[#dfe3fb]">
+            <div className="flex items-center gap-3 text-[#d34d5c]">
+              <div className="flex size-10 items-center justify-center rounded-full bg-[#fdf2f4]">
+                <AlertTriangle className="size-5" />
+              </div>
+              <h3 className="font-sans text-[16px] font-bold text-[#2c3159]">
+                Remove Link?
+              </h3>
+            </div>
+            <p className="mt-3 font-sans text-[13.5px] text-[#5a6382]">
+              Are you sure you want to remove this link? This action cannot be
+              undone.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                disabled={isRemoving}
+                onClick={() => setRemovingId(null)}
+                className="h-[36px] px-4 rounded-[10px] font-sans text-[13px] font-semibold text-[#6b7399] hover:text-[#2c3159] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isRemoving}
+                onClick={confirmRemove}
+                className="h-[36px] px-4 rounded-[10px] bg-[#d34d5c] font-sans text-[13px] font-bold text-white hover:bg-[#b03a48] transition-colors disabled:opacity-60"
+              >
+                {isRemoving ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

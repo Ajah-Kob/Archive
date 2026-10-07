@@ -204,7 +204,7 @@ export async function addSystemLink(scheduleId: number, formData: FormData) {
   const parsed = readLinkForm(formData)
   if ('error' in parsed) return fail(parsed.error)
 
-  await prisma.defenseSystemLink.create({
+  const created = await prisma.defenseSystemLink.create({
     data: {
       scheduleId,
       groupId: access.schedule.groupId,
@@ -213,11 +213,20 @@ export async function addSystemLink(scheduleId: number, formData: FormData) {
       note: parsed.note,
       createdById: +access.session.user.id,
     },
+    select: {
+      id: true,
+      label: true,
+      url: true,
+      note: true,
+      updatedAt: true,
+      createdBy: { select: { name: true } },
+      _count: { select: { comments: { where: { deletedAt: null } } } },
+    },
   })
 
   revalidateTag(`system-links-${scheduleId}`, FRESH)
   revalidateFeature('defense')
-  return ok('Link added.')
+  return ok('Link added.', created)
 }
 
 export async function updateSystemLink(linkId: number, formData: FormData) {

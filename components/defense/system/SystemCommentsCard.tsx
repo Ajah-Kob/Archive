@@ -57,9 +57,8 @@ export function SystemCommentsCard({
 
   return (
     <div className="rounded-[14px] border border-[#e4e7fb] bg-white shadow-[0_2px_12px_rgba(112,125,255,0.04)]">
-      <div className="flex items-center justify-between pb-3 border-b border-[#eef0f8]">
+      <div className="flex items-center justify-between border-b border-[#eef0f8]">
         <h4 className="p-4 font-sans text-[13.5px] font-bold text-[#2c3159] flex items-center gap-2">
-          <MessageSquare className="size-4 text-[#707dff]" />
           Panelist Comments
           <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11px] font-bold text-[#707dff]">
             {comments.length}
@@ -67,7 +66,7 @@ export function SystemCommentsCard({
         </h4>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2.5">
+      <div className="p-4 flex flex-col gap-2.5">
         {comments.map((c) => (
           <div
             key={c.id}
@@ -103,7 +102,7 @@ export function SystemCommentsCard({
         ))}
 
         {isPanelist ? (
-          <div className="rounded-[12px] border-2 border-dashed border-[#dfe3fb] py-2 px-3.5 bg-[#f7f8ff]">
+          <div className="rounded-[8px] border-2 border-dashed border-[#dfe3fb] py-1.5 px-3.5 bg-[#f7f8ff]">
             {showComposer ? (
               <SystemCommentComposer
                 linkId={linkId}
@@ -123,7 +122,7 @@ export function SystemCommentsCard({
               <button
                 type="button"
                 onClick={() => setShowComposer(true)}
-                className="flex w-full items-center justify-center gap-1.5 h-fit py-2 font-sans text-[13px] font-bold text-[#707dff] hover:text-[#5062f5] transition-colors"
+                className="flex w-full items-center justify-center gap-1.5 h-fit font-sans text-[13px] font-bold text-[#707dff] hover:text-[#5062f5] transition-colors"
               >
                 <MessageSquare className="size-4" />
                 Add comment

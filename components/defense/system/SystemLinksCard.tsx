@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ExternalLink, Link2, Pencil, Plus, Trash2 } from 'lucide-react'
@@ -38,6 +38,11 @@ export function SystemLinksCard({
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
 
+  // Sync local state when the server re-fetches (router.refresh).
+  useEffect(() => {
+    setLinks(initialLinks)
+  }, [initialLinks])
+
   type ActionState = { success: boolean; message: string; payload: unknown }
 
   async function onAdd(_prev: ActionState | null, formData: FormData) {
@@ -48,6 +53,10 @@ export function SystemLinksCard({
     }
     toast.success(res.message)
     setShowForm(false)
+    // Optimistic update: add the new link to local state immediately.
+    if (res.payload) {
+      setLinks((prev) => [...prev, res.payload as StudentSystemLink])
+    }
     router.refresh()
     return { success: true, message: res.message, payload: null }
   }
@@ -77,35 +86,24 @@ export function SystemLinksCard({
   }
 
   const [addState, addAction, isPending] = useActionState(onAdd, null)
-  const [editState, editAction, isEditPending] = useActionState(onSaveEdit, null)
+  const [editState, editAction, isEditPending] = useActionState(
+    onSaveEdit,
+    null,
+  )
 
   return (
     <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] overflow-hidden">
       {/* Header */}
       <div className="border-[#f0f2fa] border-b w-full shrink-0">
-        <div className="flex items-center justify-between px-[18px] pt-[15px] pb-[16px] w-full">
+        <div className="flex items-center justify-between h-fit w-full">
           <div className="flex items-center gap-2">
-            <p className="font-['Sora',sans-serif] font-bold text-[12.5px] leading-[normal] tracking-[-0.125px] text-[#1e3a8a]">
+            <h4 className="p-4 font-sans text-[13.5px] font-bold text-[#2c3159] flex items-center gap-2">
               System Links
-            </p>
-            <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11px] font-bold text-[#707dff]">
-              {links.length}
-            </span>
+              <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11px] font-bold text-[#707dff]">
+                {links.length}
+              </span>
+            </h4>
           </div>
-          {editable ? (
-            <button
-              type="button"
-              onClick={() => setShowForm((v) => !v)}
-              className="flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
-            >
-              <Plus className="size-3" />
-              Add link
-            </button>
-          ) : (
-            <span className="flex items-center gap-[5px] h-[32px] px-[13px] py-[6px] rounded-[8px] bg-[#eef0f6] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382]">
-              Locked
-            </span>
-          )}
         </div>
       </div>
 
@@ -144,7 +142,8 @@ export function SystemLinksCard({
                     </p>
                   ) : null}
                   <p className="pt-[4px] font-sans font-medium text-[11.5px] leading-[18px] text-[#9ea8c6]">
-                    added by {link.createdBy.name} · updated {timeAgo(link.updatedAt)}
+                    added by {link.createdBy.name} · updated{' '}
+                    {timeAgo(link.updatedAt)}
                   </p>
                 </div>
 
@@ -155,7 +154,7 @@ export function SystemLinksCard({
                         type="button"
                         onClick={() => setEditingId(link.id)}
                         aria-label={`Edit ${link.label}`}
-              className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
+                        className="flex items-center gap-[5px] h-fit px-[13px] py-[6px] rounded-[8px] bg-[#f0f2fa] border border-[#e0e3f0] font-sans font-bold text-[12px] leading-[18px] text-[#5a6382] hover:bg-gray-50 transition-colors shrink-0"
                       >
                         <Pencil className="size-3" />
                         Edit
@@ -208,11 +207,11 @@ export function SystemLinksCard({
 
         {/* Dashed add link container — same pattern as add comment */}
         {editable && !showForm ? (
-          <div className="rounded-[12px] border-2 border-dashed border-[#dfe3fb] py-2 px-3.5 bg-[#f7f8ff]">
+          <div className="rounded-[8px] border-2 border-dashed border-[#dfe3fb] py-1.5 px-3.5 bg-[#f7f8ff]">
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="flex w-full items-center justify-center gap-1.5 h-fit py-2 font-sans text-[13px] font-bold text-[#707dff] hover:text-[#5062f5] transition-colors"
+              className="flex w-full items-center justify-center gap-1.5 h-fit font-sans text-[13px] font-bold text-[#707dff] hover:text-[#5062f5] transition-colors"
             >
               <Link2 className="size-4" />
               Add link

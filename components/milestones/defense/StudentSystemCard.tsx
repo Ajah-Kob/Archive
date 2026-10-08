@@ -40,7 +40,7 @@ export function StudentSystemCard({
         editable={linksAreEditable(verdict)}
       />
 
-      {initialLinks.length === 0 ? (
+      {verdict === 'PENDING' ? null : initialLinks.length === 0 ? (
         <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0px_2px_12px_0px_rgba(30,58,138,0.06),0px_1px_3px_0px_rgba(0,0,0,0.04)] overflow-hidden">
           <div className="border-[#f0f2fa] border-b w-full shrink-0">
             <div className="flex items-center px-[18px] pt-[15px] pb-[16px] w-full">

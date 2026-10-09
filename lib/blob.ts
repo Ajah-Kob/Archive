@@ -117,14 +117,6 @@ export function isPrivateBlobUrl(blobUrl: string | null | undefined): boolean {
   return isPrivateBlobPath(pathname)
 }
 
-// Compatibility aliases for callers that import the earlier prose names.
-// Keep the canonical names above (blobUrlToPathname / toSignedBlobPath) and
-// expose the older identifiers so parallel subtasks don't break.
-export const extractBlobPathname = blobUrlToPathname
-export const getBlobSignedUrl = toSignedBlobPath
-export const toSignedBlobHref = toSignedBlobPath
-export const getBlobPathname = blobUrlToPathname
-
 // ───────────────────────────── Repository note ─────────────────────────────
 //
 // `archives/*` is PRIVATE, like every other content prefix.

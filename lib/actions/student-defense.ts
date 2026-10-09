@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma'
 import { cacheTag, cacheLife, revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
 import { audit } from '@/lib/actions/audit'
+import { sanitizeBlobFilename } from '@/lib/helper'
 import { sectionIdForGroup } from '@/lib/group'
 import type {
   DefenseType,
@@ -141,11 +142,6 @@ export interface StudentDefenseSessionPayload {
 }
 
 // ───────────────────────────── Helpers ─────────────────────────────
-
-function sanitizeBlobFilename(fileName: string): string {
-  const cleaned = fileName.replace(/[^\w.\- ]+/g, '_').trim()
-  return cleaned.length > 0 ? cleaned : 'document.pdf'
-}
 
 /**
  * Derives the display status for a resubmission from its panelist reviews.

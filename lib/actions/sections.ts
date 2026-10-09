@@ -8,7 +8,7 @@ import { authOptions } from '@/lib/authOptions'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import type { SectionData } from '@/components/sections/main/SectionDataRow'
 import type { StudentData } from '@/components/my-sections/students/StudentDataRow'
-import { generateJoinCode, getInitials, timeAgo } from '@/lib/helper'
+import { activityStatusFor, generateJoinCode, getInitials } from '@/lib/helper'
 import { requireCoordinator } from '@/lib/actions/guard'
 import {
   authorizeSectionAccess,
@@ -107,15 +107,6 @@ function sectionFailureResponse(
 
   console.error(`[${actionName} | Error]:`, error)
   return { success: false, message: fallbackMessage }
-}
-
-// A student is considered "active now" if they signed in within this window.
-const ACTIVE_NOW_MS = 5 * 60 * 1000
-
-function activityStatusFor(loggedInAt: Date | null): 'active' | string {
-  if (!loggedInAt) return 'Never'
-  if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
-  return timeAgo(loggedInAt)
 }
 
 async function getSectionsData() {

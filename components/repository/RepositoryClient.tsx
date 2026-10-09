@@ -30,6 +30,8 @@ import { EditArchiveModal } from '@/components/repository/EditArchiveModal'
 import { formatAuthorsForRepository, formatRepositoryDate } from '@/lib/archiving/validation'
 import { AppDateRangePicker } from '@/components/ui/AppDateRangePicker'
 import { toSignedBlobPath } from '@/lib/blob'
+import { useIsCoarsePointer } from '@/lib/hooks/useMediaQuery'
+import { PdfViewer } from '@/components/archiving/PdfViewer'
 import { toast } from 'sonner'
 import {
   favoriteArchive,
@@ -115,6 +117,41 @@ function DetailsModal({ item, onClose }: { item: RepositoryArchiveRow | null; on
           >
             Close
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// In-app reader for a published capstone. Renders the headless EmbedPDF
+// viewer — custom UI, no browser toolbar, no download button — instead of a
+// new tab. The viewer fetches the signed route itself from `item.blobUrl`
+// and revokes its object URL on unmount, so this modal holds no bytes.
+function ReaderModal({ item, onClose }: { item: RepositoryArchiveRow | null; onClose: () => void }) {
+  if (!item) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} role="presentation">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Read document: ${item.title}`}
+        className="relative w-full max-w-[880px] h-[85vh] bg-white rounded-[14px] shadow-[0_24px_64px_rgba(16,19,58,0.16)] border border-[#eceef8] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-[#f0f2fa] shrink-0">
+          <h2 className="font-heading font-bold text-[15px] leading-[22px] text-[#10133a] truncate">{item.title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close reader"
+            className="size-[30px] rounded-[10px] bg-[#fafbff] border border-[#eceef8] flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
+          >
+            <X className="size-[14px] text-[#8a93b4]" strokeWidth={2} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0">
+          <PdfViewer src={item.blobUrl} fileName={item.fileName} />
         </div>
       </div>
     </div>
@@ -240,12 +277,17 @@ export function RepositoryClient({
   canFavorite,
 }: RepositoryClientProps) {
   const router = useRouter()
+  // EmbedPDF workspaces are desktop-only (touch gestures unresolved), so the
+  // in-app reader is desktop-only too. Coarse pointers keep the previous
+  // new-tab viewer rather than losing reading entirely on mobile.
+  const isCoarsePointer = useIsCoarsePointer()
   const [searchTerm, setSearchTerm] = useState('')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [sortValue, setSortValue] = useState<SortValue>('newest')
   const [dateFrom, setDateFrom] = useState<Date | null>(null)
   const [dateTo, setDateTo] = useState<Date | null>(null)
   const [selected, setSelected] = useState<RepositoryArchiveRow | null>(null)
+  const [readerTarget, setReaderTarget] = useState<RepositoryArchiveRow | null>(null)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<RepositoryArchiveRow | null>(null)
   const [editTarget, setEditTarget] = useState<RepositoryArchiveRow | null>(null)
@@ -387,12 +429,21 @@ export function RepositoryClient({
     setDateTo(null)
   }
 
+  // Desktop opens the in-app reader (headless EmbedPDF — no browser toolbar,
+  // no download button). Coarse pointers keep the previous new-tab viewer:
+  // EmbedPDF workspaces are desktop-only, and blocking reading on mobile
+  // would be a regression, not a policy.
+  //
   // Archive PDFs are private blobs, so the raw vercel-storage URL is not
-  // openable in the browser — it 401s. Fetch through the auth-gated signed
-  // route instead, then hand the tab an object URL. This also lets a signed-out
-  // visitor (the /repository page itself is ungated) get a readable toast
-  // rather than a raw 401 JSON page in a new tab.
+  // openable in the browser — it 401s. The mobile path fetches through the
+  // auth-gated signed route instead, then hands the tab an object URL. This
+  // also lets a signed-out visitor (the /repository page itself is ungated)
+  // get a readable toast rather than a raw 401 JSON page in a new tab.
   const openArchive = async (item: RepositoryArchiveRow) => {
+    if (!isCoarsePointer) {
+      setReaderTarget(item)
+      return
+    }
     // window.open MUST run synchronously inside the click handler. Browsers
     // only permit it while the page still holds live user activation, and an
     // `await` yields to the event loop — so opening the tab after the fetch
@@ -741,6 +792,8 @@ export function RepositoryClient({
       </div>
 
       <DetailsModal item={selected} onClose={() => setSelected(null)} />
+
+      <ReaderModal item={readerTarget} onClose={() => setReaderTarget(null)} />
 
       <DeleteArchiveModal archive={deleteTarget} onClose={() => setDeleteTarget(null)} />
 

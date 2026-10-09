@@ -12,8 +12,11 @@ import { RepositoryClient } from '@/components/repository/RepositoryClient'
  * `CapstoneArchive.blobUrl` is still the full https://…vercel-storage.com/archives/…
  * URL, but the browser must NOT open it directly — it 401s.
  *
- * `RepositoryClient` derives the pathname and fetches
- * `GET /api/blob/archives/...` with credentials, then opens an object URL.
+ * On desktop `RepositoryClient` opens the in-app reader (headless EmbedPDF —
+ * no browser toolbar, no download button). The viewer derives the pathname
+ * and fetches `GET /api/blob/archives/...` with credentials. On coarse
+ * pointers the reader is unavailable (EmbedPDF workspaces are desktop-only),
+ * so opening falls back to a new tab with an object URL.
  * The route's global gate is the entire policy: any signed-in, non-deleted
  * user of any role (GUEST included) may read published work; signed-out
  * callers get 401. See lib/blob.ts for the full note.

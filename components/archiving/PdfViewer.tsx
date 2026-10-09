@@ -33,17 +33,17 @@ export interface ArchivingPdfViewerProps {
 }
 
 /**
- * Archiving PdfViewer — fetches via signed route /api/blob/archiving/... instead of raw blobUrl.
+ * Archiving PdfViewer — fetches via signed route /api/blob/... instead of raw blobUrl.
  *
- * DB still stores the full https://…vercel-storage.com/archiving/{groupId}/… URL, but
- * the client never puts that URL in an <a href> or <EmbedPDF src>. The pathname is
+ * DB still stores the full https://…vercel-storage.com/… URL, but the client
+ * never puts that URL in an <a href> or <EmbedPDF src>. The pathname is
  * derived via `blobUrlToPathname` (new URL(blobUrl).pathname slice) and fetched
  * with credentials from the auth-gated route. 401/403 are surfaced with a toast
  * and an inline unauthorized state; the PDF is rendered via EmbedPDF from a
  * fetched object URL, not the raw public URL.
  *
- * Repository `archives/*` is also private and is not routed through this
- * viewer — RepositoryClient opens it via the signed route instead.
+ * Accepted prefixes: `archiving/*` (review workspace) and `archives/*`
+ * (repository reader). Anything else renders "Invalid document link."
  * See lib/blob.ts + app/repository/page.tsx note.
  */
 export function PdfViewer({ src, fileName }: ArchivingPdfViewerProps) {
@@ -66,7 +66,10 @@ export function PdfViewer({ src, fileName }: ArchivingPdfViewerProps) {
         setFetchError('No document.')
         return
       }
-      if (!signedPath || !pathname.startsWith('archiving/')) {
+      if (
+        !signedPath ||
+        (!pathname.startsWith('archiving/') && !pathname.startsWith('archives/'))
+      ) {
         setFetchError('Invalid document link.')
         return
       }
@@ -241,7 +244,7 @@ export function PdfViewer({ src, fileName }: ArchivingPdfViewerProps) {
           </code>{' '}
           and is fetched via the signed route{' '}
           <code className="rounded bg-[#f4f6ff] px-1 py-0.5 text-[#707dff]">
-            /api/blob/archiving/...
+            /api/blob/{pathname.startsWith('archives/') ? 'archives' : 'archiving'}/...
           </code>{' '}
           — not the raw blob URL.
         </p>

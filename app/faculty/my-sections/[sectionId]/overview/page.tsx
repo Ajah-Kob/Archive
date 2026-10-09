@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
-import { unstable_noStore } from 'next/cache'
 import { getCoordinatorSectionById } from '@/lib/actions/sections'
+import { getSectionActivityFeed } from '@/lib/actions/section-activity'
 import { SectionOverviewCard } from '@/components/my-sections/overview/SectionOverviewCard'
 import { SectionActivityFeed } from '@/components/my-sections/overview/SectionActivityFeed'
 
@@ -9,12 +9,6 @@ export default async function MySectionOverviewPage({
 }: {
   params: Promise<{ sectionId: string }>
 }) {
-  // Opt out of static prerendering — the page uses session-gated data and
-  // server actions that call headers(), which is forbidden in a prerender
-  // scope. With cacheComponents enabled, unstable_noStore() is the correct
-  // way to mark this page as dynamic.
-  unstable_noStore()
-
   const { sectionId } = await params
   const parsedId = parseInt(sectionId, 10)
   if (Number.isNaN(parsedId)) notFound()
@@ -26,10 +20,15 @@ export default async function MySectionOverviewPage({
   // Reuse getCoordinatorSectionById payload — zero extra Prisma queries.
   const { section } = payload
 
+  // Fetch the feed server-side: the page already has the session context, and
+  // a client-side action call hangs under cacheComponents. Pass entries down.
+  const activityRes = await getSectionActivityFeed(parsedId)
+  const entries = activityRes.success && activityRes.payload ? activityRes.payload : null
+
   return (
     <div className="flex flex-col gap-4 sm:gap-5 w-full">
       <SectionOverviewCard section={section} />
-      <SectionActivityFeed sectionId={parsedId} />
+      <SectionActivityFeed entries={entries} />
     </div>
   )
 }

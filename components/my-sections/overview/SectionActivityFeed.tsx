@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Activity, Check, Copy, FileUp, Flag, Layers, PenLine, Shield, UserPlus, Users } from 'lucide-react'
-import { getSectionActivityFeed, type SectionActivityEntry } from '@/lib/actions/section-activity'
+import type { SectionActivityEntry } from '@/lib/actions/section-activity'
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso)
@@ -109,53 +108,17 @@ function describe(entry: SectionActivityEntry): string {
  * section. Mirrors the resubmission feed's visual language (icon tile, rail,
  * actor + description + timestamp) but scoped to the section.
  *
- * Rendered inside the coordinator workspace; the page already gates access.
+ * Entries are fetched server-side by the page and passed in — no client-side
+ * action call.
  */
-export function SectionActivityFeed({ sectionId }: { sectionId: number }) {
-  const [entries, setEntries] = useState<SectionActivityEntry[] | null>(null)
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        console.log('[ActivityFeed] fetching for sectionId:', sectionId)
-        const res = await getSectionActivityFeed(sectionId)
-        console.log('[ActivityFeed] response:', res)
-        if (cancelled) return
-        if (res.success && res.payload) {
-          setEntries(res.payload)
-          setError(false)
-        } else {
-          console.warn('[ActivityFeed] action returned error:', res.message)
-          setError(true)
-        }
-      } catch (err) {
-        console.error('[ActivityFeed] fetch threw:', err)
-        if (!cancelled) setError(true)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
-
-  if (error) {
+export function SectionActivityFeed({ entries }: { entries: SectionActivityEntry[] | null }) {
+  if (entries === null) {
     return (
       <div className="rounded-[14px] border border-[#eceef8] bg-white p-5 shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)]">
         <h2 className="font-['Sora',sans-serif] font-bold text-[13.5px] text-[#1e3a8a]">Activity</h2>
         <p className="mt-2 font-sans text-[12.5px] text-[#8a93b4]">
           Could not load activity. Please try again.
         </p>
-      </div>
-    )
-  }
-
-  if (entries === null) {
-    return (
-      <div className="rounded-[14px] border border-[#eceef8] bg-white p-5 shadow-[0_4px_24px_rgba(112,125,255,0.08),0_1px_4px_rgba(0,0,0,0.04)]">
-        <h2 className="font-['Sora',sans-serif] font-bold text-[13.5px] text-[#1e3a8a]">Activity</h2>
-        <p className="mt-2 font-sans text-[12.5px] text-[#8a93b4]">Loading activity…</p>
       </div>
     )
   }

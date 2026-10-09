@@ -20,12 +20,9 @@ import {
   ScrollText,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useRef } from 'react'
 import { roleHome } from '@/lib/helper'
 import { CountBadge } from '@/components/ui/CountBadge'
 import { useIndicatorCounts } from '@/lib/hooks/useIndicatorCounts'
-import { isBadgeVisible } from '@/lib/indicators'
-import { useIndicators } from '@/store/useIndicators'
 
 type BadgeTone = 'critical' | 'warning' | 'info'
 
@@ -88,37 +85,6 @@ export function NavLinks({
   // everyone else sees only their own panelist queue.
   const chairLike = isAdmin || isProgramChair
   const counts = useIndicatorCounts()
-  const seen = useIndicators((state) => state.seen)
-  const markSeen = useIndicators((state) => state.markSeen)
-  const markedPath = useRef<string | null>(null)
-
-  // Seen-semantics: entering a section records its badges' counts as the
-  // baseline, hiding them until counts rise above it. Guarded to once per
-  // pathname so later refetches while stationary can still re-trigger.
-  useEffect(() => {
-    if (!counts || markedPath.current === pathname) return
-    markedPath.current = pathname
-    for (const section of sections) {
-      for (const item of section.items) {
-        if (isNavActive(pathname, item.href)) {
-          if (item.countKey) markSeen(item.countKey, counts[item.countKey] ?? 0)
-          if (item.criticalKey) markSeen(item.criticalKey, counts[item.criticalKey] ?? 0)
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, counts])
-
-  // Re-baseline downward: work resolved elsewhere must never leave a stale
-  // baseline that hides genuinely new items later. Strictly lower-only, so
-  // this never writes an identical value back into the store.
-  useEffect(() => {
-    if (!counts) return
-    for (const [key, value] of Object.entries(counts)) {
-      const baseline = seen[key]
-      if (baseline != null && value < baseline) markSeen(key, value)
-    }
-  }, [counts, seen, markSeen])
 
   const sections: NavSection[] = [
     {
@@ -220,19 +186,9 @@ export function NavLinks({
               {visibleItems.map((item) => {
                 const isActive = isNavActive(pathname, item.href)
                 const Icon = item.icon
-                const rawCount = item.countKey ? (counts?.[item.countKey] ?? 0) : 0
-                // Seen-suppressed display count: CountBadge already hides
-                // zero, so pass 0 when the section was already opened.
-                const count =
-                  item.countKey && isBadgeVisible(rawCount, item.countKey ? seen[item.countKey] : undefined)
-                    ? rawCount
-                    : 0
-                // Critical tone follows the same seen-suppression: a stale
-                // queue you already opened reads as its base tone, not red.
-                const criticalCount = item.criticalKey ? (counts?.[item.criticalKey] ?? 0) : 0
+                const count = item.countKey ? (counts?.[item.countKey] ?? 0) : 0
                 const tone: BadgeTone =
-                  item.criticalKey &&
-                  isBadgeVisible(criticalCount, item.criticalKey ? seen[item.criticalKey] : undefined)
+                  item.criticalKey && counts && (counts[item.criticalKey] ?? 0) > 0
                     ? 'critical'
                     : (item.tone ?? 'critical')
                 return (

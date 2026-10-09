@@ -18,7 +18,6 @@ import {
   markAllNotificationsRead,
   type NotificationItem,
 } from '@/lib/actions/notifications'
-import { useIndicators } from '@/store/useIndicators'
 
 interface InvitationNotification {
   id: number
@@ -139,8 +138,6 @@ export default function NotificationPanel() {
     notifications.filter((n) => !n.readAt).length +
     updates.filter((u) => !u.readAt).length
 
-  const bumpIndicators = useIndicators((state) => state.bump)
-
   const handleUpdateClick = async (update: NotificationItem) => {
     if (!update.readAt) {
       const result = await markNotificationRead(update.id)
@@ -150,8 +147,6 @@ export default function NotificationPanel() {
             u.id === update.id ? { ...u, readAt: new Date().toISOString() } : u,
           ),
         )
-        // Sidebar and tab badges share these counts — refresh them too.
-        bumpIndicators()
       }
     }
     if (update.href) {
@@ -182,7 +177,6 @@ export default function NotificationPanel() {
     const result = await acceptInvitation(id)
     if (result.success) {
       toast.success(result.message)
-      bumpIndicators()
       transitionItem(
         id,
         'ACCEPTED',
@@ -206,7 +200,6 @@ export default function NotificationPanel() {
     const result = await declineInvitation(id)
     if (result.success) {
       toast.success(result.message)
-      bumpIndicators()
       transitionItem(
         id,
         'REJECTED',
@@ -228,7 +221,6 @@ export default function NotificationPanel() {
     ])
     if (invitesRes.success && updatesRes.success) toast.success('All notifications marked as read.')
     else toast.error(invitesRes.message)
-    bumpIndicators()
     load()
   }
 

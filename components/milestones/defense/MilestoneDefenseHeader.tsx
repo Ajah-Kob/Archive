@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname } from 'next/navigation'
 import { GroupContext } from '@/components/milestones/GroupContext'
-import { useIndicatorCounts, useSuppressedCount } from '@/lib/hooks/useIndicatorCounts'
+import { useIndicatorCounts } from '@/lib/hooks/useIndicatorCounts'
 import {
   DocumentHistoryDrawer,
   type DocumentHistoryItem,
@@ -115,29 +114,17 @@ export function MilestoneDefenseHeader({
     data.submissions.filter((s) => !s.isInitial).length === 0
   // Defense badge: unread updates addressed to this milestone's base href
   // (verdict arrived, defense rescheduled). Clears via the notification
-  // panel, which owns read state — and hides once this tab is opened.
+  // panel, which owns read state.
   const unreadKey =
     milestone === 'final-defense' ? 'unreadFinalDefense' : 'unreadProposalDefense'
-  const pathname = usePathname() || ''
-  const base = `/student/milestone/${milestone}`
-  const defenseBadge = useSuppressedCount(
-    `tab:def:${milestone}`,
-    counts?.[unreadKey] ?? 0,
-    pathname === `${base}/defense` || pathname === base,
-  )
-  const resubBadge = useSuppressedCount(
-    `tab:res:${milestone}`,
-    resubmitRequired ? 1 : 0,
-    pathname === `${base}/resubmission`,
-  )
 
   return (
     <>
       <GroupContext
         onDocumentHistory={() => setHistoryOpen(true)}
         tabBadges={{
-          defense: defenseBadge,
-          resubmission: resubBadge,
+          defense: counts?.[unreadKey] ?? 0,
+          resubmission: resubmitRequired ? 1 : 0,
         }}
       />
       <DocumentHistoryDrawer

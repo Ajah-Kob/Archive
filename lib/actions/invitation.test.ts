@@ -9,7 +9,6 @@ import {
   acceptInvitation,
   cancelInvitation,
   getMyPendingInvitations,
-  getPendingCoordinatorInvitations,
   sendInvitation,
 } from './invitation'
 
@@ -99,7 +98,7 @@ function invitation(overrides: Record<string, unknown> = {}) {
     facultyId: 300,
     studentId: null,
     groupId: null,
-    role: 'COORDINATOR',
+    role: 'GROUP',
     invitedById: 900,
     status: 'PENDING',
     readAt: null,
@@ -112,7 +111,7 @@ function invitation(overrides: Record<string, unknown> = {}) {
   }
 }
 
-describe('coordinator invitation compatibility', () => {
+describe('invitation guards', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     getSessionMock.mockReset().mockResolvedValue(facultySession)
@@ -132,80 +131,6 @@ describe('coordinator invitation compatibility', () => {
     prismaMock.faculty.findFirst
       .mockReset()
       .mockResolvedValue({ userId: 901 })
-  })
-
-  test('rejects new Coordinator invitations as immediate assignments', async () => {
-    const result = await sendInvitation(300, 'COORDINATOR')
-
-    expect(result).toEqual({
-      success: false,
-      message:
-        'Coordinator assignments are immediate and no longer require an invitation.',
-      payload: null,
-    })
-    expect(prismaMock.invitation.create).not.toHaveBeenCalled()
-  })
-
-  test('keeps the existing invitation flow for Adviser assignments', async () => {
-    prismaMock.invitation.findFirst.mockResolvedValue(null)
-
-    const result = await sendInvitation(300, 'ADVISER')
-
-    expect(result.success).toBe(true)
-    expect(prismaMock.invitation.create).toHaveBeenCalledWith({
-      data: {
-        facultyId: 300,
-        role: 'ADVISER',
-        invitedById: 900,
-        status: 'PENDING',
-      },
-    })
-  })
-
-  test('cancels a legacy Coordinator invitation instead of accepting it', async () => {
-    prismaMock.invitation.findFirst.mockResolvedValue(
-      invitation({ faculty: { id: 300, userId: 901 } }),
-    )
-    getSessionMock.mockResolvedValue(facultySession)
-
-    const result = await acceptInvitation(700)
-
-    expect(result).toEqual({
-      success: false,
-      payload: null,
-      message:
-        'Coordinator assignments are now immediate and no longer require acceptance.',
-    })
-    expect(prismaMock.invitation.update).toHaveBeenCalledWith({
-      where: { id: 700 },
-      data: { status: 'CANCELLED', readAt: expect.any(Date) },
-    })
-    expect(addAdviserMock).not.toHaveBeenCalled()
-    expect(revalidateTagMock).toHaveBeenCalledWith('my-invitations-901', 'max')
-  })
-
-  test('lazily hides and cancels legacy Coordinator invitations on invitee reads', async () => {
-    const result = await getMyPendingInvitations(901)
-
-    expect(prismaMock.invitation.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          role: 'COORDINATOR',
-          faculty: { userId: 901 },
-        }),
-        data: { status: 'CANCELLED' },
-      }),
-    )
-    expect(result).toEqual({ success: true, payload: [] })
-  })
-
-  test('guards pending Coordinator invitation reads to managers', async () => {
-    managerGuardMock.mockResolvedValue(null)
-
-    const result = await getPendingCoordinatorInvitations('COORDINATOR')
-
-    expect(result.success).toBe(false)
-    expect(prismaMock.invitation.findMany).not.toHaveBeenCalled()
   })
 
   test('guards invitation cancellation to managers', async () => {

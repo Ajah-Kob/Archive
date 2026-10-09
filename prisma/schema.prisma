@@ -132,9 +132,6 @@ model JoinCode {
 // ───────────────────────────── Invitation ─────────────────────────────
 
 enum InvitationRole {
-  COORDINATOR
-  ADVISER
-  PANELIST
   GROUP
   ADVISER_ASSIGNMENT
 }

@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChevronLeft, History } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
-import { CountBadge } from '@/components/ui/CountBadge'
 
 interface MilestoneHeaderProps {
   /**
@@ -13,15 +12,6 @@ interface MilestoneHeaderProps {
    * history drawer.
    */
   onDocumentHistory?: () => void
-  /**
-   * Optional per-tab badge counts. Absent or zero renders no badge.
-   * Supplied by MilestoneDefenseHeader, which derives them from data it
-   * already holds â€” no additional queries for the tab bar.
-   */
-  tabBadges?: {
-    defense?: number
-    resubmission?: number
-  }
 }
 
 const DEFENSE_SLUGS = ['proposal-defense', 'final-defense'] as const
@@ -47,7 +37,7 @@ function isSystemTabActive(pathname: string, base: string): boolean {
  * Milestone header for the student milestone pages (renamed from GroupContext).
  * Renders Back + Defense/Resubmission tabs + Document History in a HeaderBar.
  */
-export function MilestoneHeader({ onDocumentHistory, tabBadges }: MilestoneHeaderProps) {
+export function MilestoneHeader({ onDocumentHistory }: MilestoneHeaderProps) {
   const pathname = usePathname() || ''
   const router = useRouter()
   const isListPage = pathname === '/student/milestone'
@@ -90,16 +80,13 @@ export function MilestoneHeader({ onDocumentHistory, tabBadges }: MilestoneHeade
           <Link
             href={`${defenseBase}/defense`}
             aria-current={defenseActive ? 'page' : undefined}
-            className={`relative flex items-center gap-[6px] h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
+            className={`relative flex items-center h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
               defenseActive
                 ? 'font-bold text-[#707dff]'
                 : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
             }`}
           >
             Defense
-            {tabBadges?.defense ? (
-              <CountBadge count={tabBadges.defense} label="Defense updates" tone="info" />
-            ) : null}
             {defenseActive && (
               <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
             )}
@@ -107,7 +94,7 @@ export function MilestoneHeader({ onDocumentHistory, tabBadges }: MilestoneHeade
           <Link
             href={`${defenseBase}/system`}
             aria-current={systemActive ? 'page' : undefined}
-            className={`relative flex items-center gap-[6px] h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
+            className={`relative flex items-center h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
               systemActive
                 ? 'font-bold text-[#707dff]'
                 : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
@@ -121,16 +108,13 @@ export function MilestoneHeader({ onDocumentHistory, tabBadges }: MilestoneHeade
           <Link
             href={`${defenseBase}/resubmission`}
             aria-current={resubmissionActive ? 'page' : undefined}
-            className={`relative flex items-center gap-[6px] h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
+            className={`relative flex items-center h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
               resubmissionActive
                 ? 'font-bold text-[#707dff]'
                 : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
             }`}
           >
             Resubmission
-            {tabBadges?.resubmission ? (
-              <CountBadge count={tabBadges.resubmission} label="Resubmission required" />
-            ) : null}
             {resubmissionActive && (
               <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
             )}

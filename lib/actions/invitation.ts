@@ -9,7 +9,6 @@ import {
 } from '@/lib/actions/guard'
 import { addAdviser } from '@/lib/actions/adviser'
 import { audit } from '@/lib/actions/audit'
-import { revalidateIndicators } from '@/lib/actions/indicators'
 import { GROUP_CAP, ADVISER_INVITE_TTL_MS } from '@/types/milestones'
 import type { InvitationRole } from '@prisma/client'
 
@@ -127,7 +126,6 @@ async function revalidateInvitee(invitation: {
   const inviteeId = invitation.faculty?.userId ?? invitation.student?.userId
   if (inviteeId) {
     revalidateTag(`my-invitations-${inviteeId}`, 'max')
-    await revalidateIndicators([inviteeId])
   }
   revalidateTag('invitations', 'max')
   revalidateTag('faculty', 'max')
@@ -236,7 +234,6 @@ export async function acceptInvitation(invitationId: number) {
       revalidateTag(`classmates-${session.user.id}`, 'max')
       revalidateTag(`classmates-${invitation.invitedBy.id}`, 'max')
       revalidateGroupWorkspace(group.id, invitation.invitedBy.id)
-      await revalidateIndicators([session.user.id])
       try {
         await audit({
           action: 'GROUP_JOIN',
@@ -313,7 +310,6 @@ export async function acceptInvitation(invitationId: number) {
       revalidateTag(`workspace-${invitation.invitedBy.id}`, 'max')
       revalidateTag(`my-invitations-${session.user.id}`, 'max')
       revalidateGroupWorkspace(group.id)
-      await revalidateIndicators([session.user.id])
       revalidateTag('advisers', 'max')
       revalidateTag('faculty', 'max')
       try {
@@ -440,7 +436,6 @@ export async function markAllInvitationsRead(userId: number) {
     })
 
     revalidateTag(`my-invitations-${userId}`, 'max')
-    await revalidateIndicators([userId])
 
     return {
       success: true,

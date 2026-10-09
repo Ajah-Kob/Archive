@@ -1582,9 +1582,6 @@ export async function reviewDefenseResubmission(
       console.error('[reviewDefenseResubmission | revalidate journey | Error]:', revalidateError)
     }
 
-    // The reviewer's own queue badge decrements with this decision.
-    await revalidateIndicators([panelistId])
-
     try {
       await audit({
         action: 'DEFENSE_RESUBMISSION_REVIEW',

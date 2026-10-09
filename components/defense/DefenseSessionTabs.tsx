@@ -3,16 +3,13 @@
 import {
   createContext,
   use,
-  useMemo,
   useState,
   type ReactNode,
 } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import { ArrowLeft, History } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
-import { CountBadge } from '@/components/ui/CountBadge'
 import {
   DocumentHistoryDrawer,
   type DocumentHistoryItem,
@@ -45,15 +42,6 @@ const TABS: ReadonlyArray<{ key: DefenseSessionTabKey; label: string }> = [
 interface DefenseSessionTabsContextValue {
   activeTab: DefenseSessionTabKey
   selectTab: (key: DefenseSessionTabKey) => void
-  /**
-   * Badge state derived from the session payload already in hand — no
-   * additional queries. Resubmission counts my PENDING reviews; the session
-   * dot marks a verdict only its chair can give.
-   */
-  badges: {
-    resubmission: number
-    sessionDot: boolean
-  }
 }
 
 // ── Context (composition via createContext + use()) ──────────────────────────
@@ -174,7 +162,7 @@ function deriveResubmissionItems(
 // ── Tabs bar (h-[40px] with 2px indicator — SectionTabs pattern) ────────────
 
 export function DefenseSessionTabsList() {
-  const { activeTab, selectTab, badges } = useDefenseSessionTabs()
+  const { activeTab, selectTab } = useDefenseSessionTabs()
 
   return (
     <div className="flex items-center gap-1 px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 overflow-x-auto">
@@ -185,19 +173,13 @@ export function DefenseSessionTabsList() {
             key={tab.key}
             type="button"
             onClick={() => selectTab(tab.key)}
-            className={`relative flex items-center gap-[6px] h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
+            className={`relative flex items-center h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
               isActive
                 ? 'font-bold text-[#707dff]'
                 : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
             }`}
           >
             {tab.label}
-            {tab.key === 'resubmission' && badges.resubmission > 0 ? (
-              <CountBadge count={badges.resubmission} label="Resubmissions awaiting your review" />
-            ) : null}
-            {tab.key === 'session' && badges.sessionDot ? (
-              <CountBadge count={1} label="Verdict pending" dot />
-            ) : null}
             {isActive && (
               <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
             )}
@@ -317,30 +299,8 @@ export function DefenseSessionTabsRoot({
     return `/faculty/defense/${resolvedScheduleId}/${key}`
   }
 
-  // Tab badges derived from the session payload already in hand — no
-  // additional queries. Resubmission counts resubmissions where MY review
-  // is still PENDING (reviews carry panelistId); the session dot marks a
-  // verdict only this schedule's chair can give.
-  const { data: viewerSession } = useSession()
-  const viewerId = viewerSession?.user?.id ? +viewerSession.user.id : null
-  const badges = useMemo(() => {
-    const resubmissions = session?.resubmissions ?? []
-    const resubmission =
-      viewerId == null
-        ? 0
-        : resubmissions.filter((r) =>
-            ((r.reviews ?? []) as Array<{ panelistId?: number; status?: string }>).some(
-              (rv) => rv.panelistId === viewerId && rv.status === 'PENDING',
-            ),
-          ).length
-    const sessionDot =
-      (session?.verdict as string | undefined) === 'PENDING' &&
-      (session?.myRole as string | undefined) === 'CHAIR'
-    return { resubmission, sessionDot }
-  }, [session, viewerId])
-
   return (
-    <DefenseSessionTabsContext value={{ activeTab, selectTab, badges }}>
+    <DefenseSessionTabsContext value={{ activeTab, selectTab }}>
       <div
         className={[
           'flex flex-col flex-1 min-h-0 overflow-hidden',
@@ -381,19 +341,13 @@ export function DefenseSessionTabsRoot({
                   // Keep context in sync for TabPanel consumers that still rely on it (legacy Shell)
                   // Prevent full reload — Next Link handles it, but we still update legacy state for instant feedback
                 }}
-                className={`relative flex items-center gap-[6px] h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
+                className={`relative flex items-center h-[40px] px-[14px] font-sans text-[13px] transition-colors shrink-0 ${
                   isActive
                     ? 'font-bold text-[#707dff]'
                     : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
                 }`}
               >
                 {tab.label}
-                {tab.key === 'resubmission' && badges.resubmission > 0 ? (
-                  <CountBadge count={badges.resubmission} label="Resubmissions awaiting your review" />
-                ) : null}
-                {tab.key === 'session' && badges.sessionDot ? (
-                  <CountBadge count={1} label="Verdict pending" dot />
-                ) : null}
                 {isActive && (
                   <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
                 )}

@@ -976,6 +976,27 @@ export async function setMilestoneAvailability(
       if (s.groupId) revalidateTag(`journey-${s.groupId}`, { expire: 0 })
     }
 
+    // Notify every student in the section of the unlock/lock.
+    try {
+      const milestoneLabel =
+        MILESTONE_DEFS.find((d) => d.key === key)?.label ?? key
+      const verb = open ? 'unlocked' : 'locked'
+      if (sectionStudents.length > 0) {
+        await prisma.notification.createMany({
+          data: sectionStudents.map((s) => ({
+            userId: s.userId,
+            title: `${milestoneLabel} ${verb}`,
+            body: open
+              ? `${milestoneLabel} has been unlocked. You can now work on it.`
+              : `${milestoneLabel} has been locked. Contact your coordinator if you have questions.`,
+            href: '/student/milestone',
+          })),
+        })
+      }
+    } catch (err) {
+      console.error('[setMilestoneAvailability | notify Error]:', err)
+    }
+
     try {
       await audit({
         action: 'MILESTONE_AVAILABILITY_SET',
@@ -1065,6 +1086,25 @@ export async function setPhaseAvailability(
     for (const s of sectionStudents) {
       if (s.userId) revalidateTag(`workspace-${s.userId}`, { expire: 0 })
       if (s.groupId) revalidateTag(`journey-${s.groupId}`, { expire: 0 })
+    }
+
+    // Notify every student in the section of the unlock/lock.
+    try {
+      const verb = open ? 'unlocked' : 'locked'
+      if (sectionStudents.length > 0) {
+        await prisma.notification.createMany({
+          data: sectionStudents.map((s) => ({
+            userId: s.userId,
+            title: `${phase} ${verb}`,
+            body: open
+              ? `${phase} has been unlocked. You can now work on it.`
+              : `${phase} has been locked. Contact your coordinator if you have questions.`,
+            href: '/student/milestone',
+          })),
+        })
+      }
+    } catch (err) {
+      console.error('[setPhaseAvailability | notify Error]:', err)
     }
 
     try {

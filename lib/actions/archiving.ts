@@ -1063,6 +1063,26 @@ export async function approveArchiving(groupId: number) {
       })
     } catch {}
 
+    // Notify every group member that their capstone has been published.
+    try {
+      const members = await prisma.student.findMany({
+        where: { groupId, deletedAt: null },
+        select: { userId: true },
+      })
+      if (members.length > 0) {
+        await prisma.notification.createMany({
+          data: members.map((m) => ({
+            userId: m.userId,
+            title: 'Capstone archived',
+            body: `${submission.title ?? 'Your capstone'} has been approved and published to the repository.`,
+            href: '/repository',
+          })),
+        })
+      }
+    } catch (err) {
+      console.error('[approveArchiving | notify Error]:', err)
+    }
+
     return { success: true, message: 'Capstone approved and published to Repository.' }
   } catch (error) {
     console.error('[approveArchiving | Error]:', error)

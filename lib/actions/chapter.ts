@@ -550,6 +550,28 @@ export async function submitChapter(
       })
     } catch {}
 
+    // Notify the adviser of the new submission.
+    if (auth.group.adviserId) {
+      try {
+        const adviser = await prisma.adviser.findFirst({
+          where: { id: auth.group.adviserId, deletedAt: null },
+          select: { faculty: { select: { userId: true } } },
+        })
+        if (adviser?.faculty.userId) {
+          await prisma.notification.create({
+            data: {
+              userId: adviser.faculty.userId,
+              title: 'New chapter submission',
+              body: `${CHAPTER_LABELS[chapter]} was submitted by ${auth.group.students.length > 1 ? 'one of your groups' : 'your group'}.`,
+              href: '/faculty/document-review',
+            },
+          })
+        }
+      } catch (err) {
+        console.error('[submitChapter | notify Error]:', err)
+      }
+    }
+
     await revalidateChapterGroup(auth.group, { expireNow: true })
 
     return { success: true, message: `${CHAPTER_LABELS[chapter]} submitted for review.`, payload: { milestoneId } }
@@ -621,6 +643,28 @@ export async function resubmitChapter(
         sectionId: auth.group.sectionId,
       })
     } catch {}
+
+    // Notify the adviser of the resubmission.
+    if (auth.group.adviserId) {
+      try {
+        const adviser = await prisma.adviser.findFirst({
+          where: { id: auth.group.adviserId, deletedAt: null },
+          select: { faculty: { select: { userId: true } } },
+        })
+        if (adviser?.faculty.userId) {
+          await prisma.notification.create({
+            data: {
+              userId: adviser.faculty.userId,
+              title: 'Chapter resubmitted',
+              body: `${CHAPTER_LABELS[chapter]} has been resubmitted for review.`,
+              href: '/faculty/document-review',
+            },
+          })
+        }
+      } catch (err) {
+        console.error('[resubmitChapter | notify Error]:', err)
+      }
+    }
 
     await revalidateChapterGroup(auth.group, { expireNow: true })
 

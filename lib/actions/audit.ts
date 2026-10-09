@@ -42,8 +42,7 @@ export type GetAuditLogsParams = {
 
 export type GetAuditLogsResult = {
   success: boolean
-  // Use any[] until prisma generate picks up the AuditLog model; runtime is (prisma as any).auditLog
-  logs: any[]
+  logs: unknown[]
   totalCount: number
   totalPages: number
   page: number
@@ -111,13 +110,13 @@ async function getAuditLogsData(params: GetAuditLogsParams): Promise<GetAuditLog
     const skip = (page - 1) * perPage
 
     const [logs, totalCount] = await prisma.$transaction([
-      (prisma as any).auditLog.findMany({
+      prisma.auditLog.findMany({
         where: where as any,
         skip,
         take: perPage,
         orderBy: { createdAt: "desc" },
       }),
-      (prisma as any).auditLog.count({ where: where as any }),
+      prisma.auditLog.count({ where: where as any }),
     ])
 
     return {
@@ -199,7 +198,7 @@ export async function audit(input: AuditInput): Promise<void> {
       h.get("x-real-ip")?.trim() ||
       null
 
-    await (prisma as any).auditLog.create({
+    await prisma.auditLog.create({
       data: {
         actorId: Number((session.user as any).id) || null,
         actorName: ((session.user as any).name as string) ?? "Unknown",

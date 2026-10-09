@@ -134,8 +134,9 @@ export const getBlobPathname = blobUrlToPathname
 // vercel-storage URL in `capstoneArchive.blobUrl`. Clients MUST NOT link that
 // URL directly — they derive the pathname and go through `GET /api/blob/...`:
 //
-//   - app/repository/page.tsx passes `blobUrl` to RepositoryClient, which
-//     fetches `toSignedBlobPath(blobUrl)` with `credentials: 'include'`.
+//   - /repository/[id] renders the headless EmbedPDF viewer with the stored
+//     `blobUrl`; the viewer derives the pathname and fetches
+//     `toSignedBlobPath(blobUrl)` with `credentials: 'include'`.
 //
 // (There is no `scripts/migrate-private-blobs.ts` in this repo. Nothing needs
 // migrating anyway: archive uploads always failed before this change, so every
@@ -145,6 +146,13 @@ export const getBlobPathname = blobUrlToPathname
 // signed-in, non-deleted user of ANY role (GUEST included) may read a
 // published capstone; signed-out callers get 401. Published work is not
 // group-scoped the way chapter/defense/archiving are.
+//
+// Note the two blob shapes a published row can hold: admin-published rows
+// point at fresh copies under `archives/*`, while chair-approved rows
+// reference the submission's `archiving/*` blob directly (approveArchiving
+// does not copy bytes). The signed route therefore also serves an
+// `archiving/*` pathname when a live CapstoneArchive references it, and
+// unpublishing (soft-delete) revokes access again.
 //
 // No data migration is required: existing rows keep the same blobUrl shape,
 // only the fetch path changes.

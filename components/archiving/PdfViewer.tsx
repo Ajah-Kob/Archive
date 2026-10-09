@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Loader2, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
+import { ZoomPluginPackage } from '@embedpdf/plugin-zoom/react'
+import { PanPluginPackage } from '@embedpdf/plugin-pan/react'
 import {
   DocumentContent,
   DocumentManagerPluginPackage,
@@ -46,7 +48,19 @@ export interface ArchivingPdfViewerProps {
  * (repository reader). Anything else renders "Invalid document link."
  * See lib/blob.ts + app/repository/page.tsx note.
  */
-export function PdfViewer({ src, fileName }: ArchivingPdfViewerProps) {
+export function PdfViewer({
+  src,
+  fileName,
+  toolbar,
+}: ArchivingPdfViewerProps & {
+  /**
+   * Rendered above the document, inside the EmbedPDF tree so plugin hooks
+   * (e.g. useZoom) work. Receives the active document id, null until the
+   * document registers — render controls unconditionally and gate the
+   * plugin-dependent ones on it, so the bar does not pop in late.
+   */
+  toolbar?: (documentId: string | null) => ReactNode
+}) {
   const { engine, isLoading: engineLoading, error: engineError } = usePdfiumEngine()
 
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
@@ -253,6 +267,12 @@ export function PdfViewer({ src, fileName }: ArchivingPdfViewerProps) {
   }
 
   // Render PDF from fetched object URL (private, auth-gated), not raw blobUrl.
+  // ZoomPluginPackage registered so a toolbar slot can offer zoom controls;
+  // the 50%-200% clamp lives here so gestures inherit it too.
+  // PanPluginPackage with defaultMode 'always' makes pan the default tool.
+  // (This viewer's sole consumer is the repository reader, which wants
+  // pan-first and has no toolbar to switch back with. 'mobile' would be a
+  // no-op here; only 'always' makes the plugin declare the default.)
   const plugins = [
     createPluginRegistration(DocumentManagerPluginPackage, {
       initialDocuments: [{ url: objectUrl }],
@@ -260,6 +280,8 @@ export function PdfViewer({ src, fileName }: ArchivingPdfViewerProps) {
     createPluginRegistration(ViewportPluginPackage),
     createPluginRegistration(ScrollPluginPackage),
     createPluginRegistration(RenderPluginPackage),
+    createPluginRegistration(ZoomPluginPackage, { minZoom: 0.5, maxZoom: 2 }),
+    createPluginRegistration(PanPluginPackage, { defaultMode: 'always' }),
     createPluginRegistration(InteractionManagerPluginPackage),
     createPluginRegistration(SelectionPluginPackage, { toleranceFactor: 0 }),
     createPluginRegistration(HistoryPluginPackage),
@@ -269,44 +291,54 @@ export function PdfViewer({ src, fileName }: ArchivingPdfViewerProps) {
   ]
 
   return (
-    <div className="h-full w-full min-h-[480px] overflow-hidden bg-[#e8eaf4] relative">
+    <div className="epdf-viewer-area flex h-full w-full min-h-[480px] flex-col overflow-hidden bg-[#e8eaf4] relative">
       <EmbedPDF engine={engine} plugins={plugins}>
-        {({ activeDocumentId }) =>
-          activeDocumentId && (
-            <DocumentContent documentId={activeDocumentId}>
-              {({ isLoaded }) =>
-                isLoaded && (
-                  <Viewport documentId={activeDocumentId}>
-                    <Scroller
-                      documentId={activeDocumentId}
-                      renderPage={({ width, height, pageIndex }) => (
-                        <div style={{ width, height }}>
-                          <PagePointerProvider
-                            documentId={activeDocumentId}
-                            pageIndex={pageIndex}
-                          >
+        {({ activeDocumentId }) => (
+          <>
+            {toolbar?.(activeDocumentId)}
+            <div className="flex-1 min-h-0">
+              {activeDocumentId && (
+                <DocumentContent documentId={activeDocumentId}>
+                  {({ isLoaded }) =>
+                    isLoaded && (
+                      <Viewport documentId={activeDocumentId}>
+                        <Scroller
+                          documentId={activeDocumentId}
+                          renderPage={({ width, height, pageIndex }) => (
+                            <div style={{ width, height }}>
+                              <PagePointerProvider
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              >
+                            {/* draggable={false}: without it the browser starts a
+                                native drag (ghost image + disabled cursor)
+                                instead of a text selection. Every other
+                                workspace passes false for the same reason. */}
                             <RenderLayer
                               documentId={activeDocumentId}
                               pageIndex={pageIndex}
+                              draggable={false}
                             />
-                            <SelectionLayer
-                              documentId={activeDocumentId}
-                              pageIndex={pageIndex}
-                            />
-                            <AnnotationLayer
-                              documentId={activeDocumentId}
-                              pageIndex={pageIndex}
-                            />
-                          </PagePointerProvider>
-                        </div>
-                      )}
-                    />
-                  </Viewport>
-                )
-              }
-            </DocumentContent>
-          )
-        }
+                                <SelectionLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
+                                <AnnotationLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
+                              </PagePointerProvider>
+                            </div>
+                          )}
+                        />
+                      </Viewport>
+                    )
+                  }
+                </DocumentContent>
+              )}
+            </div>
+          </>
+        )}
       </EmbedPDF>
     </div>
   )

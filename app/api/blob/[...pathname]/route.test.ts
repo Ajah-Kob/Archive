@@ -19,6 +19,7 @@ jest.mock('@/lib/prisma', () => ({
     adviser: { findFirst: jest.fn() },
     defenseSchedule: { findFirst: jest.fn() },
     defensePanelist: { findFirst: jest.fn() },
+    capstoneArchive: { findMany: jest.fn() },
   },
 }))
 
@@ -52,6 +53,7 @@ const prismaMock = {
   group: { findFirst: asMock(prisma.group.findFirst) },
   adviser: { findFirst: asMock(prisma.adviser.findFirst) },
   section: { findFirst: asMock(prisma.section.findFirst) },
+  capstoneArchive: { findMany: asMock((prisma as unknown as { capstoneArchive: { findMany: unknown } }).capstoneArchive.findMany) },
 }
 const listMock = asMock(list)
 const headMock = asMock(head)
@@ -86,6 +88,8 @@ function blobExists() {
 beforeEach(() => {
   process.env.BLOB_READ_WRITE_TOKEN = 'test-token'
   blobExists()
+  // Default: nothing published, so archiving/* falls through to group auth.
+  prismaMock.capstoneArchive.findMany.mockResolvedValue([])
 })
 
 describe('blob route — archives/* authorization', () => {
@@ -336,5 +340,75 @@ describe('blob route — defense/* panelist authorization', () => {
     const res = await GET(req(['defense', 'abc', 'x.pdf']), ctx(['defense', 'abc', 'x.pdf']))
 
     expect(res.status).toBe(404)
+  })
+})
+
+// ─────────────── archiving/* referenced by a published archive ──────────────
+//
+// Regression cover for a real bug: approveArchiving references the
+// submission's archiving/* blob directly instead of copying it under
+// archives/*, so every chair-approved capstone kept an archiving/* pathname
+// and 403d for readers outside its group. Published work is not group-scoped,
+// so any signed-in user may read it; unpublished blobs still need group access.
+describe('blob route — archiving/* published to the repository', () => {
+  const PUBLISHED_PATH = 'archiving/2/Sample File-abc.pdf'
+  const PUBLISHED_URL = `${HOST}/${encodeURI(PUBLISHED_PATH)}`
+
+  function archivingBlobExists() {
+    listMock.mockResolvedValue({
+      blobs: [{ pathname: PUBLISHED_PATH, url: PUBLISHED_URL, downloadUrl: PUBLISHED_URL }],
+    })
+    headMock.mockResolvedValue({ pathname: PUBLISHED_PATH, downloadUrl: PUBLISHED_URL })
+    getMock.mockResolvedValue({
+      statusCode: 200,
+      stream: new ReadableStream(),
+      headers: new Headers({ 'content-type': 'application/pdf' }),
+      blob: { contentType: 'application/pdf' },
+    })
+  }
+
+  beforeEach(() => {
+    archivingBlobExists()
+    // Signed in as a student with no relation to group 2.
+    getServerSession.mockResolvedValue({ user: { id: '9', role: 'STUDENT' } })
+    prismaMock.user.findFirst.mockResolvedValue({ id: 9, role: 'STUDENT' })
+    prismaMock.faculty.findFirst.mockResolvedValue(null)
+    prismaMock.group.findFirst.mockResolvedValue({
+      id: 2,
+      sectionId: 1,
+      adviserId: null,
+      students: [],
+    })
+  })
+
+  test('lets an out-of-group reader open a published archiving blob', async () => {
+    prismaMock.capstoneArchive.findMany.mockResolvedValue([{ blobUrl: PUBLISHED_URL }])
+
+    const res = await GET(req(['archiving', '2', 'Sample File-abc.pdf']), ctx(['archiving', '2', 'Sample File-abc.pdf']))
+
+    expect(res.status).toBe(200)
+    expect(getMock).toHaveBeenCalledWith(
+      PUBLISHED_PATH,
+      expect.objectContaining({ access: 'private' }),
+    )
+  })
+
+  test('still 403s an unpublished archiving blob for outsiders', async () => {
+    prismaMock.capstoneArchive.findMany.mockResolvedValue([])
+
+    const res = await GET(req(['archiving', '2', 'Sample File-abc.pdf']), ctx(['archiving', '2', 'Sample File-abc.pdf']))
+
+    expect(res.status).toBe(403)
+    expect(getMock).not.toHaveBeenCalled()
+  })
+
+  test('stops serving a published blob once the archive is soft-deleted', async () => {
+    // findMany is filtered to deletedAt: null by the implementation, so a
+    // soft-deleted archive simply never appears here.
+    prismaMock.capstoneArchive.findMany.mockResolvedValue([])
+
+    const res = await GET(req(['archiving', '2', 'Sample File-abc.pdf']), ctx(['archiving', '2', 'Sample File-abc.pdf']))
+
+    expect(res.status).toBe(403)
   })
 })

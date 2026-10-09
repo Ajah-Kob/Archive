@@ -645,6 +645,7 @@ async function getCoordinatorSectionData(sectionId: number) {
           id: true,
           groupName: true,
           leaderStudentId: true,
+          topicTitle: true,
           adviser: {
             include: {
               faculty: {
@@ -662,7 +663,6 @@ async function getCoordinatorSectionData(sectionId: number) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
-          capstone: { select: { topicId: true } },
           milestones: {
             where: { deletedAt: null },
             include: {
@@ -738,7 +738,7 @@ async function getCoordinatorSectionData(sectionId: number) {
         : null,
       journey: buildJourneyRows(
         {
-          capstone: g.capstone ? { topicId: g.capstone.topicId } : null,
+          topicTitle: g.topicTitle,
           milestones: g.milestones.map((m) => ({
             chapter: m.chapter,
             submissions: m.submissions,
@@ -2158,14 +2158,8 @@ export async function getCoordinatorGroupDetail(groupId: number) {
           select: { status: true, deletedAt: true },
           orderBy: { createdAt: 'desc' },
         },
-        capstone: {
-          include: {
-            topic: {
-              include: {
-                uploadedBy: { include: { user: { select: { name: true } } } },
-              },
-            },
-          },
+        topicSubmittedBy: {
+          include: { user: { select: { name: true } } },
         },
         milestones: {
           where: { deletedAt: null },
@@ -2221,7 +2215,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
 
     const journey = buildJourneyRows(
       {
-        capstone: group.capstone ? { topicId: group.capstone.topicId } : null,
+        topicTitle: group.topicTitle,
         milestones: group.milestones.map((m) => ({
           chapter: m.chapter,
           submissions: m.submissions,
@@ -2323,14 +2317,14 @@ export async function getCoordinatorGroupDetail(groupId: number) {
               image: group.adviser.faculty.user.image,
             }
           : null,
-        topic: group.capstone
+        topic: group.topicTitle
           ? {
-              id: group.capstone.topic.id,
-              title: group.capstone.topic.title,
-              status: group.capstone.topic.status as 'PENDING' | 'APPROVED' | 'NEED_REVISION',
+              id: group.id,
+              title: group.topicTitle,
+              status: 'APPROVED' as const,
               note: null,
-              submittedBy: group.capstone.topic.uploadedBy?.user.name ?? '',
-              createdAt: group.capstone.topic.createdAt.toISOString(),
+              submittedBy: group.topicSubmittedBy?.user.name ?? '',
+              createdAt: (group.topicSubmittedAt ?? group.updatedAt).toISOString(),
             }
           : null,
         journey,

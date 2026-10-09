@@ -100,7 +100,6 @@ model Adviser {
   id        Int        @id @default(autoincrement())
   facultyId Int        @unique
   faculty   Faculty    @relation(fields: [facultyId], references: [id])
-  capstones Capstone[]
   groups    Group[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -229,7 +228,6 @@ model Student {
   ledGroup    Group?       @relation("GroupLeader")
   topicSubmittedGroups Group[] @relation("GroupTopicSubmitter")
   invitations Invitation[]
-  topics      Topic[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
@@ -254,8 +252,6 @@ model Group {
   topicSubmittedBy    Student?             @relation("GroupTopicSubmitter", fields: [topicSubmittedById], references: [id], onDelete: SetNull)
   topicSubmittedAt    DateTime?
   students            Student[]
-  topics              Topic[]
-  capstone            Capstone?
   milestones          Milestone[]
   capstoneArchive     CapstoneArchive?
   archivingSubmission ArchivingSubmission?
@@ -270,58 +266,12 @@ model Group {
   @@index([deletedAt])
 }
 
-// ───────────────────────────── Topic & Capstone ─────────────────────────────
-
-enum TopicStatus {
-  PENDING
-  APPROVED
-  NEED_REVISION
-}
-
-model Topic {
-  id           Int         @id @default(autoincrement())
-  groupId      Int
-  group        Group       @relation(fields: [groupId], references: [id])
-  title        String
-  background   String
-  uploadedById Int?
-  uploadedBy   Student?    @relation(fields: [uploadedById], references: [id])
-  status       TopicStatus @default(PENDING)
-  capstone     Capstone?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  deletedAt    DateTime?
-
-  @@index([groupId])
-  @@index([uploadedById])
-  @@index([status])
-  @@index([deletedAt])
-}
+// ───────────────────────────── Milestone & Submission ─────────────────────────────
 
 enum CapstonePhase {
   CAPSTONE_1
   CAPSTONE_2
 }
-
-model Capstone {
-  id         Int         @id @default(autoincrement())
-  groupId    Int         @unique
-  group      Group       @relation(fields: [groupId], references: [id])
-  topicId    Int         @unique
-  topic      Topic       @relation(fields: [topicId], references: [id])
-  adviserId  Int?
-  adviser    Adviser?    @relation(fields: [adviserId], references: [id])
-  milestones Milestone[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  deletedAt  DateTime?
-
-  @@index([topicId])
-  @@index([adviserId])
-  @@index([deletedAt])
-}
-
-// ───────────────────────────── Milestone & Submission ─────────────────────────────
 
 enum Chapter {
   CHAPTER_1
@@ -337,8 +287,6 @@ model Milestone {
   group       Group                 @relation(fields: [groupId], references: [id])
   phase       CapstonePhase
   chapter     Chapter
-  capstoneId  Int
-  capstone    Capstone              @relation(fields: [capstoneId], references: [id])
   submissions MilestoneSubmission[]
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
@@ -346,7 +294,6 @@ model Milestone {
 
   @@unique([groupId, chapter])
   @@index([groupId])
-  @@index([capstoneId])
   @@index([deletedAt])
 }
 

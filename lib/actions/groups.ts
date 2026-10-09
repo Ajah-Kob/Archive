@@ -97,19 +97,9 @@ export async function getMyWorkspace(userId: number): Promise<{
             },
             orderBy: { createdAt: 'desc' },
           },
-          topics: {
-            where: { deletedAt: null },
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              deletedAt: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-            orderBy: { createdAt: 'desc' },
+          topicSubmittedBy: {
+            include: { user: { select: { name: true } } },
           },
-          capstone: { select: { topicId: true } },
           milestones: {
             where: { deletedAt: null },
             include: {
@@ -249,20 +239,11 @@ export async function getMyWorkspace(userId: number): Promise<{
     }))
   const pendingCount = invitations.filter((i) => i.status === 'PENDING').length
 
-  // Single final topic: the confirmed capstone topic wins; otherwise the
-  // most recently created active topic (covers pre-confirmation groups).
-  const confirmedTopic = group.capstone
-    ? group.topics.find((t) => t.id === group.capstone.topicId) ?? null
-    : null
-  const latestTopic = [...group.topics].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-  )[0] ?? null
-  const finalTopicRow = confirmedTopic ?? latestTopic
-  const finalTopic = finalTopicRow
+  // Single final topic lives on the group row itself.
+  const finalTopic = group.topicTitle
     ? {
-        id: finalTopicRow.id,
-        title: finalTopicRow.title,
-        updatedAt: finalTopicRow.updatedAt.toISOString(),
+        title: group.topicTitle,
+        updatedAt: group.topicSubmittedAt?.toISOString() ?? group.updatedAt.toISOString(),
       }
     : null
 
@@ -281,7 +262,7 @@ export async function getMyWorkspace(userId: number): Promise<{
     },
     journey: buildJourneyRows(
       {
-        capstone: group.capstone,
+        topicTitle: group.topicTitle,
         milestones: group.milestones,
         capstoneArchive: group.capstoneArchive,
         archivingSubmission: group.archivingSubmission,
@@ -315,12 +296,7 @@ export async function getGroupContext(groupId: number): Promise<{
           id: true,
           groupName: true,
           leaderStudentId: true,
-          topics: {
-            where: { deletedAt: null, status: 'APPROVED' },
-            select: { title: true },
-            take: 1,
-            orderBy: { updatedAt: 'desc' },
-          },
+          topicTitle: true,
         },
       },
     },
@@ -336,7 +312,7 @@ export async function getGroupContext(groupId: number): Promise<{
       id: student.group.id,
       name: student.group.groupName,
       isLeader: student.group.leaderStudentId === student.id,
-      topicTitle: student.group.topics[0]?.title ?? null,
+      topicTitle: student.group.topicTitle,
     },
   }
 }

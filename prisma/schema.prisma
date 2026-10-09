@@ -683,16 +683,21 @@ model AuditLog {
   entity     String
   entityId   String?
   entityName String?
-  before     Json?
-  after      Json?
-  ip         String?
-  createdAt  DateTime @default(now())
+  before Json?
+  after  Json?
+  ip     String?
+  createdAt DateTime @default(now())
+  // Section scope for the coordinator activity feed. Nullable so all
+  // pre-existing rows stay valid; rows without a section never appear
+  // in any section feed.
+  sectionId Int?
 
   @@index([createdAt])
   @@index([actorId])
   @@index([action])
   @@index([entity])
   @@index([createdAt, action])
+  @@index([sectionId, createdAt])
 }
 
 // ───────────────────────────── Notifications ─────────────────────────────

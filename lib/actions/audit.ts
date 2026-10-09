@@ -173,6 +173,12 @@ export type AuditInput = {
   entityName?: string | null
   before?: unknown
   after?: unknown
+  /**
+   * Section scope for the coordinator activity feed. Optional so all 36
+   * existing call sites keep working untouched — only section-visible
+   * events pass it. Rows without a section never appear in any feed.
+   */
+  sectionId?: number | null
 }
 
 /**
@@ -205,13 +211,18 @@ export async function audit(input: AuditInput): Promise<void> {
         entityName: input.entityName ?? null,
         before: (input.before as any) ?? null,
         after: (input.after as any) ?? null,
+        sectionId: input.sectionId ?? null,
         ip,
       },
     })
 
     revalidateTag("audit", "max")
-  } catch {
+  } catch (err) {
     // Isolate audit failures — do not throw into the calling business action.
+    // Log instead of swallowing silently: the section activity feed depends
+    // on row completeness, and a quiet write failure would surface as
+    // mysteriously missing feed entries.
+    console.error("[audit | write failed]:", err)
     return
   }
 }

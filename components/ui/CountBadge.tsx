@@ -4,13 +4,14 @@ interface CountBadgeProps {
   /** Accessible name, e.g. "Document Review". Announced as "{label}, {count} pending". */
   label: string
   /** Visual urgency. Mirrors the chair-alert tone vocabulary. */
-  tone?: 'critical' | 'info'
+  tone?: 'critical' | 'warning' | 'info'
   /** Compact dot for icon-only contexts (minimized sidebar). Still labelled. */
   dot?: boolean
 }
 
 const TONE_CLASS = {
   critical: 'bg-[#fe6f6f]',
+  warning: 'bg-[#f59e0b]',
   info: 'bg-[#707dff]',
 } as const
 

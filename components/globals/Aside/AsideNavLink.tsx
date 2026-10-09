@@ -21,12 +21,21 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { roleHome } from '@/lib/helper'
+import { CountBadge } from '@/components/ui/CountBadge'
+import { useIndicatorCounts } from '@/lib/hooks/useIndicatorCounts'
+
+type BadgeTone = 'critical' | 'warning' | 'info'
 
 type NavItem = {
   label: string
   href: string
   icon: LucideIcon
   show: boolean
+  /** Key into useIndicatorCounts. Absent key (role not applicable) hides the badge. */
+  countKey?: string
+  /** Badge turns critical while this key is positive. Defaults to info. */
+  criticalKey?: string
+  tone?: BadgeTone
 }
 
 type NavSection = {
@@ -72,6 +81,10 @@ export function NavLinks({
         ? '/student/templates'
         : null
   const isProgramChair = !!session?.user?.isProgramChair
+  // Chairs and admins see program-wide verdict queues on the Defense nav;
+  // everyone else sees only their own panelist queue.
+  const chairLike = isAdmin || isProgramChair
+  const counts = useIndicatorCounts()
 
   const sections: NavSection[] = [
     {
@@ -86,17 +99,25 @@ export function NavLinks({
           icon: Gauge,
           show: isProgramChair,
         },
-        { label: 'Join Archive', href: '/guest', icon: UserPlus, show: isGuest },
+        { label: 'Join Archive', href: '/guest', icon: UserPlus, show: isGuest, countKey: 'invites' },
       ],
     },
     {
       label: 'CAPSTONE',
       items: [
-    { label: 'My Team', href: '/student/my-team', icon: Users, show: isStudent },
-    { label: 'Milestones', href: '/student/milestone', icon: Flag, show: isStudent },
-        { label: 'My Sections', href: '/faculty/my-sections', icon: Layers, show: isCoordinator },
-        { label: 'Document Review', href: '/faculty/document-review', icon: ClipboardCheck, show: isAdviser },
-        { label: 'Defense', href: '/faculty/defense', icon: Shield, show: isFaculty },
+    { label: 'My Team', href: '/student/my-team', icon: Users, show: isStudent, countKey: 'groupInvites' },
+    { label: 'Milestones', href: '/student/milestone', icon: Flag, show: isStudent, countKey: 'resubmit' },
+        { label: 'My Sections', href: '/faculty/my-sections', icon: Layers, show: isCoordinator, countKey: 'myStaleDefenses', criticalKey: 'myStaleDefenses' },
+        { label: 'Document Review', href: '/faculty/document-review', icon: ClipboardCheck, show: isAdviser, countKey: 'adviserQueue' },
+        {
+          label: 'Defense',
+          href: '/faculty/defense',
+          icon: Shield,
+          show: isFaculty,
+          countKey: chairLike ? 'pendingVerdicts' : 'myVerdicts',
+          criticalKey: chairLike ? 'staleDefenses' : 'myVerdictsStale',
+          tone: 'info',
+        },
         { label: 'Defense Scheduling', href: '/faculty/defense-scheduling', icon: CalendarClock, show: isCoordinator },
       ],
     },
@@ -108,18 +129,24 @@ export function NavLinks({
           href: '/faculty/faculty-management/members',
           icon: Users,
           show: isAdmin || isCoordinator || isProgramChair,
+          countKey: 'advisersAtCap',
+          tone: 'warning',
         },
         {
           label: 'Section Management',
           href: '/faculty/section-management',
           icon: Layers,
           show: isAdmin || isCoordinator || isProgramChair,
+          countKey: 'unassignedSections',
+          criticalKey: 'unassignedSections',
         },
         {
           label: 'Archiving',
           href: '/faculty/archiving',
           icon: Archive,
           show: isAdmin || isProgramChair,
+          countKey: 'archivingReview',
+          tone: 'warning',
         },
         {
           label: 'Audit Logs',
@@ -159,6 +186,11 @@ export function NavLinks({
               {visibleItems.map((item) => {
                 const isActive = isNavActive(pathname, item.href)
                 const Icon = item.icon
+                const count = item.countKey ? (counts?.[item.countKey] ?? 0) : 0
+                const tone: BadgeTone =
+                  item.criticalKey && counts && (counts[item.criticalKey] ?? 0) > 0
+                    ? 'critical'
+                    : (item.tone ?? 'critical')
                 return (
                   <Link
                     key={item.href}
@@ -172,11 +204,14 @@ export function NavLinks({
                     {isActive && (
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-full bg-[#707dff]" />
                     )}
-                    <span className="flex items-center justify-center w-5 shrink-0">
+                    <span className="relative flex items-center justify-center w-5 shrink-0">
                       <Icon
                         size={20}
                         className={`${isActive ? 'text-[#707dff]' : 'text-[#5a6382] group-hover:text-[#707dff]'}`}
                       />
+                      {minimize && item.countKey ? (
+                        <CountBadge count={count} label={item.label} tone={tone} dot />
+                      ) : null}
                     </span>
                     <span
                       className={`text-[13px] whitespace-nowrap shrink-0 transition-opacity duration-300 ${
@@ -185,6 +220,11 @@ export function NavLinks({
                     >
                       {item.label}
                     </span>
+                    {!minimize && item.countKey ? (
+                      <span className="ml-auto shrink-0">
+                        <CountBadge count={count} label={item.label} tone={tone} />
+                      </span>
+                    ) : null}
                   </Link>
                 )
               })}

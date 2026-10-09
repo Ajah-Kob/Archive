@@ -742,16 +742,11 @@ model DefenseSystemLink {
   schedule    DefenseSchedule @relation(fields: [scheduleId], references: [id])
   groupId     Int
   group       Group           @relation(fields: [groupId], references: [id])
-  /// A LINK_PRESETS value, or free text when the student chose "Other".
+  /// Free-text label chosen by the student.
   label       String
   url         String
   /// One line describing what this link shows.
   note        String?
-  /// Set when this row was pre-filled from the proposal defense (decision 10).
-  /// The two sets stay independent; this only records the origin.
-  copiedFromId Int?
-  copiedFrom  DefenseSystemLink?  @relation("LinkCopies", fields: [copiedFromId], references: [id])
-  copies      DefenseSystemLink[] @relation("LinkCopies")
   /// Withdrawn by the student while still unlocked, but panelist comments exist.
   removedAt   DateTime?
   createdById Int
@@ -774,16 +769,11 @@ model SystemLinkComment {
   authorId Int
   author   User     @relation("SystemCommentAuthor", fields: [authorId], references: [id])
   body     String
-  /// null = a root comment. Set = a panelist reply to that root (depth 1).
-  parentId Int?
-  parent   SystemLinkComment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  SystemLinkComment[] @relation("CommentThread")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
   @@index([linkId])
-  @@index([parentId])
   @@index([authorId])
   @@index([deletedAt])
 }

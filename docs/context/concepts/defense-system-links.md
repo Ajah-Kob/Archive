@@ -15,9 +15,9 @@ Two tables, keyed on the **schedule** rather than the defense type:
 ```
 DefenseSchedule (id, groupId, type, verdict)
         │
-        └── DefenseSystemLink  (label, url, note, copiedFromId, removedAt)
+        └── DefenseSystemLink  (label, url, note, removedAt)
                     │
-                    └── SystemLinkComment  (body, parentId)
+                    └── SystemLinkComment  (body)
 ```
 
 Keying on the schedule is what makes "a fresh set per defense" fall out for
@@ -90,9 +90,8 @@ Recorded so a later reader does not add them back:
 
 ## Copy from the other defense
 
-At the final defense the student can pre-fill from the proposal defense in one
-click. It is a **copy, not a link between the sets** — `copiedFromId` records the
-origin, and editing the copy must not rewrite the proposal defense's history.
+Removed. Each defense's link set is entered fresh; the `copiedFromId`
+provenance column and the pre-fill action were dropped with it.
 
 ## Archive
 

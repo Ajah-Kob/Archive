@@ -46,9 +46,7 @@ export type PanelistSystemLink = {
 export type StudentSystemLink = Omit<
   PanelistSystemLink,
   'removedAt'
-> & {
-  copiedFromId: number | null
-}
+>
 
 export type SystemLinkCommentNode = {
   id: number
@@ -117,7 +115,6 @@ export async function getSystemLinksForStudent(scheduleId: number) {
       url: true,
       note: true,
       updatedAt: true,
-      copiedFromId: true,
       createdBy: { select: { name: true } },
       _count: { select: { comments: { where: { deletedAt: null } } } },
     },
@@ -282,59 +279,6 @@ export async function removeSystemLink(linkId: number) {
   revalidateTag(`system-links-${link.scheduleId}`, FRESH)
   revalidateFeature('defense')
   return ok('Link removed.')
-}
-
-/**
- * Pre-fills a defense's empty set from the same group's set for the other
- * DefenseType (decision 10). A copy, not a link between the two sets -- editing
- * the copy must not rewrite the source's history, which is what keeps each
- * defense's discussion independent.
- */
-export async function copyProposalLinks(scheduleId: number) {
-  const access = await requireScheduleStudent(scheduleId)
-  if (!access) return unauthorized
-  if (!linksAreEditable(access.schedule.verdict))
-    return fail(SYSTEM_LINK_MESSAGE.LOCKED)
-
-  const source = await prisma.defenseSchedule.findFirst({
-    where: {
-      groupId: access.schedule.groupId,
-      type: access.schedule.type === 'FINAL' ? 'PROPOSAL' : 'FINAL',
-      deletedAt: null,
-      id: { not: scheduleId },
-    },
-    orderBy: { date: 'desc' },
-    select: { id: true },
-  })
-  if (!source) return fail('No earlier defense links to copy.')
-
-  const existing = await prisma.defenseSystemLink.count({
-    where: { scheduleId, deletedAt: null, removedAt: null },
-  })
-  if (existing > 0) return fail('This defense already has links.')
-
-  const copyable = await prisma.defenseSystemLink.findMany({
-    where: { scheduleId: source.id, deletedAt: null, removedAt: null },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true, label: true, url: true, note: true },
-  })
-  if (copyable.length === 0) return fail('No earlier defense links to copy.')
-
-  await prisma.defenseSystemLink.createMany({
-    data: copyable.map((l) => ({
-      scheduleId,
-      groupId: access.schedule.groupId,
-      label: l.label,
-      url: l.url,
-      note: l.note,
-      copiedFromId: l.id,
-      createdById: +access.session.user.id,
-    })),
-  })
-
-  revalidateTag(`system-links-${scheduleId}`, FRESH)
-  revalidateFeature('defense')
-  return ok(`Copied ${copyable.length} link${copyable.length === 1 ? '' : 's'}.`)
 }
 
 export async function addSystemComment(linkId: number, formData: FormData) {

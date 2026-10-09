@@ -2,19 +2,10 @@
 
 import prisma from '@/lib/prisma'
 import { revalidateTag, updateTag } from 'next/cache'
-import { timeAgo } from '@/lib/helper'
+import { activityStatusFor } from '@/lib/helper'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import { audit } from '@/lib/actions/audit'
 
-// A coordinator is considered "active now" if they signed in within this window.
-// Mirrors the faculty activity window in lib/actions/faculty.ts.
-const ACTIVE_NOW_MS = 5 * 60 * 1000
-
-function activityStatusFor(loggedInAt: Date | null): 'active' | string {
-  if (!loggedInAt) return 'Never'
-  if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
-  return timeAgo(loggedInAt)
-}
 import { USERS_PER_PAGE } from '@/config/constants'
 import { requireAdminOrProgramChair, requireUser } from '@/lib/actions/guard'
 import {

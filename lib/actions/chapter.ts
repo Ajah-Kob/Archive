@@ -4,6 +4,7 @@ import { head } from '@vercel/blob'
 import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client'
 import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
+import { sanitizeBlobFilename } from '@/lib/helper'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
 import {
   buildJourneyRows,
@@ -323,13 +324,6 @@ export async function getChapterData(
       phaseLocks,
     } as any,
   }
-}
-
-// Sanitizes a client-supplied filename for the blob pathname: keeps word
-// characters, dot, dash and space; everything else becomes an underscore.
-function sanitizeBlobFilename(fileName: string): string {
-  const cleaned = fileName.replace(/[^\w.\- ]+/g, '_').trim()
-  return cleaned.length > 0 ? cleaned : 'document.pdf'
 }
 
 /**

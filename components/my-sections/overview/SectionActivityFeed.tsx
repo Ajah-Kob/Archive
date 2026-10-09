@@ -1,19 +1,8 @@
 'use client'
 
 import { Activity, Check, Copy, FileUp, Flag, Layers, PenLine, Shield, UserPlus, Users } from 'lucide-react'
-import type { SectionActivityEntry } from '@/lib/actions/section-activity'
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
+import { formatDateTime } from '@/lib/helper'
+import { getSectionActivityFeed, type SectionActivityEntry } from '@/lib/actions/section-activity'
 
 const ACTION_META: Record<string, { Icon: typeof Activity; tile: string; tone: string }> = {
   GROUP_CREATE: { Icon: Users, tile: 'bg-[rgba(112,125,255,0.08)] border-[rgba(112,125,255,0.19)]', tone: 'text-[#707dff]' },

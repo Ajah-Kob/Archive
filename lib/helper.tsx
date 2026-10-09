@@ -91,3 +91,31 @@ export function timeAgo(date: Date | string): string {
 
   return target.toLocaleDateString()
 }
+
+// A user is considered "active now" if they signed in within this window.
+export const ACTIVE_NOW_MS = 5 * 60 * 1000
+
+export function activityStatusFor(loggedInAt: Date | null): 'active' | string {
+  if (!loggedInAt) return 'Never'
+  if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
+  return timeAgo(loggedInAt)
+}
+
+// Sanitizes a client-supplied filename for a blob pathname: keeps word
+// characters, dot, dash and space; everything else becomes an underscore.
+export function sanitizeBlobFilename(fileName: string): string {
+  const cleaned = fileName.replace(/[^\w.\- ]+/g, '_').trim()
+  return cleaned.length > 0 ? cleaned : 'document.pdf'
+}
+
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}

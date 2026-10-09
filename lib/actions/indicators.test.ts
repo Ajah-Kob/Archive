@@ -212,6 +212,25 @@ describe('getIndicatorCounts', () => {
     const res = await getIndicatorCounts()
 
     expect(res.success).toBe(true)
-    expect(Object.keys(res.payload ?? {}).sort()).toEqual(['invites', 'unread'])
+    expect(Object.keys(res.payload ?? {}).sort()).toEqual([
+      'invites',
+      'unread',
+      'unreadFinalDefense',
+      'unreadProposalDefense',
+    ])
+  })
+
+  test('unread defense keys count rows by exact milestone href', async () => {
+    mockRoles({ role: 'STUDENT', student: { id: 3, groupId: 7 } })
+    prismaMock.notification.count.mockImplementation(async (args: unknown) => {
+      const href = (args as { where: { href?: string } }).where.href
+      if (href === '/student/milestone/proposal-defense') return 2
+      return 0
+    })
+
+    const res = await getIndicatorCounts()
+
+    expect(res.payload?.unreadProposalDefense).toBe(2)
+    expect(res.payload?.unreadFinalDefense).toBe(0)
   })
 })

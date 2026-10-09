@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
+import { CountBadge } from '@/components/ui/CountBadge'
 import { UpcomingSessionsContainer } from './UpcomingSessionsContainer'
 import { ResubmissionsTable } from './ResubmissionsTable'
 import type {
@@ -35,6 +36,10 @@ export function DefensePage({ schedules, resubmissions }: DefensePageProps) {
   const upcoming = schedules.filter((s) => s.verdict === 'PENDING')
   // Completed = verdict has been submitted (APPROVED, MINOR/MAJOR, REDEFENSE)
   const completed = schedules.filter((s) => s.verdict !== 'PENDING')
+  // Badge = past-date undecided defenses only. A non-empty upcoming list is
+  // normal; only stale ones need chasing.
+  const now = Date.now()
+  const staleUpcoming = upcoming.filter((s) => new Date(s.date).getTime() < now).length
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -46,13 +51,19 @@ export function DefensePage({ schedules, resubmissions }: DefensePageProps) {
               key={tab.id}
               type="button"
               onClick={() => setActive(tab.id)}
-              className={`relative flex items-center h-[40px] px-[14px] font-sans text-[13px] transition-colors ${
+              className={`relative flex items-center gap-[6px] h-[40px] px-[14px] font-sans text-[13px] transition-colors ${
                 isActive
                   ? 'font-bold text-[#707dff]'
                   : 'font-semibold text-[#8a93b4] hover:text-[#5a6382]'
               }`}
             >
               {tab.label}
+              {tab.id === 'upcoming' && staleUpcoming > 0 ? (
+                <CountBadge count={staleUpcoming} label="Overdue undecided defenses" />
+              ) : null}
+              {tab.id === 'resubmissions' && resubmissions.length > 0 ? (
+                <CountBadge count={resubmissions.length} label="Resubmissions awaiting review" tone="info" />
+              ) : null}
               {isActive && (
                 <span className="absolute left-0 right-0 bottom-0 h-[2px] rounded-full bg-[#707dff]" />
               )}

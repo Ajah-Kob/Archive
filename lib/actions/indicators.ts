@@ -77,6 +77,22 @@ async function getIndicatorCountsData(userId: number): Promise<IndicatorCounts> 
       'unread',
       await prisma.notification.count({ where: { userId, readAt: null } }),
     ])(),
+    // Unread updates scoped to each defense milestone. Verdict and reschedule
+    // notifications point at the milestone base href (no /defense suffix), so
+    // href equality is exact — no cross-defense bleed. Powers the student
+    // Defense-tab badge via MilestoneDefenseHeader.
+    (async (): Promise<readonly [string, number]> => [
+      'unreadProposalDefense',
+      await prisma.notification.count({
+        where: { userId, readAt: null, href: '/student/milestone/proposal-defense' },
+      }),
+    ])(),
+    (async (): Promise<readonly [string, number]> => [
+      'unreadFinalDefense',
+      await prisma.notification.count({
+        where: { userId, readAt: null, href: '/student/milestone/final-defense' },
+      }),
+    ])(),
   ]
 
   // Student: defenses demanding a resubmission. Same predicate as the

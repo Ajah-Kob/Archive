@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { GroupContext } from '@/components/milestones/GroupContext'
+import { useIndicatorCounts } from '@/lib/hooks/useIndicatorCounts'
 import {
   DocumentHistoryDrawer,
   type DocumentHistoryItem,
@@ -102,10 +103,30 @@ export function MilestoneDefenseHeader({
   const [historyOpen, setHistoryOpen] = useState(false)
   const initialItem = getHistoryInitial(data)
   const resubmissionItems = getHistoryResubmissions(data)
+  const counts = useIndicatorCounts()
+
+  // Resubmission badge: same predicate as DefenseTabPanel's canResubmit —
+  // verdict in, no revised submission yet. Zero new queries: verdict and
+  // submissions arrive in `data`.
+  const resubmitRequired =
+    data != null &&
+    (data.verdict === 'MINOR_REVISION' || data.verdict === 'MAJOR_REVISION') &&
+    data.submissions.filter((s) => !s.isInitial).length === 0
+  // Defense badge: unread updates addressed to this milestone's base href
+  // (verdict arrived, defense rescheduled). Clears via the notification
+  // panel, which owns read state.
+  const unreadKey =
+    milestone === 'final-defense' ? 'unreadFinalDefense' : 'unreadProposalDefense'
 
   return (
     <>
-      <GroupContext onDocumentHistory={() => setHistoryOpen(true)} />
+      <GroupContext
+        onDocumentHistory={() => setHistoryOpen(true)}
+        tabBadges={{
+          defense: counts?.[unreadKey] ?? 0,
+          resubmission: resubmitRequired ? 1 : 0,
+        }}
+      />
       <DocumentHistoryDrawer
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}

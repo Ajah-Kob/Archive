@@ -275,6 +275,20 @@ export async function removeFaculty(facultyId: number) {
   revalidateFeature('faculties')
   revalidateFeature('sections')
 
+  // No sectionId: removal is refused while the faculty still advises groups
+  // or manages sections, so a removed faculty has no section scope left.
+  // The row still belongs in the admin audit log.
+  try {
+    await audit({
+      action: 'FACULTY_REMOVE',
+      entity: 'FACULTY',
+      entityId: String(facultyId),
+      entityName: `Faculty ${facultyId}`,
+      before: { facultyId, active: true },
+      after: { facultyId, active: false },
+    })
+  } catch {}
+
   return { success: true, message: 'Faculty removed.' }
 }
 
@@ -320,6 +334,19 @@ export async function joinFacultyWithCode(userId: number, code: string) {
   revalidateTag('users', 'max')
   revalidateTag('faculty', 'max')
   revalidateFeature('faculties')
+
+  // No sectionId: joining as faculty is not section-scoped. The row still
+  // belongs in the admin audit log.
+  try {
+    await audit({
+      action: 'FACULTY_JOIN',
+      entity: 'FACULTY',
+      entityId: String(userId),
+      entityName: `User ${userId}`,
+      before: null,
+      after: { userId, role: 'FACULTY' },
+    })
+  } catch {}
 
   return { success: true, message: 'Faculty registration successful.' }
 }

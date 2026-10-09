@@ -546,6 +546,7 @@ export async function submitChapter(
         entityName: CHAPTER_LABELS[chapter],
         before: null,
         after: { chapter, fileName: upload.fileName, blobUrl: upload.blobUrl, size: upload.size, milestoneId, groupId: auth.group.id },
+        sectionId: auth.group.sectionId,
       })
     } catch {}
 
@@ -617,6 +618,7 @@ export async function resubmitChapter(
         entityName: CHAPTER_LABELS[chapter],
         before: { chapter, status: "NEED_REVISION", milestoneId },
         after: { chapter, fileName: upload.fileName, blobUrl: upload.blobUrl, size: upload.size, milestoneId, submissionId: newSubmissionId },
+        sectionId: auth.group.sectionId,
       })
     } catch {}
 

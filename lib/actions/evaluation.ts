@@ -421,6 +421,17 @@ export async function reviewSubmission(
     revalidateTag(`my-section-${group.sectionId}`, config)
     // The adviser's own review-queue badge decrements with this review.
     await revalidateIndicators([adviser.faculty.userId])
+    try {
+      await audit({
+        action: 'CHAPTER_REVIEW',
+        entity: 'CHAPTER',
+        entityId: String(submission.id),
+        entityName: submission.fileName,
+        before: { submissionId: submission.id, status: 'PENDING' },
+        after: { submissionId: submission.id, status: decision },
+        sectionId: group.sectionId,
+      })
+    } catch {}
 
     try {
       const chapterLabel = CHAPTER_LABELS[(submission as any).milestone.chapter] ?? (submission as any).milestone.chapter

@@ -496,6 +496,7 @@ export async function joinSectionWithCode(code: string) {
           sectionId: joined.sectionId,
           section: joined.sectionName,
         },
+        sectionId: joined.sectionId,
       })
     } catch {}
 
@@ -975,6 +976,18 @@ export async function setMilestoneAvailability(
       if (s.groupId) revalidateTag(`journey-${s.groupId}`, { expire: 0 })
     }
 
+    try {
+      await audit({
+        action: 'MILESTONE_AVAILABILITY_SET',
+        entity: 'SECTION',
+        entityId: String(section.id),
+        entityName: `Section ${section.id}`,
+        before: null,
+        after: { key, open },
+        sectionId: section.id,
+      })
+    } catch {}
+
     return {
       success: true,
       message: open ? 'Milestone unlocked.' : 'Milestone locked.',
@@ -1053,6 +1066,18 @@ export async function setPhaseAvailability(
       if (s.userId) revalidateTag(`workspace-${s.userId}`, { expire: 0 })
       if (s.groupId) revalidateTag(`journey-${s.groupId}`, { expire: 0 })
     }
+
+    try {
+      await audit({
+        action: 'PHASE_AVAILABILITY_SET',
+        entity: 'SECTION',
+        entityId: String(section.id),
+        entityName: `Section ${section.id}`,
+        before: null,
+        after: { phase, open },
+        sectionId: section.id,
+      })
+    } catch {}
 
     return {
       success: true,
@@ -1200,6 +1225,7 @@ export async function createSection(
           coordinatorId: null,
           headerColor: null,
         },
+        sectionId: createdSectionId ?? null,
       })
     } catch {}
 
@@ -1312,6 +1338,7 @@ export async function updateSection(
           entityName: name,
           before: { section: current.section, academicYear: current.academicYear },
           after: { section: name, academicYear },
+          sectionId: current.id,
         })
       } catch {}
       revalidateCoordinatorCache(current.id)
@@ -1365,6 +1392,7 @@ export async function updateSection(
           entityName: current.section,
           before: { section: current.section, headerColor: currentColor },
           after: { section: name, headerColor },
+          sectionId: current.id,
         })
       } catch {}
       revalidateCoordinatorCache(current.id)
@@ -1398,6 +1426,7 @@ export async function updateSection(
         entityName: name,
         before: { section: current.section, headerColor: currentColor },
         after: { section: name, headerColor },
+        sectionId: current.id,
       })
     } catch {}
 
@@ -1485,6 +1514,7 @@ export async function archiveSection(id: number) {
           section: archived.section.section,
           deletedAt: archived.archivedAt.toISOString(),
         },
+        sectionId: archived.section.id,
       })
     } catch {}
 
@@ -1580,6 +1610,18 @@ export async function assignSectionCoordinator(
     }
 
     revalidateCoordinatorCache(section.id)
+
+    try {
+      await audit({
+        action: 'SECTION_COORDINATOR_ASSIGN',
+        entity: 'SECTION',
+        entityId: String(section.id),
+        entityName: section.section,
+        before: { coordinatorId: null },
+        after: { coordinatorId: coordinator.id },
+        sectionId: section.id,
+      })
+    } catch {}
 
     return {
       success: true,
@@ -1702,6 +1744,7 @@ export async function reassignSectionCoordinator(
         entityName: section.section,
         before: { coordinatorId: expectedCoordinatorId },
         after: { coordinatorId: nextCoordinatorId },
+        sectionId: section.id,
       })
     } catch {}
 
@@ -1785,6 +1828,17 @@ export async function removeStudentFromSection(studentId: number) {
     revalidateTag(`workspace-${student.userId}`, 'max')
     revalidateTag(`classmates-${student.userId}`, 'max')
     if (groupId) revalidateTag(`journey-${groupId}`, 'max')
+    try {
+      await audit({
+        action: 'STUDENT_REMOVE_SECTION',
+        entity: 'SECTION',
+        entityId: String(student.sectionId),
+        entityName: `Section ${student.sectionId}`,
+        before: { studentId: student.id, groupId },
+        after: { studentId: student.id, removed: true },
+        sectionId: student.sectionId,
+      })
+    } catch {}
     return { success: true, message: 'Student removed from the section.' }
   } catch (error) {
     console.error('[removeStudentFromSection | Error]:', error)
@@ -1866,6 +1920,20 @@ export async function removeStudentsFromSection(studentIds: number[]) {
       revalidateTag(`classmates-${userId}`, 'max')
     }
     for (const groupId of groupIds) revalidateTag(`journey-${groupId}`, 'max')
+    try {
+      for (const sectionId of sectionIds) {
+        const inSection = students.filter((s) => s.sectionId === sectionId)
+        await audit({
+          action: 'STUDENT_REMOVE_SECTION',
+          entity: 'SECTION',
+          entityId: String(sectionId),
+          entityName: `Section ${sectionId}`,
+          before: { studentIds: inSection.map((s) => s.id) },
+          after: { removedStudentIds: inSection.map((s) => s.id) },
+          sectionId,
+        })
+      }
+    } catch {}
     const count = students.length
     return { success: true, message: count === 1 ? 'Student removed from the section.' : `${count} students removed from the section.` }
   } catch (error) {
@@ -1912,6 +1980,19 @@ export async function copySectionJoinCode(sectionId: number) {
       })
       regenerated = true
       revalidateCoordinatorCache(section.id)
+      // Audit only the regeneration (a state change). A plain copy that
+      // returns the still-valid code is a read, not feed material.
+      try {
+        await audit({
+          action: 'SECTION_JOIN_CODE_REGENERATE',
+          entity: 'SECTION',
+          entityId: String(section.id),
+          entityName: section.section,
+          before: null,
+          after: { joinCodeId: joinCode.id },
+          sectionId: section.id,
+        })
+      } catch {}
     }
 
     return {

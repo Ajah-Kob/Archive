@@ -35,6 +35,16 @@ async function revalidateDefenseJourneyCache(sectionId: number | null | undefine
   if (sectionId) revalidateTag(`my-section-${sectionId}`, 'max')
 }
 
+/** Resolves a group's section for audit scoping. Null when unknown — the
+ * row is still written, it just never appears in a section feed. */
+async function sectionIdForGroup(groupId: number): Promise<number | null> {
+  const group = await prisma.group.findFirst({
+    where: { id: groupId, deletedAt: null },
+    select: { sectionId: true },
+  })
+  return group?.sectionId ?? null
+}
+
 // ───────────────────────────── Panelist session helpers (pure) ─────────────
 
 type PanelistFeedback = { comments: number; pages: number; hasCommitted?: boolean; hasDraft?: boolean } | null
@@ -723,6 +733,7 @@ export async function createDefenseSchedule(
         entityName: groupForAudit?.groupName ?? `Group ${groupId} - ${type}`,
         before: null,
         after: { groupId, type, date: date.toISOString(), startTime, endTime, venue, panelists: parsed.panelists },
+        sectionId: group.sectionId,
       })
     } catch {}
 
@@ -872,6 +883,7 @@ export async function updateDefenseSchedule(
         entityName: groupNameForAudit,
         before: beforeSnapshot,
         after: { ...data, panelists: panelists ?? undefined },
+        sectionId: updated.group.sectionId,
       })
     } catch {}
 
@@ -1078,6 +1090,7 @@ export async function rescheduleForRedefense(
           venue,
           panelists,
         },
+        sectionId: await sectionIdForGroup(schedule.groupId),
       })
     } catch {}
 
@@ -1355,9 +1368,11 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
     try {
       // Resolve group name for human-readable entityName (best-effort).
       let groupNameForVerdict: string | null = null
+      let groupIdForVerdict: number | null = null
       try {
-        const s = await prisma.defenseSchedule.findFirst({ where: { id: scheduleId }, select: { group: { select: { groupName: true } } } })
+        const s = await prisma.defenseSchedule.findFirst({ where: { id: scheduleId }, select: { groupId: true, group: { select: { groupName: true } } } })
         groupNameForVerdict = (s as any)?.group?.groupName ?? null
+        groupIdForVerdict = (s as any)?.groupId ?? null
       } catch {}
       await audit({
         action: "DEFENSE_VERDICT",
@@ -1366,6 +1381,7 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
         entityName: groupNameForVerdict ?? `Schedule ${scheduleId}`,
         before: { verdict: beforeVerdict },
         after: { verdict, verdictSubmittedAt: now.toISOString() },
+        sectionId: groupIdForVerdict != null ? await sectionIdForGroup(groupIdForVerdict) : null,
       })
     } catch {}
 
@@ -1601,15 +1617,32 @@ export async function reviewDefenseResubmission(
 
     revalidateTag('defense', 'max')
     revalidateFeature('defense')
+    let reviewSectionId: number | null = null
     try {
       const schedule = await prisma.defenseSchedule.findFirst({
         where: { id: submission.scheduleId, deletedAt: null },
         select: { group: { select: { sectionId: true } } },
       })
+      reviewSectionId = schedule?.group.sectionId ?? null
       await revalidateDefenseJourneyCache(schedule?.group.sectionId)
     } catch (revalidateError) {
       console.error('[reviewDefenseResubmission | revalidate journey | Error]:', revalidateError)
     }
+
+    // The reviewer's own queue badge decrements with this decision.
+    await revalidateIndicators([panelistId])
+
+    try {
+      await audit({
+        action: 'DEFENSE_RESUBMISSION_REVIEW',
+        entity: 'DEFENSE_SCHEDULE',
+        entityId: String(submission.scheduleId),
+        entityName: `Resubmission v-review (${normalizedDecision})`,
+        before: { submissionId, status: 'PENDING' },
+        after: { submissionId, status: normalizedDecision, reviewedAt: now.toISOString() },
+        sectionId: reviewSectionId,
+      })
+    } catch {}
 
     return {
       success: true,

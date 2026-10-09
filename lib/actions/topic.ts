@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
+import { audit } from '@/lib/actions/audit'
 
 // Revalidates every cache that surfaces a group's topic: each member's
 // workspace, the journey, and the coordinator's section views.
@@ -125,6 +126,18 @@ export async function saveFinalTopic(_prevState: any, formData: FormData) {
       },
     })
   }
+
+  try {
+    await audit({
+      action: 'TOPIC_SAVE',
+      entity: 'GROUP',
+      entityId: String(group.id),
+      entityName: group.groupName,
+      before: null,
+      after: { topicId, title },
+      sectionId: group.sectionId,
+    })
+  } catch {}
 
   revalidateGroupTopics(group, { expireNow: true })
   return { success: true, message: 'Final topic saved.' }

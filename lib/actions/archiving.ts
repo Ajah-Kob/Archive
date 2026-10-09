@@ -807,6 +807,7 @@ export async function submitArchiving(_prevState: any, formData: FormData) {
         entityName: data.title ?? persisted?.title ?? `Group ${groupId}`,
         before: existing ? { status: existing.status, title: existing.title, blobUrl: existing.blobUrl } : null,
         after: { status: "IN_REVIEW", title: data.title, blobUrl: effectiveBlobUrl, fileName: effectiveFileName },
+        sectionId: ctx.sectionId,
       })
     } catch {}
 
@@ -1058,6 +1059,7 @@ export async function approveArchiving(groupId: number) {
         entityName: submission.title ?? `Group ${groupId}`,
         before: { status: submission.status, title: submission.title, blobUrl: submission.blobUrl },
         after: { status: "ARCHIVED", title: submission.title, blobUrl: submission.blobUrl },
+        sectionId: submission.group?.sectionId ?? null,
       })
     } catch {}
 

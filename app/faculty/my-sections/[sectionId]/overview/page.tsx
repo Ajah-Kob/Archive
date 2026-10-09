@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getCoordinatorSectionById } from '@/lib/actions/sections'
 import { SectionOverviewCard } from '@/components/my-sections/overview/SectionOverviewCard'
+import { SectionActivityFeed } from '@/components/my-sections/overview/SectionActivityFeed'
 
 export default async function MySectionOverviewPage({
   params,
@@ -21,6 +22,7 @@ export default async function MySectionOverviewPage({
   return (
     <div className="flex flex-col gap-4 sm:gap-5 w-full">
       <SectionOverviewCard section={section} />
+      <SectionActivityFeed sectionId={parsedId} />
     </div>
   )
 }

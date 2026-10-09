@@ -28,6 +28,14 @@ export const useIndicators = create<IndicatorsState>()((set) => ({
   version: 0,
   bump: () => set((state) => ({ version: state.version + 1 })),
   seen: {},
+  // Returns the existing state untouched when the baseline is unchanged.
+  // Without this, every markSeen call notifies subscribers even for an
+  // identical value, and the re-baseline effects that run on every
+  // seen-change re-fire forever (maximum update depth exceeded).
   markSeen: (key, count) =>
-    set((state) => ({ seen: { ...state.seen, [key]: count } })),
+    set((state) =>
+      state.seen[key] === count
+        ? state
+        : { seen: { ...state.seen, [key]: count } },
+    ),
 }))

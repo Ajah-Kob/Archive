@@ -110,12 +110,13 @@ export function NavLinks({
   }, [pathname, counts])
 
   // Re-baseline downward: work resolved elsewhere must never leave a stale
-  // baseline that hides genuinely new items later.
+  // baseline that hides genuinely new items later. Strictly lower-only, so
+  // this never writes an identical value back into the store.
   useEffect(() => {
     if (!counts) return
     for (const [key, value] of Object.entries(counts)) {
       const baseline = seen[key]
-      if (baseline != null && value <= baseline) markSeen(key, value)
+      if (baseline != null && value < baseline) markSeen(key, value)
     }
   }, [counts, seen, markSeen])
 

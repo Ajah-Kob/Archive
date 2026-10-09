@@ -65,7 +65,7 @@ export function useSuppressedCount(
   const wasActive = useRef(false)
 
   useEffect(() => {
-    if (key != null && seen != null && count <= seen) markSeen(key, count)
+    if (key != null && seen != null && count < seen) markSeen(key, count)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, count, seen])
 

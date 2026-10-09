@@ -48,13 +48,6 @@ export type StudentSystemLink = Omit<
   'removedAt'
 >
 
-export type SystemLinkCommentNode = {
-  id: number
-  body: string
-  createdAt: Date | string
-  author: { name: string }
-}
-
 /**
  * Panelist view of one defense: every link, including withdrawn ones, so a
  * panelist can see that a comment thread existed on something the group took

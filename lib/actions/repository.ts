@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { cacheTag, cacheLife, revalidateTag } from 'next/cache'
+import { sanitizeBlobFilename } from '@/lib/helper'
 import { put, del } from '@vercel/blob'
 import { getSession, requireAdmin, unauthorized } from '@/lib/actions/guard'
 import { revalidateFeature } from '@/lib/actions/revalidate'
@@ -151,11 +152,6 @@ export async function getRepositoryArchive(id: number): Promise<{
 // requireStudent-guarded and group-scoped (Blob path archiving/${groupId}/),
 // so admins (no student group) cannot use it. These actions inline the Blob
 // put/del instead, following the lib/actions/media.ts + template.ts pattern.
-
-function sanitizeBlobFilename(fileName: string): string {
-  const cleaned = fileName.replace(/[^\w.\- ]+/g, '_').trim()
-  return cleaned.length > 0 ? cleaned : 'document.pdf'
-}
 
 function revalidateRepository() {
   revalidateTag('archives', 'max')

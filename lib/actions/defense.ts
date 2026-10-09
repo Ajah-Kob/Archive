@@ -13,6 +13,7 @@ import {
 import { getFacultyMembers } from '@/lib/actions/faculty'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import { audit } from '@/lib/actions/audit'
+import { sectionIdForGroup } from '@/lib/group'
 import type {
   DefenseType,
   DefenseVerdict,
@@ -32,16 +33,6 @@ const PANELIST_ROLES: PanelistRole[] = ['CHAIR', 'PANEL_MEMBER']
 
 async function revalidateDefenseJourneyCache(sectionId: number | null | undefined) {
   if (sectionId) revalidateTag(`my-section-${sectionId}`, 'max')
-}
-
-/** Resolves a group's section for audit scoping. Null when unknown — the
- * row is still written, it just never appears in a section feed. */
-async function sectionIdForGroup(groupId: number): Promise<number | null> {
-  const group = await prisma.group.findFirst({
-    where: { id: groupId, deletedAt: null },
-    select: { sectionId: true },
-  })
-  return group?.sectionId ?? null
 }
 
 // ───────────────────────────── Panelist session helpers (pure) ─────────────

@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
+import { sanitizeBlobFilename } from '@/lib/helper'
 import { put, del } from '@vercel/blob'
 import {
   requireStudent,
@@ -83,11 +84,6 @@ function deriveUiStatus(
   if (submission.status === 'IN_REVIEW') return 'IN_REVIEW'
   // DRAFT maps to READY (student can still edit)
   return 'READY_FOR_ARCHIVING'
-}
-
-function sanitizeBlobFilename(fileName: string): string {
-  const cleaned = fileName.replace(/[^\w.\- ]+/g, '_').trim()
-  return cleaned.length > 0 ? cleaned : 'document.pdf'
 }
 
 function revalidateArchiving(groupId: number) {

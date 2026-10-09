@@ -190,9 +190,6 @@ export function DefenseSessionTabsList() {
   )
 }
 
-// Alias for spec prose: Tabs
-export const DefenseSessionTabsNav = DefenseSessionTabsList
-
 // ── TabPanel (conditional render via context — no boolean prop proliferation) ─
 
 export interface DefenseSessionTabPanelProps {
@@ -378,10 +375,4 @@ export const DefenseSessionTabs = {
   Root: DefenseSessionTabsRoot,
   Tabs: DefenseSessionTabsList,
   TabPanel: DefenseSessionTabPanel,
-  // aliases for flexible import paths
-  List: DefenseSessionTabsList,
-  Panel: DefenseSessionTabPanel,
 }
-
-// Default export for convenience
-export default DefenseSessionTabs

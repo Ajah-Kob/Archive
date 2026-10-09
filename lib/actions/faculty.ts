@@ -3,7 +3,7 @@
 import prisma from '@/lib/prisma'
 import { getSession, requireAdmin, requireAdminOrProgramChair, unauthorized } from '@/lib/actions/guard'
 import { validateFacultyCode } from '@/lib/actions/join-code'
-import { timeAgo } from '@/lib/helper'
+import { activityStatusFor } from '@/lib/helper'
 import {
   cacheTag,
   cacheLife,
@@ -11,15 +11,6 @@ import {
 import { revalidateTag } from 'next/cache'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import { audit } from '@/lib/actions/audit'
-
-// A faculty member is considered "active now" if they signed in within this window.
-const ACTIVE_NOW_MS = 5 * 60 * 1000
-
-function activityStatusFor(loggedInAt: Date | null): 'active' | string {
-  if (!loggedInAt) return 'Never'
-  if (Date.now() - loggedInAt.getTime() < ACTIVE_NOW_MS) return 'active'
-  return timeAgo(loggedInAt)
-}
 
 async function getAvailableFacultyData() {
   try {

@@ -1,6 +1,7 @@
 'use client'
 
 import { Check, FileUp, PenLine } from 'lucide-react'
+import { formatDateTime } from '@/lib/helper'
 import { LatestDocumentCardRoot } from './DefenseDocumentCard/Root'
 import { LatestDocumentCardHeader } from './DefenseDocumentCard/Header'
 import { LatestDocumentCardBody } from './DefenseDocumentCard/Body'
@@ -35,18 +36,6 @@ export interface ResubmissionActivityFeedProps {
   }>
   /** Pre-derived entries; skips re-deriving when the caller already has them. */
   entries?: ResubmissionActivityEntry[]
-}
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
 }
 
 function entryMeta(kind: ResubmissionActivityEntry['kind']) {

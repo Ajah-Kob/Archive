@@ -227,6 +227,7 @@ model Student {
   groupId     Int?
   group       Group?       @relation(fields: [groupId], references: [id])
   ledGroup    Group?       @relation("GroupLeader")
+  topicSubmittedGroups Group[] @relation("GroupTopicSubmitter")
   invitations Invitation[]
   topics      Topic[]
   createdAt   DateTime     @default(now())
@@ -245,6 +246,13 @@ model Group {
   leaderStudent       Student?             @relation("GroupLeader", fields: [leaderStudentId], references: [id])
   adviserId           Int?
   adviser             Adviser?             @relation(fields: [adviserId], references: [id])
+  /// Final capstone topic, set by the group leader. Replaces the Topic +
+  /// Capstone tables: one title per group, always approved, with submitter
+  /// and timestamp preserved for display.
+  topicTitle          String?
+  topicSubmittedById  Int?
+  topicSubmittedBy    Student?             @relation("GroupTopicSubmitter", fields: [topicSubmittedById], references: [id], onDelete: SetNull)
+  topicSubmittedAt    DateTime?
   students            Student[]
   topics              Topic[]
   capstone            Capstone?

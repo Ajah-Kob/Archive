@@ -13,6 +13,7 @@ import { useSession } from 'next-auth/react'
 import { ArrowLeft, History } from 'lucide-react'
 import { HeaderBar } from '@/components/globals/HeaderBar'
 import { CountBadge } from '@/components/ui/CountBadge'
+import { useSuppressedCount } from '@/lib/hooks/useIndicatorCounts'
 import {
   DocumentHistoryDrawer,
   type DocumentHistoryItem,
@@ -320,10 +321,11 @@ export function DefenseSessionTabsRoot({
   // Tab badges derived from the session payload already in hand — no
   // additional queries. Resubmission counts resubmissions where MY review
   // is still PENDING (reviews carry panelistId); the session dot marks a
-  // verdict only this schedule's chair can give.
+  // verdict only this schedule's chair can give. Both hide once their tab
+  // is opened, reappearing only on new activity.
   const { data: viewerSession } = useSession()
   const viewerId = viewerSession?.user?.id ? +viewerSession.user.id : null
-  const badges = useMemo(() => {
+  const rawBadges = useMemo(() => {
     const resubmissions = session?.resubmissions ?? []
     const resubmission =
       viewerId == null
@@ -338,6 +340,19 @@ export function DefenseSessionTabsRoot({
       (session?.myRole as string | undefined) === 'CHAIR'
     return { resubmission, sessionDot }
   }, [session, viewerId])
+  const scheduleScope = resolvedScheduleId != null ? String(resolvedScheduleId) : undefined
+  const badges = {
+    resubmission: useSuppressedCount(
+      scheduleScope ? `tab:resub:${scheduleScope}` : undefined,
+      rawBadges.resubmission,
+      activeTab === 'resubmission',
+    ),
+    sessionDot: useSuppressedCount(
+      scheduleScope ? `tab:ses:${scheduleScope}` : undefined,
+      rawBadges.sessionDot ? 1 : 0,
+      activeTab === 'session',
+    ) > 0,
+  }
 
   return (
     <DefenseSessionTabsContext value={{ activeTab, selectTab, badges }}>

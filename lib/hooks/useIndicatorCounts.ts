@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { useRef } from 'react'
 import { getIndicatorCounts, type IndicatorCounts } from '@/lib/actions/indicators'
+import { isBadgeVisible } from '@/lib/indicators'
 import { useIndicators } from '@/store/useIndicators'
 
 /**
@@ -40,4 +42,40 @@ export function useIndicatorCounts(): IndicatorCounts | null {
   }, [load])
 
   return counts
+}
+
+/**
+ * One badge's display count under seen-semantics. Call once per badge with
+ * a stable key (sidebar count keys; schedule- or milestone-scoped `tab:*`
+ * keys for tabs) and whether its section is currently open.
+ *
+ * - Opening (mount-open or switched-in) records the current count as the
+ *   baseline, hiding the badge until the count rises above it.
+ * - A count dropping at/below baseline re-baselines downward, so work
+ *   resolved elsewhere never leaves a stale baseline behind.
+ * - No key (scope unknown) falls back to the raw count.
+ */
+export function useSuppressedCount(
+  key: string | undefined,
+  count: number,
+  active: boolean,
+): number {
+  const seen = useIndicators((state) => (key ? state.seen[key] : undefined))
+  const markSeen = useIndicators((state) => state.markSeen)
+  const wasActive = useRef(false)
+
+  useEffect(() => {
+    if (key != null && seen != null && count <= seen) markSeen(key, count)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, count, seen])
+
+  useEffect(() => {
+    if (active && key != null && !wasActive.current) markSeen(key, count)
+    wasActive.current = active
+    // count intentionally excluded: a rise while viewing must show, not hide.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, key])
+
+  if (key == null) return count
+  return isBadgeVisible(count, seen) ? count : 0
 }

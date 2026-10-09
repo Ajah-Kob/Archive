@@ -1,6 +1,7 @@
 import { describe, expect, jest, test } from '@jest/globals'
 import prisma from '@/lib/prisma'
 import { requireUser } from '@/lib/actions/guard'
+import { isBadgeVisible } from '@/lib/indicators'
 import { getIndicatorCounts } from './indicators'
 
 jest.mock('@/lib/prisma', () => ({
@@ -218,6 +219,20 @@ describe('getIndicatorCounts', () => {
       'unreadFinalDefense',
       'unreadProposalDefense',
     ])
+  })
+
+  test('seen-semantics: badge shows only above the open-time baseline', () => {
+    // Never visited: everything positive shows.
+    expect(isBadgeVisible(3, undefined)).toBe(true)
+    // Opened at 3: hidden until the count rises.
+    expect(isBadgeVisible(3, 3)).toBe(false)
+    // New activity above baseline: shows again.
+    expect(isBadgeVisible(4, 3)).toBe(true)
+    // Work resolved elsewhere re-baselines downward: stays hidden.
+    expect(isBadgeVisible(2, 3)).toBe(false)
+    // Zero never shows, with or without a baseline.
+    expect(isBadgeVisible(0, undefined)).toBe(false)
+    expect(isBadgeVisible(0, 5)).toBe(false)
   })
 
   test('unread defense keys count rows by exact milestone href', async () => {

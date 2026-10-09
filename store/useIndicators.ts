@@ -4,6 +4,14 @@ type IndicatorsState = {
   /** Bumped after any mutation that can change indicator counts. */
   version: number
   bump: () => void
+  /**
+   * Per-badge baselines for seen-semantics: opening a section records the
+   * count at open; the badge reappears only when the count rises above it.
+   * In-memory only (never persisted) — persisting would desync SSR markup
+   * from the hydrated client and trip hydration errors.
+   */
+  seen: Record<string, number>
+  markSeen: (key: string, count: number) => void
 }
 
 /**
@@ -19,4 +27,7 @@ type IndicatorsState = {
 export const useIndicators = create<IndicatorsState>()((set) => ({
   version: 0,
   bump: () => set((state) => ({ version: state.version + 1 })),
+  seen: {},
+  markSeen: (key, count) =>
+    set((state) => ({ seen: { ...state.seen, [key]: count } })),
 }))

@@ -11,6 +11,7 @@ import {
   unauthorized,
 } from '@/lib/actions/guard'
 import { getFacultyMembers } from '@/lib/actions/faculty'
+import { revalidateIndicators } from '@/lib/actions/indicators'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import { audit } from '@/lib/actions/audit'
 import type {
@@ -1106,6 +1107,28 @@ export async function rescheduleForRedefense(
     revalidateFeature('defense')
     await revalidateDefenseJourneyCache(schedule.group.sectionId)
 
+    // A reschedule reopens the verdict window: panelist queues grow back and
+    // group unread keys flip. Best-effort, like the notification above.
+    try {
+      const audience = await prisma.defenseSchedule.findFirst({
+        where: { id: created.id },
+        select: {
+          panelists: { where: { deletedAt: null }, select: { userId: true } },
+          group: {
+            select: {
+              students: { where: { deletedAt: null }, select: { userId: true } },
+            },
+          },
+        },
+      })
+      await revalidateIndicators([
+        ...(audience?.panelists.map((p) => p.userId) ?? []),
+        ...(audience?.group.students.map((s) => s.userId) ?? []),
+      ])
+    } catch (indicatorError) {
+      console.error('[rescheduleForRedefense | indicators Error]:', indicatorError)
+    }
+
     return {
       success: true,
       message: 'Redefense rescheduled successfully.',
@@ -1430,6 +1453,30 @@ export async function submitPanelistVerdict(scheduleId: number, verdict: string)
       }
     } catch (notifyError) {
       console.error('[submitPanelistVerdict | notify Error]:', notifyError)
+    }
+
+    // A verdict moves every badge it touches: panelists' queues shrink, the
+    // group's resubmit/unread keys flip, chair and coordinator stale counts
+    // drop. Best-effort like the notification above — a recorded verdict
+    // matters more than a refreshed badge.
+    try {
+      const audience = await prisma.defenseSchedule.findFirst({
+        where: { id: scheduleId },
+        select: {
+          panelists: { where: { deletedAt: null }, select: { userId: true } },
+          group: {
+            select: {
+              students: { where: { deletedAt: null }, select: { userId: true } },
+            },
+          },
+        },
+      })
+      await revalidateIndicators([
+        ...(audience?.panelists.map((p) => p.userId) ?? []),
+        ...(audience?.group.students.map((s) => s.userId) ?? []),
+      ])
+    } catch (indicatorError) {
+      console.error('[submitPanelistVerdict | indicators Error]:', indicatorError)
     }
 
     return { success: true, message: 'Verdict submitted successfully.', payload: updated }

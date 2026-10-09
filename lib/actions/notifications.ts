@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/actions/guard'
+import { revalidateIndicators } from '@/lib/actions/indicators'
 
 export interface NotificationItem {
   id: number
@@ -68,6 +69,7 @@ export async function markNotificationRead(id: number) {
         where: { id: row.id },
         data: { readAt: new Date() },
       })
+      await revalidateIndicators([session.user.id])
     }
     return { success: true, message: 'Marked as read.' }
   } catch {
@@ -84,6 +86,7 @@ export async function markAllNotificationsRead(userId: number) {
       where: { userId, readAt: null },
       data: { readAt: new Date() },
     })
+    await revalidateIndicators([userId])
     return { success: true, message: 'All notifications marked as read.' }
   } catch {
     return { success: false, message: 'Failed to update notifications.' }

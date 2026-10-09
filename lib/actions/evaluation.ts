@@ -3,6 +3,7 @@
 import { revalidateTag } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { requireAdviser, unauthorized } from '@/lib/actions/guard'
+import { revalidateIndicators } from '@/lib/actions/indicators'
 import { audit } from '@/lib/actions/audit'
 
 export interface EvaluationItem {
@@ -418,6 +419,8 @@ export async function reviewSubmission(
     revalidateTag(`journey-${group.id}`, config)
     revalidateTag(`evaluations-${adviser.id}`, config)
     revalidateTag(`my-section-${group.sectionId}`, config)
+    // The adviser's own review-queue badge decrements with this review.
+    await revalidateIndicators([adviser.faculty.userId])
 
     try {
       const chapterLabel = CHAPTER_LABELS[(submission as any).milestone.chapter] ?? (submission as any).milestone.chapter

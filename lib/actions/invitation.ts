@@ -8,6 +8,7 @@ import {
   unauthorized,
 } from '@/lib/actions/guard'
 import { addAdviser } from '@/lib/actions/adviser'
+import { revalidateIndicators } from '@/lib/actions/indicators'
 import { GROUP_CAP, ADVISER_INVITE_TTL_MS } from '@/types/milestones'
 import type { InvitationRole } from '@prisma/client'
 
@@ -118,13 +119,14 @@ export async function getMyPendingInvitations(userId: number) {
   return getMyPendingInvitationsData(userId)
 }
 
-function revalidateInvitee(invitation: {
+async function revalidateInvitee(invitation: {
   faculty?: { userId?: number } | null
   student?: { userId?: number } | null
 }) {
   const inviteeId = invitation.faculty?.userId ?? invitation.student?.userId
   if (inviteeId) {
     revalidateTag(`my-invitations-${inviteeId}`, 'max')
+    await revalidateIndicators([inviteeId])
   }
   revalidateTag('invitations', 'max')
   revalidateTag('faculty', 'max')
@@ -171,7 +173,7 @@ export async function acceptInvitation(invitationId: number) {
         where: { id: invitationId },
         data: { status: 'CANCELLED', readAt },
       })
-      revalidateInvitee(invitation)
+      await revalidateInvitee(invitation)
       return {
         success: false,
         payload: null,
@@ -233,6 +235,7 @@ export async function acceptInvitation(invitationId: number) {
       revalidateTag(`classmates-${session.user.id}`, 'max')
       revalidateTag(`classmates-${invitation.invitedBy.id}`, 'max')
       revalidateGroupWorkspace(group.id, invitation.invitedBy.id)
+      await revalidateIndicators([session.user.id])
 
       return {
         success: true,
@@ -298,6 +301,7 @@ export async function acceptInvitation(invitationId: number) {
       revalidateTag(`workspace-${invitation.invitedBy.id}`, 'max')
       revalidateTag(`my-invitations-${session.user.id}`, 'max')
       revalidateGroupWorkspace(group.id)
+      await revalidateIndicators([session.user.id])
       revalidateTag('advisers', 'max')
       revalidateTag('faculty', 'max')
 
@@ -333,7 +337,7 @@ export async function acceptInvitation(invitationId: number) {
       data: { status: 'ACCEPTED', readAt },
     })
 
-    revalidateInvitee(invitation)
+    await revalidateInvitee(invitation)
 
     return {
       success: true,
@@ -380,7 +384,7 @@ export async function declineInvitation(invitationId: number) {
       data: { status: 'REJECTED', readAt: new Date() },
     })
 
-    revalidateInvitee(invitation)
+    await revalidateInvitee(invitation)
     if (invitation.groupId) {
       revalidateGroupWorkspace(invitation.group.id, invitation.invitedBy.id)
     }
@@ -413,6 +417,7 @@ export async function markAllInvitationsRead(userId: number) {
     })
 
     revalidateTag(`my-invitations-${userId}`, 'max')
+    await revalidateIndicators([userId])
 
     return {
       success: true,
@@ -472,7 +477,7 @@ export async function sendInvitation(
       select: { userId: true },
     })
 
-    revalidateInvitee({ faculty: { userId: invitedFaculty?.userId } })
+    await revalidateInvitee({ faculty: { userId: invitedFaculty?.userId } })
 
     return {
       success: true,
@@ -504,7 +509,7 @@ export async function cancelInvitation(invitationId: number) {
       select: { userId: true },
     })
 
-    revalidateInvitee({ faculty: { userId: cancelledFaculty?.userId } })
+    await revalidateInvitee({ faculty: { userId: cancelledFaculty?.userId } })
 
     return { success: true, message: 'Invitation cancelled.' }
   } catch {

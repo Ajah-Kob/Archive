@@ -9,10 +9,11 @@ import { useIndicators } from '@/store/useIndicators'
  * Badge counts for the sidebar and tab bars.
  *
  * Re-fetches on mount, on every navigation (the Aside persists across route
- * changes within a layout, so mount-only would go stale), and whenever a
- * mutation bumps the indicators store. Signed-out visitors get null and
- * render no badges. Fetch failures are silent — a missing badge beats a
- * broken sidebar.
+ * changes within a layout, so mount-only would go stale), when the tab
+ * regains focus or visibility (cheap catch-all for mutations made in another
+ * tab), and whenever a mutation bumps the indicators store. Signed-out
+ * visitors get null and render no badges. Fetch failures are silent — a
+ * missing badge beats a broken sidebar.
  */
 export function useIndicatorCounts(): IndicatorCounts | null {
   const [counts, setCounts] = useState<IndicatorCounts | null>(null)
@@ -27,6 +28,16 @@ export function useIndicatorCounts(): IndicatorCounts | null {
   useEffect(() => {
     load()
   }, [load, pathname, version])
+
+  useEffect(() => {
+    const refresh = () => load()
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [load])
 
   return counts
 }

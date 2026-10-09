@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { cacheLife, cacheTag } from 'next/cache'
+import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
 import { requireUser } from '@/lib/actions/guard'
 import { ADVISER_INVITE_TTL_MS } from '@/types/milestones'
 import { ADVISER_CAP } from '@/config/constants'
@@ -19,9 +19,11 @@ import { ADVISER_CAP } from '@/config/constants'
  */
 export type IndicatorCounts = Record<string, number>
 
+const indicatorTag = (userId: number) => `indicators-${userId}`
+
 async function getIndicatorCountsData(userId: number): Promise<IndicatorCounts> {
   'use cache'
-  cacheTag(`indicators-${userId}`)
+  cacheTag(indicatorTag(userId))
   cacheLife('max')
 
   // Role resolution mirrors guard.ts but reads the DB directly, so a freshly
@@ -236,6 +238,25 @@ async function getIndicatorCountsData(userId: number): Promise<IndicatorCounts> 
 
   const entries = await Promise.all(tasks)
   return Object.fromEntries(entries)
+}
+
+/**
+ * Bust cached indicator counts for the given users. Call alongside the
+ * feature's own revalidateTag calls in any mutation that changes a count
+ * (review submitted, verdict submitted, invitation answered, notification
+ * read). Users are re-resolved from the affected rows, never trusted from
+ * the client. Mutations whose affected audience is unbounded (chair-wide
+ * alerts) skip this and rely on navigation refresh instead.
+ */
+export async function revalidateIndicators(userIds: Array<number | string | null | undefined>) {
+  const seen = new Set<number>()
+  for (const id of userIds) {
+    const userId = typeof id === 'string' ? Number(id) : id
+    if (Number.isInteger(userId) && userId! > 0 && !seen.has(userId as number)) {
+      seen.add(userId as number)
+      revalidateTag(indicatorTag(userId), 'max')
+    }
+  }
 }
 
 export async function getIndicatorCounts(): Promise<{

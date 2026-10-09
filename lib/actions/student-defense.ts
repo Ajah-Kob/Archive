@@ -5,6 +5,7 @@ import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client'
 import prisma from '@/lib/prisma'
 import { cacheTag, cacheLife, revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
+import { revalidateIndicators } from '@/lib/actions/indicators'
 import type {
   DefenseType,
   DefenseVerdict,
@@ -687,6 +688,17 @@ export async function resubmitDefenseDocument(
     })
 
     revalidateTag('defense', 'max')
+
+    // The group's resubmit badge clears with this upload. Best-effort.
+    try {
+      const mates = await prisma.student.findMany({
+        where: { groupId: schedule.groupId, deletedAt: null },
+        select: { userId: true },
+      })
+      await revalidateIndicators(mates.map((m) => m.userId))
+    } catch (indicatorError) {
+      console.error('[resubmitDefenseDocument | indicators Error]:', indicatorError)
+    }
 
     return {
       success: true,

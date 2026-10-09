@@ -125,5 +125,5 @@ export function MilestoneHeader({ onDocumentHistory }: MilestoneHeaderProps) {
   )
 }
 
-// Backward compat alias — GroupContext was renamed to MilestoneHeader
+// Backward compat alias â€” GroupContext was renamed to MilestoneHeader
 export const GroupContext = MilestoneHeader

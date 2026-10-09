@@ -529,6 +529,7 @@ describe('section manager mutations', () => {
         entityName: SECTION_NAME,
         before: { coordinatorId: CURRENT_COORDINATOR_ID },
         after: { coordinatorId: NEXT_COORDINATOR_ID },
+        sectionId: SECTION_ID,
       })
       expect(updateTagMock).toHaveBeenCalledWith('sections')
       expect(updateTagMock).toHaveBeenCalledWith('my-sections')
@@ -656,6 +657,7 @@ describe('section manager mutations', () => {
           section: SECTION_NAME,
           deletedAt: sectionWrite.data.deletedAt.toISOString(),
         },
+        sectionId: SECTION_ID,
       })
       expect(updateTagMock).toHaveBeenCalledWith('sections')
       expect(updateTagMock).toHaveBeenCalledWith('faculty')
@@ -800,6 +802,7 @@ describe('section manager mutations', () => {
           sectionId: SECTION_ID,
           section: SECTION_NAME,
         },
+        sectionId: SECTION_ID,
       })
       expect(updateTagMock).toHaveBeenCalledWith('users')
       expect(updateTagMock).toHaveBeenCalledWith('sections')

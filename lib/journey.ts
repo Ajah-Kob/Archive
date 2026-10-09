@@ -25,7 +25,7 @@ const CHAPTER_KEYS = [
 ] as const
 
 export type JourneySource = {
-  capstone: { topicId: number } | null
+  topicTitle: string | null
   milestones: {
     chapter: string
     submissions: { status: string; deletedAt: Date | null }[]

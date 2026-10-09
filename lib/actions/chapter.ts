@@ -122,6 +122,7 @@ async function getStudentGroup(sessionUserId: number) {
           id: true,
           sectionId: true,
           adviserId: true,
+          topicTitle: true,
           students: {
             where: { deletedAt: null },
             select: { id: true, userId: true },
@@ -210,7 +211,6 @@ export async function getChapterData(
         where: { deletedAt: null },
         include: {
           students: { where: { deletedAt: null }, select: { id: true } },
-          capstone: { select: { topicId: true } },
           milestones: {
             where: { deletedAt: null },
             include: {
@@ -257,7 +257,7 @@ export async function getChapterData(
   const journey = buildJourneyRows(
     effectiveGroup
       ? {
-          capstone: effectiveGroup.capstone,
+          topicTitle: effectiveGroup.topicTitle,
           milestones: effectiveGroup.milestones.map((m) => ({
             chapter: m.chapter,
             submissions: m.submissions,
@@ -273,7 +273,7 @@ export async function getChapterData(
   const phaseLocks = effectiveGroup ? await getPhaseLocks(student.sectionId) : { 'CAPSTONE 1': false, 'CAPSTONE 2': false }
 
   const milestone = effectiveGroup?.milestones.find((m) => m.chapter === chapter) ?? null
-  const requiresCapstone = !!effectiveGroup && !effectiveGroup.capstone
+  const requiresCapstone = !!effectiveGroup && !effectiveGroup.topicTitle
 
   let current: ChapterVersionItem | null = null
   let history: ChapterVersionItem[] = []
@@ -419,14 +419,14 @@ async function verifyChapterUpload(
 }
 
 // Shared guard for submit/resubmit: the caller must be a student, a member of
-// the group, the chapter must be open, and the group must have an approved
-// topic (a Capstone row). Returns the group + milestone (existing or to be
+// the group, the chapter must be open, and the group must have a confirmed
+// topic. Returns the group + milestone (existing or to be
 // created) or an error result.
 async function authorizeChapterMutation(
   chapter: ChapterKey,
   sessionUserId: number,
 ): Promise<
-  | { ok: true; group: { id: number; sectionId: number; adviserId: number | null; students: { userId: number }[] }; milestoneId: number | null }
+  | { ok: true; group: { id: number; sectionId: number; adviserId: number | null; topicTitle: string | null; students: { userId: number }[] }; milestoneId: number | null }
   | { ok: false; result: { success: boolean; message: string } }
 > {
   const group = await getStudentGroup(sessionUserId)
@@ -435,11 +435,7 @@ async function authorizeChapterMutation(
   const open = await chapterIsOpen(group.sectionId, chapter)
   if (!open) return { ok: false, result: { success: false, message: 'This chapter is locked.' } }
 
-  const capstone = await prisma.capstone.findFirst({
-    where: { groupId: group.id, deletedAt: null },
-    select: { id: true },
-  })
-  if (!capstone) {
+  if (!group.topicTitle) {
     return { ok: false, result: { success: false, message: 'Confirm your capstone topic before submitting.' } }
   }
 
@@ -456,7 +452,6 @@ async function authorizeChapterMutation(
 // Returns the milestoneId (newly created or existing) so resubmit can target it.
 async function persistChapterSubmission(
   groupId: number,
-  capstoneId: number,
   phase: 'CAPSTONE_1' | 'CAPSTONE_2',
   chapter: ChapterKey,
   userId: number,
@@ -468,7 +463,6 @@ async function persistChapterSubmission(
       update: {},
       create: {
         groupId,
-        capstoneId,
         phase,
         chapter,
       },
@@ -508,14 +502,6 @@ export async function submitChapter(
   if (uploadError) return { success: false, message: uploadError }
 
   try {
-    const capstone = await prisma.capstone.findFirst({
-      where: { groupId: auth.group.id, deletedAt: null },
-      select: { id: true },
-    })
-    if (!capstone) {
-      return { success: false, message: 'Confirm your capstone topic before submitting.' }
-    }
-
     // Guard: only one live (non-soft-deleted) submission may exist for the
     // milestone. The Postgres partial unique index enforces this at the DB
     // level; this check gives a friendly message before the constraint fires.
@@ -531,7 +517,6 @@ export async function submitChapter(
 
     const { milestoneId, submissionId } = await persistChapterSubmission(
       auth.group.id,
-      capstone.id,
       DB_PHASE[chapter],
       chapter,
       +session.user.id,
@@ -546,8 +531,31 @@ export async function submitChapter(
         entityName: CHAPTER_LABELS[chapter],
         before: null,
         after: { chapter, fileName: upload.fileName, blobUrl: upload.blobUrl, size: upload.size, milestoneId, groupId: auth.group.id },
+        sectionId: auth.group.sectionId,
       })
     } catch {}
+
+    // Notify the adviser of the new submission.
+    if (auth.group.adviserId) {
+      try {
+        const adviser = await prisma.adviser.findFirst({
+          where: { id: auth.group.adviserId, deletedAt: null },
+          select: { faculty: { select: { userId: true } } },
+        })
+        if (adviser?.faculty.userId) {
+          await prisma.notification.create({
+            data: {
+              userId: adviser.faculty.userId,
+              title: 'New chapter submission',
+              body: `${CHAPTER_LABELS[chapter]} was submitted by ${auth.group.students.length > 1 ? 'one of your groups' : 'your group'}.`,
+              href: '/faculty/document-review',
+            },
+          })
+        }
+      } catch (err) {
+        console.error('[submitChapter | notify Error]:', err)
+      }
+    }
 
     await revalidateChapterGroup(auth.group, { expireNow: true })
 
@@ -617,8 +625,31 @@ export async function resubmitChapter(
         entityName: CHAPTER_LABELS[chapter],
         before: { chapter, status: "NEED_REVISION", milestoneId },
         after: { chapter, fileName: upload.fileName, blobUrl: upload.blobUrl, size: upload.size, milestoneId, submissionId: newSubmissionId },
+        sectionId: auth.group.sectionId,
       })
     } catch {}
+
+    // Notify the adviser of the resubmission.
+    if (auth.group.adviserId) {
+      try {
+        const adviser = await prisma.adviser.findFirst({
+          where: { id: auth.group.adviserId, deletedAt: null },
+          select: { faculty: { select: { userId: true } } },
+        })
+        if (adviser?.faculty.userId) {
+          await prisma.notification.create({
+            data: {
+              userId: adviser.faculty.userId,
+              title: 'Chapter resubmitted',
+              body: `${CHAPTER_LABELS[chapter]} has been resubmitted for review.`,
+              href: '/faculty/document-review',
+            },
+          })
+        }
+      } catch (err) {
+        console.error('[resubmitChapter | notify Error]:', err)
+      }
+    }
 
     await revalidateChapterGroup(auth.group, { expireNow: true })
 

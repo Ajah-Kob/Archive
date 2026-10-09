@@ -5,6 +5,7 @@ import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client'
 import prisma from '@/lib/prisma'
 import { cacheTag, cacheLife, revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
+import { audit } from '@/lib/actions/audit'
 import type {
   DefenseType,
   DefenseVerdict,
@@ -52,8 +53,18 @@ async function findStudentScheduleByType(
   })
 }
 
-/** Shared guard for the four actions that need a type-scoped schedule. */
-function missingScheduleMessage() {
+  /** Resolves a group's section for audit scoping. Null when unknown — the
+   * row is still written, it just never appears in a section feed. */
+  async function sectionIdForGroup(groupId: number): Promise<number | null> {
+    const group = await prisma.group.findFirst({
+      where: { id: groupId, deletedAt: null },
+      select: { sectionId: true },
+    })
+    return group?.sectionId ?? null
+  }
+
+  /** Shared guard for the four actions that need a type-scoped schedule. */
+  function missingScheduleMessage() {
   return 'No defense schedule found for your group.'
 }
 
@@ -536,6 +547,18 @@ export async function submitDefenseDocument(
 
     revalidateTag('defense', 'max')
 
+    try {
+      await audit({
+        action: 'DEFENSE_DOCUMENT_SUBMIT',
+        entity: 'DEFENSE_SCHEDULE',
+        entityId: String(schedule.id),
+        entityName: `${upload.defenseType} document v${submission.version}`,
+        before: null,
+        after: { submissionId: submission.id, fileName: upload.fileName },
+        sectionId: await sectionIdForGroup(schedule.groupId),
+      })
+    } catch {}
+
     return {
       success: true,
       message: 'Defense document submitted for review.',
@@ -688,6 +711,20 @@ export async function resubmitDefenseDocument(
 
     revalidateTag('defense', 'max')
 
+    revalidateTag('defense', 'max')
+
+    try {
+      await audit({
+        action: 'DEFENSE_DOCUMENT_RESUBMIT',
+        entity: 'DEFENSE_SCHEDULE',
+        entityId: String(schedule.id),
+        entityName: `${upload.defenseType} resubmission v${submission.version}`,
+        before: null,
+        after: { submissionId: submission.id, fileName: upload.fileName },
+        sectionId: await sectionIdForGroup(schedule.groupId),
+      })
+    } catch {}
+
     return {
       success: true,
       message: 'Defense document resubmitted for review.',
@@ -760,6 +797,18 @@ export async function replaceDefenseDocument(
     await del(current.blobUrl)
 
     revalidateTag('defense', 'max')
+
+    try {
+      await audit({
+        action: 'DEFENSE_DOCUMENT_REPLACE',
+        entity: 'DEFENSE_SCHEDULE',
+        entityId: String(schedule.id),
+        entityName: `${upload.defenseType} document replaced`,
+        before: { submissionId: current.id },
+        after: { submissionId: current.id, fileName: upload.fileName },
+        sectionId: await sectionIdForGroup(schedule.groupId),
+      })
+    } catch {}
 
     return { success: true, message: 'Defense document replaced.' }
   } catch (error) {

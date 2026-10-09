@@ -496,6 +496,7 @@ export async function joinSectionWithCode(code: string) {
           sectionId: joined.sectionId,
           section: joined.sectionName,
         },
+        sectionId: joined.sectionId,
       })
     } catch {}
 
@@ -644,6 +645,7 @@ async function getCoordinatorSectionData(sectionId: number) {
           id: true,
           groupName: true,
           leaderStudentId: true,
+          topicTitle: true,
           adviser: {
             include: {
               faculty: {
@@ -661,7 +663,6 @@ async function getCoordinatorSectionData(sectionId: number) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
-          capstone: { select: { topicId: true } },
           milestones: {
             where: { deletedAt: null },
             include: {
@@ -737,7 +738,7 @@ async function getCoordinatorSectionData(sectionId: number) {
         : null,
       journey: buildJourneyRows(
         {
-          capstone: g.capstone ? { topicId: g.capstone.topicId } : null,
+          topicTitle: g.topicTitle,
           milestones: g.milestones.map((m) => ({
             chapter: m.chapter,
             submissions: m.submissions,
@@ -975,6 +976,39 @@ export async function setMilestoneAvailability(
       if (s.groupId) revalidateTag(`journey-${s.groupId}`, { expire: 0 })
     }
 
+    // Notify every student in the section of the unlock/lock.
+    try {
+      const milestoneLabel =
+        MILESTONE_DEFS.find((d) => d.key === key)?.label ?? key
+      const verb = open ? 'unlocked' : 'locked'
+      if (sectionStudents.length > 0) {
+        await prisma.notification.createMany({
+          data: sectionStudents.map((s) => ({
+            userId: s.userId,
+            title: `${milestoneLabel} ${verb}`,
+            body: open
+              ? `${milestoneLabel} has been unlocked. You can now work on it.`
+              : `${milestoneLabel} has been locked. Contact your coordinator if you have questions.`,
+            href: '/student/milestone',
+          })),
+        })
+      }
+    } catch (err) {
+      console.error('[setMilestoneAvailability | notify Error]:', err)
+    }
+
+    try {
+      await audit({
+        action: 'MILESTONE_AVAILABILITY_SET',
+        entity: 'SECTION',
+        entityId: String(section.id),
+        entityName: `Section ${section.id}`,
+        before: null,
+        after: { key, open },
+        sectionId: section.id,
+      })
+    } catch {}
+
     return {
       success: true,
       message: open ? 'Milestone unlocked.' : 'Milestone locked.',
@@ -1053,6 +1087,37 @@ export async function setPhaseAvailability(
       if (s.userId) revalidateTag(`workspace-${s.userId}`, { expire: 0 })
       if (s.groupId) revalidateTag(`journey-${s.groupId}`, { expire: 0 })
     }
+
+    // Notify every student in the section of the unlock/lock.
+    try {
+      const verb = open ? 'unlocked' : 'locked'
+      if (sectionStudents.length > 0) {
+        await prisma.notification.createMany({
+          data: sectionStudents.map((s) => ({
+            userId: s.userId,
+            title: `${phase} ${verb}`,
+            body: open
+              ? `${phase} has been unlocked. You can now work on it.`
+              : `${phase} has been locked. Contact your coordinator if you have questions.`,
+            href: '/student/milestone',
+          })),
+        })
+      }
+    } catch (err) {
+      console.error('[setPhaseAvailability | notify Error]:', err)
+    }
+
+    try {
+      await audit({
+        action: 'PHASE_AVAILABILITY_SET',
+        entity: 'SECTION',
+        entityId: String(section.id),
+        entityName: `Section ${section.id}`,
+        before: null,
+        after: { phase, open },
+        sectionId: section.id,
+      })
+    } catch {}
 
     return {
       success: true,
@@ -1200,6 +1265,7 @@ export async function createSection(
           coordinatorId: null,
           headerColor: null,
         },
+        sectionId: createdSectionId ?? null,
       })
     } catch {}
 
@@ -1312,6 +1378,7 @@ export async function updateSection(
           entityName: name,
           before: { section: current.section, academicYear: current.academicYear },
           after: { section: name, academicYear },
+          sectionId: current.id,
         })
       } catch {}
       revalidateCoordinatorCache(current.id)
@@ -1365,6 +1432,7 @@ export async function updateSection(
           entityName: current.section,
           before: { section: current.section, headerColor: currentColor },
           after: { section: name, headerColor },
+          sectionId: current.id,
         })
       } catch {}
       revalidateCoordinatorCache(current.id)
@@ -1398,6 +1466,7 @@ export async function updateSection(
         entityName: name,
         before: { section: current.section, headerColor: currentColor },
         after: { section: name, headerColor },
+        sectionId: current.id,
       })
     } catch {}
 
@@ -1485,6 +1554,7 @@ export async function archiveSection(id: number) {
           section: archived.section.section,
           deletedAt: archived.archivedAt.toISOString(),
         },
+        sectionId: archived.section.id,
       })
     } catch {}
 
@@ -1580,6 +1650,18 @@ export async function assignSectionCoordinator(
     }
 
     revalidateCoordinatorCache(section.id)
+
+    try {
+      await audit({
+        action: 'SECTION_COORDINATOR_ASSIGN',
+        entity: 'SECTION',
+        entityId: String(section.id),
+        entityName: section.section,
+        before: { coordinatorId: null },
+        after: { coordinatorId: coordinator.id },
+        sectionId: section.id,
+      })
+    } catch {}
 
     return {
       success: true,
@@ -1702,6 +1784,7 @@ export async function reassignSectionCoordinator(
         entityName: section.section,
         before: { coordinatorId: expectedCoordinatorId },
         after: { coordinatorId: nextCoordinatorId },
+        sectionId: section.id,
       })
     } catch {}
 
@@ -1785,6 +1868,17 @@ export async function removeStudentFromSection(studentId: number) {
     revalidateTag(`workspace-${student.userId}`, 'max')
     revalidateTag(`classmates-${student.userId}`, 'max')
     if (groupId) revalidateTag(`journey-${groupId}`, 'max')
+    try {
+      await audit({
+        action: 'STUDENT_REMOVE_SECTION',
+        entity: 'SECTION',
+        entityId: String(student.sectionId),
+        entityName: `Section ${student.sectionId}`,
+        before: { studentId: student.id, groupId },
+        after: { studentId: student.id, removed: true },
+        sectionId: student.sectionId,
+      })
+    } catch {}
     return { success: true, message: 'Student removed from the section.' }
   } catch (error) {
     console.error('[removeStudentFromSection | Error]:', error)
@@ -1866,6 +1960,20 @@ export async function removeStudentsFromSection(studentIds: number[]) {
       revalidateTag(`classmates-${userId}`, 'max')
     }
     for (const groupId of groupIds) revalidateTag(`journey-${groupId}`, 'max')
+    try {
+      for (const sectionId of sectionIds) {
+        const inSection = students.filter((s) => s.sectionId === sectionId)
+        await audit({
+          action: 'STUDENT_REMOVE_SECTION',
+          entity: 'SECTION',
+          entityId: String(sectionId),
+          entityName: `Section ${sectionId}`,
+          before: { studentIds: inSection.map((s) => s.id) },
+          after: { removedStudentIds: inSection.map((s) => s.id) },
+          sectionId,
+        })
+      }
+    } catch {}
     const count = students.length
     return { success: true, message: count === 1 ? 'Student removed from the section.' : `${count} students removed from the section.` }
   } catch (error) {
@@ -1912,6 +2020,19 @@ export async function copySectionJoinCode(sectionId: number) {
       })
       regenerated = true
       revalidateCoordinatorCache(section.id)
+      // Audit only the regeneration (a state change). A plain copy that
+      // returns the still-valid code is a read, not feed material.
+      try {
+        await audit({
+          action: 'SECTION_JOIN_CODE_REGENERATE',
+          entity: 'SECTION',
+          entityId: String(section.id),
+          entityName: section.section,
+          before: null,
+          after: { joinCodeId: joinCode.id },
+          sectionId: section.id,
+        })
+      } catch {}
     }
 
     return {
@@ -2037,14 +2158,8 @@ export async function getCoordinatorGroupDetail(groupId: number) {
           select: { status: true, deletedAt: true },
           orderBy: { createdAt: 'desc' },
         },
-        capstone: {
-          include: {
-            topic: {
-              include: {
-                uploadedBy: { include: { user: { select: { name: true } } } },
-              },
-            },
-          },
+        topicSubmittedBy: {
+          include: { user: { select: { name: true } } },
         },
         milestones: {
           where: { deletedAt: null },
@@ -2100,7 +2215,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
 
     const journey = buildJourneyRows(
       {
-        capstone: group.capstone ? { topicId: group.capstone.topicId } : null,
+        topicTitle: group.topicTitle,
         milestones: group.milestones.map((m) => ({
           chapter: m.chapter,
           submissions: m.submissions,
@@ -2202,14 +2317,14 @@ export async function getCoordinatorGroupDetail(groupId: number) {
               image: group.adviser.faculty.user.image,
             }
           : null,
-        topic: group.capstone
+        topic: group.topicTitle
           ? {
-              id: group.capstone.topic.id,
-              title: group.capstone.topic.title,
-              status: group.capstone.topic.status as 'PENDING' | 'APPROVED' | 'NEED_REVISION',
+              id: group.id,
+              title: group.topicTitle,
+              status: 'APPROVED' as const,
               note: null,
-              submittedBy: group.capstone.topic.uploadedBy?.user.name ?? '',
-              createdAt: group.capstone.topic.createdAt.toISOString(),
+              submittedBy: group.topicSubmittedBy?.user.name ?? '',
+              createdAt: (group.topicSubmittedAt ?? group.updatedAt).toISOString(),
             }
           : null,
         journey,

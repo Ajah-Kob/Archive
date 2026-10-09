@@ -27,9 +27,8 @@ model User {
   name                         String
   email                        String                        @unique
   image                        String?
-  avatarGradient               String                        @default("linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)")
+  avatarGradient               String     @default("linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)")
   role                         Role                          @default(GUEST)
-  activatedAt                  DateTime?
   createdAt                    DateTime                      @default(now())
   loggedInAt                   DateTime?                     @default(now())
   deletedAt                    DateTime?
@@ -101,7 +100,6 @@ model Adviser {
   id        Int        @id @default(autoincrement())
   facultyId Int        @unique
   faculty   Faculty    @relation(fields: [facultyId], references: [id])
-  capstones Capstone[]
   groups    Group[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -132,9 +130,6 @@ model JoinCode {
 // ───────────────────────────── Invitation ─────────────────────────────
 
 enum InvitationRole {
-  COORDINATOR
-  ADVISER
-  PANELIST
   GROUP
   ADVISER_ASSIGNMENT
 }
@@ -231,8 +226,8 @@ model Student {
   groupId     Int?
   group       Group?       @relation(fields: [groupId], references: [id])
   ledGroup    Group?       @relation("GroupLeader")
+  topicSubmittedGroups Group[] @relation("GroupTopicSubmitter")
   invitations Invitation[]
-  topics      Topic[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
@@ -249,9 +244,14 @@ model Group {
   leaderStudent       Student?             @relation("GroupLeader", fields: [leaderStudentId], references: [id])
   adviserId           Int?
   adviser             Adviser?             @relation(fields: [adviserId], references: [id])
+  /// Final capstone topic, set by the group leader. Replaces the Topic +
+  /// Capstone tables: one title per group, always approved, with submitter
+  /// and timestamp preserved for display.
+  topicTitle          String?
+  topicSubmittedById  Int?
+  topicSubmittedBy    Student?             @relation("GroupTopicSubmitter", fields: [topicSubmittedById], references: [id], onDelete: SetNull)
+  topicSubmittedAt    DateTime?
   students            Student[]
-  topics              Topic[]
-  capstone            Capstone?
   milestones          Milestone[]
   capstoneArchive     CapstoneArchive?
   archivingSubmission ArchivingSubmission?
@@ -266,58 +266,12 @@ model Group {
   @@index([deletedAt])
 }
 
-// ───────────────────────────── Topic & Capstone ─────────────────────────────
-
-enum TopicStatus {
-  PENDING
-  APPROVED
-  NEED_REVISION
-}
-
-model Topic {
-  id           Int         @id @default(autoincrement())
-  groupId      Int
-  group        Group       @relation(fields: [groupId], references: [id])
-  title        String
-  background   String
-  uploadedById Int?
-  uploadedBy   Student?    @relation(fields: [uploadedById], references: [id])
-  status       TopicStatus @default(PENDING)
-  capstone     Capstone?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  deletedAt    DateTime?
-
-  @@index([groupId])
-  @@index([uploadedById])
-  @@index([status])
-  @@index([deletedAt])
-}
+// ───────────────────────────── Milestone & Submission ─────────────────────────────
 
 enum CapstonePhase {
   CAPSTONE_1
   CAPSTONE_2
 }
-
-model Capstone {
-  id         Int         @id @default(autoincrement())
-  groupId    Int         @unique
-  group      Group       @relation(fields: [groupId], references: [id])
-  topicId    Int         @unique
-  topic      Topic       @relation(fields: [topicId], references: [id])
-  adviserId  Int?
-  adviser    Adviser?    @relation(fields: [adviserId], references: [id])
-  milestones Milestone[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  deletedAt  DateTime?
-
-  @@index([topicId])
-  @@index([adviserId])
-  @@index([deletedAt])
-}
-
-// ───────────────────────────── Milestone & Submission ─────────────────────────────
 
 enum Chapter {
   CHAPTER_1
@@ -333,8 +287,6 @@ model Milestone {
   group       Group                 @relation(fields: [groupId], references: [id])
   phase       CapstonePhase
   chapter     Chapter
-  capstoneId  Int
-  capstone    Capstone              @relation(fields: [capstoneId], references: [id])
   submissions MilestoneSubmission[]
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
@@ -342,7 +294,6 @@ model Milestone {
 
   @@unique([groupId, chapter])
   @@index([groupId])
-  @@index([capstoneId])
   @@index([deletedAt])
 }
 
@@ -683,16 +634,21 @@ model AuditLog {
   entity     String
   entityId   String?
   entityName String?
-  before     Json?
-  after      Json?
-  ip         String?
-  createdAt  DateTime @default(now())
+  before Json?
+  after  Json?
+  ip     String?
+  createdAt DateTime @default(now())
+  // Section scope for the coordinator activity feed. Nullable so all
+  // pre-existing rows stay valid; rows without a section never appear
+  // in any section feed.
+  sectionId Int?
 
   @@index([createdAt])
   @@index([actorId])
   @@index([action])
   @@index([entity])
   @@index([createdAt, action])
+  @@index([sectionId, createdAt])
 }
 
 // ───────────────────────────── Notifications ─────────────────────────────
@@ -737,16 +693,11 @@ model DefenseSystemLink {
   schedule    DefenseSchedule @relation(fields: [scheduleId], references: [id])
   groupId     Int
   group       Group           @relation(fields: [groupId], references: [id])
-  /// A LINK_PRESETS value, or free text when the student chose "Other".
+  /// Free-text label chosen by the student.
   label       String
   url         String
   /// One line describing what this link shows.
   note        String?
-  /// Set when this row was pre-filled from the proposal defense (decision 10).
-  /// The two sets stay independent; this only records the origin.
-  copiedFromId Int?
-  copiedFrom  DefenseSystemLink?  @relation("LinkCopies", fields: [copiedFromId], references: [id])
-  copies      DefenseSystemLink[] @relation("LinkCopies")
   /// Withdrawn by the student while still unlocked, but panelist comments exist.
   removedAt   DateTime?
   createdById Int
@@ -769,16 +720,11 @@ model SystemLinkComment {
   authorId Int
   author   User     @relation("SystemCommentAuthor", fields: [authorId], references: [id])
   body     String
-  /// null = a root comment. Set = a panelist reply to that root (depth 1).
-  parentId Int?
-  parent   SystemLinkComment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  SystemLinkComment[] @relation("CommentThread")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
   @@index([linkId])
-  @@index([parentId])
   @@index([authorId])
   @@index([deletedAt])
 }

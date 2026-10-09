@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import prisma from '@/lib/prisma'
+import { blobUrlToPathname } from '@/lib/blob'
 import { get, head, list } from '@vercel/blob'
 
 const ADMIN_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
@@ -201,6 +202,19 @@ async function handleRequest(
     if (!Number.isInteger(groupId)) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
+    // Published to the repository? approveArchiving references the
+    // submission's archiving/* blob directly instead of copying it under
+    // archives/*, so a published capstone keeps an archiving/* pathname.
+    // Any signed-in user may read published work — the global auth gate above
+    // is the whole policy, same as archives/*. Unpublished blobs still need
+    // group access below.
+    if (await isPublishedArchiveBlob(pathname)) {
+      const verified = await verifyBlobPathname(pathname)
+      if (!verified) {
+        return NextResponse.json({ message: 'Not found' }, { status: 404 })
+      }
+      return await serveBlob(pathname, req)
+    }
     const allowed = await authorizeGroupAccess(groupId, userId, role)
     if (!allowed) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
@@ -263,6 +277,28 @@ async function handleRequest(
 
   // Invalid prefix → 404
   return NextResponse.json({ message: 'Not found' }, { status: 404 })
+}
+
+/**
+ * Whether a blob pathname is referenced by a live published archive.
+ *
+ * A false return (including on lookup failure) falls through to the normal
+ * group-scoped check, so a DB blip denies rather than grants.
+ *
+ * Compared in JS via blobUrlToPathname: stored blobUrls are full URLs whose
+ * percent-encoding may differ from the decoded request path, so a SQL string
+ * comparison is unreliable. One row per published capstone — tiny table.
+ */
+async function isPublishedArchiveBlob(pathname: string): Promise<boolean> {
+  try {
+    const rows = await prisma.capstoneArchive.findMany({
+      where: { deletedAt: null },
+      select: { blobUrl: true },
+    })
+    return rows.some((r) => blobUrlToPathname(r.blobUrl) === pathname)
+  } catch {
+    return false
+  }
 }
 
 function decodeOnce(value: string): string {

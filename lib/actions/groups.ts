@@ -97,19 +97,9 @@ export async function getMyWorkspace(userId: number): Promise<{
             },
             orderBy: { createdAt: 'desc' },
           },
-          topics: {
-            where: { deletedAt: null },
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              deletedAt: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-            orderBy: { createdAt: 'desc' },
+          topicSubmittedBy: {
+            include: { user: { select: { name: true } } },
           },
-          capstone: { select: { topicId: true } },
           milestones: {
             where: { deletedAt: null },
             include: {
@@ -249,20 +239,11 @@ export async function getMyWorkspace(userId: number): Promise<{
     }))
   const pendingCount = invitations.filter((i) => i.status === 'PENDING').length
 
-  // Single final topic: the confirmed capstone topic wins; otherwise the
-  // most recently created active topic (covers pre-confirmation groups).
-  const confirmedTopic = group.capstone
-    ? group.topics.find((t) => t.id === group.capstone.topicId) ?? null
-    : null
-  const latestTopic = [...group.topics].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-  )[0] ?? null
-  const finalTopicRow = confirmedTopic ?? latestTopic
-  const finalTopic = finalTopicRow
+  // Single final topic lives on the group row itself.
+  const finalTopic = group.topicTitle
     ? {
-        id: finalTopicRow.id,
-        title: finalTopicRow.title,
-        updatedAt: finalTopicRow.updatedAt.toISOString(),
+        title: group.topicTitle,
+        updatedAt: group.topicSubmittedAt?.toISOString() ?? group.updatedAt.toISOString(),
       }
     : null
 
@@ -281,7 +262,7 @@ export async function getMyWorkspace(userId: number): Promise<{
     },
     journey: buildJourneyRows(
       {
-        capstone: group.capstone,
+        topicTitle: group.topicTitle,
         milestones: group.milestones,
         capstoneArchive: group.capstoneArchive,
         archivingSubmission: group.archivingSubmission,
@@ -315,12 +296,7 @@ export async function getGroupContext(groupId: number): Promise<{
           id: true,
           groupName: true,
           leaderStudentId: true,
-          topics: {
-            where: { deletedAt: null, status: 'APPROVED' },
-            select: { title: true },
-            take: 1,
-            orderBy: { updatedAt: 'desc' },
-          },
+          topicTitle: true,
         },
       },
     },
@@ -336,7 +312,7 @@ export async function getGroupContext(groupId: number): Promise<{
       id: student.group.id,
       name: student.group.groupName,
       isLeader: student.group.leaderStudentId === student.id,
-      topicTitle: student.group.topics[0]?.title ?? null,
+      topicTitle: student.group.topicTitle,
     },
   }
 }
@@ -506,6 +482,7 @@ export async function createGroup(name: string) {
         entityName: cleanName,
         before: null,
         after: { groupName: cleanName, sectionId: leader.sectionId, leaderStudentId: leader.id },
+        sectionId: leader.sectionId,
       })
     } catch {}
 
@@ -589,6 +566,18 @@ export async function inviteGroupMembers(memberIds: number[]) {
     revalidateTag(`classmates-${session.user.id}`, 'max')
     revalidateWorkspace(+session.user.id, groupId)
 
+    try {
+      await audit({
+        action: 'GROUP_INVITE_SEND',
+        entity: 'GROUP',
+        entityId: String(groupId),
+        entityName: `Group ${groupId}`,
+        before: null,
+        after: { invitedStudentIds: classmates.map((c) => c.id), role: 'GROUP' },
+        sectionId: student.group.sectionId,
+      })
+    } catch {}
+
     return { success: true, message: 'Invitations sent.' }
   } catch {
     return { success: false, message: 'Failed to send invitations.' }
@@ -609,7 +598,7 @@ export async function renameGroup(groupId: number, name: string) {
   const student = await prisma.student.findFirst({
     where: { userId: +session.user.id, deletedAt: null },
     include: {
-      group: { select: { id: true, leaderStudentId: true, sectionId: true } },
+      group: { select: { id: true, leaderStudentId: true, sectionId: true, groupName: true } },
     },
   })
   if (!student?.group) return { success: false, message: 'You are not in a group.' }
@@ -619,6 +608,7 @@ export async function renameGroup(groupId: number, name: string) {
   if (student.group.leaderStudentId !== student.id) {
     return { success: false, message: 'Only the group leader can rename the group.' }
   }
+  const previousName = student.group.groupName
 
   const duplicate = await prisma.group.findFirst({
     where: {
@@ -641,6 +631,17 @@ export async function renameGroup(groupId: number, name: string) {
       where: { id: groupId },
       data: { groupName: cleanName },
     })
+    try {
+      await audit({
+        action: 'GROUP_RENAME',
+        entity: 'GROUP',
+        entityId: String(groupId),
+        entityName: cleanName,
+        before: { groupName: previousName },
+        after: { groupName: cleanName },
+        sectionId: student.group.sectionId,
+      })
+    } catch {}
     revalidateWorkspace(+session.user.id, groupId)
     return { success: true, message: 'Group renamed successfully.' }
   } catch {
@@ -674,7 +675,7 @@ export async function removeGroupMember(memberId: number) {
   try {
     const groupRowForAudit = await prisma.group.findFirst({
       where: { id: student.group.id },
-      select: { groupName: true },
+      select: { groupName: true, sectionId: true },
     })
     await prisma.student.update({
       where: { id: memberId },
@@ -688,6 +689,7 @@ export async function removeGroupMember(memberId: number) {
         entityName: groupRowForAudit?.groupName ?? `Group ${student.group.id}`,
         before: { groupId: student.group.id, memberId, groupName: groupRowForAudit?.groupName ?? null },
         after: { groupId: student.group.id, removedMemberId: memberId },
+        sectionId: groupRowForAudit?.sectionId ?? null,
       })
     } catch {}
     revalidateWorkspace(+session.user.id, student.group.id)
@@ -707,7 +709,7 @@ export async function transferLeadership(memberId: number) {
 
   const student = await prisma.student.findFirst({
     where: { userId: +session.user.id, deletedAt: null },
-    include: { group: { select: { id: true, leaderStudentId: true } } },
+    include: { group: { select: { id: true, leaderStudentId: true, sectionId: true } } },
   })
   if (!student?.group) return { success: false, message: 'You are not in a group.' }
   if (student.group.leaderStudentId !== student.id) {
@@ -741,6 +743,7 @@ export async function transferLeadership(memberId: number) {
         entityName: groupRowForTransfer?.groupName ?? `Group ${student.group.id}`,
         before: { leaderStudentId: beforeLeader },
         after: { leaderStudentId: memberId },
+        sectionId: student.group.sectionId,
       })
     } catch {}
     revalidateWorkspace(+session.user.id, student.group.id)
@@ -759,7 +762,7 @@ export async function leaveGroup() {
 
   const student = await prisma.student.findFirst({
     where: { userId: +session.user.id, deletedAt: null },
-    include: { group: { select: { id: true, leaderStudentId: true } } },
+    include: { group: { select: { id: true, leaderStudentId: true, sectionId: true } } },
   })
   if (!student?.group) return { success: false, message: 'You are not in a group.' }
 
@@ -797,6 +800,7 @@ export async function leaveGroup() {
             entityName: groupNameForAudit ?? `Group ${student.group.id}`,
             before: { memberId: student.id, isLeader: true, leaderStudentId: student.id },
             after: { memberId: student.id, left: true, newLeaderId: nextLeader.id },
+            sectionId: student.group.sectionId,
           })
         } catch {}
         revalidateWorkspace(+session.user.id, student.group.id)
@@ -821,6 +825,7 @@ export async function leaveGroup() {
             entityName: groupNameForAudit ?? `Group ${student.group.id}`,
             before: { memberId: student.id, isLeader: true, groupName: groupNameForAudit },
             after: { memberId: student.id, left: true, groupDeleted: true },
+            sectionId: student.group.sectionId,
           })
         } catch {}
         revalidateWorkspace(+session.user.id, student.group.id)
@@ -848,6 +853,7 @@ export async function leaveGroup() {
           entityName: groupNameForAudit ?? `Group ${student.group.id}`,
           before: { memberId: student.id, isLeader: false },
           after: { memberId: student.id, left: true, remaining, groupDeleted: remaining === 0 },
+          sectionId: student.group.sectionId,
         })
       } catch {}
       revalidateWorkspace(+session.user.id, student.group.id)
@@ -865,7 +871,7 @@ export async function cancelGroupInvitation(invitationId: number) {
 
   const student = await prisma.student.findFirst({
     where: { userId: +session.user.id, deletedAt: null },
-    include: { group: { select: { id: true, leaderStudentId: true } } },
+    include: { group: { select: { id: true, leaderStudentId: true, sectionId: true } } },
   })
   if (!student?.group) return { success: false, message: 'You are not in a group.' }
   if (student.group.leaderStudentId !== student.id) {
@@ -889,6 +895,17 @@ export async function cancelGroupInvitation(invitationId: number) {
       where: { id: invitationId },
       data: { status: 'CANCELLED' },
     })
+    try {
+      await audit({
+        action: 'GROUP_INVITE_CANCEL',
+        entity: 'GROUP',
+        entityId: String(student.group.id),
+        entityName: `Group ${student.group.id}`,
+        before: { invitationId, status: 'PENDING' },
+        after: { invitationId, status: 'CANCELLED' },
+        sectionId: student.group.sectionId,
+      })
+    } catch {}
     revalidateWorkspace(+session.user.id, student.group.id)
     if (invitation.student?.userId) {
       revalidateTag(`my-invitations-${invitation.student.userId}`, 'max')
@@ -908,7 +925,7 @@ export async function sendAdviserInvitation(facultyId: number) {
   const student = await prisma.student.findFirst({
     where: { userId: +session.user.id, deletedAt: null },
     include: {
-      group: { select: { id: true, leaderStudentId: true, adviserId: true } },
+      group: { select: { id: true, leaderStudentId: true, adviserId: true, sectionId: true } },
     },
   })
   if (!student?.group) return { success: false, message: 'You are not in a group.' }
@@ -946,6 +963,17 @@ export async function sendAdviserInvitation(facultyId: number) {
         status: 'PENDING',
       },
     })
+    try {
+      await audit({
+        action: 'ADVISER_INVITE_SEND',
+        entity: 'GROUP',
+        entityId: String(student.group.id),
+        entityName: `Group ${student.group.id}`,
+        before: null,
+        after: { invitationId: record.id, facultyId, role: 'ADVISER_ASSIGNMENT' },
+        sectionId: student.group.sectionId,
+      })
+    } catch {}
     revalidateWorkspace(+session.user.id, student.group.id)
     revalidateTag(`my-invitations-${faculty.user.id}`, 'max')
     revalidateAdviserCaches()
@@ -966,7 +994,7 @@ export async function cancelAdviserInvitation(invitationId: number) {
 
   const student = await prisma.student.findFirst({
     where: { userId: +session.user.id, deletedAt: null },
-    include: { group: { select: { id: true, leaderStudentId: true } } },
+    include: { group: { select: { id: true, leaderStudentId: true, sectionId: true } } },
   })
   if (!student?.group) return { success: false, message: 'You are not in a group.' }
   if (student.group.leaderStudentId !== student.id) {
@@ -990,6 +1018,17 @@ export async function cancelAdviserInvitation(invitationId: number) {
       where: { id: invitationId },
       data: { status: 'CANCELLED' },
     })
+    try {
+      await audit({
+        action: 'ADVISER_INVITE_CANCEL',
+        entity: 'GROUP',
+        entityId: String(student.group.id),
+        entityName: `Group ${student.group.id}`,
+        before: { invitationId, status: 'PENDING' },
+        after: { invitationId, status: 'CANCELLED' },
+        sectionId: student.group.sectionId,
+      })
+    } catch {}
     revalidateWorkspace(+session.user.id, student.group.id)
     if (invitation.faculty?.userId) {
       revalidateTag(`my-invitations-${invitation.faculty.userId}`, 'max')

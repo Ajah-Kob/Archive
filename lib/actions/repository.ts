@@ -119,6 +119,33 @@ export async function getArchivedCapstones(): Promise<{
   return getRepositoryArchives()
 }
 
+/**
+ * Single-archive reader for /repository/[id].
+ *
+ * Same cached source as the list (tags 'archives' + 'repository'), so
+ * publish/edit/delete invalidation covers this read with nothing extra.
+ * No auth guard — the repository is shared by any role, and the signed blob
+ * route re-checks access when the viewer fetches the bytes.
+ */
+export async function getRepositoryArchive(id: number): Promise<{
+  success: boolean
+  message: string
+  payload: RepositoryArchiveRow | null
+}> {
+  if (!Number.isInteger(id)) {
+    return { success: false, message: 'Archive not found.', payload: null }
+  }
+  const res = await getRepositoryArchives()
+  if (!res.success || !res.payload) {
+    return { success: false, message: 'Failed to fetch repository archives.', payload: null }
+  }
+  const row = res.payload.find((r) => r.id === id) ?? null
+  if (!row) {
+    return { success: false, message: 'Archive not found.', payload: null }
+  }
+  return { success: true, message: '', payload: row }
+}
+
 // ───────────────────────── admin mutations ─────────────────────────
 // Admin-safe variants: uploadArchivingDocument in lib/actions/archiving.ts is
 // requireStudent-guarded and group-scoped (Blob path archiving/${groupId}/),

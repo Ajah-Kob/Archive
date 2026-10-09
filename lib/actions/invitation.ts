@@ -8,48 +8,15 @@ import {
   unauthorized,
 } from '@/lib/actions/guard'
 import { addAdviser } from '@/lib/actions/adviser'
+import { audit } from '@/lib/actions/audit'
 import { GROUP_CAP, ADVISER_INVITE_TTL_MS } from '@/types/milestones'
 import type { InvitationRole } from '@prisma/client'
 
 const table = 'invitation'
 
-async function getPendingCoordinatorInvitationsData(role: InvitationRole) {
-  try {
-    const invitations = await prisma[table].findMany({
-      where: { role, status: 'PENDING' },
-      include: {
-        faculty: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true, image: true },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    return { success: true, payload: invitations }
-  } catch {
-    return {
-      success: false,
-      payload: null,
-      message: 'Failed to get invitations',
-    }
-  }
-}
-
-export async function getPendingCoordinatorInvitations(role: InvitationRole) {
-  const session = await requireAdminOrProgramChair()
-  if (!session?.user?.id) return unauthorized
-
-  return getPendingCoordinatorInvitationsData(role)
-}
-
 // Invitations sent TO a specific user (invitee view — notification panel).
-// Coordinator assignments are immediate, so legacy pending Coordinator rows
-// flip to CANCELLED lazily on read. Pending GROUP and ADVISER_ASSIGNMENT
-// invites older than the 7-day TTL are cancelled the same way.
+// Pending GROUP and ADVISER_ASSIGNMENT invites older than the 7-day TTL
+// are cancelled lazily on read.
 async function getMyPendingInvitationsData(userId: number) {
   'use cache'
   cacheTag(`my-invitations-${userId}`)
@@ -64,16 +31,6 @@ async function getMyPendingInvitationsData(userId: number) {
         role: { in: ['GROUP', 'ADVISER_ASSIGNMENT'] },
         createdAt: { lt: cutoff },
         OR: [{ faculty: { userId } }, { student: { userId } }],
-      },
-      data: { status: 'CANCELLED' },
-    })
-
-    await prisma[table].updateMany({
-      where: {
-        deletedAt: null,
-        status: 'PENDING',
-        role: 'COORDINATOR',
-        faculty: { userId },
       },
       data: { status: 'CANCELLED' },
     })
@@ -118,7 +75,7 @@ export async function getMyPendingInvitations(userId: number) {
   return getMyPendingInvitationsData(userId)
 }
 
-function revalidateInvitee(invitation: {
+async function revalidateInvitee(invitation: {
   faculty?: { userId?: number } | null
   student?: { userId?: number } | null
 }) {
@@ -146,7 +103,7 @@ export async function acceptInvitation(invitationId: number) {
       include: {
         faculty: { select: { id: true, userId: true } },
         student: { select: { id: true, userId: true } },
-        group: { select: { id: true, groupName: true } },
+        group: { select: { id: true, groupName: true, sectionId: true } },
         invitedBy: { select: { id: true } },
       },
     })
@@ -165,20 +122,6 @@ export async function acceptInvitation(invitationId: number) {
     }
 
     const readAt = new Date()
-
-    if (invitation.role === 'COORDINATOR') {
-      await prisma[table].update({
-        where: { id: invitationId },
-        data: { status: 'CANCELLED', readAt },
-      })
-      revalidateInvitee(invitation)
-      return {
-        success: false,
-        payload: null,
-        message:
-          'Coordinator assignments are now immediate and no longer require acceptance.',
-      }
-    }
 
     if (invitation.role === 'GROUP') {
       const groupId = invitation.groupId
@@ -233,6 +176,17 @@ export async function acceptInvitation(invitationId: number) {
       revalidateTag(`classmates-${session.user.id}`, 'max')
       revalidateTag(`classmates-${invitation.invitedBy.id}`, 'max')
       revalidateGroupWorkspace(group.id, invitation.invitedBy.id)
+      try {
+        await audit({
+          action: 'GROUP_JOIN',
+          entity: 'GROUP',
+          entityId: String(group.id),
+          entityName: group.groupName,
+          before: { invitationId, status: 'PENDING' },
+          after: { invitationId, status: 'ACCEPTED', studentId: student.id },
+          sectionId: invitation.group?.sectionId ?? null,
+        })
+      } catch {}
 
       return {
         success: true,
@@ -254,7 +208,7 @@ export async function acceptInvitation(invitationId: number) {
 
       const group = await prisma.group.findFirst({
         where: { id: groupId, deletedAt: null },
-        select: { id: true, adviserId: true },
+        select: { id: true, adviserId: true, sectionId: true, groupName: true },
       })
       if (!group) {
         return { success: false, payload: null, message: 'Group not found.' }
@@ -300,6 +254,17 @@ export async function acceptInvitation(invitationId: number) {
       revalidateGroupWorkspace(group.id)
       revalidateTag('advisers', 'max')
       revalidateTag('faculty', 'max')
+      try {
+        await audit({
+          action: 'ADVISER_ASSIGNED',
+          entity: 'GROUP',
+          entityId: String(group.id),
+          entityName: group.groupName,
+          before: { invitationId, adviserId: null },
+          after: { invitationId, status: 'ACCEPTED', adviserId },
+          sectionId: group.sectionId,
+        })
+      } catch {}
 
       return {
         success: true,
@@ -333,7 +298,7 @@ export async function acceptInvitation(invitationId: number) {
       data: { status: 'ACCEPTED', readAt },
     })
 
-    revalidateInvitee(invitation)
+    await revalidateInvitee(invitation)
 
     return {
       success: true,
@@ -380,7 +345,7 @@ export async function declineInvitation(invitationId: number) {
       data: { status: 'REJECTED', readAt: new Date() },
     })
 
-    revalidateInvitee(invitation)
+    await revalidateInvitee(invitation)
     if (invitation.groupId) {
       revalidateGroupWorkspace(invitation.group.id, invitation.invitedBy.id)
     }
@@ -437,14 +402,6 @@ export async function sendInvitation(
 
   const invitedById = Number(session.user.id)
   if (!Number.isInteger(invitedById) || invitedById < 1) return unauthorized
-  if (role === 'COORDINATOR') {
-    return {
-      success: false,
-      message:
-        'Coordinator assignments are immediate and no longer require an invitation.',
-      payload: null,
-    }
-  }
 
   try {
     const existing = await prisma[table].findFirst({
@@ -472,7 +429,7 @@ export async function sendInvitation(
       select: { userId: true },
     })
 
-    revalidateInvitee({ faculty: { userId: invitedFaculty?.userId } })
+    await revalidateInvitee({ faculty: { userId: invitedFaculty?.userId } })
 
     return {
       success: true,
@@ -504,7 +461,7 @@ export async function cancelInvitation(invitationId: number) {
       select: { userId: true },
     })
 
-    revalidateInvitee({ faculty: { userId: cancelledFaculty?.userId } })
+    await revalidateInvitee({ faculty: { userId: cancelledFaculty?.userId } })
 
     return { success: true, message: 'Invitation cancelled.' }
   } catch {

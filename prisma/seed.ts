@@ -30,7 +30,6 @@ async function main() {
         password: passwordHash,
         role: seed.role,
         avatarGradient: pickRandomGradient(),
-        activatedAt: new Date(),
       },
     })
 
@@ -98,7 +97,6 @@ async function seedDefenseResubmissions(passwordHash: string) {
           password: passwordHash,
           role: 'FACULTY',
           avatarGradient: pickRandomGradient(),
-          activatedAt: new Date(),
         },
       })
       await prisma.faculty.create({ data: { userId: user.id } })

@@ -417,7 +417,18 @@ export async function reviewSubmission(
     }
     revalidateTag(`journey-${group.id}`, config)
     revalidateTag(`evaluations-${adviser.id}`, config)
-    revalidateTag(`my-section-${group.sectionId}`, config)
+      revalidateTag(`my-section-${group.sectionId}`, config)
+      try {
+      await audit({
+        action: 'CHAPTER_REVIEW',
+        entity: 'CHAPTER',
+        entityId: String(submission.id),
+        entityName: submission.fileName,
+        before: { submissionId: submission.id, status: 'PENDING' },
+        after: { submissionId: submission.id, status: decision },
+        sectionId: group.sectionId,
+      })
+    } catch {}
 
     try {
       const chapterLabel = CHAPTER_LABELS[(submission as any).milestone.chapter] ?? (submission as any).milestone.chapter

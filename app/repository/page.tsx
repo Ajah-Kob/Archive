@@ -12,11 +12,14 @@ import { RepositoryClient } from '@/components/repository/RepositoryClient'
  * `CapstoneArchive.blobUrl` is still the full https://…vercel-storage.com/archives/…
  * URL, but the browser must NOT open it directly — it 401s.
  *
- * `RepositoryClient` derives the pathname and fetches
- * `GET /api/blob/archives/...` with credentials, then opens an object URL.
+ * Opening a document navigates to /repository/[id], which renders the in-app
+ * reader (headless EmbedPDF — no browser toolbar, no download button). The
+ * viewer derives the pathname and fetches `GET /api/blob/archives/...` with
+ * credentials. On coarse pointers the reader is unavailable (EmbedPDF
+ * workspaces are desktop-only), so the page shows MobileUnsupported instead.
  * The route's global gate is the entire policy: any signed-in, non-deleted
  * user of any role (GUEST included) may read published work; signed-out
- * callers get 401. See lib/blob.ts for the full note.
+ * callers get the viewer's inline unauthorized state. See lib/blob.ts.
  *
  * This page itself stays ungated (proxy.ts has no guard), so a signed-out
  * visitor still sees the catalogue and gets a "Sign in to open" toast rather

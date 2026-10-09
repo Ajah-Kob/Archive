@@ -96,7 +96,12 @@ export function NavLinks({
     { label: 'Milestones', href: '/student/milestone', icon: Flag, show: isStudent },
         { label: 'My Sections', href: '/faculty/my-sections', icon: Layers, show: isCoordinator },
         { label: 'Document Review', href: '/faculty/document-review', icon: ClipboardCheck, show: isAdviser },
-        { label: 'Defense', href: '/faculty/defense', icon: Shield, show: isFaculty },
+        {
+          label: 'Defense',
+          href: '/faculty/defense',
+          icon: Shield,
+          show: isFaculty,
+        },
         { label: 'Defense Scheduling', href: '/faculty/defense-scheduling', icon: CalendarClock, show: isCoordinator },
       ],
     },
@@ -172,7 +177,7 @@ export function NavLinks({
                     {isActive && (
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] rounded-full bg-[#707dff]" />
                     )}
-                    <span className="flex items-center justify-center w-5 shrink-0">
+                    <span className="relative flex items-center justify-center w-5 shrink-0">
                       <Icon
                         size={20}
                         className={`${isActive ? 'text-[#707dff]' : 'text-[#5a6382] group-hover:text-[#707dff]'}`}

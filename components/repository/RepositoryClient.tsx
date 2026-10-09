@@ -29,7 +29,6 @@ import { DeleteArchiveModal } from '@/components/repository/DeleteArchiveModal'
 import { EditArchiveModal } from '@/components/repository/EditArchiveModal'
 import { formatAuthorsForRepository, formatRepositoryDate } from '@/lib/archiving/validation'
 import { AppDateRangePicker } from '@/components/ui/AppDateRangePicker'
-import { toSignedBlobPath } from '@/lib/blob'
 import { toast } from 'sonner'
 import {
   favoriteArchive,
@@ -387,66 +386,11 @@ export function RepositoryClient({
     setDateTo(null)
   }
 
-  // Archive PDFs are private blobs, so the raw vercel-storage URL is not
-  // openable in the browser — it 401s. Fetch through the auth-gated signed
-  // route instead, then hand the tab an object URL. This also lets a signed-out
-  // visitor (the /repository page itself is ungated) get a readable toast
-  // rather than a raw 401 JSON page in a new tab.
-  const openArchive = async (item: RepositoryArchiveRow) => {
-    // window.open MUST run synchronously inside the click handler. Browsers
-    // only permit it while the page still holds live user activation, and an
-    // `await` yields to the event loop — so opening the tab after the fetch
-    // resolves is treated as unsolicited and blocked. That made the pop-up
-    // fail intermittently, on a race between the fetch and the activation
-    // window expiring (fast/cached fetch won, slow/large PDF lost).
-    // Open the shell first, then navigate it once the bytes are in hand.
-    const tab = window.open('', '_blank')
-    if (!tab) {
-      toast.error('Allow pop-ups to open this document.')
-      return
-    }
-    tab.opener = null
-    // Paint a placeholder so the tab is not blank while the PDF downloads.
-    try {
-      tab.document.write(
-        '<!doctype html><meta charset="utf-8"><body style="font:14px/1.5 system-ui,-apple-system,sans-serif;color:#5a6382;padding:2.5rem">Loading document…</body>',
-      )
-      tab.document.close()
-    } catch {
-      // A tab that refuses document.write is still usable for navigation.
-    }
-
-    let objectUrl: string | null = null
-    try {
-      const signedPath = toSignedBlobPath(item.blobUrl)
-      if (!signedPath) {
-        tab.close()
-        toast.error('This document has no stored file.')
-        return
-      }
-
-      const res = await fetch(signedPath, { credentials: 'include' })
-      if (res.status === 401) {
-        tab.close()
-        toast.error('Sign in to open this document.')
-        return
-      }
-      if (!res.ok) {
-        tab.close()
-        toast.error('Could not open this document.')
-        return
-      }
-
-      const blob = await res.blob()
-      objectUrl = URL.createObjectURL(blob)
-      tab.location.replace(objectUrl)
-      // Give the new tab time to load before releasing the blob.
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl as string), 60_000)
-    } catch {
-      tab.close()
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-      toast.error('Could not open this document.')
-    }
+  // Reading happens on /repository/[id] (in-app headless EmbedPDF reader —
+  // no browser toolbar, no download button). Same-tab navigation, so no
+  // popup-blocker race like the old window.open flow had.
+  const openArchive = (item: RepositoryArchiveRow) => {
+    router.push(`/repository/${item.id}`)
   }
 
   return (
@@ -608,13 +552,13 @@ export function RepositoryClient({
                   aria-label={`Open document: ${item.title}`}
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest('button, a')) return
-                    void openArchive(item)
+                    openArchive(item)
                   }}
                   onKeyDown={(e) => {
                     if (e.key !== 'Enter' && e.key !== ' ') return
                     if ((e.target as HTMLElement).closest('button, a')) return
                     e.preventDefault()
-                    void openArchive(item)
+                    openArchive(item)
                   }}
                   className="bg-white rounded-[12px] shadow-[0px_1px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_28px_rgba(112,125,255,0.16)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex overflow-hidden w-full"
                 >
@@ -718,7 +662,7 @@ export function RepositoryClient({
                       </button>
                       <button
                         type="button"
-                        onClick={() => void openArchive(item)}
+                        onClick={() => openArchive(item)}
                         aria-label="Open document"
                         className="inline-flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[9px] bg-white border border-[#dfe3fb] font-sans font-bold text-[12.5px] leading-none text-[#5a6382] hover:bg-[#f8f9ff] transition-colors"
                       >

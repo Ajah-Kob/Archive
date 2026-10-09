@@ -42,8 +42,7 @@ export type GetAuditLogsParams = {
 
 export type GetAuditLogsResult = {
   success: boolean
-  // Use any[] until prisma generate picks up the AuditLog model; runtime is (prisma as any).auditLog
-  logs: any[]
+  logs: unknown[]
   totalCount: number
   totalPages: number
   page: number
@@ -111,13 +110,13 @@ async function getAuditLogsData(params: GetAuditLogsParams): Promise<GetAuditLog
     const skip = (page - 1) * perPage
 
     const [logs, totalCount] = await prisma.$transaction([
-      (prisma as any).auditLog.findMany({
+      prisma.auditLog.findMany({
         where: where as any,
         skip,
         take: perPage,
         orderBy: { createdAt: "desc" },
       }),
-      (prisma as any).auditLog.count({ where: where as any }),
+      prisma.auditLog.count({ where: where as any }),
     ])
 
     return {
@@ -173,6 +172,12 @@ export type AuditInput = {
   entityName?: string | null
   before?: unknown
   after?: unknown
+  /**
+   * Section scope for the coordinator activity feed. Optional so all 36
+   * existing call sites keep working untouched — only section-visible
+   * events pass it. Rows without a section never appear in any feed.
+   */
+  sectionId?: number | null
 }
 
 /**
@@ -193,7 +198,7 @@ export async function audit(input: AuditInput): Promise<void> {
       h.get("x-real-ip")?.trim() ||
       null
 
-    await (prisma as any).auditLog.create({
+    await prisma.auditLog.create({
       data: {
         actorId: Number((session.user as any).id) || null,
         actorName: ((session.user as any).name as string) ?? "Unknown",
@@ -205,13 +210,18 @@ export async function audit(input: AuditInput): Promise<void> {
         entityName: input.entityName ?? null,
         before: (input.before as any) ?? null,
         after: (input.after as any) ?? null,
+        sectionId: input.sectionId ?? null,
         ip,
       },
     })
 
     revalidateTag("audit", "max")
-  } catch {
+  } catch (err) {
     // Isolate audit failures — do not throw into the calling business action.
+    // Log instead of swallowing silently: the section activity feed depends
+    // on row completeness, and a quiet write failure would surface as
+    // mysteriously missing feed entries.
+    console.error("[audit | write failed]:", err)
     return
   }
 }

@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
+import { audit } from '@/lib/actions/audit'
 
 // Revalidates every cache that surfaces a group's topic: each member's
 // workspace, the journey, and the coordinator's section views.
@@ -55,9 +56,9 @@ async function getStudentGroup() {
 
 // ───────────────────────────── Final topic (single-topic flow) ─────────────
 
-// Saves the group's single final topic. The leader can set or update it at
-// any time; saving also ensures the Capstone row exists so chapters unlock.
-// There is no coordinator review in this flow — the topic is final on save.
+// Saves the group's single final topic directly on the group row. The leader
+// can set or update it at any time. There is no coordinator review in this
+// flow — the topic is final on save.
 export async function saveFinalTopic(_prevState: any, formData: FormData) {
   const student = await getStudentGroup()
   if (!student?.group) return unauthorized
@@ -76,55 +77,27 @@ export async function saveFinalTopic(_prevState: any, formData: FormData) {
     return { success: false, message: 'Title must not exceed 25 words.' }
   }
 
-  const capstone = await prisma.capstone.findUnique({
-    where: { groupId: group.id },
-    select: { id: true, topicId: true },
+  const now = new Date()
+  await prisma.group.update({
+    where: { id: group.id },
+    data: {
+      topicTitle: title,
+      topicSubmittedById: student.id,
+      topicSubmittedAt: now,
+    },
   })
-  // Prefer the confirmed capstone topic so edits land on the live row;
-  // otherwise fall back to the most recent active topic.
-  const existing =
-    (capstone
-      ? await prisma.topic.findFirst({
-          where: { id: capstone.topicId, groupId: group.id, deletedAt: null },
-          select: { id: true },
-        })
-      : null) ??
-    (await prisma.topic.findFirst({
-      where: { groupId: group.id, deletedAt: null },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
-    }))
 
-  const topicId = existing
-    ? (
-        await prisma.topic.update({
-          where: { id: existing.id },
-          data: { title, status: 'APPROVED' },
-          select: { id: true },
-        })
-      ).id
-    : (
-        await prisma.topic.create({
-          data: {
-            groupId: group.id,
-            uploadedById: student.id,
-            title,
-            background: '',
-            status: 'APPROVED',
-          },
-          select: { id: true },
-        })
-      ).id
-
-  if (!capstone) {
-    await prisma.capstone.create({
-      data: {
-        groupId: group.id,
-        topicId,
-        adviserId: group.adviserId ?? null,
-      },
+  try {
+    await audit({
+      action: 'TOPIC_SAVE',
+      entity: 'GROUP',
+      entityId: String(group.id),
+      entityName: group.groupName,
+      before: null,
+      after: { title },
+      sectionId: group.sectionId,
     })
-  }
+  } catch {}
 
   revalidateGroupTopics(group, { expireNow: true })
   return { success: true, message: 'Final topic saved.' }

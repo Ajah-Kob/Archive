@@ -118,13 +118,21 @@ export function SectionActivityFeed({ sectionId }: { sectionId: number }) {
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const res = await getSectionActivityFeed(sectionId)
-      if (cancelled) return
-      if (res.success && res.payload) {
-        setEntries(res.payload)
-        setError(false)
-      } else {
-        setError(true)
+      try {
+        console.log('[ActivityFeed] fetching for sectionId:', sectionId)
+        const res = await getSectionActivityFeed(sectionId)
+        console.log('[ActivityFeed] response:', res)
+        if (cancelled) return
+        if (res.success && res.payload) {
+          setEntries(res.payload)
+          setError(false)
+        } else {
+          console.warn('[ActivityFeed] action returned error:', res.message)
+          setError(true)
+        }
+      } catch (err) {
+        console.error('[ActivityFeed] fetch threw:', err)
+        if (!cancelled) setError(true)
       }
     })()
     return () => {

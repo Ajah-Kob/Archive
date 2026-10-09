@@ -30,10 +30,9 @@ export interface SectionActivityEntry {
 export async function getSectionActivityFeed(
   sectionId: number,
 ): Promise<{ success: boolean; message: string; payload: SectionActivityEntry[] | null }> {
-  'use cache'
-  cacheTag(`section-activity-${sectionId}`)
-  cacheLife('max')
-
+  // Not 'use cache': the guard resolves the session via headers(), which is a
+  // dynamic data source and forbidden inside a cache scope. The feed is
+  // per-user and per-section, so shared caching buys little anyway.
   const coordinator = await requireCoordinator()
   if (!coordinator) {
     return { success: false, message: 'Not authorized', payload: null }

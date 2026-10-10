@@ -1,10 +1,15 @@
 'use client'
 
-import { Filter } from 'lucide-react'
 import { SearchBar } from '@/components/ui/SearchBar'
+import { Filter } from '@/components/ui/Filter'
+import { AppDateRangePicker } from '@/components/ui/AppDateRangePicker'
 
 const ROLES = ['SUPERADMIN', 'ADMIN', 'FACULTY', 'STUDENT', 'GUEST']
-const PER_PAGE_OPTIONS = [10, 25, 50]
+
+const ROLE_OPTIONS = [
+  { value: '', label: 'All roles' },
+  ...ROLES.map((r) => ({ value: r, label: r.charAt(0) + r.slice(1).toLowerCase() })),
+]
 
 export interface FiltersState {
   searchTerm: string
@@ -19,13 +24,25 @@ interface UsersToolbarProps {
   onFilterChange: React.Dispatch<React.SetStateAction<FiltersState>>
 }
 
+function toDate(value: string): Date | null {
+  if (!value) return null
+  const d = new Date(`${value}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function toKey(date: Date | null): string {
+  if (!date) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 export default function UsersToolbar({
   filters,
   onFilterChange,
 }: UsersToolbarProps) {
   return (
-    <div className="bg-white border border-[#e8ebf8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)] py-[20px] px-[20px] flex flex-col sm:flex-row items-center gap-[15px]">
-      <div className="flex-1 w-full">
+    <>
+      <div className="w-[240px] sm:w-[320px] shrink-0">
         <SearchBar
           value={filters.searchTerm}
           onChange={(value) =>
@@ -38,65 +55,36 @@ export default function UsersToolbar({
         />
       </div>
 
-      <div className="relative w-full sm:w-auto">
-        <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <select
-          value={filters.roleFilter}
-          onChange={(e) =>
+      <Filter
+        value={filters.roleFilter}
+        options={ROLE_OPTIONS}
+        onChange={(value) =>
+          onFilterChange((prev) => ({
+            ...prev,
+            roleFilter: value,
+          }))
+        }
+        ariaLabel="Filter by role"
+      />
+
+      <div className="w-[280px] sm:w-[320px] shrink-0">
+        <AppDateRangePicker
+          start={toDate(filters.dateFrom)}
+          end={toDate(filters.dateTo)}
+          onStartChange={(value) =>
             onFilterChange((prev) => ({
               ...prev,
-              roleFilter: e.target.value,
+              dateFrom: toKey(value),
             }))
           }
-          className="pl-9 pr-4 py-2.5 bg-white border border-slate-200/80 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm appearance-none cursor-pointer min-w-[150px]"
-        >
-          <option value="">All roles</option>
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r.charAt(0) + r.slice(1).toLowerCase()}
-            </option>
-          ))}
-        </select>
+          onEndChange={(value) =>
+            onFilterChange((prev) => ({
+              ...prev,
+              dateTo: toKey(value),
+            }))
+          }
+        />
       </div>
-
-      <input
-        type="date"
-        value={filters.dateFrom}
-        onChange={(e) =>
-          onFilterChange((prev) => ({
-            ...prev,
-            dateFrom: e.target.value,
-          }))
-        }
-        className="px-3 py-2.5 bg-white border border-slate-200/80 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm min-w-[140px]"
-      />
-
-      <input
-        type="date"
-        value={filters.dateTo}
-        onChange={(e) =>
-          onFilterChange((prev) => ({
-            ...prev,
-            dateTo: e.target.value,
-          }))
-        }
-        className="px-3 py-2.5 bg-white border border-slate-200/80 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm min-w-[140px]"
-      />
-
-      <select
-        value={filters.perPage}
-        onChange={(e) =>
-          onFilterChange((prev) => ({
-            ...prev,
-            perPage: Number(e.target.value),
-          }))
-        }
-        className="px-3 py-2.5 bg-white border border-slate-200/80 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm appearance-none cursor-pointer"
-      >
-        {PER_PAGE_OPTIONS.map((n) => (
-          <option key={n} value={n}>{n} / page</option>
-        ))}
-      </select>
-    </div>
+    </>
   )
 }

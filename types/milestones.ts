@@ -71,6 +71,7 @@ export type AdviserState =
       canManage: boolean
       facultyId: number
       name: string
+      honorific?: string | null
       email: string
       image: string | null
       avatarGradient: string | null
@@ -131,6 +132,7 @@ export interface AdviserOption {
   id: number
   userId: number
   name: string
+  honorific?: string | null
   email: string
   image: string | null
   workload: number

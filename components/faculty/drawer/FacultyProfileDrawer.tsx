@@ -7,7 +7,7 @@ import { DrawerSkeleton } from '@/components/faculty/drawer/DrawerSkeleton'
 import { ActivityStatus } from '@/components/ui/ActivityStatus'
 import { Drawer } from '@/components/ui/Drawer'
 import { useFacultyDrawer } from '@/store/useFacultyDrawer'
-import { getInitials } from '@/lib/helper'
+import { getInitials, displayNameWithHonorific } from '@/lib/helper'
 import { getFacultyMemberDetail } from '@/lib/actions/faculty'
 
 export interface FacultyGroup {
@@ -20,6 +20,7 @@ export interface FacultyGroup {
 interface FacultyDetail {
   id: number
   name: string
+  honorific?: string | null
   email: string
   activityStatus: 'active' | string
   roles: string[]
@@ -87,7 +88,7 @@ export function FacultyProfileDrawer() {
                 <div className="flex flex-col gap-[6px] min-w-0">
                   <div className="flex items-center gap-[8px]">
                     <p className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] truncate">
-                      {detail.name}
+                      {displayNameWithHonorific(detail.name, (detail as any).honorific ?? null)}
                     </p>
                     {detail.roles.length > 0 && (
                       <span className="px-[9px] py-[3px] bg-[#f4f6ff] border border-[#e5e8ff] rounded-full font-sans font-semibold text-[10.5px] leading-[15.75px] text-[#707dff] whitespace-nowrap">

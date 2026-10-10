@@ -214,6 +214,7 @@ function PanelistCard({
         <UserProfile
           initials={getInitials(panelist.name)}
           name={panelist.name}
+          honorific={(panelist as any).honorific ?? null}
           email={panelist.email}
           gradient={panelist.avatarGradient ?? gradientFor(panelist.userId)}
         />

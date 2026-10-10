@@ -299,6 +299,7 @@ export async function getCoordinatorDetail(facultyId: number) {
         id: faculty.id,
         userId: faculty.userId,
         name: faculty.user.name,
+        honorific: (faculty as unknown as { honorific?: string | null }).honorific ?? null,
         email: faculty.user.email,
         activityStatus: activityStatusFor(faculty.user.loggedInAt),
         totalStudents: sections.reduce((n, s) => n + s.studentCount, 0),
@@ -318,6 +319,7 @@ export interface ActiveCoordinatorOption {
   id: number
   facultyId: number
   name: string
+  honorific?: string | null
   email: string
   image: string | null
   avatarGradient: string
@@ -373,6 +375,7 @@ export async function getActiveCoordinators() {
       id: row.id,
       facultyId: row.facultyId,
       name: row.faculty.user.name,
+      honorific: (row.faculty as unknown as { honorific?: string | null }).honorific ?? null,
       email: row.faculty.user.email,
       image: row.faculty.user.image,
       avatarGradient: row.faculty.user.avatarGradient,

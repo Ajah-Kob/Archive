@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { getAvailableAdvisers, sendAdviserInvitation } from '@/lib/actions/groups'
 import type { AdviserOption } from '@/types/milestones'
 import { ADVISER_CAP } from '@/config/constants'
-import { getInitials } from '@/lib/helper'
+import { getInitials, displayNameWithHonorific } from '@/lib/helper'
 
 interface AdviserModalProps {
   onClose: () => void
@@ -106,7 +106,7 @@ export function AdviserModal({ onClose, onInvited }: AdviserModalProps) {
 
                   <div className="flex-1 min-w-px">
                     <p className="font-sans font-semibold text-[13.5px] leading-[20.25px] text-[#1e2145] truncate">
-                      {adviser.name}
+                      {displayNameWithHonorific(adviser.name, (adviser as any).honorific ?? null)}
                     </p>
                     <p className="font-sans font-medium text-[11.5px] leading-[17.25px] text-[#9ea8c6] truncate">
                       {adviser.email}

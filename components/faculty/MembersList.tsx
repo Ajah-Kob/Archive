@@ -76,6 +76,7 @@ export function MembersList() {
       userId: m.userId,
       initials: getInitials(m.name),
       name: m.name,
+      honorific: (m as any).honorific ?? null,
       email: m.email,
       avatarGradient: m.avatarGradient,
       activityStatus: m.activityStatus,

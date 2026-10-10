@@ -78,6 +78,7 @@ export function AssignedCoordinatorList({
               <UserProfile
                 initials={coordinator.initials}
                 name={coordinator.name}
+                honorific={(coordinator as any).honorific ?? null}
                 email={coordinator.email}
                 gradient={coordinator.gradient}
               />

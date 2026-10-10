@@ -1,6 +1,9 @@
+import { displayNameWithHonorific } from '@/lib/helper'
+
 interface UserProfileProps {
   initials: string
   name: string
+  honorific?: string | null
   email?: string
   /** Details line below name — when omitted, no details row is rendered. Alias for email for backward compat. */
   details?: string
@@ -22,6 +25,7 @@ export const PANELIST_AVATAR_GRADIENT =
 export function UserProfile({
   initials,
   name,
+  honorific,
   email,
   details,
   detailsNode,
@@ -31,6 +35,7 @@ export function UserProfile({
 }: UserProfileProps) {
   const detailsText = (details ?? email)?.trim() ?? ''
   const showDetails = Boolean(detailsNode) || detailsText.length > 0
+  const displayName = displayNameWithHonorific(name, honorific)
 
   return (
     <div className="flex gap-2.5 items-center min-w-0">
@@ -49,7 +54,7 @@ export function UserProfile({
       <div className="flex flex-col min-w-0">
         <div className="flex items-center gap-[6px] min-w-0">
           <p className="font-sans font-bold text-[13px] leading-none text-[#1e2145] truncate">
-            {name}
+            {displayName}
           </p>
           {badge && (
             <span className="inline-flex items-center px-[6px] py-[1px] rounded-full bg-[#f4f6ff] border border-[#e5e8ff] font-sans font-bold text-[10px] leading-none text-[#707dff] shrink-0">

@@ -336,6 +336,7 @@ export function GroupDashboard({ data }: { data: WorkspaceData }) {
               <UserProfile
                 initials={getInitials(adviser.name)}
                 name={adviser.name}
+                honorific={(adviser as any).honorific ?? null}
                 email={adviser.email}
                 gradient={adviser.avatarGradient ?? undefined}
               />

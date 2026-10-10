@@ -86,6 +86,7 @@ export function AvailableFacultyList({ data = [] }: AvailableFacultyListProps) {
                     <UserProfile
                       initials={faculty.initials}
                       name={faculty.name}
+                      honorific={(faculty as any).honorific ?? null}
                       email={faculty.email}
                       gradient={faculty.gradient}
                     />

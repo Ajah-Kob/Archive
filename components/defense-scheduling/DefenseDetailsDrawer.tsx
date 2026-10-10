@@ -14,7 +14,7 @@ import type {
   DefensePanelistPayload,
   DefenseSchedulePayload,
 } from '@/lib/actions/defense'
-import { getInitials } from '@/lib/helper'
+import { getInitials, displayNameWithHonorific } from '@/lib/helper'
 
 interface DefenseDetailsDrawerProps {
   /** Selected schedule, or null when the drawer is closed. */
@@ -318,7 +318,7 @@ function PanelistCard({
         </span>
       </div>
       <p className="min-w-0 flex-1 truncate font-sans font-semibold text-[13px] leading-[19.5px] text-[#1e2145]">
-        {panelist.name}
+        {displayNameWithHonorific(panelist.name, (panelist as any).honorific ?? null)}
       </p>
       <PanelistBadge role={panelist.role} memberIndex={memberIndex} />
     </div>

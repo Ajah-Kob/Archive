@@ -326,6 +326,7 @@ function AssignCoordinatorModalBody({
                       <UserProfile
                         initials={getInitials(coordinator.name)}
                         name={coordinator.name}
+                        honorific={(coordinator as any).honorific ?? null}
                         email={coordinator.email}
                         gradient={coordinator.avatarGradient}
                       />

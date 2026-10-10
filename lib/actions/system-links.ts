@@ -7,6 +7,7 @@ import {
   requireScheduleStudent,
   unauthorized,
 } from '@/lib/actions/guard'
+import { honorificsForUserIds } from '@/lib/group'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import {
   SYSTEM_LINK_MESSAGE,
@@ -135,7 +136,7 @@ async function cachedLinkComments(linkId: number, scheduleId: number) {
   cacheTag(`system-links-${scheduleId}`)
   cacheLife('max')
 
-  return prisma.systemLinkComment.findMany({
+  const comments = await prisma.systemLinkComment.findMany({
     where: { linkId, deletedAt: null },
     orderBy: { createdAt: 'asc' },
     select: {
@@ -146,6 +147,14 @@ async function cachedLinkComments(linkId: number, scheduleId: number) {
       author: { select: { name: true } },
     },
   })
+  const titles = await honorificsForUserIds(comments.map((c) => c.authorId))
+  return comments.map((c) => ({
+    ...c,
+    author: {
+      ...c.author,
+      honorific: titles.get(c.authorId) ?? null,
+    },
+  }))
 }
 
 /**

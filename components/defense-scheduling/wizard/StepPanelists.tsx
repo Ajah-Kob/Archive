@@ -124,6 +124,7 @@ function SlotZone({
               <UserProfile
                 initials={getInitials(member.name)}
                 name={member.name}
+                honorific={(member as any).honorific ?? null}
                 email={member.email ?? ''}
               />
               <button

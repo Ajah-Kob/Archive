@@ -13,7 +13,7 @@ import {
 import { getFacultyMembers } from '@/lib/actions/faculty'
 import { revalidateFeature } from '@/lib/actions/revalidate'
 import { audit } from '@/lib/actions/audit'
-import { sectionIdForGroup } from '@/lib/group'
+import { sectionIdForGroup, honorificsForUserIds } from '@/lib/group'
 import type {
   DefenseType,
   DefenseVerdict,
@@ -61,13 +61,14 @@ function resolvePanelistFeedbackFromAnnotations(
 }
 
 function toPanelistPayload(
-  p: { userId: number; name: string; email: string; image: string | null; avatarGradient?: string | null; role: PanelistRole },
+  p: { userId: number; name: string; honorific?: string | null; email: string; image: string | null; avatarGradient?: string | null; role: PanelistRole },
   verdict: DefenseVerdict,
   annotationRows: Array<{ status: string; data: unknown }> = [],
 ): DefensePanelistPayload {
   return {
     userId: p.userId,
     name: p.name,
+    honorific: p.honorific ?? null,
     email: p.email,
     image: p.image,
     avatarGradient: p.avatarGradient ?? null,
@@ -151,6 +152,7 @@ function parsePanelists(
 export interface DefensePanelistPayload {
   userId: number
   name: string
+  honorific?: string | null
   email: string
   image: string | null
   avatarGradient?: string | null
@@ -225,6 +227,10 @@ async function getDefenseSchedulesData() {
     orderBy: { date: 'desc' },
   })
 
+  const panelistTitles = await honorificsForUserIds(
+    schedules.flatMap((s) => s.panelists.map((p) => p.userId)),
+  )
+
   return schedules.map(
     (s): DefenseSchedulePayload => ({
       id: s.id,
@@ -242,7 +248,7 @@ async function getDefenseSchedulesData() {
       createdByName: s.createdByUser.name,
       panelists: s.panelists.map((p) =>
         toPanelistPayload(
-          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
+          { userId: p.userId, name: p.user.name, honorific: panelistTitles.get(p.userId) ?? null, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
           s.verdict,
         ),
       ),
@@ -328,6 +334,10 @@ async function getMyDefenseSchedulesData(
     orderBy: { date: 'asc' },
   })
 
+  const panelistTitles = await honorificsForUserIds(
+    schedules.flatMap((s) => s.panelists.map((p) => p.userId)),
+  )
+
   return schedules.map(
     (s): MyDefenseSchedulePayload => ({
       id: s.id,
@@ -345,7 +355,7 @@ async function getMyDefenseSchedulesData(
       createdByName: s.createdByUser.name,
       panelists: s.panelists.map((p) =>
         toPanelistPayload(
-          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
+          { userId: p.userId, name: p.user.name, honorific: panelistTitles.get(p.userId) ?? null, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
           s.verdict,
         ),
       ),
@@ -356,6 +366,7 @@ async function getMyDefenseSchedulesData(
         }>,
         s.group.leaderStudentId,
       ),
+      // My-panel list ends here — the session payload below has its own mapper.
       myRole:
         s.panelists.find((p) => p.userId === userId)?.role ?? 'PANEL_MEMBER',
     }),
@@ -1704,6 +1715,10 @@ async function getDefenseSessionData(
 
   if (!schedule) return null
 
+  const sessionTitles = await honorificsForUserIds(
+    schedule.panelists.map((p) => p.userId),
+  )
+
   return {
     id: schedule.id,
     groupId: schedule.groupId,
@@ -1745,7 +1760,7 @@ async function getDefenseSessionData(
       }
       return schedule.panelists.map((p) =>
         toPanelistPayload(
-          { userId: p.userId, name: p.user.name, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
+          { userId: p.userId, name: p.user.name, honorific: sessionTitles.get(p.userId) ?? null, email: p.user.email, image: p.user.image, avatarGradient: p.user.avatarGradient ?? null, role: p.role },
           schedule.verdict,
           byAuthor.get(p.userId) ?? [],
         ),

@@ -20,13 +20,12 @@ export default async function AdminAuditPage() {
 
   const logs = initial.success ? (initial.logs as never[]) : []
   const totalCount = initial.totalCount ?? 0
-  const totalPages = initial.totalPages ?? 1
 
   return (
     <section className="flex flex-col w-full h-full min-h-0 overflow-hidden">
       <PageLabel label="Audit Log" />
 
-      <AuditClient initialLogs={logs as never} initialTotalCount={totalCount} initialTotalPages={totalPages} initialPerPage={20} />
+      <AuditClient initialLogs={logs as never} initialTotalCount={totalCount} initialPerPage={20} />
     </section>
   )
 }

@@ -2144,11 +2144,6 @@ export async function getCoordinatorGroupDetail(groupId: number) {
             },
           },
         },
-        topics: {
-          where: { deletedAt: null },
-          select: { status: true, deletedAt: true },
-          orderBy: { createdAt: 'desc' },
-        },
         topicSubmittedBy: {
           include: { user: { select: { name: true } } },
         },

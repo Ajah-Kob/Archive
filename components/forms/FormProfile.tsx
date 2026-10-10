@@ -8,7 +8,7 @@ import { useSession } from 'next-auth/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { updateMe } from '@/lib/actions/me'
 import { deleteMedia, uploadMedia } from '@/lib/actions/media'
-import { getInitials } from '@/lib/helper'
+import { getInitials, displayNameWithHonorific } from '@/lib/helper'
 import { AuthInput } from '@/components/ui/AuthInput'
 import { UnsavedChangesModal } from '@/components/forms/UnsavedChangesModal'
 import { ProfileCropModal } from '@/components/forms/ProfileCropModal'
@@ -60,6 +60,7 @@ export default function FormProfile({
   const [isEditing, setIsEditing] = useState(false)
   const [draftName, setDraftName] = useState('')
   const [draftEmail, setDraftEmail] = useState('')
+  const [draftHonorific, setDraftHonorific] = useState('')
   const [unsavedOpen, setUnsavedOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [state, handleSubmit, isPending] = useActionState(updateMe, {
@@ -149,7 +150,7 @@ export default function FormProfile({
     }
     document.addEventListener('click', handleClickCapture, true)
     return () => document.removeEventListener('click', handleClickCapture, true)
-  }, [isEditing, draftName, draftEmail, pendingFile, pendingRemove])
+  }, [isEditing, draftName, draftEmail, draftHonorific, pendingFile, pendingRemove])
 
   async function sessionUpdate(updatedUser: User) {
     // Merge updated fields into the existing session user, then refresh the
@@ -163,6 +164,10 @@ export default function FormProfile({
 
   function computeDirty(): boolean {
     if (pendingFile !== null || pendingRemove) return true
+    if (
+      draftHonorific.trim() !== (initialHonorific ?? '').trim()
+    )
+      return true
     return (
       draftName.trim() !== (profile.name ?? '') ||
       draftEmail.trim() !== (profile.email ?? '')
@@ -175,6 +180,13 @@ export default function FormProfile({
     const changes: PendingChange[] = []
     if (name !== (profile.name ?? '')) {
       changes.push({ label: 'Name', from: profile.name ?? '—', to: name || '—' })
+    }
+    if (draftHonorific.trim() !== (initialHonorific ?? '').trim()) {
+      changes.push({
+        label: 'Honorific',
+        from: initialHonorific || '—',
+        to: draftHonorific.trim() || '—',
+      })
     }
     if (email !== (profile.email ?? '')) {
       changes.push({
@@ -202,6 +214,7 @@ export default function FormProfile({
   function handleEnterEdit() {
     setDraftName(profile.name ?? '')
     setDraftEmail(profile.email ?? '')
+    setDraftHonorific(initialHonorific ?? '')
     dirtyRef.current = false
     setIsEditing(true)
   }
@@ -261,6 +274,7 @@ export default function FormProfile({
     formRef.current?.reset()
     setDraftName('')
     setDraftEmail('')
+    setDraftHonorific('')
     setPendingFile(null)
     setPendingRemove(false)
     setPreviewImage(profile.image ?? null)
@@ -282,6 +296,7 @@ export default function FormProfile({
     formRef.current?.reset()
     setDraftName('')
     setDraftEmail('')
+    setDraftHonorific('')
     setPendingFile(null)
     setPendingRemove(false)
     setPreviewImage(profile.image ?? null)
@@ -325,9 +340,21 @@ export default function FormProfile({
   }
 
   const roleLabel = formatRole(profile.role)
+  const profileHonorific =
+    (profile as unknown as { faculty?: { honorific?: string | null } | null })
+      .faculty?.honorific ?? null
+  const displayName = displayNameWithHonorific(
+    profile.name,
+    profileHonorific,
+  )
+  const isFaculty =
+    (profile as unknown as { faculty?: unknown | null }).faculty != null ||
+    (profile as unknown as { role?: string }).role === 'FACULTY'
+  const initialHonorific = profileHonorific ?? ''
   const hasChanges =
     draftName.trim() !== (profile.name ?? '') ||
     draftEmail.trim() !== (profile.email ?? '') ||
+    draftHonorific.trim() !== initialHonorific.trim() ||
     pendingFile !== null ||
     pendingRemove
   const saveDisabled =
@@ -431,7 +458,7 @@ export default function FormProfile({
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="truncate font-heading text-[18px] font-bold leading-[27px] text-[#1e2145]">
-                {profile.name}
+                {displayName}
               </p>
               {roleLabel && (
                 <span className="inline-flex shrink-0 items-center rounded-full border border-[#e5e8ff] bg-[#f4f6ff] px-[8px] py-[2px] font-sans text-[10.5px] font-bold leading-[15.75px] text-[#707dff]">
@@ -536,6 +563,48 @@ export default function FormProfile({
                   )
                 )}
               </AuthInput>
+              {isFaculty && (
+                <AuthInput
+                  label="Honorific (optional)"
+                  name="honorific"
+                  type="text"
+                  placeholder="Dr., Engr., Prof., Ms., Mrs."
+                  value={draftHonorific}
+                  onChange={(e) => setDraftHonorific(e.target.value)}
+                  disabled={isPending}
+                  endPadding="pr-[68px]"
+                >
+                  {draftHonorific.trim() !== initialHonorific.trim() ? (
+                    <span className="flex h-full items-center pr-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setDraftHonorific(initialHonorific)}
+                        aria-label="Undo honorific change"
+                        disabled={loading}
+                        className="inline-flex items-center gap-1 font-sans text-[12px] font-semibold text-[#707dff] transition-colors hover:text-[#5a67ff] disabled:opacity-60"
+                      >
+                        <Undo2 className="size-3" />
+                        Undo
+                      </button>
+                    </span>
+                  ) : (
+                    draftHonorific !== '' && (
+                      <span className="flex h-full items-center pr-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setDraftHonorific('')}
+                          aria-label="Clear honorific"
+                          disabled={loading}
+                          className="inline-flex items-center gap-1 font-sans text-[12px] font-semibold text-[#ef4444] transition-colors hover:text-[#dc2626] disabled:opacity-60"
+                        >
+                          <X className="size-3" />
+                          Clear
+                        </button>
+                      </span>
+                    )
+                  )}
+                </AuthInput>
+              )}
               <div className="flex justify-end gap-[10px]">
                 <button
                   type="button"

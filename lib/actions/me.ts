@@ -34,8 +34,7 @@ async function getMeData(id: string) {
       },
       include: {
         faculty: {
-          where: { deletedAt: null },
-          select: { honorific: true },
+          select: { id: true, honorific: true, deletedAt: true },
         },
       },
     })
@@ -48,6 +47,13 @@ async function getMeData(id: string) {
         payload: [],
       }
     }
+
+    // Relation includes don't respect soft-deletes — null a removed faculty
+    // in code so non-faculty and removed-faculty behave the same.
+    const row = me as unknown as {
+      faculty?: { deletedAt: Date | null } | null
+    } & Record<string, unknown>
+    if (row.faculty?.deletedAt != null) row.faculty = null
 
     return {
       success: true,
@@ -107,8 +113,7 @@ export async function updateMe(_prevState: User, formData: FormData) {
       where: { id: +id, deletedAt: null },
       include: {
         faculty: {
-          where: { deletedAt: null },
-          select: { id: true, honorific: true },
+          select: { id: true, honorific: true, deletedAt: true },
         },
       },
     })
@@ -119,11 +124,18 @@ export async function updateMe(_prevState: User, formData: FormData) {
         message: 'User not found.',
       }
     }
-    const currentHonorific =
-      (current as unknown as { faculty?: { honorific: string | null } | null })
-        .faculty?.honorific ?? null
-    const hasFaculty =
-      (current as unknown as { faculty?: unknown | null }).faculty != null
+    const currentFaculty = (
+      current as unknown as {
+        faculty?: {
+          honorific: string | null
+          deletedAt: Date | null
+        } | null
+      }
+    ).faculty
+    const liveFaculty =
+      currentFaculty?.deletedAt == null ? currentFaculty : null
+    const currentHonorific = liveFaculty?.honorific ?? null
+    const hasFaculty = liveFaculty != null
     const honorificChanged = hasFaculty && honorific !== currentHonorific
 
     // Prepare the update data — changed columns only.
@@ -227,11 +239,18 @@ export async function updateMe(_prevState: User, formData: FormData) {
       where: { id: +id, deletedAt: null },
       include: {
         faculty: {
-          where: { deletedAt: null },
-          select: { honorific: true },
+          select: { honorific: true, deletedAt: true },
         },
       },
     })
+    if (
+      (fresh as unknown as { faculty?: { deletedAt: Date | null } | null })
+        ?.faculty?.deletedAt != null
+    ) {
+      ;(
+        fresh as unknown as { faculty?: unknown | null }
+      ).faculty = null
+    }
 
     revalidateTag('me', 'max')
 

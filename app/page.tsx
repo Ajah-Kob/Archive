@@ -105,7 +105,7 @@ export default async function Home() {
                 href="/signup"
                 className="inline-flex items-center justify-center h-10 px-7 rounded-[10px] bg-white border border-[#eceef8] font-sans font-bold text-sm text-[#1e2145] hover:bg-[#f8f9fe] hover:border-[#e0e3ff] active:scale-[0.98] transition-all w-full sm:w-auto"
               >
-                Sign In
+                Sign Up
               </Link>
             </div>
           )}

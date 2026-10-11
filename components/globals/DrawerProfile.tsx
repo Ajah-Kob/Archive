@@ -10,7 +10,7 @@ import {
   UserPen,
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import { getInitials } from '@/lib/helper'
+import { getInitials, displayNameWithHonorific } from '@/lib/helper'
 import { toSignedBlobPath } from '@/lib/blob'
 
 export default function DrawerProfile() {
@@ -43,7 +43,10 @@ export default function DrawerProfile() {
     }
   }, [isOpen])
 
-  const name = session?.user?.name || 'User'
+  const name = displayNameWithHonorific(
+    session?.user?.name || 'User',
+    (session?.user as unknown as { honorific?: string | null })?.honorific ?? null,
+  )
   const initials = session?.user?.name ? getInitials(session.user.name) : '?'
 
   const avatar = session?.user?.image ? (

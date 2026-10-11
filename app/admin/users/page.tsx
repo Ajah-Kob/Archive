@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
-import { UserPlus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, UserPlus } from 'lucide-react'
 import { PageLabel } from '@/components/globals/PageLabel'
+import { ScrollFadeRegion } from '@/components/ui/ScrollFadeRegion'
 import UsersToolbar, {
   type FiltersState,
 } from '@/components/features/users/main/UsersToolbar'
@@ -14,12 +15,25 @@ import DeleteUserModal from '@/components/features/users/modal/DeleteUserModal'
 import ConfirmChairModal from '@/components/features/users/modal/ConfirmChairModal'
 import { getUsers } from '@/lib/actions/user'
 
+// Client-side sorting needs the full filtered set in memory. Bounded so a
+// huge user base can't OOM the browser — past this, narrow with filters.
+// ponytail: full-fetch ceiling; upgrade path is server-side sort + keyset
+// pagination if user volume outgrows it.
+const CLIENT_FETCH_LIMIT = 2000
+
+function sortValue(user: UserItem, field: string): string | number {
+  if (field === 'id') return user.id
+  if (field === 'chair') return user.isProgramChair ? 1 : 0
+  if (field === 'createdAt') return new Date(user.createdAtRaw).getTime()
+  const v = (user as unknown as Record<string, unknown>)[field]
+  return (v ?? '').toString()
+}
+
 export default function DashboardUsersPage() {
   const { data: session } = useSession()
 
   const [users, setUsers] = useState<UserItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<FiltersState>({
     searchTerm: '',
@@ -29,7 +43,7 @@ export default function DashboardUsersPage() {
     perPage: 10,
   })
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [pageInput, setPageInput] = useState('1')
   const [total, setTotal] = useState(0)
   const [sortField, setSortField] = useState('id')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
@@ -42,56 +56,41 @@ export default function DashboardUsersPage() {
     null,
   )
 
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
-
   const mapUser = useCallback(
     (u: any): UserItem => ({
       id: u.id,
       name: u.name,
+      honorific: u.faculty?.honorific ?? null,
+      avatarGradient: u.avatarGradient ?? null,
       email: u.email,
       role: u.role,
       isProgramChair: u.faculty?.isProgramChair ?? false,
       createdAt: new Date(u.createdAt).toLocaleDateString(),
+      createdAtRaw: new Date(u.createdAt).toISOString(),
     }),
     [],
   )
 
-  const fetchPage = useCallback(
-    async (
-      p: number,
-      opts?: {
-        append?: boolean
-        search?: string
-        role?: string
-        df?: string
-        dt?: string
-        pp?: number
-        sf?: string
-        sd?: string
-      },
-    ) => {
+  // Backend only supplies the filtered set — sort + pagination stay in memory
+  const fetchUsers = useCallback(
+    async (opts?: {
+      search?: string
+      role?: string
+      df?: string
+      dt?: string
+    }) => {
       const s = opts?.search ?? filters.searchTerm
       const r = opts?.role ?? filters.roleFilter
       const df = opts?.df ?? filters.dateFrom
       const dt = opts?.dt ?? filters.dateTo
-      const pp = opts?.pp ?? filters.perPage
-      const sf = opts?.sf ?? sortField
-      const sd = opts?.sd ?? sortDir
 
-      if (p === 1) setLoading(true)
-      else setLoadingMore(true)
+      setLoading(true)
 
       try {
-        const res = await getUsers(p, pp, s, r, df, dt, sf, sd)
+        const res = await getUsers(1, CLIENT_FETCH_LIMIT, s, r, df, dt)
         if (res.success) {
           const mapped = (res.payload ?? []).map(mapUser)
-          if (opts?.append) {
-            setUsers((prev) => [...prev, ...mapped])
-          } else {
-            setUsers(mapped)
-          }
-          setTotalPages(res.totalPages ?? 1)
+          setUsers(mapped)
           setTotal(res.total ?? 0)
           setError(null)
         } else {
@@ -100,8 +99,7 @@ export default function DashboardUsersPage() {
       } catch {
         setError('Failed to load users')
       } finally {
-        if (p === 1) setLoading(false)
-        else setLoadingMore(false)
+        setLoading(false)
       }
     },
     [
@@ -109,59 +107,73 @@ export default function DashboardUsersPage() {
       filters.roleFilter,
       filters.dateFrom,
       filters.dateTo,
-      filters.perPage,
-      sortField,
-      sortDir,
       mapUser,
     ],
   )
 
-  // Fetch on filter/sort changes
+  // Fetch on filter changes
   useEffect(() => {
     setPage(1)
-    fetchPage(1)
+    fetchUsers()
   }, [
     filters.searchTerm,
     filters.roleFilter,
     filters.dateFrom,
     filters.dateTo,
-    filters.perPage,
-    sortField,
-    sortDir,
-    fetchPage,
+    fetchUsers,
   ])
 
-  // Infinite scroll
-  const hasMore = page < totalPages
+  // Client-side sort + pagination over the fetched set — instant, no refetch
+  const sortedUsers = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...users].sort((a, b) => {
+      const va = sortValue(a, sortField)
+      const vb = sortValue(b, sortField)
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
+      return String(va).localeCompare(String(vb)) * dir
+    })
+  }, [users, sortField, sortDir])
 
-  const loadMore = useCallback(async () => {
-    if (loadingMore || loading || !hasMore) return
-    const nextPage = page + 1
-    setPage(nextPage)
-    await fetchPage(nextPage, { append: true })
-  }, [loadingMore, loading, hasMore, page, fetchPage])
+  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / filters.perPage))
+  const pageUsers = sortedUsers.slice(
+    (page - 1) * filters.perPage,
+    page * filters.perPage,
+  )
 
+  // Filters can shrink the set below the current page — clamp back
   useEffect(() => {
-    const sentinel = sentinelRef.current
-    const scrollContainer = scrollContainerRef.current
-    if (!sentinel || !scrollContainer) return
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) loadMore()
-      },
-      { root: scrollContainer, threshold: 0.1 },
-    )
+  function goToPage(p: number) {
+    const clamped = Math.min(Math.max(1, p), Math.max(1, totalPages))
+    setPage(clamped)
+    setPageInput(String(clamped))
+  }
 
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [loadMore])
+  function commitPageInput() {
+    const n = parseInt(pageInput, 10)
+    if (Number.isNaN(n)) {
+      setPageInput(String(page))
+      return
+    }
+    goToPage(n)
+  }
 
   function handleSort(field: string) {
     setSortDir((prev) =>
       sortField === field ? (prev === 'asc' ? 'desc' : 'asc') : 'asc',
     )
     setSortField(field)
+  }
+
+  function handlePerPageChange(pp: number) {
+    setFilters((prev) => ({ ...prev, perPage: pp }))
+    setPage(1)
+  }
+
+  function refreshAfterMutation() {
+    fetchUsers()
   }
 
   function openAddUserModal() {
@@ -183,20 +195,16 @@ export default function DashboardUsersPage() {
   const isSuperadmin = session?.user?.role === 'SUPERADMIN'
 
   return (
-    <div className="flex flex-col w-full gap-5 h-full">
+    <div className="flex flex-col w-full h-full">
       <PageLabel label="Users" />
-      <div className="flex flex-col gap-[12px]">
-        <div className="flex">
-          <div className="flex flex-col w-full gap-1">
-            <h1 className="font-heading font-bold text-[26px] leading-[20.25px] text-[#10133a] tracking-[-0.135px]">
-              Users
-            </h1>
-            <p className="font-sans font-medium text-[13.5px] text-[#8a93b4]">
-              Manage user accounts, roles, and faculty program chair
-              assignments.
-            </p>
-          </div>
-          {canManage && (
+
+      <div className="w-full flex flex-nowrap items-center justify-between gap-x-[16px] px-4 sm:px-8 bg-[#eef2ff] border-b border-[#dfe3fb] shrink-0 min-h-[56px]">
+        {/* Single line: search + filters scroll sideways rather than wrapping. */}
+        <ScrollFadeRegion className="flex items-center gap-2.5 flex-1">
+          <UsersToolbar filters={filters} onFilterChange={setFilters} />
+        </ScrollFadeRegion>
+        {canManage && (
+          <div className="flex items-center gap-[8px] shrink-0">
             <button
               type="button"
               onClick={openAddUserModal}
@@ -205,22 +213,16 @@ export default function DashboardUsersPage() {
               <UserPlus size={16} />
               <span>Add User</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-col gap-[10px] flex-1 min-h-px">
-        <UsersToolbar filters={filters} onFilterChange={setFilters} />
-
-        <span className="text-[13px] font-semibold text-[#6b7399] pl-[5px]">
-          {total > 0 ? `${total} result${total !== 1 ? 's' : ''}` : ''}
-        </span>
+      <div className="flex flex-col gap-[10px] flex-1 min-h-px px-4 sm:px-[30px] py-[30px]">
 
         <UsersTable
-          users={users}
+          users={pageUsers}
           error={loading ? null : error}
           loading={loading}
-          loadingMore={loadingMore}
           isEmpty={
             !loading &&
             users.length === 0 &&
@@ -230,8 +232,6 @@ export default function DashboardUsersPage() {
           sortField={sortField}
           sortDir={sortDir}
           onSort={handleSort}
-          scrollContainerRef={scrollContainerRef}
-          sentinelRef={sentinelRef}
           getRowActions={(item) => {
             const actions: any[] = [
               { label: 'Edit', onClick: () => openEditUserModal(item) },
@@ -257,30 +257,102 @@ export default function DashboardUsersPage() {
             return actions
           }}
         />
+
+        {/* Footer — same pagination bar as the audit log */}
+        <div className="shrink-0 flex-none flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white border border-[#eceef8] rounded-[14px] shadow-[0_2px_12px_rgba(30,58,138,0.06),0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-[12.5px] font-medium text-[#5a6382]">
+              <span className="hidden sm:inline">Rows per page</span>
+              <span className="sm:hidden">Rows</span>
+              <select
+                value={filters.perPage}
+                onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                className="h-[32px] px-2.5 pr-7 bg-white border border-[#e8ebf8] rounded-[9px] text-[13px] font-semibold text-[#1e2145] focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.18)] focus:border-[#707dff] transition-all"
+                aria-label="Rows per page"
+              >
+                {[10, 25, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="hidden md:inline text-[12px] text-[#8a93b4] border-l border-[#f0f2fa] pl-3">
+              {total > users.length
+                ? `first ${users.length} of ${total} total — refine filters`
+                : `${total} total`}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12.5px] font-medium text-[#5a6382] hidden sm:inline">Page</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value)}
+                onBlur={commitPageInput}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commitPageInput()
+                    ;(e.target as HTMLInputElement).blur()
+                  }
+                }}
+                className="w-[64px] h-[32px] px-2 text-center bg-white border border-[#e8ebf8] rounded-[9px] text-[13px] font-semibold text-[#1e2145] focus:outline-none focus:ring-2 focus:ring-[rgba(112,125,255,0.18)] focus:border-[#707dff] transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                aria-label="Page number"
+              />
+              <span className="text-[12.5px] font-medium text-[#8a93b4] whitespace-nowrap">/ {totalPages}</span>
+            </div>
+
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                type="button"
+                onClick={() => goToPage(page - 1)}
+                disabled={page <= 1 || loading}
+                aria-label="Previous page"
+                className="inline-flex items-center justify-center size-[32px] rounded-[9px] bg-white border border-[#e8ebf8] text-[#5a6382] hover:bg-[#fafbff] hover:border-[#dfe3fb] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="size-[14px]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => goToPage(page + 1)}
+                disabled={page >= totalPages || loading}
+                aria-label="Next page"
+                className="inline-flex items-center justify-center size-[32px] rounded-[9px] bg-white border border-[#e8ebf8] text-[#5a6382] hover:bg-[#fafbff] hover:border-[#dfe3fb] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="size-[14px]" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <AddUserModal
         isOpen={modal === 'add'}
         onClose={closeModal}
-        onSuccess={() => fetchPage(1)}
+        onSuccess={refreshAfterMutation}
       />
 
       <EditUserModal
         user={selectedUser}
         onClose={closeModal}
-        onSuccess={() => fetchPage(1)}
+        onSuccess={refreshAfterMutation}
       />
 
       <DeleteUserModal
         user={deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onSuccess={() => fetchPage(1)}
+        onSuccess={refreshAfterMutation}
       />
 
       <ConfirmChairModal
         user={chairConfirmTarget}
         onClose={() => setChairConfirmTarget(null)}
-        onSuccess={() => fetchPage(1)}
+        onSuccess={refreshAfterMutation}
       />
     </div>
   )

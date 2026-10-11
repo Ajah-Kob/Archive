@@ -54,6 +54,7 @@ export function ProgressOverview({ groups }: ProgressOverviewProps) {
                     <UserProfile
                       initials={getInitials(group.adviser.name)}
                       name={group.adviser.name}
+                      honorific={(group.adviser as any).honorific ?? null}
                       email={group.adviser.email}
                     />
                   ) : (

@@ -7,7 +7,7 @@ import { CoordinatorDetailsSkeleton } from '@/components/faculty/drawer/Coordina
 import { ActivityStatus } from '@/components/ui/ActivityStatus'
 import { Drawer } from '@/components/ui/Drawer'
 import { useCoordinatorDetailDrawer } from '@/store/useCoordinatorDetailDrawer'
-import { getInitials } from '@/lib/helper'
+import { getInitials, displayNameWithHonorific } from '@/lib/helper'
 import { getCoordinatorDetail } from '@/lib/actions/coordinator'
 
 interface CoordinatorSection {
@@ -79,7 +79,7 @@ export function CoordinatorDetailsDrawer() {
                 <div className="flex flex-col gap-[6px] min-w-0">
                   <div className="flex items-center gap-[8px]">
                     <p className="font-heading font-bold text-[16px] leading-[24px] text-[#10133a] truncate">
-                      {detail.name}
+                      {displayNameWithHonorific(detail.name, (detail as any).honorific ?? null)}
                     </p>
                     <span className="px-[9px] py-[3px] bg-[#f4f6ff] border border-[#e5e8ff] rounded-full font-sans font-semibold text-[10.5px] leading-[15.75px] text-[#707dff] whitespace-nowrap">
                       Coordinator

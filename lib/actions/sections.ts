@@ -182,6 +182,7 @@ async function getSectionsData() {
               id: coordinator.id,
               initials: getInitials(user.name),
               name: user.name,
+              honorific: (faculty as any).honorific ?? null,
               email: user.email,
               avatarGradient: user.avatarGradient,
             }
@@ -210,7 +211,7 @@ export interface SectionGroupProgress {
   id: number
   name: string
   memberCount: number
-  adviser: { name: string; email: string; image: string | null } | null
+  adviser: { name: string; honorific?: string | null; email: string; image: string | null } | null
   journey: JourneyRow[]
 }
 
@@ -723,6 +724,7 @@ async function getCoordinatorSectionData(sectionId: number) {
       adviser: g.adviser
         ? {
             name: g.adviser.faculty.user.name,
+            honorific: (g.adviser.faculty as any).honorific ?? null,
             email: g.adviser.faculty.user.email,
             image: g.adviser.faculty.user.image,
           }
@@ -2094,7 +2096,7 @@ export interface SectionGroupDetail {
   name: string
   capstone2OpenedAt: string | null
   members: SectionGroupMember[]
-  adviser: { name: string; email: string; image: string | null } | null
+  adviser: { name: string; honorific?: string | null; email: string; image: string | null } | null
   topic: SectionGroupTopic | null
   journey: JourneyRow[]
   chapters: SectionGroupChapter[]
@@ -2299,6 +2301,7 @@ export async function getCoordinatorGroupDetail(groupId: number) {
         adviser: group.adviser
           ? {
               name: group.adviser.faculty.user.name,
+              honorific: (group.adviser.faculty as any).honorific ?? null,
               email: group.adviser.faculty.user.email,
               image: group.adviser.faculty.user.image,
             }

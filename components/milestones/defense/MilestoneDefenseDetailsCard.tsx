@@ -247,6 +247,7 @@ function PanelistRow({ panelist, verdict, isFirst, isLast }: PanelistRowProps) {
         <UserProfile
           initials={getInitials(panelist.name)}
           name={panelist.name}
+          honorific={(panelist as any).honorific ?? null}
           email={panelist.email}
           gradient={panelist.avatarGradient ?? PANELIST_AVATAR_GRADIENT}
           avatarClassName="size-[35px]"

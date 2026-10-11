@@ -69,6 +69,7 @@ export function SectionCard({
           <UserProfile
             initials={data.coordinator.initials}
             name={data.coordinator.name}
+            honorific={(data.coordinator as any).honorific ?? null}
             email={data.coordinator.email}
             gradient={data.coordinator.avatarGradient}
           />

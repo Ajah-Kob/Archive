@@ -99,6 +99,7 @@ export function FacultyList({ advisersOnly = false }: { advisersOnly?: boolean }
         userId: m.userId,
         initials: getInitials(m.name),
         name: m.name,
+        honorific: (m as any).honorific ?? null,
         email: m.email,
         avatarGradient: (m as any).avatarGradient,
         activityStatus: m.activityStatus,

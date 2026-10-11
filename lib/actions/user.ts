@@ -84,7 +84,7 @@ async function getUsersData(
         skip,
         take: perPage,
         orderBy,
-        include: { faculty: { select: { isProgramChair: true } } },
+        include: { faculty: { select: { isProgramChair: true, honorific: true } } },
       }),
       prisma[table].count({ where }),
     ])

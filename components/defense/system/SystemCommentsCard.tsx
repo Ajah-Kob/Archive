@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { MessageSquare, Trash2, AlertTriangle } from 'lucide-react'
-import { getInitials, timeAgo } from '@/lib/helper'
+import { getInitials, timeAgo, displayNameWithHonorific } from '@/lib/helper'
 import { deleteSystemComment } from '@/lib/actions/system-links'
 import { SystemCommentComposer } from './SystemCommentComposer'
 
@@ -12,7 +12,7 @@ export interface SystemCommentItem {
   id: number
   body: string
   createdAt: Date | string
-  author: { name: string }
+  author: { name: string; honorific?: string | null }
   authorId: number
 }
 
@@ -82,7 +82,7 @@ export function SystemCommentsCard({
                 {getInitials(c.author.name)}
               </span>
               <span className="font-sans text-[12px] font-bold text-[#2c3159]">
-                {c.author.name}
+                {displayNameWithHonorific(c.author.name, (c.author as any).honorific ?? null)}
               </span>
               <span className="font-sans text-[11px] text-[#8a93b4]">
                 {timeAgo(c.createdAt)}

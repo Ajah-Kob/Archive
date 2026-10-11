@@ -38,7 +38,19 @@ export type GetAuditLogsParams = {
   entity?: string // exact match
   from?: Date | string | null // from AppDateRangePicker — start Date (inclusive)
   to?: Date | string | null // to AppDateRangePicker — end Date (inclusive)
+  sortField?: string // one of createdAt, actorName, action, entity, entityName, ip
+  sortDir?: "asc" | "desc"
+  all?: boolean // full filtered set (capped) for client-side sort/paginate
 }
+
+const AUDIT_SORT_FIELDS = new Set([
+  "createdAt",
+  "actorName",
+  "action",
+  "entity",
+  "entityName",
+  "ip",
+])
 
 export type GetAuditLogsResult = {
   success: boolean
@@ -109,12 +121,17 @@ async function getAuditLogsData(params: GetAuditLogsParams): Promise<GetAuditLog
 
     const skip = (page - 1) * perPage
 
+    const sortField = AUDIT_SORT_FIELDS.has(params.sortField ?? "")
+      ? (params.sortField as "createdAt" | "actorName" | "action" | "entity" | "entityName" | "ip")
+      : "createdAt"
+    const sortDir = params.sortDir === "asc" ? "asc" : "desc"
+
     const [logs, totalCount] = await prisma.$transaction([
       prisma.auditLog.findMany({
         where: where as any,
         skip,
         take: perPage,
-        orderBy: { createdAt: "desc" },
+        orderBy: { [sortField]: sortDir },
       }),
       prisma.auditLog.count({ where: where as any }),
     ])

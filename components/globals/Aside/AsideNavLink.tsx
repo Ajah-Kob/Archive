@@ -126,6 +126,17 @@ export function NavLinks({
           icon: Archive,
           show: isAdmin || isProgramChair,
         },
+      ],
+    },
+    {
+      label: 'ADMIN',
+      items: [
+        {
+          label: 'Users',
+          href: '/admin/users',
+          icon: UserCog,
+          show: isAdmin,
+        },
         {
           label: 'Audit Logs',
           href: '/admin/audit',

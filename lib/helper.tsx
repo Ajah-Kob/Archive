@@ -119,3 +119,14 @@ export function formatDateTime(iso: string): string {
     minute: '2-digit',
   })
 }
+
+// Prefixes a name with a faculty honorific ("Dr.", "Engr.", "Prof.").
+// Empty or whitespace-only honorific returns the name unchanged.
+export function displayNameWithHonorific(
+  name: string | null | undefined,
+  honorific: string | null | undefined,
+): string {
+  const clean = (honorific ?? '').trim()
+  if (!clean) return name ?? ''
+  return `${clean} ${name ?? ''}`.trim()
+}

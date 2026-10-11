@@ -326,11 +326,9 @@ export function CalendarSkeleton() {
                       key={d}
                       className="flex-1 min-h-0 rounded-[4px] border border-[#f2f4fb] flex flex-col items-center gap-[2px] p-[2px]"
                     >
-                      <div
-                        className={`size-[9px] shrink-0 rounded-full ${seeded === 0 ? 'bg-[#707dff]' : BLOCK}`}
-                      />
+                      <div className={`size-[9px] shrink-0 rounded-full ${BLOCK}`} />
                       {seeded < 3 ? (
-                        <div className="h-[3px] w-full shrink-0 rounded bg-[#dfe3fb]" />
+                        <div className={`h-[3px] w-full shrink-0 rounded ${BLOCK}`} />
                       ) : null}
                     </div>
                   )

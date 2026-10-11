@@ -229,7 +229,7 @@ export function GroupProgressDrawer({ groupId, onClose }: GroupProgressDrawerPro
                 <SectionHeading>Adviser</SectionHeading>
                 {detail.adviser ? (
                   <div className="border border-[#eceef8] rounded-[9px] px-[14px] py-[11px]">
-                    <UserProfile initials={getInitials(detail.adviser.name)} name={detail.adviser.name} email={detail.adviser.email} />
+                    <UserProfile initials={getInitials(detail.adviser.name)} name={detail.adviser.name} honorific={(detail.adviser as any).honorific ?? null} email={detail.adviser.email} />
                   </div>
                 ) : (
                   <p className="font-sans font-medium italic text-[12.5px] leading-[18.75px] text-[#c4cadf]">No adviser assigned yet.</p>

@@ -111,6 +111,7 @@ export function CoordinatorTable({
               <UserProfile
                 initials={coordinator.initials}
                 name={coordinator.name}
+                honorific={(coordinator as any).honorific ?? null}
                 email={coordinator.email}
                 gradient={coordinator.avatarGradient}
                 badge={coordinator.userId === viewerUserId ? 'You' : undefined}
@@ -192,6 +193,7 @@ export function CoordinatorTable({
               <UserProfile
                 initials={coordinator.initials}
                 name={coordinator.name}
+                honorific={(coordinator as any).honorific ?? null}
                 email={coordinator.email}
                 gradient={coordinator.avatarGradient}
                 badge={

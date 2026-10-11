@@ -96,6 +96,7 @@ export function FacultyTable({
                 <UserProfile
                   initials={member.initials}
                   name={member.name}
+                  honorific={(member as any).honorific ?? null}
                   email={member.email}
                   gradient={member.avatarGradient}
                   badge={member.userId === viewerUserId ? 'You' : undefined}

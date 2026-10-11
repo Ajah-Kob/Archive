@@ -7,7 +7,7 @@ import { cacheTag, cacheLife, revalidateTag } from 'next/cache'
 import { requireStudent, unauthorized } from '@/lib/actions/guard'
 import { audit } from '@/lib/actions/audit'
 import { sanitizeBlobFilename } from '@/lib/helper'
-import { sectionIdForGroup } from '@/lib/group'
+import { sectionIdForGroup, honorificsForUserIds } from '@/lib/group'
 import type {
   DefenseType,
   DefenseVerdict,
@@ -250,6 +250,10 @@ async function getStudentDefenseSessionData(
 
   if (!schedule) return null
 
+  const panelistTitles = await honorificsForUserIds(
+    schedule.panelists.map((p) => p.userId),
+  )
+
   // Per-panelist feedback for the student tab — same source rule as the
   // faculty side: the INITIAL submission's COMMITTED rows only (never
   // reset by resubmissions, never leaking DRAFT content or counts).
@@ -295,6 +299,7 @@ async function getStudentDefenseSessionData(
       return {
         userId: p.userId,
         name: p.user.name,
+        honorific: panelistTitles.get(p.userId) ?? null,
         email: p.user.email,
         image: p.user.image,
         avatarGradient: (p.user as { avatarGradient?: string | null }).avatarGradient ?? null,

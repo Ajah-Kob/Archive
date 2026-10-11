@@ -55,6 +55,7 @@ export function ManageCoodinatorDrawer() {
         id: faculty.id,
         initials: getInitials(faculty.user.name),
         name: faculty.user.name,
+        honorific: (faculty as any).honorific ?? null,
         email: faculty.user.email,
         gradient: faculty.user.avatarGradient,
         isProgramChair: faculty.isProgramChair,

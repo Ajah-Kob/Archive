@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { getAuditLogs } from '@/lib/actions/audit'
 import { AuditFilters } from './AuditFilters'
@@ -10,40 +10,50 @@ import { AuditDetailDrawer } from './AuditDetailDrawer'
 interface AuditClientProps {
   initialLogs: AuditLogRow[]
   initialTotalCount: number
-  initialTotalPages: number
   initialPerPage?: number
 }
 
 const PER_PAGE_OPTIONS = [10, 20, 50, 100] as const
 
+// Client-side sorting needs the full filtered set in memory. Bounded so one
+// huge audit history can't OOM the browser — past this, narrow with filters.
+// ponytail: full-fetch ceiling; upgrade path is server-side sort + keyset
+// pagination when audit volume outgrows it.
+const CLIENT_FETCH_LIMIT = 2000
+
+function sortValue(log: AuditLogRow, field: string): string | number {
+  if (field === 'createdAt') return new Date(log.createdAt).getTime()
+  const v = (log as unknown as Record<string, unknown>)[field]
+  return (v ?? '').toString()
+}
+
 export function AuditClient({
   initialLogs,
   initialTotalCount,
-  initialTotalPages,
   initialPerPage = 20,
 }: AuditClientProps) {
   // Filter state
   const [actorDraft, setActorDraft] = useState('')
   const [actor, setActor] = useState('')
-  const [action, setAction] = useState('')
-  const [entity, setEntity] = useState('')
   const [start, setStart] = useState<Date | null>(null)
   const [end, setEnd] = useState<Date | null>(null)
+
+  // Sort state — newest first by default
+  const [sortField, setSortField] = useState('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   // Pagination state
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState<number>(initialPerPage)
   const [pageInput, setPageInput] = useState('1')
 
-  // Data state
+  // Data state — full filtered set, sorted/paginated in memory
   const [logs, setLogs] = useState<AuditLogRow[]>(initialLogs)
   const [totalCount, setTotalCount] = useState(initialTotalCount)
-  const [totalPages, setTotalPages] = useState(initialTotalPages)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<AuditLogRow | null>(null)
 
-  const isFirstMount = useRef(true)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Keep pageInput in sync with page
@@ -70,11 +80,7 @@ export function AuditClient({
 
   const fetchLogs = useCallback(
     async (params: {
-      p: number
-      pp: number
       actorVal: string
-      actionVal: string
-      entityVal: string
       startVal: Date | null
       endVal: Date | null
     }) => {
@@ -82,18 +88,15 @@ export function AuditClient({
       setError(null)
       try {
         const res = await getAuditLogs({
-          page: params.p,
-          perPage: params.pp,
+          page: 1,
+          perPage: CLIENT_FETCH_LIMIT,
           actor: params.actorVal || undefined,
-          action: params.actionVal || undefined,
-          entity: params.entityVal || undefined,
           from: params.startVal,
           to: params.endVal,
         })
         if (res.success) {
           setLogs(res.logs as AuditLogRow[])
           setTotalCount(res.totalCount)
-          setTotalPages(res.totalPages)
         } else {
           setError(res.message ?? 'Failed to load audit logs')
         }
@@ -106,30 +109,39 @@ export function AuditClient({
     [],
   )
 
-  // Main fetch effect: server-driven pagination, filters reset to page 1
+  // Main fetch effect: filters only — sort/pagination stay in memory
   useEffect(() => {
-    if (isFirstMount.current) {
-      isFirstMount.current = false
-      return
-    }
     fetchLogs({
-      p: page,
-      pp: perPage,
       actorVal: actor,
-      actionVal: action,
-      entityVal: entity,
       startVal: start,
       endVal: end,
     })
-  }, [actor, action, entity, start, end, page, perPage, fetchLogs])
+  }, [actor, start, end, fetchLogs])
 
-  function handleActionChange(v: string) {
-    setAction(v)
-    setPage(1)
-  }
+  // Client-side sort + pagination over the fetched set — instant, no refetch
+  const sortedLogs = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...logs].sort((a, b) => {
+      const va = sortValue(a, sortField)
+      const vb = sortValue(b, sortField)
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
+      return String(va).localeCompare(String(vb)) * dir
+    })
+  }, [logs, sortField, sortDir])
 
-  function handleEntityChange(v: string) {
-    setEntity(v)
+  const totalPages = Math.max(1, Math.ceil(sortedLogs.length / perPage))
+  const pageLogs = sortedLogs.slice((page - 1) * perPage, page * perPage)
+
+  // Filters can shrink the set below the current page — clamp back
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  function handleSort(field: string) {
+    setSortDir((prev) =>
+      sortField === field ? (prev === 'asc' ? 'desc' : 'asc') : 'asc',
+    )
+    setSortField(field)
     setPage(1)
   }
 
@@ -159,17 +171,13 @@ export function AuditClient({
     else setPageInput(String(clamped))
   }
 
-  const isEmptyFilters = !actor && !action && !entity && !start && !end
+  const isEmptyFilters = !actor && !start && !end
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       <AuditFilters
         actor={actorDraft}
         onActorChange={setActorDraft}
-        actionValue={action}
-        onActionChange={handleActionChange}
-        entityValue={entity}
-        onEntityChange={handleEntityChange}
         start={start}
         end={end}
         onStartChange={handleStartChange}
@@ -180,7 +188,11 @@ export function AuditClient({
         {/* Count line */}
         <div className="flex items-center justify-between px-1 shrink-0">
           <span className="text-[13px] font-semibold text-[#6b7399]">
-            {loading ? 'Loading…' : `${totalCount} ${totalCount === 1 ? 'entry' : 'entries'}`}
+            {loading
+              ? 'Loading…'
+              : totalCount > logs.length
+                ? `Showing first ${logs.length} of ${totalCount} — refine filters to narrow results`
+                : `${totalCount} ${totalCount === 1 ? 'entry' : 'entries'}`}
           </span>
           <span className="text-[12px] font-medium text-[#8a93b4] hidden sm:inline">
             Admin-only · business writes only
@@ -189,11 +201,14 @@ export function AuditClient({
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <AuditTable
-            logs={logs}
+            logs={pageLogs}
             loading={loading}
             error={error}
             onSelect={setSelected}
             isEmpty={isEmptyFilters && logs.length === 0}
+            sortField={sortField}
+            sortDir={sortDir}
+            onSort={handleSort}
           />
         </div>
 

@@ -90,6 +90,9 @@ export const authOptions: NextAuthOptions = {
           token.email = dbUser.email
           token.image = dbUser.image
           token.role = dbUser.role
+          token.honorific =
+            (dbUser.faculty as unknown as { honorific?: string | null } | null)?.honorific?.trim() ||
+            null
           token.isProgramChair = dbUser.faculty?.isProgramChair ?? false
           token.isFaculty = !!dbUser.faculty && dbUser.faculty.deletedAt === null
           token.isStudent = !!dbUser.student && dbUser.student.deletedAt === null
@@ -111,6 +114,7 @@ export const authOptions: NextAuthOptions = {
       session.user.email = token.email as string
       session.user.image = token.image as string
       session.user.role = token.role as string
+      session.user.honorific = (token as unknown as { honorific?: string | null }).honorific ?? null
       session.user.isProgramChair = token.isProgramChair as boolean
       session.user.isFaculty = token.isFaculty as boolean
       session.user.isStudent = token.isStudent as boolean

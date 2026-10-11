@@ -32,6 +32,11 @@ async function getMeData(id: string) {
         id: +id,
         deletedAt: null,
       },
+      include: {
+        faculty: {
+          select: { id: true, honorific: true, deletedAt: true },
+        },
+      },
     })
 
     console.log(`---DB HIT: GET ME with ID: ${id} from database---`)
@@ -42,6 +47,13 @@ async function getMeData(id: string) {
         payload: [],
       }
     }
+
+    // Relation includes don't respect soft-deletes — null a removed faculty
+    // in code so non-faculty and removed-faculty behave the same.
+    const row = me as unknown as {
+      faculty?: { deletedAt: Date | null } | null
+    } & Record<string, unknown>
+    if (row.faculty?.deletedAt != null) row.faculty = null
 
     return {
       success: true,
@@ -83,6 +95,11 @@ export async function updateMe(_prevState: User, formData: FormData) {
   const name = formData.get('name')?.toString().trim() || null
   const email = formData.get('email')?.toString().trim() || null
   const image = formData.get('image')?.toString().trim() || null
+  const honorificRaw = formData.get('honorific')?.toString().trim() || null
+  const honorific =
+    honorificRaw && honorificRaw.length > 30
+      ? honorificRaw.slice(0, 30)
+      : honorificRaw
   const updatedAt = new Date()
 
   // Image handling
@@ -94,6 +111,11 @@ export async function updateMe(_prevState: User, formData: FormData) {
     // no-op save must not bump updatedAt.
     const current = await prisma[table].findFirst({
       where: { id: +id, deletedAt: null },
+      include: {
+        faculty: {
+          select: { id: true, honorific: true, deletedAt: true },
+        },
+      },
     })
     if (!current) {
       return {
@@ -102,6 +124,19 @@ export async function updateMe(_prevState: User, formData: FormData) {
         message: 'User not found.',
       }
     }
+    const currentFaculty = (
+      current as unknown as {
+        faculty?: {
+          honorific: string | null
+          deletedAt: Date | null
+        } | null
+      }
+    ).faculty
+    const liveFaculty =
+      currentFaculty?.deletedAt == null ? currentFaculty : null
+    const currentHonorific = liveFaculty?.honorific ?? null
+    const hasFaculty = liveFaculty != null
+    const honorificChanged = hasFaculty && honorific !== currentHonorific
 
     // Prepare the update data — changed columns only.
     let updateData: Record<string, any> = {}
@@ -149,7 +184,7 @@ export async function updateMe(_prevState: User, formData: FormData) {
     }
 
     // Nothing actually changed — skip the write (and the updatedAt bump).
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(updateData).length === 0 && !honorificChanged) {
       return {
         success: true,
         payload: sanitizeUser(current),
@@ -180,19 +215,48 @@ export async function updateMe(_prevState: User, formData: FormData) {
 
     updateData.updatedAt = new Date()
 
-    // Update me data
-    const updatedUser = await prisma[table].update({
-      where: {
-        id: +id,
+    // Update me data — skip the User write when only the honorific changed.
+    let updatedUser
+    if (Object.keys(updateData).length > 1) {
+      updatedUser = await prisma[table].update({
+        where: {
+          id: +id,
+        },
+        data: updateData,
+      })
+    } else {
+      updatedUser = current
+    }
+
+    if (honorificChanged) {
+      await prisma.faculty.updateMany({
+        where: { userId: +id, deletedAt: null },
+        data: { honorific },
+      })
+    }
+
+    const fresh = await prisma[table].findFirst({
+      where: { id: +id, deletedAt: null },
+      include: {
+        faculty: {
+          select: { honorific: true, deletedAt: true },
+        },
       },
-      data: updateData,
     })
+    if (
+      (fresh as unknown as { faculty?: { deletedAt: Date | null } | null })
+        ?.faculty?.deletedAt != null
+    ) {
+      ;(
+        fresh as unknown as { faculty?: unknown | null }
+      ).faculty = null
+    }
 
     revalidateTag('me', 'max')
 
     return {
       success: true,
-      payload: sanitizeUser(updatedUser),
+      payload: sanitizeUser(fresh ?? updatedUser),
       message: 'Profile updated successfully!',
     }
   } catch (error) {

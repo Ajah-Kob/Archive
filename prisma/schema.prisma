@@ -73,6 +73,7 @@ model Faculty {
   id             Int          @id @default(autoincrement())
   userId         Int          @unique
   user           User         @relation(fields: [userId], references: [id])
+  honorific      String?
   isProgramChair Boolean      @default(false)
   coordinator    Coordinator?
   adviser        Adviser?

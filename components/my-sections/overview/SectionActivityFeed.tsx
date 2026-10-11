@@ -49,46 +49,114 @@ function actionMeta(action: string) {
   return ACTION_META[action] ?? FALLBACK_META
 }
 
+function val(source: unknown, ...keys: string[]): string | null {
+  if (source == null) return null
+  if (typeof source === 'string') return source || null
+  if (typeof source !== 'object') return null
+  for (const k of keys) {
+    const v = (source as Record<string, unknown>)[k]
+    if (typeof v === 'string' && v) return v
+  }
+  return null
+}
+
+// Raw status codes never reach the reader — every outcome has a plain verb.
+function words(code: string | null): string {
+  if (!code) return 'reviewed'
+  const map: Record<string, string> = {
+    APPROVED: 'approved',
+    NEED_REVISION: 'requested revisions on',
+    MINOR_REVISION: 'approved with minor revisions',
+    MAJOR_REVISION: 'approved with major revisions',
+    REDEFENSE: 'ordered a redefense for',
+    PENDING: 'is pending for',
+  }
+  return map[code] ?? code.replace(/_/g, ' ').toLowerCase()
+}
+
+function titleCase(code: string): string {
+  return code
+    .split('_')
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(' ')
+}
+
+function openWord(after: unknown): string {
+  if (after && typeof after === 'object' && 'open' in after) {
+    return (after as { open?: unknown }).open ? 'unlocked' : 'locked'
+  }
+  return 'updated'
+}
+
+function defenseWhen(after: unknown): string {
+  const date = val(after, 'date')
+  const venue = val(after, 'venue')
+  const when = date ? formatDateTime(date) : null
+  if (when && venue) return ` on ${when} at ${venue}`
+  if (when) return ` on ${when}`
+  if (venue) return ` at ${venue}`
+  return ''
+}
+
+function defenseKind(after: unknown): string {
+  const type = val(after, 'type')
+  if (!type) return 'defense'
+  return `${type.charAt(0) + type.slice(1).toLowerCase()} defense`
+}
+
 function describe(entry: SectionActivityEntry): string {
   const name = entry.entityName ?? entry.entity
   switch (entry.action) {
-    case 'GROUP_CREATE': return 'Group created'
-    case 'GROUP_RENAME': return `Group renamed to ${name}`
+    case 'GROUP_CREATE': return `created group ${name}`
+    case 'GROUP_RENAME': {
+      const from = val(entry.before, 'groupName', 'name') ?? 'a group'
+      const to = val(entry.after, 'groupName', 'name') ?? name
+      return `renamed group ${from} to ${to}`
+    }
     case 'GROUP_JOIN': return `${name} joined the section`
     case 'GROUP_LEAVE': return `${name} left the group`
     case 'GROUP_REMOVE_MEMBER': return `${name} was removed from the group`
-    case 'GROUP_TRANSFER': return `Leadership transferred to ${name}`
-    case 'GROUP_INVITE_SEND': return `Group invitation sent to ${name}`
-    case 'GROUP_INVITE_CANCEL': return `Group invitation to ${name} cancelled`
-    case 'ADVISER_INVITE_SEND': return `Adviser invitation sent to ${name}`
-    case 'ADVISER_INVITE_CANCEL': return `Adviser invitation to ${name} cancelled`
-    case 'ADVISER_ASSIGNED': return `${name} assigned as adviser`
-    case 'SECTION_CREATE': return `Section ${name} created`
-    case 'SECTION_UPDATE': return `Section ${name} updated`
-    case 'SECTION_ARCHIVE': return `Section ${name} archived`
-    case 'SECTION_COORDINATOR_ASSIGN': return `${name} assigned as coordinator`
-    case 'SECTION_COORDINATOR_REASSIGN': return `Coordinator reassigned to ${name}`
-    case 'SECTION_JOIN_CODE_REGENERATE': return 'Join code regenerated'
-    case 'STUDENT_REMOVE_SECTION': return `${name} removed from the section`
-    case 'MILESTONE_AVAILABILITY_SET': return `Milestone ${name} ${entry.after && typeof entry.after === 'object' && 'open' in entry.after && entry.after.open ? 'unlocked' : 'locked'}`
-    case 'PHASE_AVAILABILITY_SET': return `Phase ${name} ${entry.after && typeof entry.after === 'object' && 'open' in entry.after && entry.after.open ? 'unlocked' : 'locked'}`
-    case 'CHAPTER_SUBMIT': return `${name} submitted for review`
-    case 'CHAPTER_RESUBMIT': return `${name} resubmitted for review`
-    case 'CHAPTER_REVIEW': return `${name} reviewed — ${String(entry.after ?? '').replace(/_/g, ' ').toLowerCase()}`
-    case 'DEFENSE_SCHEDULE_CREATE': return `Defense scheduled — ${name}`
-    case 'DEFENSE_SCHEDULE_UPDATE': return `Defense schedule updated — ${name}`
-    case 'DEFENSE_RESCHEDULE': return `Defense rescheduled — ${name}`
-    case 'DEFENSE_VERDICT': return `Verdict submitted — ${String(entry.after ?? '').replace(/_/g, ' ').toLowerCase()}`
-    case 'DEFENSE_DOCUMENT_SUBMIT': return `${name} submitted`
-    case 'DEFENSE_DOCUMENT_RESUBMIT': return `${name} resubmitted`
-    case 'DEFENSE_DOCUMENT_REPLACE': return `${name} replaced`
-    case 'DEFENSE_RESUBMISSION_REVIEW': return `Resubmission reviewed — ${String(entry.after ?? '').replace(/_/g, ' ').toLowerCase()}`
-    case 'ARCHIVING_SUBMIT': return `${name} submitted for archiving`
-    case 'ARCHIVING_APPROVE': return `${name} approved and published`
-    case 'TOPIC_SAVE': return `Topic saved — ${name}`
+    case 'GROUP_TRANSFER': return `transferred leadership to ${name}`
+    case 'GROUP_INVITE_SEND': return `invited ${name} to the group`
+    case 'GROUP_INVITE_CANCEL': return `cancelled the group invitation to ${name}`
+    case 'ADVISER_INVITE_SEND': return `invited ${name} as adviser`
+    case 'ADVISER_INVITE_CANCEL': return `cancelled the adviser invitation to ${name}`
+    case 'ADVISER_ASSIGNED': return `${name} accepted the adviser role`
+    case 'SECTION_CREATE': return `created section ${name}`
+    case 'SECTION_UPDATE': return `updated section ${name}`
+    case 'SECTION_ARCHIVE': return `archived section ${name}`
+    case 'SECTION_COORDINATOR_ASSIGN': return `assigned ${name} as coordinator`
+    case 'SECTION_COORDINATOR_REASSIGN': return `reassigned coordination to ${name}`
+    case 'SECTION_JOIN_CODE_REGENERATE': return 'regenerated the section join code'
+    case 'STUDENT_REMOVE_SECTION': return `removed ${name} from the section`
+    case 'MILESTONE_AVAILABILITY_SET': return `${openWord(entry.after)} milestone ${name}`
+    case 'PHASE_AVAILABILITY_SET': return `${openWord(entry.after)} phase ${name}`
+    case 'CHAPTER_SUBMIT': {
+      const file = val(entry.after, 'fileName')
+      return `submitted ${name}${file ? ` (${file})` : ''} for review`
+    }
+    case 'CHAPTER_RESUBMIT': {
+      const file = val(entry.after, 'fileName')
+      return `resubmitted ${name}${file ? ` (${file})` : ''} for review`
+    }
+    case 'CHAPTER_REVIEW': return `${words(val(entry.after, 'status'))} ${name}`
+    case 'DEFENSE_SCHEDULE_CREATE': return `scheduled the ${defenseKind(entry.after)} for ${name}${defenseWhen(entry.after)}`
+    case 'DEFENSE_SCHEDULE_UPDATE': return `updated the ${defenseKind(entry.after)} schedule for ${name}${defenseWhen(entry.after)}`
+    case 'DEFENSE_RESCHEDULE': return `rescheduled the ${defenseKind(entry.after)} for ${name}${defenseWhen(entry.after)}`
+    case 'DEFENSE_VERDICT': return `gave the verdict for ${name}: ${words(val(entry.after, 'verdict'))}`
+    case 'DEFENSE_DOCUMENT_SUBMIT': return `submitted ${name} for the defense`
+    case 'DEFENSE_DOCUMENT_RESUBMIT': return `resubmitted ${name} for the defense`
+    case 'DEFENSE_DOCUMENT_REPLACE': return `replaced ${name} for the defense`
+    case 'DEFENSE_RESUBMISSION_REVIEW': return `reviewed the resubmission for ${name} — ${words(val(entry.after, 'status'))}`
+    case 'ARCHIVING_SUBMIT': return `submitted ${name} for archiving`
+    case 'ARCHIVING_APPROVE': return `approved ${name} for the repository`
+    case 'TOPIC_SAVE': {
+      const title = val(entry.after, 'title') ?? name
+      return `set the topic of ${name} to “${title}”`
+    }
     case 'FACULTY_JOIN': return `${name} joined as faculty`
-    case 'FACULTY_REMOVE': return `${name} removed from faculty`
-    default: return entry.action.replace(/_/g, ' ').toLowerCase()
+    case 'FACULTY_REMOVE': return `${name} left the faculty`
+    default: return `${titleCase(entry.action)} — ${name}`
   }
 }
 
@@ -120,7 +188,7 @@ export function SectionActivityFeed({ entries }: { entries: SectionActivityEntry
           No activity yet. Events in this section will appear here.
         </p>
       ) : (
-        <ol className="mt-3 flex flex-col">
+        <ol className="mt-3 flex flex-col max-h-[560px] overflow-y-auto">
           {entries.map((entry, index) => {
             const { Icon, tile, tone } = actionMeta(entry.action)
             const isLast = index === entries.length - 1

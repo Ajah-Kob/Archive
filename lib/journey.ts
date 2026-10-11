@@ -141,6 +141,25 @@ function resolveDefenseJourneyState(
   return input ? deriveDefenseJourneyState(input) : 'DEFAULT'
 }
 
+// Status line under defense rows in the journey rail. Mirrors the chapter
+// wording so Proposal/Final Defense read the same as the chapters around them.
+function defenseSublabel(state: JourneyState): string | undefined {
+  switch (state) {
+    case 'APPROVED':
+      return 'Approved'
+    case 'MINOR_REVISION':
+      return 'Minor Revision'
+    case 'MAJOR_REVISION':
+      return 'Major Revision'
+    case 'REDEFENSE':
+      return 'Redefense'
+    case 'SUBMITTED':
+      return 'In Review'
+    default:
+      return undefined
+  }
+}
+
 // Statically built groupless journey (all locked) so we never allocate it per request.
 const JOURNEY_ROWS_EMPTY: JourneyRow[] = [
   { slug: 'chapter-1', label: 'Chapter 1', header: 'CAPSTONE 1', state: 'LOCKED' },
@@ -293,6 +312,7 @@ export function buildJourneyRows(
       }
       if (isOpen('PROPOSAL_DEFENSE')) {
         defense.state = resolveDefenseJourneyState(group.defenses, 'PROPOSAL')
+        defense.sublabel = defenseSublabel(defense.state)
       }
       rows.push(defense)
     } else if (chapter === 'CHAPTER_5') {
@@ -304,6 +324,7 @@ export function buildJourneyRows(
       }
       if (isOpen('FINAL_DEFENSE')) {
         defense.state = resolveDefenseJourneyState(group.defenses, 'FINAL')
+        defense.sublabel = defenseSublabel(defense.state)
       }
       rows.push(defense)
     }

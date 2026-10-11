@@ -3,6 +3,7 @@
 import { Link2 } from 'lucide-react'
 import type { PanelistSystemComment } from './SystemCommentsCard'
 import type { PanelistSystemLink } from '@/lib/actions/system-links'
+import { linksAreEditable } from '@/lib/system-links'
 import { SystemLinksCard } from './SystemLinksCard'
 import { SystemCommentsCard } from './SystemCommentsCard'
 
@@ -17,12 +18,17 @@ export function SystemTabPanel({
   links,
   commentsByLink,
   currentUserId,
+  verdict,
 }: {
   links: PanelistSystemLink[]
   commentsByLink: Record<number, PanelistSystemComment[]>
   /** Whose comments get a delete button. */
   currentUserId: number
+  /** Schedule verdict — anything but PENDING locks the discussion. */
+  verdict: string
 }) {
+  // Verdict commits everything: links, annotations, and comments alike.
+  const locked = !linksAreEditable(verdict)
   // Withdrawn links sink to the bottom but are never hidden: a panelist should
   // see that feedback was left on something the group took down.
   const ordered = [
@@ -41,6 +47,11 @@ export function SystemTabPanel({
 
   return (
     <div className="flex flex-col gap-5">
+      {locked && (
+        <div className="rounded-[10px] border border-[#e8ebf8] bg-[#fafbff] px-4 py-3 text-center font-sans text-[12.5px] font-medium text-[#8a93b4]">
+          Verdict submitted — this discussion is locked as part of the record.
+        </div>
+      )}
       <SystemLinksCard
         scheduleId={0}
         verdict=""
@@ -56,6 +67,7 @@ export function SystemTabPanel({
           initialComments={commentsByLink[link.id] ?? []}
           currentUserId={currentUserId}
           isPanelist={true}
+          locked={locked}
         />
       ))}
     </div>

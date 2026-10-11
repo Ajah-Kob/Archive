@@ -24,6 +24,7 @@ export default async function DefenseSystemTabPage({
   const linksRes = await getSystemLinksForPanelist(id)
   if (!linksRes.success) notFound()
   const links = linksRes.payload?.links ?? []
+  const verdict = linksRes.payload?.verdict ?? 'PENDING'
 
   // Drives which comments show a delete button. Read here rather than in the
   // action so the card can render the button without a second round trip.
@@ -50,6 +51,7 @@ export default async function DefenseSystemTabPage({
         links={links}
         commentsByLink={commentsByLink}
         currentUserId={currentUserId}
+        verdict={verdict}
       />
     </DefenseSessionTabPanel>
   )

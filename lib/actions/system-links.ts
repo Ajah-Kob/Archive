@@ -62,7 +62,11 @@ export async function getSystemLinksForPanelist(scheduleId: number) {
   if (!access) return { ...unauthorized, payload: null }
 
   const links = await cachedPanelistLinks(scheduleId)
-  return { success: true as const, message: '', payload: { links } }
+  return {
+    success: true as const,
+    message: '',
+    payload: { links, verdict: access.schedule.verdict },
+  }
 }
 
 async function cachedPanelistLinks(scheduleId: number) {
@@ -298,6 +302,10 @@ export async function addSystemComment(linkId: number, formData: FormData) {
   const access = await requireSchedulePanelist(link.scheduleId)
   if (!access) return unauthorized
 
+  // Verdict commits everything — links, annotations, comments alike.
+  if (!linksAreEditable(access.schedule.verdict))
+    return fail(SYSTEM_LINK_MESSAGE.LOCKED)
+
   const created = await prisma.systemLinkComment.create({
     data: { linkId, body, authorId: +access.session.user.id },
     select: {
@@ -334,6 +342,10 @@ export async function deleteSystemComment(commentId: number) {
   const access = await requireSchedulePanelist(comment.link.scheduleId)
   if (!access) return unauthorized
   if (comment.authorId !== +access.session.user.id) return unauthorized
+
+  // Verdict commits the discussion — deleting afterward rewrites history.
+  if (!linksAreEditable(access.schedule.verdict))
+    return fail(SYSTEM_LINK_MESSAGE.LOCKED)
 
   await prisma.systemLinkComment.update({
     where: { id: commentId },

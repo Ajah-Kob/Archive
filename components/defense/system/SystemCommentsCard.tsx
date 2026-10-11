@@ -23,11 +23,14 @@ export function SystemCommentsCard({
   initialComments,
   currentUserId,
   isPanelist = false,
+  locked = false,
 }: {
   linkId: number
   initialComments: SystemCommentItem[]
   currentUserId?: number
   isPanelist?: boolean
+  /** Verdict submitted — composer and deletes hide, history stays readable. */
+  locked?: boolean
 }) {
   const router = useRouter()
   const [comments, setComments] = useState<SystemCommentItem[]>(initialComments)
@@ -88,7 +91,7 @@ export function SystemCommentsCard({
                 {timeAgo(c.createdAt)}
               </span>
 
-              {currentUserId && c.authorId === currentUserId ? (
+              {currentUserId && c.authorId === currentUserId && !locked ? (
                 <button
                   type="button"
                   onClick={() => setDeletingId(c.id)}
@@ -107,7 +110,7 @@ export function SystemCommentsCard({
           ))
         )}
 
-        {isPanelist ? (
+        {isPanelist && !locked ? (
           <div className="rounded-[8px] border-2 border-dashed border-[#dfe3fb] py-1.5 px-3.5 bg-[#f7f8ff]">
             {showComposer ? (
               <SystemCommentComposer

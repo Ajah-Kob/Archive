@@ -176,19 +176,6 @@ export default function TemplatesPage({
     handleUploadComplete()
   }
 
-  const handleViewFile = (file: TemplateItem) => {
-    if (file.fileUrl && file.fileUrl !== '#') {
-      window.open(file.fileUrl, '_blank')
-    } else {
-      // Unreachable today: Template.blobUrl is non-nullable in the schema and
-      // getTemplates maps it straight through, so fileUrl is always a real blob
-      // URL. Kept as a guard against a template row without an attached file.
-      // Was a native alert() with stub copy ("Viewing <name>"), which would
-      // have read as a bug had it ever fired.
-      toast.error(`No file is attached to "${file.name}".`)
-    }
-  }
-
   const handleDownloadFile = (file: TemplateItem) => {
     const a = document.createElement('a')
     a.href = file.fileUrl
@@ -293,7 +280,6 @@ export default function TemplatesPage({
             sortDir={sortDir}
             onSort={handleSort}
             getRowActions={(item) => [
-              { label: 'View', onClick: () => handleViewFile(item) },
               { label: 'Download', onClick: () => handleDownloadFile(item) },
               ...(canRemove
                 ? [

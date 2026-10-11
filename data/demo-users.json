@@ -1,0 +1,53 @@
+{
+  "note": "Monday live-demo dataset. All passwords are 'defaultpass' (set by the seed script, not stored here). Students attach to sections in the users phase; groups, advisers and progress come in later phases.",
+  "sections": [
+    { "key": "4BG1", "name": "BSIS 4BG1", "academicYear": "2026-2027" },
+    { "key": "4BG2", "name": "BSIS 4BG2", "academicYear": "2026-2027" }
+  ],
+  "faculty": [
+    { "name": "Maria Clara Santos", "email": "maria.santos@bulsu.edu.ph", "honorific": "Dr.", "isCoordinator": true, "isProgramChair": true, "coordinatorOf": "4BG1" },
+    { "name": "Jose Ramos", "email": "jose.ramos@bulsu.edu.ph", "honorific": "Engr.", "isCoordinator": true, "isProgramChair": false, "coordinatorOf": "4BG2" },
+    { "name": "Ana Reyes", "email": "ana.reyes@bulsu.edu.ph", "honorific": "Prof.", "isCoordinator": true, "isProgramChair": false, "coordinatorOf": null },
+    { "name": "Carlo Aquino", "email": "carlo.aquino@bulsu.edu.ph", "honorific": "Dr.", "isCoordinator": false, "isProgramChair": false, "coordinatorOf": null },
+    { "name": "Liza Navarro", "email": "liza.navarro@bulsu.edu.ph", "honorific": "Engr.", "isCoordinator": false, "isProgramChair": false, "coordinatorOf": null },
+    { "name": "Karen Lim", "email": "karen.lim@bulsu.edu.ph", "honorific": "Ms.", "isCoordinator": false, "isProgramChair": false, "coordinatorOf": null },
+    { "name": "Rosa Cruz", "email": "rosa.cruz@bulsu.edu.ph", "honorific": "Mrs.", "isCoordinator": false, "isProgramChair": false, "coordinatorOf": null },
+    { "name": "Mark Villanueva", "email": "mark.villanueva@bulsu.edu.ph", "honorific": "Dr.", "isCoordinator": false, "isProgramChair": false, "coordinatorOf": null },
+    { "name": "Paulo Garcia", "email": "paulo.garcia@bulsu.edu.ph", "honorific": "Engr.", "isCoordinator": false, "isProgramChair": false, "coordinatorOf": null },
+    { "name": "Daniel Torres", "email": "daniel.torres@bulsu.edu.ph", "honorific": "Mr.", "isCoordinator": false, "isProgramChair": false, "coordinatorOf": null }
+  ],
+  "groups": [
+    { "key": "G1", "name": "Group 1", "section": "4BG1", "adviser": "carlo.aquino@bulsu.edu.ph" },
+    { "key": "G2", "name": "Group 2", "section": "4BG1", "adviser": "liza.navarro@bulsu.edu.ph" },
+    { "key": "G3", "name": "Group 3", "section": "4BG1", "adviser": "karen.lim@bulsu.edu.ph" },
+    { "key": "G4", "name": "Group 4", "section": "4BG2", "adviser": "rosa.cruz@bulsu.edu.ph" },
+    { "key": "G5", "name": "Group 5", "section": "4BG2", "adviser": null },
+    { "key": "G6", "name": "Group 6", "section": "4BG2", "adviser": null }
+  ],
+  "students": [
+    { "name": "Juan Dela Cruz", "email": "juan.delacruz@bulsu.edu.ph", "section": "4BG1", "group": "G1", "isLeader": true },
+    { "name": "Miguel Torres", "email": "miguel.torres@bulsu.edu.ph", "section": "4BG1", "group": "G1", "isLeader": false },
+    { "name": "Sofia Reyes", "email": "sofia.reyes@bulsu.edu.ph", "section": "4BG1", "group": "G1", "isLeader": false },
+    { "name": "Andrea Bautista", "email": "andrea.bautista@bulsu.edu.ph", "section": "4BG1", "group": "G1", "isLeader": false },
+    { "name": "Rafael Mendoza", "email": "rafael.mendoza@bulsu.edu.ph", "section": "4BG1", "group": "G2", "isLeader": true },
+    { "name": "Isabella Santos", "email": "isabella.santos@bulsu.edu.ph", "section": "4BG1", "group": "G2", "isLeader": false },
+    { "name": "Lucas Garcia", "email": "lucas.garcia@bulsu.edu.ph", "section": "4BG1", "group": "G2", "isLeader": false },
+    { "name": "Mia Ramos", "email": "mia.ramos@bulsu.edu.ph", "section": "4BG1", "group": "G2", "isLeader": false },
+    { "name": "Ethan Aquino", "email": "ethan.aquino@bulsu.edu.ph", "section": "4BG1", "group": "G3", "isLeader": true },
+    { "name": "Ava Navarro", "email": "ava.navarro@bulsu.edu.ph", "section": "4BG1", "group": "G3", "isLeader": false },
+    { "name": "Noah Villanueva", "email": "noah.villanueva@bulsu.edu.ph", "section": "4BG1", "group": "G3", "isLeader": false },
+    { "name": "Luna Cruz", "email": "luna.cruz@bulsu.edu.ph", "section": "4BG1", "group": "G3", "isLeader": false },
+    { "name": "Liam Fernandez", "email": "liam.fernandez@bulsu.edu.ph", "section": "4BG2", "group": "G4", "isLeader": true },
+    { "name": "Emma Salazar", "email": "emma.salazar@bulsu.edu.ph", "section": "4BG2", "group": "G4", "isLeader": false },
+    { "name": "Oliver Mercado", "email": "oliver.mercado@bulsu.edu.ph", "section": "4BG2", "group": "G4", "isLeader": false },
+    { "name": "Charlotte Aguilar", "email": "charlotte.aguilar@bulsu.edu.ph", "section": "4BG2", "group": "G4", "isLeader": false },
+    { "name": "Amelia Flores", "email": "amelia.flores@bulsu.edu.ph", "section": "4BG2", "group": "G5", "isLeader": true },
+    { "name": "Benjamin Gonzales", "email": "benjamin.gonzales@bulsu.edu.ph", "section": "4BG2", "group": "G5", "isLeader": false },
+    { "name": "Harper Castillo", "email": "harper.castillo@bulsu.edu.ph", "section": "4BG2", "group": "G5", "isLeader": false },
+    { "name": "Evelyn Morales", "email": "evelyn.morales@bulsu.edu.ph", "section": "4BG2", "group": "G5", "isLeader": false },
+    { "name": "Abigail Domingo", "email": "abigail.domingo@bulsu.edu.ph", "section": "4BG2", "group": "G6", "isLeader": true },
+    { "name": "Daniel Santiago", "email": "daniel.santiago@bulsu.edu.ph", "section": "4BG2", "group": "G6", "isLeader": false },
+    { "name": "Grace Romero", "email": "grace.romero@bulsu.edu.ph", "section": "4BG2", "group": "G6", "isLeader": false },
+    { "name": "Samuel Padilla", "email": "samuel.padilla@bulsu.edu.ph", "section": "4BG2", "group": "G6", "isLeader": false }
+  ]
+}

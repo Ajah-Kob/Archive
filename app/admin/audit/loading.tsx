@@ -37,7 +37,7 @@ export default function AdminAuditLoading() {
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            <AuditTable logs={[]} loading onSelect={() => {}} />
+            <AuditTable logs={[]} loading />
           </div>
 
           {/* Footer pinned shrink-0 — same shell as the audit page */}

@@ -24,7 +24,7 @@ interface AuditTableProps {
   logs: AuditLogRow[]
   loading?: boolean
   error?: string | null
-  onSelect: (log: AuditLogRow) => void
+  onSelect?: (log: AuditLogRow) => void
   isEmpty?: boolean
   sortField?: string
   sortDir?: 'asc' | 'desc'
@@ -291,7 +291,7 @@ export function AuditTable({ logs, loading, error, onSelect, isEmpty, sortField,
                 <button
                   key={log.id}
                   type="button"
-                  onClick={() => onSelect(log)}
+                  onClick={onSelect ? () => onSelect(log) : undefined}
                   className="grid px-[20px] min-h-[56px] py-2.5 items-center border-b border-[#f0f2fa] last:border-b-0 hover:bg-[#f8f9ff] transition-colors text-left w-full [&>*]:min-w-0"
                   style={{ gridTemplateColumns: template }}
                 >

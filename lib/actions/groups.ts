@@ -308,10 +308,11 @@ export async function getGroupContext(groupId: number): Promise<{
   }
 }
 
-// Same-section classmates who are not yet in a group and can be invited.
-// Plain server action (no 'use cache'): the picker must show current data on
-// every open — a cached entry would go stale indefinitely because no page
-// render reads this tag, and 'max'-profile revalidation is page-driven.
+// Same-section classmates, including ones already in a group (shown disabled
+// so an empty list never reads as a bug). Plain server action (no 'use
+// cache'): the picker must show current data on every open — a cached entry
+// would go stale indefinitely because no page render reads this tag, and
+// 'max'-profile revalidation is page-driven.
 export async function getAvailableClassmates(): Promise<{
   success: boolean
   message: string
@@ -331,7 +332,6 @@ export async function getAvailableClassmates(): Promise<{
   const classmates = await prisma.student.findMany({
     where: {
       sectionId: leader.sectionId,
-      groupId: null,
       deletedAt: null,
       id: { not: leader.id },
     },
@@ -364,6 +364,7 @@ export async function getAvailableClassmates(): Promise<{
     email: s.user.email,
     image: s.user.image,
     invited: invitedSet.has(s.id),
+    inGroup: s.groupId != null,
   }))
 
   return { success: true, message: '', payload }

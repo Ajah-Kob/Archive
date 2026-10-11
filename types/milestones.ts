@@ -126,6 +126,7 @@ export interface Classmate {
   email: string
   image: string | null
   invited: boolean
+  inGroup: boolean
 }
 
 export interface AdviserOption {

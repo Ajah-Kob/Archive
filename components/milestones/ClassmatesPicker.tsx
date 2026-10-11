@@ -53,6 +53,7 @@ export function ClassmatesPicker({
   }, [classmates, query])
 
   const remaining = Math.max(0, limit - selected.length)
+  const allGrouped = classmates.length > 0 && classmates.every((c) => c.inGroup || c.invited)
 
   return (
     <div className="w-full">
@@ -77,6 +78,11 @@ export function ClassmatesPicker({
       </div>
 
       <div className="pt-[10px] border border-[#eceef8] rounded-[9px] h-[312px] overflow-y-auto">
+        {allGrouped && !loading && query.trim() === '' && (
+          <p className="px-[14px] pt-[10px] font-sans font-medium text-[12px] leading-[17px] text-[#8a93b4]">
+            Everyone in your section is already in a team.
+          </p>
+        )}
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <span className="text-[12.5px] font-medium text-[#9ea8c6]">
@@ -93,7 +99,8 @@ export function ClassmatesPicker({
         ) : (
           filtered.map((c, i) => {
             const isSelected = selected.includes(c.id)
-            const isDisabled = c.invited || (!isSelected && remaining === 0)
+            const unavailable = c.invited || c.inGroup
+            const isDisabled = unavailable || (!isSelected && remaining === 0)
             return (
               <button
                 key={c.id}
@@ -127,6 +134,10 @@ export function ClassmatesPicker({
                 {c.invited ? (
                   <span className="bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.18)] rounded-[6px] px-[8px] py-[3px] text-[10.5px] font-semibold text-[#f59e0b] whitespace-nowrap">
                     Invited
+                  </span>
+                ) : c.inGroup ? (
+                  <span className="bg-[#f4f5fc] border border-[#e8ebf8] rounded-[6px] px-[8px] py-[3px] text-[10.5px] font-semibold text-[#9ea8c6] whitespace-nowrap">
+                    In a team
                   </span>
                 ) : (
                   <div

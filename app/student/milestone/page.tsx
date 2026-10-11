@@ -148,7 +148,7 @@ export default async function MilestonePage() {
       {/* Hard gate: no topic yet — dim everything and block all clicks until
           the group sets one on My Team. */}
       {topicMissing && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px] p-4">
           <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-[14px] border border-[#eceef8] bg-white p-6 text-center shadow-[0_20px_60px_rgba(16,20,58,0.3)]">
             <p className="font-heading font-bold text-[17px] leading-[24px] text-[#1e2145]">
               Topic not submitted

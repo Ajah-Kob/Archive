@@ -139,9 +139,33 @@ export default async function MilestonePage() {
     rows: workspace.journey.filter((r) => r.header === header),
   }))
 
+  const topicMissing = !(workspace as any).group?.finalTopic
+
   return (
-    <section className="h-full flex min-h-0">
+    <section className="h-full flex min-h-0 relative">
       <JoinedToast message="You've joined your section." />
+
+      {/* Hard gate: no topic yet — dim everything and block all clicks until
+          the group sets one on My Team. */}
+      {topicMissing && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px] p-4">
+          <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-[14px] border border-[#eceef8] bg-white p-6 text-center shadow-[0_20px_60px_rgba(16,20,58,0.3)]">
+            <p className="font-heading font-bold text-[17px] leading-[24px] text-[#1e2145]">
+              Topic not submitted
+            </p>
+            <p className="font-sans font-medium text-[13px] leading-[19px] text-[#5a6382]">
+              Your group has not set a research topic yet. Milestones stay
+              locked until you submit one.
+            </p>
+            <Link
+              href="/student/my-team"
+              className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#707dff] px-7 font-sans text-sm font-bold text-white shadow-[0_4px_12px_rgba(112,125,255,0.32)] transition-all hover:bg-[#5a67ff] active:scale-[0.98]"
+            >
+              Set topic
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         {/* Square padding: p-4 keeps the vertical inset equal to the 16px

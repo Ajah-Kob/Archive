@@ -57,10 +57,11 @@ function getColorLabel(colorKey: string): string {
 }
 
 // Deep-link button copy per automatic kind (href comes straight from the
-// feed). Manual events link back to /calendar itself, so they get no button —
-// Edit/Delete are their actions.
+// feed). Defenses are details-only from the calendar — no role may jump into
+// a defense session from here. Manual events link back to /calendar itself,
+// so they get no button — Edit/Delete are their actions.
 const DEEP_LINK_LABEL: Record<CalendarFeedKind, string | null> = {
-  defense: 'Open defense',
+  defense: null,
   'milestone-opened': 'Open milestone',
   'milestone-submission': 'Open submission',
   archive: 'Open in repository',

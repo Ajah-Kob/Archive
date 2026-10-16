@@ -27,7 +27,7 @@ model User {
   name                         String
   email                        String                        @unique
   image                        String?
-  avatarGradient               String     @default("linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)")
+  avatarGradient               String                        @default("linear-gradient(135deg, #707dff 0%, #5062f5 60%, #3a52ef 100%)")
   role                         Role                          @default(GUEST)
   createdAt                    DateTime                      @default(now())
   loggedInAt                   DateTime?                     @default(now())
@@ -51,8 +51,8 @@ model User {
   archivingSubmissions         ArchivingSubmission[]
   calendarEvents               CalendarEvent[]
   notifications                Notification[]
-  systemLinksCreated           DefenseSystemLink[]            @relation("SystemLinkAuthor")
-  systemLinkComments           SystemLinkComment[]            @relation("SystemCommentAuthor")
+  systemLinksCreated           DefenseSystemLink[]           @relation("SystemLinkAuthor")
+  systemLinkComments           SystemLinkComment[]           @relation("SystemCommentAuthor")
 
   @@index([email, deletedAt])
 }
@@ -98,12 +98,12 @@ model Coordinator {
 }
 
 model Adviser {
-  id        Int        @id @default(autoincrement())
-  facultyId Int        @unique
-  faculty   Faculty    @relation(fields: [facultyId], references: [id])
+  id        Int       @id @default(autoincrement())
+  facultyId Int       @unique
+  faculty   Faculty   @relation(fields: [facultyId], references: [id])
   groups    Group[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([deletedAt])
@@ -219,19 +219,19 @@ model MilestoneAvailability {
 }
 
 model Student {
-  id          Int          @id @default(autoincrement())
-  userId      Int          @unique
-  user        User         @relation(fields: [userId], references: [id])
-  sectionId   Int
-  section     Section      @relation(fields: [sectionId], references: [id])
-  groupId     Int?
-  group       Group?       @relation(fields: [groupId], references: [id])
-  ledGroup    Group?       @relation("GroupLeader")
-  topicSubmittedGroups Group[] @relation("GroupTopicSubmitter")
-  invitations Invitation[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  deletedAt   DateTime?
+  id                   Int          @id @default(autoincrement())
+  userId               Int          @unique
+  user                 User         @relation(fields: [userId], references: [id])
+  sectionId            Int
+  section              Section      @relation(fields: [sectionId], references: [id])
+  groupId              Int?
+  group                Group?       @relation(fields: [groupId], references: [id])
+  ledGroup             Group?       @relation("GroupLeader")
+  topicSubmittedGroups Group[]      @relation("GroupTopicSubmitter")
+  invitations          Invitation[]
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  deletedAt            DateTime?
 
   @@index([deletedAt])
 }
@@ -263,6 +263,7 @@ model Group {
   updatedAt           DateTime             @updatedAt
   deletedAt           DateTime?
 
+  @@unique([sectionId, groupName])
   @@index([sectionId])
   @@index([deletedAt])
 }
@@ -635,14 +636,14 @@ model AuditLog {
   entity     String
   entityId   String?
   entityName String?
-  before Json?
-  after  Json?
-  ip     String?
-  createdAt DateTime @default(now())
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
   // Section scope for the coordinator activity feed. Nullable so all
   // pre-existing rows stay valid; rows without a section never appear
   // in any section feed.
-  sectionId Int?
+  sectionId  Int?
 
   @@index([createdAt])
   @@index([actorId])
@@ -666,7 +667,7 @@ model Notification {
   href      String?
   readAt    DateTime?
   createdAt DateTime  @default(now())
-  
+
   @@index([userId])
   @@index([userId, readAt])
 }
@@ -689,11 +690,11 @@ model Notification {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model DefenseSystemLink {
-  id          Int             @id @default(autoincrement())
+  id          Int                 @id @default(autoincrement())
   scheduleId  Int
-  schedule    DefenseSchedule @relation(fields: [scheduleId], references: [id])
+  schedule    DefenseSchedule     @relation(fields: [scheduleId], references: [id])
   groupId     Int
-  group       Group           @relation(fields: [groupId], references: [id])
+  group       Group               @relation(fields: [groupId], references: [id])
   /// Free-text label chosen by the student.
   label       String
   url         String
@@ -702,10 +703,10 @@ model DefenseSystemLink {
   /// Withdrawn by the student while still unlocked, but panelist comments exist.
   removedAt   DateTime?
   createdById Int
-  createdBy   User             @relation("SystemLinkAuthor", fields: [createdById], references: [id])
+  createdBy   User                @relation("SystemLinkAuthor", fields: [createdById], references: [id])
   comments    SystemLinkComment[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   deletedAt   DateTime?
 
   @@index([scheduleId])
@@ -715,14 +716,14 @@ model DefenseSystemLink {
 }
 
 model SystemLinkComment {
-  id       Int      @id @default(autoincrement())
-  linkId   Int
-  link     DefenseSystemLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
-  authorId Int
-  author   User     @relation("SystemCommentAuthor", fields: [authorId], references: [id])
-  body     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        Int               @id @default(autoincrement())
+  linkId    Int
+  link      DefenseSystemLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    User              @relation("SystemCommentAuthor", fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
   deletedAt DateTime?
 
   @@index([linkId])

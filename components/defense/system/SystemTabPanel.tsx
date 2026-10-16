@@ -19,6 +19,7 @@ export function SystemTabPanel({
   commentsByLink,
   currentUserId,
   verdict,
+  scheduleId,
 }: {
   links: PanelistSystemLink[]
   commentsByLink: Record<number, PanelistSystemComment[]>
@@ -26,6 +27,7 @@ export function SystemTabPanel({
   currentUserId: number
   /** Schedule verdict — anything but PENDING locks the discussion. */
   verdict: string
+  scheduleId: number
 }) {
   // Verdict commits everything: links, annotations, and comments alike.
   const locked = !linksAreEditable(verdict)
@@ -53,9 +55,9 @@ export function SystemTabPanel({
         </div>
       )}
       <SystemLinksCard
-        scheduleId={0}
-        verdict=""
-        defenseLabel=""
+        scheduleId={scheduleId}
+        verdict={verdict}
+        defenseLabel="Defense"
         initialLinks={ordered as never}
         editable={false}
       />

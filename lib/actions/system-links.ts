@@ -14,6 +14,7 @@ import {
   isAllowedLinkUrl,
   linksAreEditable,
 } from '@/lib/system-links'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // The acting user must see their own write immediately, so bust rather than let
 // stale-while-revalidate serve the old value. Matches the annotations.ts form.
@@ -203,6 +204,8 @@ export async function addSystemLink(scheduleId: number, formData: FormData) {
   if (!access) return unauthorized
   if (!linksAreEditable(access.schedule.verdict))
     return fail(SYSTEM_LINK_MESSAGE.LOCKED)
+  if (!checkRateLimit(+access.session.user.id, `system-link:${scheduleId}`, 10, 60_000))
+    return fail('Too many requests. Try again in a minute.')
 
   const parsed = readLinkForm(formData)
   if ('error' in parsed) return fail(parsed.error)
@@ -305,6 +308,8 @@ export async function addSystemComment(linkId: number, formData: FormData) {
   // Verdict commits everything — links, annotations, comments alike.
   if (!linksAreEditable(access.schedule.verdict))
     return fail(SYSTEM_LINK_MESSAGE.LOCKED)
+  if (!checkRateLimit(+access.session.user.id, `system-comment:${link.scheduleId}`, 10, 60_000))
+    return fail('Too many requests. Try again in a minute.')
 
   const created = await prisma.systemLinkComment.create({
     data: { linkId, body, authorId: +access.session.user.id },

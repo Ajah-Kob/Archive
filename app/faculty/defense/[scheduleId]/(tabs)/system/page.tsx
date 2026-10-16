@@ -52,6 +52,7 @@ export default async function DefenseSystemTabPage({
         commentsByLink={commentsByLink}
         currentUserId={currentUserId}
         verdict={verdict}
+        scheduleId={id}
       />
     </DefenseSessionTabPanel>
   )

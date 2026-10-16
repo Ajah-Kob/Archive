@@ -385,17 +385,28 @@ export async function getAvailableAdvisers(): Promise<{
     where: { deletedAt: null },
     include: {
       user: { select: { id: true, name: true, email: true, image: true } },
-      adviser: {
-        include: {
-          groups: { where: { deletedAt: null }, select: { id: true } },
-        },
-      },
+      adviser: { select: { id: true } },
     },
     orderBy: { user: { name: 'asc' } },
   })
 
+  const adviserIds = faculty
+    .map((f) => f.adviser?.id)
+    .filter((id): id is number => typeof id === 'number')
+  const counts =
+    adviserIds.length > 0
+      ? await prisma.group.groupBy({
+          by: ['adviserId'],
+          where: { adviserId: { in: adviserIds }, deletedAt: null },
+          _count: { adviserId: true },
+        })
+      : []
+  const countMap = new Map<number, number>(
+    counts.map((c) => [c.adviserId!, c._count.adviserId]),
+  )
+
   const payload: AdviserOption[] = faculty.map((f) => {
-    const workload = f.adviser?.groups.length ?? 0
+    const workload = f.adviser ? (countMap.get(f.adviser.id) ?? 0) : 0
     return {
       id: f.id,
       userId: f.userId,
@@ -489,7 +500,10 @@ export async function createGroup(name: string) {
       message: 'Group created successfully.',
       payload: { groupId: group.id },
     }
-  } catch {
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'P2002') {
+      return { success: false, message: 'A group with this name already exists in your section.' }
+    }
     return { success: false, message: 'Failed to create group.' }
   }
 }
@@ -637,7 +651,10 @@ export async function renameGroup(groupId: number, name: string) {
     } catch {}
     revalidateWorkspace(+session.user.id, groupId)
     return { success: true, message: 'Group renamed successfully.' }
-  } catch {
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'P2002') {
+      return { success: false, message: 'A group with this name already exists in your section.' }
+    }
     return { success: false, message: 'Failed to rename group.' }
   }
 }

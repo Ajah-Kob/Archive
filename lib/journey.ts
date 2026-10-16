@@ -8,6 +8,9 @@
 import type { JourneyRow, JourneyState } from '@/types/milestones'
 import { CAPSTONE1_KEYS, CAPSTONE2_KEYS } from '@/lib/milestones/phase'
 
+const CAPSTONE1_SET = new Set<string>(CAPSTONE1_KEYS as unknown as string[])
+const CAPSTONE2_SET = new Set<string>(CAPSTONE2_KEYS as unknown as string[])
+
 const CHAPTER_SLUG: Record<string, string> = {
   CHAPTER_1: 'chapter-1',
   CHAPTER_2: 'chapter-2',
@@ -220,17 +223,17 @@ export function resolveSectionAvailability(
   for (const key of keys) {
     // Phase gate overrides everything — locked phase means every key in that
     // phase is locked, regardless of its explicit row.
-    if ((CAPSTONE1_KEYS as string[]).includes(key) && !capstone1Open) {
+    if (CAPSTONE1_SET.has(key) && !capstone1Open) {
       out[key] = false
       continue
     }
-    if ((CAPSTONE2_KEYS as string[]).includes(key) && !capstone2Open) {
+    if (CAPSTONE2_SET.has(key) && !capstone2Open) {
       out[key] = false
       continue
     }
     if (explicit.has(key)) {
       out[key] = explicit.get(key)!
-    } else if ((CAPSTONE2_KEYS as string[]).includes(key)) {
+    } else if (CAPSTONE2_SET.has(key)) {
       out[key] = capstone2Open
     } else {
       out[key] = false

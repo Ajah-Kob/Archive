@@ -42,6 +42,7 @@ export function SystemCommentsCard({
     if (deletingId === null) return
     setIsDeleting(true)
     const targetId = deletingId
+    const previous = comments
     // Optimistic remove
     setComments((prev) => prev.filter((c) => c.id !== targetId))
     setDeletingId(null)
@@ -53,8 +54,8 @@ export function SystemCommentsCard({
       router.refresh()
     } else {
       toast.error(res.message)
-      // Revert if failed
-      setComments(initialComments)
+      // Revert to state before optimistic update (not stale initialComments)
+      setComments(previous)
     }
   }
 

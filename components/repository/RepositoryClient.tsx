@@ -11,10 +11,6 @@ import {
   Plus,
   Loader2,
   Upload,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   ChevronDown,
 } from 'lucide-react'
 import { FloatingActionButton } from '@/components/ui/FloatingActionButton'
@@ -27,7 +23,12 @@ import UploadArchiveModal from '@/components/repository/UploadArchiveModal'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { DeleteArchiveModal } from '@/components/repository/DeleteArchiveModal'
 import { EditArchiveModal } from '@/components/repository/EditArchiveModal'
-import { formatAuthorsForRepository, formatRepositoryDate } from '@/lib/archiving/validation'
+import { RepositoryDetailsModal } from '@/components/repository/RepositoryDetailsModal'
+import { RepositoryPagination } from '@/components/repository/RepositoryPagination'
+import {
+  formatAuthorsForRepository,
+  formatRepositoryDate,
+} from '@/lib/archiving/validation'
 import { AppDateRangePicker } from '@/components/ui/AppDateRangePicker'
 import { toast } from 'sonner'
 import {
@@ -43,81 +44,6 @@ interface RepositoryClientProps {
   favoriteIds: number[]
   /** False for signed-out visitors — the star is rendered disabled. */
   canFavorite: boolean
-}
-
-// Repository empty states use the shared component below.
-
-function DetailsModal({ item, onClose }: { item: RepositoryArchiveRow | null; onClose: () => void }) {
-  if (!item) return null
-  const authors = Array.isArray(item.authorOrder) ? item.authorOrder : []
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} role="presentation">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Paper details"
-        className="relative w-full max-w-[640px] max-h-[80vh] bg-white rounded-[14px] shadow-[0_24px_64px_rgba(16,19,58,0.16)] border border-[#eceef8] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-[#f0f2fa] shrink-0">
-          <h2 className="font-heading font-bold text-[15px] leading-[22px] text-[#10133a]">Paper Details</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close details"
-            className="size-[30px] rounded-[10px] bg-[#fafbff] border border-[#eceef8] flex items-center justify-center hover:bg-gray-50 transition-colors"
-          >
-            <X className="size-[14px] text-[#8a93b4]" strokeWidth={2} />
-          </button>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 flex flex-col gap-6">
-          <div>
-            <p className="font-heading font-bold text-[11px] uppercase tracking-wider text-[#bbc0d8] mb-2">Research Title</p>
-            <p className="font-sans font-bold text-[14px] leading-[20px] text-[#1e2145] break-words">{item.title}</p>
-          </div>
-
-          <div>
-            <p className="font-heading font-bold text-[11px] uppercase tracking-wider text-[#bbc0d8] mb-2">Abstract / Overview</p>
-            <p className="font-sans text-[13px] leading-[20px] text-[#5a6382] whitespace-pre-wrap break-words">{item.abstract ?? 'No abstract provided.'}</p>
-          </div>
-
-          <div>
-            <p className="font-heading font-bold text-[11px] uppercase tracking-wider text-[#bbc0d8] mb-2">Authors</p>
-            {authors.length === 0 ? (
-              <p className="font-sans text-[12.5px] text-[#9ea8c6]">No authors</p>
-            ) : (
-              <div className="border border-[#e8ebf8] rounded-[10px] divide-y divide-[#f0f2fa] overflow-hidden bg-white">
-                {authors.map((a, idx) => (
-                  <div key={`${a.email}-${idx}`} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="flex items-center justify-center size-[22px] rounded-full bg-[#f4f6ff] border border-[#e5e8ff] font-sans font-bold text-[10px] text-[#707dff] shrink-0">
-                      {idx + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-sans font-semibold text-[12.5px] leading-[18px] text-[#1e2145] truncate">
-                        {a.lastName ? `${a.lastName}, ${a.firstName ?? ''}`.trim() : a.firstName ?? '—'}
-                      </p>
-                      <p className="font-sans text-[11.5px] leading-[14px] text-[#8a93b4] truncate">{a.email ?? '—'}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-2.5 border-t border-[#f0f2fa] px-6 py-4 shrink-0 bg-white">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-[36px] px-[16px] rounded-[9px] bg-white border border-[#e8ebf8] font-sans font-semibold text-[13px] text-[#5a6382] hover:bg-[#f8f9ff] transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 const PER_PAGE = 10
@@ -139,99 +65,6 @@ const SORT_OPTIONS = [
 
 type SortValue = (typeof SORT_OPTIONS)[number]['value']
 
-/** How many numbered buttons to show at once, centred on the current page. */
-const PAGE_WINDOW = 5
-
-/**
- * `<<  <  1 2 3 4 5  >  >>`
- *
- * Scoped to the repository for now. The audit log has its own, different
- * control (a "Page [n] / total" field with prev/next only) — if this numbered
- * style is wanted everywhere, both should be folded into one shared component
- * rather than left as two.
- */
-function RepositoryPagination({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number
-  totalPages: number
-  onChange: (page: number) => void
-}) {
-  if (totalPages <= 1) return null
-
-  const half = Math.floor(PAGE_WINDOW / 2)
-  const end = Math.min(totalPages, page + half)
-  // Keep the window full width once either end is in view.
-  const start = Math.max(1, end - PAGE_WINDOW + 1)
-  const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i)
-
-  const btn =
-    'inline-flex items-center justify-center size-[32px] rounded-[9px] bg-white border border-[#e8ebf8] text-[#5a6382] hover:bg-[#fafbff] hover:border-[#dfe3fb] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0'
-  const numBtn = `${btn} text-[13px] font-semibold`
-  const activeBtn =
-    'inline-flex items-center justify-center size-[32px] rounded-[9px] bg-[#707dff] border border-[#707dff] text-white text-[13px] font-semibold shrink-0'
-
-  return (
-    <nav
-      aria-label="Repository pages"
-      className="flex items-center justify-center gap-[6px] pt-[4px] overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      <button
-        type="button"
-        onClick={() => onChange(1)}
-        disabled={page <= 1}
-        aria-label="First page"
-        className={btn}
-      >
-        <ChevronsLeft className="size-[14px]" />
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange(page - 1)}
-        disabled={page <= 1}
-        aria-label="Previous page"
-        className={btn}
-      >
-        <ChevronLeft className="size-[14px]" />
-      </button>
-
-      {pages.map((p) => (
-        <button
-          key={p}
-          type="button"
-          onClick={() => onChange(p)}
-          aria-label={`Page ${p}`}
-          aria-current={p === page ? 'page' : undefined}
-          className={p === page ? activeBtn : numBtn}
-        >
-          {p}
-        </button>
-      ))}
-
-      <button
-        type="button"
-        onClick={() => onChange(page + 1)}
-        disabled={page >= totalPages}
-        aria-label="Next page"
-        className={btn}
-      >
-        <ChevronRight className="size-[14px]" />
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange(totalPages)}
-        disabled={page >= totalPages}
-        aria-label="Last page"
-        className={btn}
-      >
-        <ChevronsRight className="size-[14px]" />
-      </button>
-    </nav>
-  )
-}
-
 export function RepositoryClient({
   archives,
   isAdmin = false,
@@ -246,8 +79,12 @@ export function RepositoryClient({
   const [dateTo, setDateTo] = useState<Date | null>(null)
   const [selected, setSelected] = useState<RepositoryArchiveRow | null>(null)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<RepositoryArchiveRow | null>(null)
-  const [editTarget, setEditTarget] = useState<RepositoryArchiveRow | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<RepositoryArchiveRow | null>(
+    null,
+  )
+  const [editTarget, setEditTarget] = useState<RepositoryArchiveRow | null>(
+    null,
+  )
   const [favoriteIdsState, setFavoriteIdsState] = useState<Set<number>>(
     () => new Set(favoriteIds),
   )
@@ -293,7 +130,9 @@ export function RepositoryClient({
     })
     markPending(item.id, true)
 
-    const result = next ? await favoriteArchive(item.id) : await unfavoriteArchive(item.id)
+    const result = next
+      ? await favoriteArchive(item.id)
+      : await unfavoriteArchive(item.id)
 
     if (!result?.success) {
       // Roll back to whatever the server last confirmed.
@@ -330,11 +169,18 @@ export function RepositoryClient({
         if (toMs !== null && published > toMs) return false
       }
       if (!term) return true
-      const authorsFormatted = formatAuthorsForRepository(item.authorOrder).toLowerCase()
+      const authorsFormatted = formatAuthorsForRepository(
+        item.authorOrder,
+      ).toLowerCase()
       const tagsJoined = item.tags.join(' ').toLowerCase()
       const title = item.title.toLowerCase()
       const abstract = (item.abstract ?? '').toLowerCase()
-      return title.includes(term) || authorsFormatted.includes(term) || abstract.includes(term) || tagsJoined.includes(term)
+      return (
+        title.includes(term) ||
+        authorsFormatted.includes(term) ||
+        abstract.includes(term) ||
+        tagsJoined.includes(term)
+      )
     })
 
     // Sorting happens after filtering so the order is stable for the current page
@@ -344,21 +190,47 @@ export function RepositoryClient({
     const sorted = [...list]
     switch (sortValue) {
       case 'newest':
-        sorted.sort((a, b) => new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        sorted.sort(
+          (a, b) =>
+            new Date(b.datePublished).getTime() -
+            new Date(a.datePublished).getTime(),
+        )
         break
       case 'oldest':
-        sorted.sort((a, b) => new Date(a.datePublished).getTime() - new Date(b.datePublished).getTime())
+        sorted.sort(
+          (a, b) =>
+            new Date(a.datePublished).getTime() -
+            new Date(b.datePublished).getTime(),
+        )
         break
       case 'az':
-        sorted.sort((a, b) => a.title.localeCompare(b.title) || new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        sorted.sort(
+          (a, b) =>
+            a.title.localeCompare(b.title) ||
+            new Date(b.datePublished).getTime() -
+              new Date(a.datePublished).getTime(),
+        )
         break
       case 'za':
-        sorted.sort((a, b) => b.title.localeCompare(a.title) || new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime())
+        sorted.sort(
+          (a, b) =>
+            b.title.localeCompare(a.title) ||
+            new Date(b.datePublished).getTime() -
+              new Date(a.datePublished).getTime(),
+        )
         break
     }
 
     return sorted
-  }, [archives, searchTerm, favoritesOnly, favoriteIdsState, dateFrom, dateTo, sortValue])
+  }, [
+    archives,
+    searchTerm,
+    favoritesOnly,
+    favoriteIdsState,
+    dateFrom,
+    dateTo,
+    sortValue,
+  ])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
 
@@ -379,7 +251,9 @@ export function RepositoryClient({
   // An inverted range matches nothing; the alert explains why the list is
   // empty instead of leaving a bare "No Results Found".
   const isDateRangeInvalid =
-    dateFrom !== null && dateTo !== null && dateFrom.getTime() > dateTo.getTime()
+    dateFrom !== null &&
+    dateTo !== null &&
+    dateFrom.getTime() > dateTo.getTime()
 
   const clearDateRange = () => {
     setDateFrom(null)
@@ -466,7 +340,7 @@ export function RepositoryClient({
             ml-auto keeps Favorites hard right; flex-wrap lets the row reflow on
             narrow screens instead of overflowing, since this is one line at
             every width rather than a mobile-only control. */}
-<div className="flex flex-wrap items-center gap-x-[10px] gap-y-[8px] shrink-0">
+        <div className="flex flex-wrap items-center gap-x-[10px] gap-y-[8px] shrink-0">
           <div className="relative shrink-0">
             <select
               id="repository-sort"
@@ -509,7 +383,9 @@ export function RepositoryClient({
               aria-hidden="true"
             />
             Favorites
-            <span className="tabular-nums opacity-70">({favoriteIdsState.size})</span>
+            <span className="tabular-nums opacity-70">
+              ({favoriteIdsState.size})
+            </span>
           </button>
         </div>
 
@@ -542,7 +418,9 @@ export function RepositoryClient({
             {paged.map((item) => {
               const authorsLine = formatAuthorsForRepository(item.authorOrder)
               const dateLabel = formatRepositoryDate(item.datePublished)
-              const tags = Array.isArray(item.tags) ? item.tags.filter((t) => t.trim().length > 0) : []
+              const tags = Array.isArray(item.tags)
+                ? item.tags.filter((t) => t.trim().length > 0)
+                : []
               const isFavoritePending = pendingFavoriteIds.has(item.id)
               return (
                 <div
@@ -562,7 +440,10 @@ export function RepositoryClient({
                   }}
                   className="bg-white rounded-[12px] shadow-[0px_1px_4px_0px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_28px_rgba(112,125,255,0.16)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex overflow-hidden w-full"
                 >
-                  <div className="w-[5px] bg-[#707dff] shrink-0 self-stretch rounded-l-[12px]" aria-hidden="true" />
+                  <div
+                    className="w-[5px] bg-[#707dff] shrink-0 self-stretch rounded-l-[12px]"
+                    aria-hidden="true"
+                  />
                   <div className="flex-1 min-w-0 p-[20px] flex flex-col gap-[12px]">
                     <div className="flex items-start justify-between gap-2">
                       <h2 className="flex-1 min-w-0 font-heading font-bold text-[15px] leading-[21.75px] tracking-[-0.15px] text-[#10133a] break-words line-clamp-3">
@@ -608,7 +489,9 @@ export function RepositoryClient({
                         ))}
                       </div>
                     ) : (
-                      <p className="font-sans text-[11px] leading-[16px] text-[#bbc0d8]">No tags</p>
+                      <p className="font-sans text-[11px] leading-[16px] text-[#bbc0d8]">
+                        No tags
+                      </p>
                     )}
 
                     <div className="border-t border-[#f0f2fa] pt-[12px] mt-[4px] flex flex-wrap justify-end gap-[10px]">
@@ -623,7 +506,9 @@ export function RepositoryClient({
                             ? `Remove ${item.title} from favorites`
                             : `Add ${item.title} to favorites`
                         }
-                        title={canFavorite ? undefined : 'Sign in to save favorites'}
+                        title={
+                          canFavorite ? undefined : 'Sign in to save favorites'
+                        }
                         className={`inline-flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[9px] border font-sans font-bold text-[12.5px] leading-none transition-colors disabled:cursor-not-allowed ${
                           isFavoritePending
                             ? 'opacity-70'
@@ -657,7 +542,10 @@ export function RepositoryClient({
                         aria-label="View details"
                         className="inline-flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[9px] bg-white border border-[#dfe3fb] font-sans font-bold text-[12.5px] leading-none text-[#5a6382] hover:bg-[#f8f9ff] transition-colors"
                       >
-                        <Eye className="size-[12px] text-[#5a6382]" strokeWidth={2} />
+                        <Eye
+                          className="size-[12px] text-[#5a6382]"
+                          strokeWidth={2}
+                        />
                         Details
                       </button>
                       <button
@@ -666,7 +554,10 @@ export function RepositoryClient({
                         aria-label="Open document"
                         className="inline-flex items-center justify-center gap-[6px] h-[32px] px-[12px] rounded-[9px] bg-white border border-[#dfe3fb] font-sans font-bold text-[12.5px] leading-none text-[#5a6382] hover:bg-[#f8f9ff] transition-colors"
                       >
-                        <ExternalLink className="size-[12px] text-[#5a6382]" strokeWidth={2} />
+                        <ExternalLink
+                          className="size-[12px] text-[#5a6382]"
+                          strokeWidth={2}
+                        />
                         Open
                       </button>
                     </div>
@@ -684,9 +575,15 @@ export function RepositoryClient({
         />
       </div>
 
-      <DetailsModal item={selected} onClose={() => setSelected(null)} />
+      <RepositoryDetailsModal
+        item={selected}
+        onClose={() => setSelected(null)}
+      />
 
-      <DeleteArchiveModal archive={deleteTarget} onClose={() => setDeleteTarget(null)} />
+      <DeleteArchiveModal
+        archive={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+      />
 
       {isAdmin ? (
         <EditArchiveModal
@@ -708,18 +605,18 @@ export function RepositoryClient({
             router.refresh()
           }}
         />
-        ) : null}
+      ) : null}
 
-        {/* Mobile stand-in for the Upload Research button in the bar. Same gate. */}
-        {isAdmin ? (
-          <FloatingActionButton
-            icon={<Upload className="size-6" strokeWidth={2} />}
-            label="Upload Research"
-            onClick={() => setIsUploadOpen(true)}
-          />
-        ) : null}
-      </>
-    )
+      {/* Mobile stand-in for the Upload Research button in the bar. Same gate. */}
+      {isAdmin ? (
+        <FloatingActionButton
+          icon={<Upload className="size-6" strokeWidth={2} />}
+          label="Upload Research"
+          onClick={() => setIsUploadOpen(true)}
+        />
+      ) : null}
+    </>
+  )
 }
 
 export default RepositoryClient
